@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import type { Tuning } from '../config/tuning';
 import { lerp } from '../sim/core/math';
-import { PLAYER_SOURCE, type SimEvent } from '../sim/events';
+import type { SimEvent } from '../sim/events';
+import { PLAYER_ID } from '../sim/state';
 import type { World } from '../sim/gen/world';
 import { GUARD_FIELDS, type Snapshot } from '../sim/sim';
 import { Blocks } from '../sim/world/colliders';
@@ -149,7 +150,7 @@ export class DebugLayer {
       ring.radius = e.radius;
       ring.start = time;
       ring.active = true;
-      ring.material.color.set(e.source === PLAYER_SOURCE ? palette.debug.stepPlayer : palette.debug.stepGuard);
+      ring.material.color.set(e.source === PLAYER_ID ? palette.debug.stepPlayer : palette.debug.stepGuard);
     }
   }
 

@@ -6,6 +6,17 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### Events come from one registry, with ids, times, sources and causes
+
+**Decision:** Every event has one type from the registry in `src/sim/events.ts`, an id (from 1, in order, kept in the state tree), its tick, the moment it happened in seconds, the entity that made it, and the event that caused it (or 0). Sounds are one family: a position, a surface, a loudness and a radius. The registry says how each field is stored, so the recorder encodes events generically (`record/eventCodec.ts`) and the compiler rejects a type without a complete entry. `EventLog.explain(id)` walks causes back to the first.
+
+- The player's events name the player's entity id (1), like everyone else's; the special −1 is gone. Stance events now say whose they are.
+- A footstep says what the legs were doing (`gait`), and the sound engine picks the step's voice from that. Before, it guessed the voice from loudness, so a slow walk uphill played the crouch voice.
+
+**Why:** Four labs emit and consume events in parallel: perception hears them, the brain reacts with its own, the debrief explains a mission through their causes ("the alarm, because he heard a footstep, because you sprinted on gravel"). Adding ids and causes later would mean revisiting every emitter.
+
+**Proof:** every field of every body matched on every tick of six 90-second runs, and every event's content matched apart from the new fields and the player's id. Events now say more, so the `behaviour` fingerprint moved: `SIM_VERSION` 3, `STATE_SCHEMA` 3 (the next event id), `RECORDING_VERSION` 4.
+
 ### A tick runs declared systems, and every body shares one motor
 
 **Decision:** `step()` runs the systems listed in `src/sim/systems.ts`, phase by phase: schedule, commands, intent, motor, projectiles, world, perception, awareness, camp, decide, mission. Most phases are empty until the labs fill them, but their order is fixed now. Perception sees the world after everything has moved; brains decide after perceiving; what they decide moves bodies from the next tick, one tick (33 ms) after the stimulus.

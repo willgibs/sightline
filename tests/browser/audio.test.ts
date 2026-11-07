@@ -87,7 +87,7 @@ function weightK(L: Float32Array, R: Float32Array): Float32Array {
 }
 
 function step(x: number, z: number, radius: number, surface: Surface = 2, loudness = 1.15, source = 0, y = 1.65): FootstepEvent {
-  return { type: 'footstep', tick: 1, source, x, y, z, surface, loudness, radius };
+  return { type: 'footstep', id: 1, tick: 1, t: 1 / 30, source, cause: 0, x, y, z, surface, loudness, radius, gait: 'walk' };
 }
 
 describe.runIf(canSuspend)('the sound engine', () => {

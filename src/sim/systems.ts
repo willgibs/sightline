@@ -2,12 +2,11 @@ import type { Tuning } from '../config/tuning';
 import type { Rng } from './core/rng';
 import { stepGuards } from './entities/guards';
 import { playerIntent } from './entities/player';
-import type { SimEvent } from './events';
+import type { EventDraft } from './events';
 import type { World } from './gen/world';
 import type { InputFrame } from './input';
 import { idleIntent, stepMotor, type Cylinder, type MoveIntent } from './motor/motor';
 import { popDue, scheduleAt, ticksAfter, type Scheduled } from './schedule';
-import { PLAYER_SOURCE } from './events';
 import type { EntityId, GuardEntity, PlayerEntity, SimState } from './state';
 
 /**
@@ -60,7 +59,8 @@ export interface TickContext {
   readonly rng: Rng;
   /** What each body wants this tick, by entity id: written in 'intent', read in 'motor'. */
   readonly intents: Map<EntityId, MoveIntent>;
-  emit(e: SimEvent): void;
+  /** Records an event and returns its id, for the events it causes. */
+  emit(e: EventDraft): number;
   /** Schedules `kind` to run in the 'schedule' phase `seconds` from now (at least one tick). */
   schedule(seconds: number, kind: string, a?: number, b?: number): void;
 }
@@ -113,7 +113,8 @@ export const SYSTEMS: readonly System[] = [
     phase: 'intent',
     run(ctx) {
       const p = ctx.index.player;
-      playerIntent(p.body, p.control, ctx.input, ctx.tuning.player, ctx, intentFor(ctx, p.id));
+      const motor = { world: ctx.world, tick: ctx.tick, source: p.id, emit: ctx.emit };
+      playerIntent(p.body, p.control, ctx.input, ctx.tuning.player, motor, intentFor(ctx, p.id));
     },
   },
   {
@@ -122,7 +123,7 @@ export const SYSTEMS: readonly System[] = [
     name: 'guards',
     phase: 'motor',
     run(ctx, dt) {
-      stepGuards(ctx.index.guards, ctx.world, ctx.tuning, dt, ctx.tick, ctx.rng, ctx.emit);
+      stepGuards(ctx.index.guards, ctx.world, ctx.tuning, dt, ctx.rng, ctx.emit);
     },
   },
   {
@@ -143,7 +144,7 @@ export const SYSTEMS: readonly System[] = [
       });
       let intent = intentFor(ctx, p.id);
       if (intent.tick !== ctx.tick) intent = idleIntent(p.body, ctx.tick, intent);
-      stepMotor(p.body, intent, ctx.tuning.player, { world: ctx.world, tuning: ctx.tuning, dt, tick: ctx.tick, source: PLAYER_SOURCE, others, emit: ctx.emit });
+      stepMotor(p.body, intent, ctx.tuning.player, { world: ctx.world, tuning: ctx.tuning, dt, tick: ctx.tick, source: p.id, others, emit: ctx.emit });
     },
   },
 ];

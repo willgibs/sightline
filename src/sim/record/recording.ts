@@ -5,8 +5,8 @@ import type { SimEvent } from '../events';
 import type { SpawnKind } from '../gen/world';
 import { InputFlag, type InputFrame } from '../input';
 import type { Simulation } from '../sim';
-import type { Surface } from '../world/surfaces';
 import { ByteReader, ByteWriter } from './bytes';
+import { readEvent, writeEvent } from './eventCodec';
 import { assertTuning } from '../../config/validate';
 
 /**
@@ -24,8 +24,9 @@ import { assertTuning } from '../../config/validate';
 /**
  * 2: checkpoints hash the whole state tree (sim/state.ts).
  * 3: the tree's layout changed (STATE_SCHEMA 2), so older checkpoints can't be compared.
+ * 4: events from the registry (ids, times, sources, causes); STATE_SCHEMA 3.
  */
-export const RECORDING_VERSION = 3;
+export const RECORDING_VERSION = 4;
 const MAGIC = [0x53, 0x4c, 0x52, 0x43]; // SLRC
 
 export interface RecordingHeader {
@@ -54,7 +55,6 @@ const STANCES: Stance[] = ['stand', 'crouch', 'prone'];
 const GAITS: Gait[] = ['idle', 'sprint', 'walk', 'crouch', 'crawl'];
 const STATE_BASE = 36;
 const STATE_PER_GUARD = 20;
-const EVENT_SIZE = 28;
 const INPUT_SIZE = 12;
 
 export interface RecordedState {
@@ -134,36 +134,7 @@ export class Recorder {
       }
     }
 
-    for (const e of events) {
-      const ev = this.events;
-      if (e.type === 'footstep') {
-        ev.u8(1);
-        ev.u8(e.surface);
-        ev.i16(e.source);
-        ev.u32(e.tick);
-        ev.f32(e.x);
-        ev.f32(e.y);
-        ev.f32(e.z);
-        ev.f32(e.loudness);
-        ev.f32(e.radius);
-      } else if (e.type === 'land') {
-        ev.u8(3);
-        ev.u8(e.surface);
-        ev.i16(e.source);
-        ev.u32(e.tick);
-        ev.f32(e.x);
-        ev.f32(e.y);
-        ev.f32(e.z);
-        ev.f32(e.loudness);
-        ev.f32(e.speed);
-      } else {
-        ev.u8(2);
-        ev.u8(STANCES.indexOf(e.from));
-        ev.i16(STANCES.indexOf(e.to));
-        ev.u32(e.tick);
-        for (let k = 0; k < 5; k++) ev.f32(0);
-      }
-    }
+    for (const e of events) writeEvent(this.events, e);
 
     if (sim.tick % this.checkpointEvery === 0) this.checkpoints.push(sim.hash());
     this.ticks++;
@@ -236,8 +207,20 @@ export class Recording {
     return this.states.length / (STATE_BASE + STATE_PER_GUARD * this.header.guardCount);
   }
 
+  private decoded: SimEvent[] | null = null;
+
   get eventCount(): number {
-    return this.events.length / EVENT_SIZE;
+    return this.decodedEvents().length;
+  }
+
+  private decodedEvents(): SimEvent[] {
+    if (!this.decoded) {
+      const r = new ByteReader(this.events);
+      const out: SimEvent[] = [];
+      while (r.remaining > 0) out.push(readEvent(r));
+      this.decoded = out;
+    }
+    return this.decoded;
   }
 
   readInput(i: number, out: InputFrame): InputFrame {
@@ -284,47 +267,9 @@ export class Recording {
     return s;
   }
 
+  /** Every recorded event, decoded (copies: change them freely). */
   readEvents(): SimEvent[] {
-    const out: SimEvent[] = [];
-    for (let k = 0; k < this.eventCount; k++) {
-      const v = new DataView(this.events.buffer, this.events.byteOffset + k * EVENT_SIZE, EVENT_SIZE);
-      const type = v.getUint8(0);
-      if (type === 1) {
-        out.push({
-          type: 'footstep',
-          surface: v.getUint8(1) as Surface,
-          source: v.getInt16(2, true),
-          tick: v.getUint32(4, true),
-          x: v.getFloat32(8, true),
-          y: v.getFloat32(12, true),
-          z: v.getFloat32(16, true),
-          loudness: v.getFloat32(20, true),
-          radius: v.getFloat32(24, true),
-        });
-      } else if (type === 3) {
-        const loudness = v.getFloat32(20, true);
-        out.push({
-          type: 'land',
-          surface: v.getUint8(1) as Surface,
-          source: v.getInt16(2, true),
-          tick: v.getUint32(4, true),
-          x: v.getFloat32(8, true),
-          y: v.getFloat32(12, true),
-          z: v.getFloat32(16, true),
-          loudness,
-          speed: v.getFloat32(24, true),
-          radius: loudness * this.header.tuning.noise.radiusPerUnit,
-        });
-      } else if (type === 2) {
-        out.push({
-          type: 'stance',
-          from: STANCES[v.getUint8(1)] ?? 'stand',
-          to: STANCES[v.getInt16(2, true)] ?? 'stand',
-          tick: v.getUint32(4, true),
-        });
-      }
-    }
-    return out;
+    return this.decodedEvents().map((e) => ({ ...e }));
   }
 
   toBytes(): Uint8Array {

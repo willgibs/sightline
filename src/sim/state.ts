@@ -20,9 +20,9 @@ import { emptySchedule, type ScheduleState } from './schedule';
 
 /**
  * Bumped when the tree's layout changes, so an old save-state is refused rather than
- * misread. 2: the player is a body and its controls; the schedule.
+ * misread. 2: the player is a body and its controls; the schedule. 3: event ids.
  */
-export const STATE_SCHEMA = 2;
+export const STATE_SCHEMA = 3;
 
 export type EntityId = number;
 
@@ -60,6 +60,8 @@ export interface SimState {
   tick: number;
   /** The next entity id. Ids are never reused within a run, so events stay unambiguous. */
   nextId: EntityId;
+  /** The next event id: events are numbered from 1 in the order they happen. */
+  nextEventId: number;
   /** In ascending id order; systems iterate in this order. */
   entities: Entity[];
   /** Named random streams owned by the simulation. */
@@ -69,7 +71,7 @@ export interface SimState {
 }
 
 export function emptyState(): SimState {
-  return { schema: STATE_SCHEMA, tick: 0, nextId: 1, entities: [], rng: {}, schedule: emptySchedule() };
+  return { schema: STATE_SCHEMA, tick: 0, nextId: 1, nextEventId: 1, entities: [], rng: {}, schedule: emptySchedule() };
 }
 
 /** Adds an entity with the next id. Entities stay in ascending id order. */

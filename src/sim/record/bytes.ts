@@ -1,4 +1,16 @@
-/** Little-endian binary writing and reading for recordings. */
+/**
+ * Little-endian binary writing and reading for recordings. Reading is bounds-checked:
+ * a recording is often a file from elsewhere, so running off the end is a format error
+ * with a clear message, never a RangeError from deep inside a DataView.
+ */
+
+/** A recording that can't be read: truncated, corrupt or from an unknown format. */
+export class RecordingFormatError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RecordingFormatError';
+  }
+}
 
 export class ByteWriter {
   private buf: Uint8Array;
@@ -50,10 +62,22 @@ export class ByteWriter {
     this.length += 4;
   }
 
+  i32(v: number): void {
+    this.ensure(4);
+    this.view.setInt32(this.length, v, true);
+    this.length += 4;
+  }
+
   f32(v: number): void {
     this.ensure(4);
     this.view.setFloat32(this.length, v, true);
     this.length += 4;
+  }
+
+  f64(v: number): void {
+    this.ensure(8);
+    this.view.setFloat64(this.length, v, true);
+    this.length += 8;
   }
 
   bytes(b: Uint8Array): void {
@@ -76,22 +100,51 @@ export class ByteReader {
     this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   }
 
+  get remaining(): number {
+    return this.bytes.length - this.offset;
+  }
+
+  private need(n: number): number {
+    if (this.offset + n > this.bytes.length) throw new RecordingFormatError('Recording is truncated');
+    const at = this.offset;
+    this.offset += n;
+    return at;
+  }
+
   u8(): number {
-    const v = this.view.getUint8(this.offset);
-    this.offset += 1;
-    return v;
+    return this.view.getUint8(this.need(1));
+  }
+
+  i8(): number {
+    return this.view.getInt8(this.need(1));
+  }
+
+  u16(): number {
+    return this.view.getUint16(this.need(2), true);
+  }
+
+  i16(): number {
+    return this.view.getInt16(this.need(2), true);
   }
 
   u32(): number {
-    const v = this.view.getUint32(this.offset, true);
-    this.offset += 4;
-    return v;
+    return this.view.getUint32(this.need(4), true);
+  }
+
+  i32(): number {
+    return this.view.getInt32(this.need(4), true);
+  }
+
+  f32(): number {
+    return this.view.getFloat32(this.need(4), true);
+  }
+
+  f64(): number {
+    return this.view.getFloat64(this.need(8), true);
   }
 
   take(n: number): Uint8Array {
-    if (this.offset + n > this.bytes.length) throw new Error('Recording is truncated');
-    const out = this.bytes.slice(this.offset, this.offset + n);
-    this.offset += n;
-    return out;
+    const at = this.need(n);
+    return this.bytes.slice(at, at + n);
   }
 }

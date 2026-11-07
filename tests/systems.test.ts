@@ -133,7 +133,15 @@ describe('the shared motor', () => {
     const world = testWorld({ colliders: [wall, ledge] });
     const b = createBody(world, spec, x, 0, 1, 0);
     const events: SimEvent[] = [];
-    const ctx: MotorContext = { world, tuning: defaultTuning, dt: 1 / 30, tick: 0, source: 42, others: [], emit: (e) => events.push({ ...e }) };
+    const ctx: MotorContext = {
+      world,
+      tuning: defaultTuning,
+      dt: 1 / 30,
+      tick: 0,
+      source: 42,
+      others: [],
+      emit: (e) => events.push({ ...e, id: events.length + 1, tick: ctx.tick, t: ctx.tick / 30, cause: 0 } as SimEvent),
+    };
     const intent: MoveIntent = { tick: 0, wishX, wishZ: 0, gait: 'walk', yaw: b.yaw, pitch: 0 };
     for (let t = 1; t <= seconds * 30; t++) {
       ctx.tick = intent.tick = t;

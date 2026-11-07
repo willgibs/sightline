@@ -5,8 +5,10 @@
 export { Simulation, GUARD_FIELDS, type Snapshot } from './sim';
 export { generateWorld, type World, type Spawn, type SpawnKind } from './gen/world';
 export { neutralInput, quantizeInput, type InputFrame } from './input';
-export type { SimEvent, FootstepEvent, StanceEvent } from './events';
-export { PLAYER_SOURCE } from './events';
+export type { SimEvent, FootstepEvent, LandEvent, StanceEvent, EventDraft } from './events';
+export { PLAYER_ID } from './state';
+export { EVENTS, isSound } from './events';
+export { EventLog } from './eventlog';
 export { exposure } from './perception/visibility';
 export type { BodyState, Gait, Stance } from './motor/body';
 export type { PlayerControl } from './entities/player';

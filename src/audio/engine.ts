@@ -1,7 +1,8 @@
 import type { Tuning } from '../config/tuning';
-import { PLAYER_SOURCE, type SimEvent } from '../sim/events';
+import type { SimEvent } from '../sim/events';
+import { PLAYER_ID } from '../sim/state';
 import { audibility, travelTime } from '../sim/sound';
-import { surfaceLoudness, surfaceName } from '../sim/world/surfaces';
+import { surfaceName } from '../sim/world/surfaces';
 import { footstep, humLoop, makeNoiseBuffers, makeRand, rustle, waterLoop, windBed, type Loop, type NoiseBuffers, type Rand } from './voices';
 
 /**
@@ -180,8 +181,9 @@ export class SoundEngine {
   play(events: readonly SimEvent[], earToFeet: number): void {
     for (const e of events) {
       if (e.type === 'footstep') {
-        const gait = e.loudness / surfaceLoudness(e.surface, this.tuning);
-        if (e.source === PLAYER_SOURCE) {
+        // The step's kind of sound comes from its gait; how loud it is, from its radius.
+        const gait = this.tuning.noise.movement[e.gait];
+        if (e.source === PLAYER_ID) {
           const amp = THRESHOLD * audibility(e.radius, earToFeet);
           this.voice(amp, (when) => footstep(this.ctx, this.body, this.noise, this.rand, when, surfaceName(e.surface), gait, amp));
         } else {
@@ -192,7 +194,7 @@ export class SoundEngine {
       } else if (e.type === 'land') {
         // A landing is a heavy footfall: the sprint voice at the landing's own loudness.
         const gait = 1.5;
-        if (e.source === PLAYER_SOURCE) {
+        if (e.source === PLAYER_ID) {
           const amp = THRESHOLD * audibility(e.radius, earToFeet);
           this.voice(amp, (when) => footstep(this.ctx, this.body, this.noise, this.rand, when, surfaceName(e.surface), gait, amp));
         } else {

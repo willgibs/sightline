@@ -1,7 +1,7 @@
 import type { Tuning } from '../../config/tuning';
 import { dtanDeg } from '../core/detmath';
 import { clamp, smoothstep } from '../core/math';
-import type { SimEvent } from '../events';
+import type { EventDraft } from '../events';
 import type { World } from '../gen/world';
 import { Blocks, circleOverlaps, pushOutCircle } from '../world/colliders';
 import { makeTerrainSample } from '../world/heightfield';
@@ -80,7 +80,7 @@ export interface MotorContext {
   source: number;
   /** Every other body this one can collide with. */
   others: ReadonlyArray<Cylinder>;
-  emit: (e: SimEvent) => void;
+  emit: (e: EventDraft) => number;
 }
 
 interface MotorMode {
@@ -195,7 +195,6 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
       b.stride = Math.min(b.stride - step.stride, 0.5 * step.stride);
       ctx.emit({
         type: 'footstep',
-        tick: ctx.tick,
         source: ctx.source,
         x: b.x,
         y: b.y,
@@ -203,6 +202,7 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
         surface: ground.surface,
         loudness: b.loudness,
         radius: b.loudness * tuning.noise.radiusPerUnit,
+        gait: soundGait(b, spec),
       });
     }
   }
@@ -211,7 +211,6 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
     const loudness = Math.min(L.max, impact * L.perSpeed) * surfaceLoudness(ground.surface, tuning);
     ctx.emit({
       type: 'land',
-      tick: ctx.tick,
       source: ctx.source,
       x: b.x,
       y: b.y,
@@ -223,6 +222,19 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
     });
     b.stride = 0;
   }
+}
+
+/**
+ * What the legs are doing, for the sound of a step: the gait the body moves in, or, while
+ * it coasts to a stop with no gait asked for, what its stance and speed say. Loudness
+ * says how hard the step is; this says what kind of step it is, so a slow walk uphill
+ * still sounds like walking.
+ */
+function soundGait(b: BodyState, spec: BodySpec): Exclude<Gait, 'idle'> {
+  if (b.gait !== 'idle') return b.gait;
+  if (b.stance === 'prone') return 'crawl';
+  if (b.stance === 'crouch') return 'crouch';
+  return b.speed > spec.speed.walk + 0.25 ? 'sprint' : 'walk';
 }
 
 /** The eye eases toward the stance's height; a prone change ends when its timer does. */
@@ -295,11 +307,11 @@ function driveAir(b: BodyState): void {
  * into or out of prone takes stanceTime.prone and can't be interrupted (`proneTransition`).
  * Returns whether the stance changed.
  */
-export function requestStance(b: BodyState, to: Stance, spec: BodySpec, ctx: Pick<MotorContext, 'world' | 'tick' | 'emit'>): boolean {
+export function requestStance(b: BodyState, to: Stance, spec: BodySpec, ctx: Pick<MotorContext, 'world' | 'source' | 'emit'>): boolean {
   if (to === b.stance) return false;
   if (spec.height[to] > spec.height[b.stance] && !hasHeadroom(b, spec.height[to], spec, ctx.world)) return false;
   const prone = to === 'prone' || b.stance === 'prone';
-  ctx.emit({ type: 'stance', tick: ctx.tick, from: b.stance, to });
+  ctx.emit({ type: 'stance', source: ctx.source, from: b.stance, to });
   b.eyeFrom = b.eyeHeight;
   b.stance = to;
   b.stanceDuration = prone ? spec.stanceTime.prone : spec.stanceTime.crouch;

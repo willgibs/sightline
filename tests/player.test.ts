@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { neutralInput, quantizeInput, type InputFrame } from '../src/sim/input';
 import { footfall } from '../src/sim/motor/footfall';
 import { Simulation } from '../src/sim/sim';
+import { PLAYER_ID } from '../src/sim/state';
 import type { SimEvent } from '../src/sim/events';
 import { Blocks } from '../src/sim/world/colliders';
 import { Surface } from '../src/sim/world/surfaces';
@@ -410,7 +411,7 @@ describe('controller edge cases (from the second audit)', () => {
       let last = -10;
       for (let i = 0; i < 150; i++) {
         for (const e of sim.step({ ...neutralInput(Math.atan2(-Math.cos(a), -Math.sin(a))), moveZ: 1, sprint: true })) {
-          if (e.type !== 'footstep' || e.source !== -1) continue;
+          if (e.type !== 'footstep' || e.source !== PLAYER_ID) continue;
           expect(sim.tick - last).toBeGreaterThan(1);
           last = sim.tick;
         }

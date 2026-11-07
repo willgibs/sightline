@@ -45,7 +45,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 
 ### M4 · Timed commands, the event log, recording v2
 - [ ] Tick input gains held states (optic, breath, lean) and a list of commands; precise commands carry the lag and view angles of the frame the player saw. Pose history of two ticks for hits between ticks.
-- [ ] One event registry: typed, with ids, times in seconds and causes; `explain(id)` walks the chain. Every event carries its source as an entity id: today the player's events say −1 and stance events say nothing. Footstep and landing events carry the gait, so sound picks its voice from what the legs did rather than from loudness (today an uphill walk plays the crouch voice).
+- [x] One event registry: typed, with ids, times in seconds and causes; `explain(id)` walks the chain. Every event carries its source as an entity id. Footsteps carry the gait, so sound picks its voice from what the legs did rather than from loudness.
 - [ ] Recording v2: tagged tracks (header, inputs, states, events, annotations), build and version stamps, markers; snapshots cached in memory for exact seeking.
 - [ ] A strict loader: a bounds-checked reader, a `RecordingFormatError`, whole-record sizes, a size cap, no trailing bytes. The header adds the simulation tuning key, the world fingerprint and the tick-0 hash.
 - [ ] Tuning is frozen when a simulation or recorder takes it, and a tuning change mid-run becomes a track in the recording instead of a flag. A recorder records only the simulation it was made for.

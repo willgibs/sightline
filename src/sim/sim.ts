@@ -3,7 +3,7 @@ import { assertTuning } from '../config/validate';
 import { Rng } from './core/rng';
 import { createGuard, type GuardState } from './entities/guards';
 import { createPlayer, type PlayerControl } from './entities/player';
-import type { SimEvent } from './events';
+import type { EventDraft, SimEvent } from './events';
 import { generateWorld, type SpawnKind, type World } from './gen/world';
 import { neutralInput, quantizeInput, type InputFrame } from './input';
 import { missionSpec } from './mission';
@@ -112,8 +112,16 @@ export class Simulation {
       input: this.lastInput,
       rng: this.rng,
       intents: this.intents,
-      emit: (e: SimEvent) => {
+      emit: (draft: EventDraft): number => {
+        // The draft becomes the event: numbered, stamped with its tick and, unless the
+        // emitter knows the moment within the tick, the tick's end.
+        const e = draft as SimEvent;
+        e.id = ctx.state.nextEventId++;
+        e.tick = ctx.tick;
+        e.t = draft.t ?? ctx.tick / this.tuning.sim.tickHz;
+        e.cause = draft.cause ?? 0;
         this.events.push(e);
+        return e.id;
       },
       schedule: (seconds: number, kind: string, a = 0, b = 0) => scheduleIn(ctx.state, ctx.tick, ctx.dt, seconds, kind, a, b),
     };

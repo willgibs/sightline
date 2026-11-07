@@ -8,5 +8,5 @@
 /** What generation builds from a given MissionSpec. */
 export const GEN_VERSION = 1;
 
-/** How the simulation behaves for given inputs. */
-export const SIM_VERSION = 2;
+/** How the simulation behaves for given inputs. 3: events carry ids, times, entity sources and gaits. */
+export const SIM_VERSION = 3;

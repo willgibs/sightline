@@ -4,7 +4,7 @@ import { WanderBot } from './bots/wander';
 import { datan, datan2, dcos, dexp, dlog, dpow, dsin, dtanDeg } from './core/detmath';
 import { Hasher } from './core/hash';
 import { generateWorld, type World } from './gen/world';
-import type { SimEvent } from './events';
+import { EVENTS, type FieldCodec, type SimEvent } from './events';
 import { neutralInput } from './input';
 import { Simulation } from './sim';
 import { missionSpec } from './mission';
@@ -34,9 +34,9 @@ export const GOLDEN = {
   world: '2ea333d491d7568c',
   /** 60 s of play: the person-like bot in two valleys, the fuzzing bot in one. */
   play: {
-    'TAL-4471 wander': { behaviour: '75b9eeaa336e22c6', state: 'e91ac773a9b739f3' },
-    'MUD-9031 wander': { behaviour: '25a6f124f085e264', state: '3edac392fb5b520d' },
-    'TAL-4471 chaos': { behaviour: '3362a328634e2343', state: '0e778c2a4dee7d61' },
+    'TAL-4471 wander': { behaviour: '140cae1b09e871be', state: '286715cdcae5b9be' },
+    'MUD-9031 wander': { behaviour: 'dee3211739445415', state: 'be19428592a082bc' },
+    'TAL-4471 chaos': { behaviour: '68fd0635afb0746d', state: '0ef96ed312adf847' },
   },
 } as const;
 
@@ -99,26 +99,23 @@ function behaviourInto(h: Hasher, sim: Simulation, events: readonly SimEvent[]):
     h.u32(ids[i]!).f64(g.x).f64(g.y).f64(g.z).f64(g.yaw).f64(g.headYaw).u32(g.moving ? 1 : 0);
   });
   // Events grouped by source, keeping each source's own order: which entity acted first
-  // within a tick is a detail of how systems are scheduled, not behaviour.
+  // within a tick is a detail of how systems are scheduled, not behaviour. Every field
+  // the registry stores is covered, so a new event type is covered too.
   order.length = 0;
   for (let k = 0; k < events.length; k++) order.push(k);
-  order.sort((a, b) => sourceOf(events[a]!) - sourceOf(events[b]!) || a - b);
+  order.sort((a, b) => events[a]!.source - events[b]!.source || a - b);
   h.u32(events.length);
   for (const k of order) {
     const e = events[k]!;
-    h.str(e.type).u32(e.tick);
-    if (e.type === 'stance') {
-      h.str(e.from).str(e.to);
-    } else {
-      h.f64(e.source).f64(e.x).f64(e.y).f64(e.z).u32(e.surface).f64(e.loudness).f64(e.radius);
-      if (e.type === 'land') h.f64(e.speed);
+    h.str(e.type).u32(e.id).u32(e.tick).f64(e.t).f64(e.source).u32(e.cause);
+    const fields = EVENTS[e.type].fields as Readonly<Record<string, FieldCodec>>;
+    const values = e as unknown as Readonly<Record<string, number | string>>;
+    for (const name in fields) {
+      const v = values[name]!;
+      if (typeof v === 'string') h.str(v);
+      else h.f64(v);
     }
   }
-}
-
-/** Stance events don't carry a source yet; only the player changes stance. */
-function sourceOf(e: SimEvent): number {
-  return e.type === 'stance' ? -1 : e.source;
 }
 
 /** Runs every check. `now` is a clock in milliseconds, used only to report timings. */

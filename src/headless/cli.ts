@@ -18,6 +18,7 @@ import { WanderBot } from '../sim/bots/wander';
 import { SystemProfile } from '../sim/profile';
 import { fmt, parseArgs } from './args';
 import { missionSpec } from '../sim/mission';
+import { PLAYER_ID } from '../sim/state';
 
 const args = parseArgs(process.argv.slice(2));
 const now = (): number => performance.now();
@@ -78,7 +79,7 @@ for (let i = 0; i < ticks; i++) {
   const events = sim.step(bot.next(sim, raw));
   recorder.record(sim, events);
   for (const e of events) {
-    if (e.type === 'footstep' && e.source === -1) footsteps++;
+    if (e.type === 'footstep' && e.source === PLAYER_ID) footsteps++;
     if (e.type === 'stance') stances++;
   }
   const dx = sim.player.x - lastX;

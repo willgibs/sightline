@@ -2,7 +2,7 @@ import type { Tuning } from '../../config/tuning';
 import { DEG, TWO_PI, datan2, dsin } from '../core/detmath';
 import { turnTowards, wrapAngle, yawFromDirection } from '../core/math';
 import type { Rng } from '../core/rng';
-import type { SimEvent } from '../events';
+import type { EventDraft } from '../events';
 import type { World } from '../gen/world';
 import { surfaceLoudness } from '../world/surfaces';
 
@@ -52,9 +52,8 @@ export function stepGuards(
   world: World,
   tuning: Tuning,
   dt: number,
-  tick: number,
   rng: Rng,
-  emit: (e: SimEvent) => void,
+  emit: (e: EventDraft) => number,
 ): void {
   const G = tuning.guards;
   for (const e of guards) {
@@ -91,7 +90,6 @@ export function stepGuards(
               const loudness = tuning.noise.movement.walk * surfaceLoudness(surface, tuning);
               emit({
                 type: 'footstep',
-                tick,
                 source: e.id,
                 x: g.x,
                 y: g.y,
@@ -99,6 +97,7 @@ export function stepGuards(
                 surface,
                 loudness,
                 radius: loudness * tuning.noise.radiusPerUnit,
+                gait: 'walk',
               });
             }
           }
