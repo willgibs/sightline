@@ -2,7 +2,9 @@ import type { Tuning } from '../config/tuning';
 import { dcos, dsin } from './core/detmath';
 import type { Rng } from './core/rng';
 import type { BodySpec, BodyState } from './motor/body';
-import { guardIntent } from './entities/guards';
+import { emptyMind, guardMind } from './entities/guards';
+import { keepRoutine } from './ai/routine';
+import type { GuardDecision } from './ai/mind';
 import { playerIntent } from './entities/player';
 import type { EventDraft } from './events';
 import type { World } from './gen/world';
@@ -99,6 +101,10 @@ const intentFor = (ctx: TickContext, id: EntityId): MoveIntent => {
 
 const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
 
+/** Scratch: a guard's mind and decision, rewritten for each guard. */
+const mind = emptyMind();
+const decision: GuardDecision = { move: { tick: 0, wishX: 0, wishZ: 0, gait: 'idle', yaw: 0, pitch: 0 }, headYaw: 0 };
+
 /** Scratch: the other bodies the moving one collides with, rewritten for each body. */
 const others: Cylinder[] = [];
 const cylinders: Cylinder[] = [];
@@ -165,11 +171,16 @@ export const SYSTEMS: readonly System[] = [
     },
   },
   {
-    // Guards keep to their routines (gen/routine.ts) until a brain says otherwise (lab E).
+    // Guards keep to their routines (ai/routine.ts) until a brain says otherwise (lab E).
+    // Each decides from his mind alone: the perception boundary (ai/mind.ts).
     name: 'guard-routines',
     phase: 'intent',
     run(ctx) {
-      for (const g of ctx.index.guards) guardIntent(g.body, g.guard, ctx.world, ctx.tuning, ctx.tick, intentFor(ctx, g.id));
+      for (const g of ctx.index.guards) {
+        decision.move = intentFor(ctx, g.id);
+        keepRoutine(guardMind(g, ctx.world, ctx.tuning, ctx.tick, mind), decision);
+        g.guard.headYaw = decision.headYaw;
+      }
     },
   },
   {

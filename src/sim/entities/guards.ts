@@ -1,16 +1,17 @@
 import type { Tuning } from '../../config/tuning';
+import type { GuardMind, Percept } from '../ai/mind';
 import type { World } from '../gen/world';
-import { routinePose, type RoutinePose } from '../gen/routine';
 import { createBody, type BodyState } from '../motor/body';
-import type { MoveIntent } from '../motor/motor';
+import type { GuardEntity } from '../state';
 import type { Solids } from '../world/solids';
 
 /**
  * Guards, before Phase 1 gives them senses and a brain: each keeps to his routine
- * (gen/routine.ts), a pure function of mission time, and moves with the shared motor
+ * (ai/routine.ts), a pure function of mission time, and moves with the shared motor
  * like the player, so he collides with the world, steps, slopes and makes footsteps
- * under the same rules. Labs A and E add perception and the brain that can pull a
- * guard off his routine; a guard who returns rejoins it where it says he should be.
+ * under the same rules. His brain decides from his mind alone (ai/mind.ts). Labs A and E
+ * add perception and the brain that can pull a guard off his routine; a guard who
+ * returns rejoins it where it says he should be.
  */
 export interface GuardState {
   /** Which of the camp's guard spawns (world.camp.guards) this guard came from. */
@@ -26,34 +27,30 @@ export function createGuard(world: World, solids: Solids, index: number, tuning:
   return { body, guard: { spawn: index, headYaw: 0 } };
 }
 
-const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
+type Writable<T> = { -readonly [K in keyof T]: T[K] };
+
+const NO_PERCEPTS: readonly Percept[] = [];
 
 /**
- * What a guard on routine wants this tick: to be where his routine puts him at the end
- * of it. The routine's own velocity, plus whatever closes the gap he has fallen behind
- * (shoved, or slowed by a slope), no faster than he may hurry.
+ * What a guard's brain gets to decide from (ai/mind.ts): his own body, his post, the
+ * static world, the time, and his percepts. Built here, on this side of the perception
+ * boundary, from his own state and perception's output; the brain never sees the rest.
+ * Writes into `out`, which is reused.
  */
-export function guardIntent(body: BodyState, guard: GuardState, world: World, tuning: Tuning, tick: number, out: MoveIntent): MoveIntent {
-  const routine = world.camp.guards[guard.spawn]!.routine;
-  const dt = 1 / tuning.sim.tickHz;
-  routinePose(routine, tick / tuning.sim.tickHz, pose);
-  // Exactly the routine's velocity when on schedule; more, toward it, when behind.
-  let wx = (pose.x - body.x) / dt;
-  let wz = (pose.z - body.z) / dt;
-  const cap = tuning.bodies.guard.speed.walk * tuning.guards.catchUp;
-  const w = Math.sqrt(wx * wx + wz * wz);
-  if (w > cap) {
-    wx *= cap / w;
-    wz *= cap / w;
-  }
-  // A few millimetres off is standing still, not walking.
-  const walking = pose.moving || w > 0.05;
+export function guardMind(g: GuardEntity, world: World, tuning: Tuning, tick: number, out: Writable<GuardMind>): GuardMind {
+  out.id = g.id;
+  out.self = g.body;
+  out.post = world.camp.guards[g.guard.spawn]!;
+  out.world = world;
+  out.tuning = tuning;
   out.tick = tick;
-  out.wishX = walking ? wx : 0;
-  out.wishZ = walking ? wz : 0;
-  out.gait = walking ? 'walk' : 'idle';
-  out.yaw = pose.yaw;
-  out.pitch = 0;
-  guard.headYaw = pose.headYaw;
+  out.time = tick / tuning.sim.tickHz;
+  out.percepts = NO_PERCEPTS;
   return out;
+}
+
+/** A mind for guardMind to fill: every field is written on each use. */
+export function emptyMind(): Writable<GuardMind> {
+  const unset = null as never;
+  return { id: 0, self: unset, post: unset, world: unset, tuning: unset, tick: 0, time: 0, percepts: NO_PERCEPTS };
 }

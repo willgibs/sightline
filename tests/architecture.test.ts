@@ -113,6 +113,20 @@ describe('architecture', () => {
     expect(readFileSync(join(root, 'src/config/validate.ts'), 'utf8')).toMatch(/import\.meta\.hot\?\.accept\('\.\/tuning'/);
   });
 
+  it('keeps guard brains behind the perception boundary', () => {
+    // A brain (src/sim/ai) decides from its GuardMind alone: its own body, its post, the
+    // static world, the time and its percepts. It may not reach the state, the simulation
+    // or the systems, where every entity's true state is.
+    const allowed = /^(\.\/[\w/]+|\.\.\/(core|gen|world)\/\w+|\.\.\/motor\/(body|motor|shape)|\.\.\/(events|env)|\.\.\/\.\.\/config\/tuning)$/;
+    const offenders: string[] = [];
+    for (const f of files(join(root, 'src/sim/ai'))) {
+      for (const m of readFileSync(f, 'utf8').matchAll(/^import\s[^;]*?from\s+'([^']+)'/gm)) {
+        if (!allowed.test(m[1]!)) offenders.push(`${relative(root, f)} imports ${m[1]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it('never calls Math.random inside the simulation', () => {
     const offenders = files(join(root, 'src/sim'))
       .filter((f) => !f.endsWith('seed.ts')) // randomSeed() is UI-only and documented as such

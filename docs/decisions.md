@@ -14,6 +14,14 @@ The first scene is the movement course: stairs, a 1 m and a 2 m drop, ramps of 3
 
 **Why:** each Phase 1 lab is a scene built to its exit test, and needs to be playable, scriptable and replayable without building its own harness. A regression test that needs more than one tick is a scene too.
 
+### Brains decide from what they perceive
+
+**Decision:** A guard's brain lives in `src/sim/ai` and decides from a `GuardMind` (`ai/mind.ts`): his own body, his post and routine, the static world, the tuning, the time, and his percepts. The mind is built outside the boundary from the guard's own state and perception's output (`entities/guards.ts`, `guardMind`). An architecture test allows `src/sim/ai` to import only the core, generation, the static world, the motor's types, events, the environment and the tuning's type: never the state, the simulation or the systems. Keeping to the routine is the first brain (`ai/routine.ts`), with behaviour unchanged.
+
+A no-omniscience test plays the valley twice with the player 600 m apart in two places no guard can perceive: wherever a guard has the same mind in both runs, his decisions must match bit for bit. A brain that peeks at the player's true position fails it, and the test proves that too.
+
+**Why:** a stealth game is only fair if guards know what they could have perceived. If the rule were a convention, lab E's first shortcut would read the player's position from the state; as a boundary with a test, a leak fails the build.
+
 ### The rules decide the outcome, in the state
 
 **Decision:** Every run has an outcome in the state tree: playing, then succeeded or failed, with a reason and the tick (`STATE_SCHEMA` 6). Rules are a system in the 'mission' phase that calls `decide`; the first decision stands and emits an `outcome` event, so the debrief can walk its causes. A headless scene run ends when its rules decide (unless the scene plays on), and the browser stops the run, shows the outcome and offers to play again.
