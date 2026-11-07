@@ -14,6 +14,7 @@ import { idleIntent, stepMotor, type Cylinder, type MoveIntent } from './motor/m
 import { popDue, scheduleAt, ticksAfter, type Scheduled } from './schedule';
 import { hasBody, type EntityId, type GuardEntity, type PlayerEntity, type SimState } from './state';
 import type { Solids } from './world/solids';
+import type { DebugDraw } from './debugDraw';
 
 /**
  * The order of a tick.
@@ -76,6 +77,11 @@ export interface TickContext {
    * numbers. Use the Rng only inside `use`.
    */
   draw<T>(id: EntityId, purpose: string, use: (rng: Rng) => T): T;
+  /**
+   * Shows something in the debug view (debugDraw.ts). `paint` runs only while the debug
+   * view is on, so it must never change what the system does.
+   */
+  debug(paint: (draw: DebugDraw) => void): void;
 }
 
 export interface System {
@@ -205,7 +211,10 @@ export const SYSTEMS: readonly System[] = [
         }
         let intent = intentFor(ctx, id);
         if (intent.tick !== ctx.tick) intent = idleIntent(body, ctx.tick, intent);
-        stepMotor(body, intent, spec, { world: ctx.world, solids: ctx.solids, tuning: ctx.tuning, dt, tick: ctx.tick, source: id, others, emit: ctx.emit });
+        // The controller overlay, for the player's body, in the debug view.
+        let draw: DebugDraw | null = null;
+        if (id === ctx.index.player.id) ctx.debug((d) => (draw = d));
+        stepMotor(body, intent, spec, { world: ctx.world, solids: ctx.solids, tuning: ctx.tuning, dt, tick: ctx.tick, source: id, others, emit: ctx.emit, draw });
       }
     },
   },

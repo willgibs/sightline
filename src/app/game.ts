@@ -15,6 +15,7 @@ import { emptyHit, raycast } from '../sim/world/query';
 import { entityOfCollider } from '../sim/world/solids';
 import { Surface, surfaceName } from '../sim/world/surfaces';
 import { GameRenderer, type CameraPose } from '../render/renderer';
+import { palette } from '../render/palette';
 import { Hud } from './hud';
 import { InputController } from './input';
 import { Overlay } from './overlay';
@@ -126,6 +127,7 @@ export class Game {
   private seed = '';
   /** The rules decided the run during the last ticks: show the outcome once they're drawn. */
   private decided = false;
+  private readonly drawnLabels: Array<{ x: number; y: number; text: string; color: string }> = [];
   /** The scene being played, if any (sim/scene.ts): its world, systems and setup. */
   private scene: Scene | null;
   /** What the last drawn frame showed, so a paused screen isn't drawn again unchanged. */
@@ -342,6 +344,7 @@ export class Game {
     this.recorder = new Recorder(this.sim, BUILD);
     this.savedTick = 0;
     this.failure = null;
+    this.sim.drawDebug = this.debug;
     this.redraws++;
     // From the tuning in force: a save can change the tick rate and the world together.
     this.clock = new FixedStepClock(this.tuning.sim.tickHz);
@@ -463,6 +466,7 @@ export class Game {
 
   private setDebugView(on: boolean): void {
     this.debug = on;
+    if (this.sim) this.sim.drawDebug = on;
     this.renderer.setDebug(on);
     this.hud.setDebug(on);
     if (!on) {
@@ -567,7 +571,10 @@ export class Game {
     else if (this.detached) pose = this.flyPose(dt, fov);
     else pose = this.bodyPose(dt, fov);
 
-    if (this.debug) this.updateAim(pose);
+    if (this.debug) {
+      this.updateAim(pose);
+      this.showDrawn();
+    }
     // While paused, draw only when the picture would change: a view toggled, a new valley, the window resized.
     const still = this.paused && !this.bench && samePose(pose, this.drawnPose) && this.drawnKey === this.viewKey();
     if (!still) {
@@ -659,6 +666,21 @@ export class Game {
     const ground = this.world.terrain.heightAt(this.fly.x, this.fly.z) + 0.3;
     if (this.fly.y < ground) this.fly.y = ground;
     return { x: this.fly.x, y: this.fly.y, z: this.fly.z, yaw, pitch, fov };
+  }
+
+  /** What systems drew in their last tick: lines in the world, labels in the HUD. */
+  private showDrawn(): void {
+    const shapes = this.sim.debugCanvas.shapes;
+    this.renderer.setDrawn(shapes, this.sim.tick);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    this.drawnLabels.length = 0;
+    for (const s of shapes) {
+      if (s.kind !== 'label') continue;
+      const at = this.renderer.project(s.x, s.y, s.z, w, h);
+      if (at) this.drawnLabels.push({ x: at.x, y: at.y, text: s.text, color: palette.debug.tones[s.tone] });
+    }
+    this.hud.setLabels(this.drawnLabels);
   }
 
   /** Rangefinder for the debug view: what's under the crosshair, and how far. */

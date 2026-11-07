@@ -9,6 +9,8 @@ import type { Solids } from '../world/solids';
 import { surfaceLoudness } from '../world/surfaces';
 import { bodyHeight, groundBelow, pushHistory, type BodySpec, type BodyState, type Gait, type MotorModeName, type Stance } from './body';
 import { footfall } from './footfall';
+import type { DebugDraw } from '../debugDraw';
+import { DEG, datan } from '../core/detmath';
 
 /**
  * The shared motor: how any body moves. An intent says what the body wants (a velocity,
@@ -86,6 +88,11 @@ export interface MotorContext {
   /** Every other body this one can collide with. */
   others: ReadonlyArray<Cylinder>;
   emit: (e: EventDraft) => number;
+  /**
+   * The controller overlay (debug view only): draws this body's rim probes, slope and
+   * every push of its resolve passes. Drawing only: the motor does the same with or without.
+   */
+  draw?: DebugDraw | null;
 }
 
 interface MotorMode {
@@ -236,6 +243,29 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
     });
     b.stride = 0;
   }
+  if (ctx.draw) drawController(ctx.draw, b, spec, world, tanMax);
+}
+
+/**
+ * The controller overlay: the body's circle, its rim probes (red where the terrain
+ * inside the rim rises more than a step), where it is heading, and a label with the
+ * slope against the limit, sliding, what it stands on and its motor mode.
+ */
+function drawController(d: DebugDraw, b: BodyState, spec: BodySpec, world: World, tanMax: number): void {
+  const r = spec.radius;
+  const y = b.y + 0.04;
+  d.circle(b.x, y, b.z, r, b.sliding ? 'bad' : 'info');
+  for (let k = 0; k < RIM.length; k++) {
+    const px = b.x + RIM[k]![0] * r;
+    const pz = b.z + RIM[k]![1] * r;
+    const h = world.terrain.heightAt(px, pz);
+    d.point(px, h + 0.04, pz, 0.08, h - b.y > spec.stepHeight ? 'bad' : 'good');
+  }
+  if (b.speed > 0.05) d.line(b.x, y, b.z, b.x + b.vx * 0.5, y, b.z + b.vz * 0.5, 'info');
+  const slope = datan(b.slopeTan) / DEG;
+  const tone = b.sliding ? 'bad' : b.slopeTan > tanMax * 0.8 ? 'warn' : 'muted';
+  const on = b.standingOn >= 0 ? ' · on an object' : '';
+  d.label(b.x, b.y + bodyHeight(b, spec) + 0.35, b.z, `slope ${slope.toFixed(0)}° of ${spec.maxSlopeDeg}°${b.sliding ? ' · sliding' : ''}${on} · ${b.motor}`, tone);
 }
 
 /**
@@ -383,6 +413,7 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
       if (d2 < rr * rr && d2 > 1e-12) {
         const d = Math.sqrt(d2);
         const k = Math.min(rr - d, spec.shoveMax) / d;
+        ctx.draw?.line(nx, feet + 0.1, nz, nx + dx * k, feet + 0.1, nz + dz * k, 'warn');
         nx += dx * k;
         nz += dz * k;
         cancelInto(b, dx * k, dz * k);
@@ -401,6 +432,7 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
         if (k > 0) {
           dx -= sample.gx * k;
           dz -= sample.gz * k;
+          ctx.draw?.line(nx, feet + 0.1, nz, b.x + dx, feet + 0.1, b.z + dz, 'info');
           nx = b.x + dx;
           nz = b.z + dz;
           const kv = (b.vx * sample.gx + b.vz * sample.gz) / g2;
@@ -415,6 +447,7 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
 
     if (rimPush(world, nx, nz, feet, r, spec.stepHeight, push)) {
       // Terrain rising too high inside the body's circle (the foot of a steep face): back off.
+      ctx.draw?.line(nx, feet + 0.1, nz, nx + push.x, feet + 0.1, nz + push.z, 'bad');
       nx += push.x;
       nz += push.z;
       cancelInto(b, push.x, push.z);
@@ -438,6 +471,7 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
         if (depth > r) continue;
       }
       if (push.x * push.x + push.z * push.z < 1e-18) continue; // float dust, not a contact
+      ctx.draw?.line(nx, feet + 0.1, nz, nx + push.x, feet + 0.1, nz + push.z, 'muted');
       nx += push.x;
       nz += push.z;
       cancelInto(b, push.x, push.z);

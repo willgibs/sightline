@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { disposeTree } from './dispose';
 import { SolidMeshes } from './solidMeshes';
+import type { DebugShape } from '../sim/debugDraw';
 import { sunDirection } from '../sim/env';
 import type { Tuning } from '../config/tuning';
 import type { SimEvent } from '../sim/events';
@@ -47,6 +48,7 @@ export class GameRenderer {
   private worldGroup = new THREE.Group();
   private guards: GuardMeshes | null = null;
   private solids: SolidMeshes | null = null;
+  private readonly projected = new THREE.Vector3();
   private debug: DebugLayer | null = null;
   private debugOn = false;
   private collidersOn = false;
@@ -140,6 +142,18 @@ export class GameRenderer {
     this.gl.setSize(width, height, false);
     this.camera.aspect = width / Math.max(height, 1);
     this.camera.updateProjectionMatrix();
+  }
+
+  /** What systems drew in their last tick (sim/debugDraw.ts); shown in the debug view. */
+  setDrawn(shapes: readonly DebugShape[], tick: number): void {
+    this.debug?.setDrawn(shapes, tick);
+  }
+
+  /** Where a world point lands on screen, in CSS pixels; null if it is behind the camera or off screen. */
+  project(x: number, y: number, z: number, width: number, height: number): { x: number; y: number } | null {
+    const v = this.projected.set(x, y, z).project(this.camera);
+    if (v.z < -1 || v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return null;
+    return { x: ((v.x + 1) / 2) * width, y: ((1 - v.y) / 2) * height };
   }
 
   render(prev: Snapshot, curr: Snapshot, alpha: number, time: number, pose: CameraPose, aim: THREE.Vector3 | null): void {

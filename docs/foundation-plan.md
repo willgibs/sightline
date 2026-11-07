@@ -78,13 +78,13 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [x] The perception boundary (audit item 4): a brain (`src/sim/ai`) decides from a `GuardMind` alone (its own body, its post and routine, the static world, the time, its percepts), built on the other side of the boundary from the guard's own state; an architecture test keeps `src/sim/ai` from importing the state, the simulation or the systems. The routine is the first brain. A no-omniscience test runs the valley twice with the player in two places 600 m apart: wherever a guard has the same mind in both runs, his decisions match bit for bit, and a brain that peeks at the player is caught. Lab A adds percepts' kinds and beliefs; lab E, brains with their own random streams.
 
 ### M8 · Presentation seams and feel
-- [ ] Cues (what the shipped game shows) and debug primitives as separate channels out of the simulation; the honest view reads cues only.
+- [x] Cues and debug drawings as separate channels out of the simulation: the honest view draws only snapshots and events (what the shipped game can show); systems explain themselves through `ctx.debug(draw => …)` (`sim/debugDraw.ts`: lines, points, circles, labels), which runs only while the debug view is on, isn't state and never changes an outcome.
 - [ ] An action-map layer: device bindings to named actions by context (on foot, optic, menu, debug), defaults in a data table.
 - [ ] Settings with persistence: sensitivity, field of view, invert, volume. Raw mouse input where the browser supports it.
 - [ ] Sound wired into the game: events, ambient sources, muffling, pause ducking.
 - [ ] The camera never renders from inside a guard: a guard's mesh hides while the eye is inside its capsule. (Guards that step around a cornered player come with lab E.)
 - [ ] Tree canopies drawn so an eye inside one sees it, not a hole (they are single-sided cones today).
-- [ ] A controller debug overlay: ground slope against the limit, sliding, rim probes, and the pushes of each resolve step (rule 8).
+- [x] A controller debug overlay: the body's circle, its rim probes (red where the terrain rises more than a step), its heading, a label with the slope against the limit, sliding, what it stands on and its mode, and every push of the resolve passes, coloured by what pushed (rule 8).
 - [ ] Head bob is drawn but not simulated, so a shot leaves from the eye without it. Turn bob off with an optic up, or make it a pure function of simulation time that both sides evaluate (with lab B).
 
 **The runtime audit** (the browser app and renderer, Nov 7; findings H1–H5, M1–M8, L1–L9):

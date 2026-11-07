@@ -14,6 +14,9 @@ export class Hud {
   private readonly reticle: HTMLElement;
   private readonly range: HTMLElement;
   private readonly toastEl: HTMLElement;
+  /** Labels systems drew (sim/debugDraw.ts), placed over the world in the debug view. */
+  private readonly labelLayer: HTMLElement;
+  private readonly labels: HTMLElement[] = [];
   private toastTimer = 0;
   private lastHeading = -1;
   /** The compass's drawn width in CSS pixels: what the stylesheet gives it (narrower on small screens). */
@@ -26,7 +29,8 @@ export class Hud {
       <div class="legend"></div>
       <div class="reticle"></div>
       <div class="range"></div>
-      <div class="toast"></div>`;
+      <div class="toast"></div>
+      <div class="debug-labels"></div>`;
     this.compass = root.querySelector('.compass')!;
     this.ctx = this.compass.getContext('2d')!;
     this.panel = root.querySelector('.debug-panel')!;
@@ -34,6 +38,7 @@ export class Hud {
     this.reticle = root.querySelector('.reticle')!;
     this.range = root.querySelector('.range')!;
     this.toastEl = root.querySelector('.toast')!;
+    this.labelLayer = root.querySelector('.debug-labels')!;
     this.legend.innerHTML = [
       ['F3 / `', '', 'view'],
       ['B', 'KeyB', 'colliders'],
@@ -128,6 +133,29 @@ export class Hud {
     this.toastEl.classList.add('is-on');
     window.clearTimeout(this.toastTimer);
     this.toastTimer = window.setTimeout(() => this.toastEl.classList.remove('is-on'), 2200);
+  }
+
+  /** Shows these labels at these screen positions (CSS pixels); the rest of the pool hides. At most 64. */
+  setLabels(items: ReadonlyArray<{ x: number; y: number; text: string; color: string }>): void {
+    const n = Math.min(items.length, 64);
+    while (this.labels.length < n) {
+      const el = document.createElement('div');
+      el.className = 'debug-label';
+      this.labelLayer.appendChild(el);
+      this.labels.push(el);
+    }
+    for (let k = 0; k < this.labels.length; k++) {
+      const el = this.labels[k]!;
+      const item = items[k];
+      if (k >= n || !item) {
+        if (el.style.display !== 'none') el.style.display = 'none';
+        continue;
+      }
+      el.style.display = 'block';
+      el.style.transform = `translate(${Math.round(item.x)}px, ${Math.round(item.y)}px) translate(-50%, -100%)`;
+      if (el.textContent !== item.text) el.textContent = item.text;
+      el.style.borderColor = item.color;
+    }
   }
 
   get reticleEl(): HTMLElement {

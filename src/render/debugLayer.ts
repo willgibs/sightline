@@ -8,6 +8,7 @@ import { GUARD_FIELDS, type Snapshot } from '../sim/sim';
 import { routinePose, type RoutinePose } from '../sim/gen/routine';
 import { Cell } from '../sim/world/grid';
 import { Blocks } from '../sim/world/colliders';
+import type { DebugShape } from '../sim/debugDraw';
 import { disposeTree } from './dispose';
 import { palette } from './palette';
 
@@ -63,6 +64,11 @@ export class DebugLayer {
   private colliders: THREE.LineSegments | null = null;
   private perches: THREE.Group | null = null;
   private grid: THREE.Points | null = null;
+  /** What systems drew in the last tick (sim/debugDraw.ts), as one set of coloured lines. */
+  private readonly drawn: THREE.LineSegments;
+  private drawnCapacity = 512;
+  private drawnTick = -1;
+  private readonly tones = Object.fromEntries(Object.entries(palette.debug.tones).map(([k, v]) => [k, new THREE.Color(v)])) as Record<string, THREE.Color>;
   private readonly coreHalf: number;
   private readonly wideHalf: number;
 
@@ -132,6 +138,15 @@ export class DebugLayer {
     this.aim.visible = false;
     this.group.add(this.aim);
 
+    // What systems draw: rebuilt when a tick's drawings change.
+    const drawnGeo = new THREE.BufferGeometry();
+    drawnGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.drawnCapacity * 6), 3));
+    drawnGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(this.drawnCapacity * 6), 3));
+    this.drawn = new THREE.LineSegments(drawnGeo, new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false, transparent: true, opacity: 0.95 }));
+    this.drawn.frustumCulled = false;
+    this.drawn.renderOrder = 9;
+    this.group.add(this.drawn);
+
     // Play-area boundary.
     const half = world.playHalf;
     const bounds: THREE.Vector3[] = [];
@@ -181,6 +196,55 @@ export class DebugLayer {
       if (on && !this.perches.parent) this.group.add(this.perches);
       if (!on && this.perches.parent) this.group.remove(this.perches);
     }
+  }
+
+  /**
+   * Draws what systems drew in their last tick: lines, crosses for points, circles.
+   * Labels are drawn by the HUD (the game projects them).
+   */
+  setDrawn(shapes: readonly DebugShape[], tick: number): void {
+    if (tick === this.drawnTick) return;
+    this.drawnTick = tick;
+    const segs: number[] = [];
+    const cols: THREE.Color[] = [];
+    const seg = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, c: THREE.Color) => {
+      segs.push(ax, ay, az, bx, by, bz);
+      cols.push(c);
+    };
+    for (const s of shapes) {
+      const c = this.tones[s.tone] ?? this.tones.info!;
+      if (s.kind === 'line') seg(s.ax, s.ay, s.az, s.bx, s.by, s.bz, c);
+      else if (s.kind === 'point') {
+        const h = s.size / 2;
+        seg(s.x - h, s.y, s.z, s.x + h, s.y, s.z, c);
+        seg(s.x, s.y - h, s.z, s.x, s.y + h, s.z, c);
+        seg(s.x, s.y, s.z - h, s.x, s.y, s.z + h, c);
+      } else if (s.kind === 'circle') {
+        const n = 24;
+        for (let k = 0; k < n; k++) {
+          const a0 = (k / n) * Math.PI * 2;
+          const a1 = ((k + 1) / n) * Math.PI * 2;
+          seg(s.x + Math.cos(a0) * s.r, s.y, s.z + Math.sin(a0) * s.r, s.x + Math.cos(a1) * s.r, s.y, s.z + Math.sin(a1) * s.r, c);
+        }
+      }
+    }
+    const n = cols.length;
+    if (n > this.drawnCapacity) {
+      this.drawnCapacity = n * 2;
+      this.drawn.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.drawnCapacity * 6), 3));
+      this.drawn.geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(this.drawnCapacity * 6), 3));
+    }
+    const pos = this.drawn.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const col = this.drawn.geometry.getAttribute('color') as THREE.BufferAttribute;
+    (pos.array as Float32Array).set(segs);
+    for (let k = 0; k < n; k++) {
+      const c = cols[k]!;
+      col.setXYZ(k * 2, c.r, c.g, c.b);
+      col.setXYZ(k * 2 + 1, c.r, c.g, c.b);
+    }
+    pos.needsUpdate = true;
+    col.needsUpdate = true;
+    this.drawn.geometry.setDrawRange(0, n * 2);
   }
 
   addEvents(events: readonly SimEvent[], time: number): void {

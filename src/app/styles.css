@@ -143,6 +143,28 @@ body {
   white-space: nowrap;
 }
 
+/* Labels systems draw over the world (sim/debugDraw.ts): debug view only. */
+.debug-labels {
+  display: none;
+}
+
+#hud.is-debug .debug-labels {
+  display: block;
+}
+
+.debug-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 1px 5px;
+  background: var(--panel);
+  color: var(--panel-ink);
+  font: 10px/1.4 var(--mono);
+  border-left: 2px solid;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
 .toast {
   position: absolute;
   left: 50%;

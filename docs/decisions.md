@@ -14,6 +14,12 @@ The first scene is the movement course: stairs, a 1 m and a 2 m drop, ramps of 3
 
 **Why:** each Phase 1 lab is a scene built to its exit test, and needs to be playable, scriptable and replayable without building its own harness. A regression test that needs more than one tick is a scene too.
 
+### Systems explain themselves through a debug channel
+
+**Decision:** A system draws for the debug view with `ctx.debug(draw => …)` (`src/sim/debugDraw.ts`): lines, points, circles and labels, coloured by meaning. The callback runs only while the debug view is on; what it draws isn't state, isn't hashed or recorded, and nothing in the simulation reads it back. The renderer draws the newest tick's lines, and the HUD places its labels. The first user is the controller overlay: the player's body circle, rim probes, heading, a label with slope against the limit, sliding, footing and mode, and every push of the resolve passes.
+
+**Why:** rule 8 asks every system to ship explainable, and labs A to E need to show what their systems decided and why (a perception ray, a suspicion level, a path). Without one channel, each lab would reach into the renderer its own way, or leave debugging state in the simulation.
+
 ### Camps stand at sites
 
 **Decision:** A camp is laid out in the frame of its site (`gen/site.ts`): the camp's centre, the direction its gate faces, and its pad. Everything that looks for the camp asks the site rather than the origin: validation's perches and approaches, the spawn's facing, the props kept clear of the pad, the first view, the benchmark's flight and the debug view's sight lines. The procedural valley still builds one site at the origin, so nothing moved: the valley's fingerprint is unchanged. A test builds the same camp at a site 380 m away and finds every collider, guard and routine simply moved.

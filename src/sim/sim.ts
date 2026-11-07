@@ -11,6 +11,7 @@ import type { MoveIntent } from './motor/motor';
 import { bodyShape, emptyShape } from './motor/shape';
 import type { QueryBody, QueryView } from './world/query';
 import type { Collider } from './world/colliders';
+import { DebugCanvas, type DebugDraw } from './debugDraw';
 import { Solids, solidId } from './world/solids';
 import { createGuard } from './entities/guards';
 import {
@@ -103,6 +104,13 @@ export class Simulation {
   profiler: Profiler | null = null;
   /** Set when a tick failed; the simulation runs no further ticks (restore() clears it). */
   fault: SimFault | null = null;
+  /**
+   * What systems drew for the debug view in the last tick (debugDraw.ts), while
+   * `drawDebug` is on. Not state: never read back by the simulation.
+   */
+  readonly debugCanvas = new DebugCanvas();
+  /** Collect systems' debug drawings (the debug view is on). */
+  drawDebug = false;
   /** The scene this simulation runs (scene.ts), if any: recordings name it so they can be re-simulated. */
   scene: { name: string; version: number } | null = null;
   readonly systems: readonly System[];
@@ -155,6 +163,9 @@ export class Simulation {
         return e.id;
       },
       schedule: (seconds: number, kind: string, a = 0, b = 0) => scheduleIn(ctx.state, ctx.tick, ctx.dt, seconds, kind, a, b),
+      debug: (paint: (draw: DebugDraw) => void): void => {
+        if (this.drawDebug) paint(this.debugCanvas);
+      },
       draw: <T>(id: EntityId, purpose: string, use: (rng: Rng) => T): T => {
         const key = `${id}.${purpose}`;
         const words = ctx.state.rng[key] ?? new Rng(world.seed, `entity${id}`).fork(purpose).stateWords();
@@ -218,6 +229,7 @@ export class Simulation {
     if (this.fault) throw new Error(`The simulation stopped at tick ${this.fault.tick}, in ${this.fault.system}: ${this.fault.message}`);
     quantizeInput(input, this.lastInput);
     this.events.length = 0;
+    this.debugCanvas.clear();
     const s = this.state;
     const tick = s.tick + 1;
     const ctx = this.ctx;
