@@ -32,10 +32,17 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 ## Checking work
 
 - `npm run check`: typecheck plus all tests. Must pass before you hand anything back.
+- `npm run test:browser`: tests that need a real browser (Web Audio, WebGL, each browser's JavaScript engine), run in Chromium through Playwright. On a new machine, install the browser once with `npx playwright install chromium`.
 - `npm run sim -- --minutes 10`: bot run, recording and bit-exact re-simulation, with timing.
 - `npm run seeds -- --count 100`: generation health across many seeds.
 - In the browser, `window.sightline` exposes automation hooks for scripted screenshots and playtests: `play`, `debug(on)`, `fly(x, y, z, headingDeg, pitchDeg)`, `body()`, `hold([codes])`, `tap('KeyC' | 'KeyZ')`, `zoom(on)`, `state()`, `dump()`, `recording()`.
 - Look at the result. Render the honest and debug views and judge them, rather than trusting that code which compiles also reads well.
+
+## Workflow
+
+- The repository is `willgibs/sightline` on GitHub. Keep `main` green: CI runs the full check on every push, and weekly on macOS and Windows with a cross-platform hash comparison.
+- Every push to `main` deploys to production on Vercel (sightline-willgibs.vercel.app, visible only to the owner's Vercel account); other branches get preview deploys.
+- Commit in small, verified steps, each with its tests passing.
 
 ## Conventions
 
