@@ -59,6 +59,17 @@ describe('architecture', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('reads the terrain through its queries, outside generation', () => {
+    // Simulation systems ask the terrain (heightAt, sample, surfaceAt, raycast), so real or
+    // chunked terrain can stand behind the same questions later. Only generation, the
+    // heightfield itself, test bots and the renderer touch its arrays.
+    const offenders = files(join(root, 'src/sim'))
+      .filter((f) => !/[\\/](gen|bots)[\\/]/.test(f) && !f.endsWith('heightfield.ts'))
+      .filter((f) => /\.(heights|surfaces|cellMax)\b|\.index\(/.test(code(f)))
+      .map((f) => relative(root, f));
+    expect(offenders).toEqual([]);
+  });
+
   it('never reads the clock, waits, or reaches outside inside the simulation', () => {
     // Wall-clock time, timers, async code and network or dynamic imports would make a
     // tick depend on more than its state and input. Callers pass a clock in when they

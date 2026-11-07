@@ -5,8 +5,12 @@
  * than mysterious.
  */
 
-/** What generation builds from a given MissionSpec. 2: guards' routines, generated with the camp. */
-export const GEN_VERSION = 2;
+/**
+ * What generation builds from a given MissionSpec. 2: guards' routines, generated with the
+ * camp. 3: walls and buildings block sound (Blocks.Sound), and the fingerprint covers every
+ * collider.
+ */
+export const GEN_VERSION = 3;
 
 /**
  * How the simulation behaves for given inputs. 3: events carry ids, times, entity sources

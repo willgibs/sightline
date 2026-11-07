@@ -82,6 +82,18 @@ export const defaultTuning = {
     stride: { sprint: 1.7, walk: 1.25, crouch: 0.85, crawl: 0.6 }, // metres between footsteps
   },
 
+  bodies: {
+    // A human body as three parts for sight lines, hits and the guards' meshes: a head
+    // sphere at the eye, a torso capsule from the hips to the shoulders, a legs capsule
+    // from the feet to the hips (motor/shape.ts). Heights come from each body's stance.
+    headRadius: 0.115,
+    torsoRadius: 0.22,
+    legRadius: 0.15,
+    neck: 0.24, // the top of the torso sits this far below the eye
+    hip: 0.5, // hips at this share of the stance's height
+    proneLength: 1.75, // head to heels, lying down
+  },
+
   noise: {
     // Loudness = movement × surface; heard radius = loudness × radiusPerUnit (no masking).
     // Sprinting on gravel is about three times as loud as crouch-walking on grass.

@@ -6,6 +6,20 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### One query for what a line hits, and one shape for every body
+
+**Decision:** `src/sim/world/query.ts` answers "what does this line hit" for sight, hearing, shots and the rangefinder alike: the terrain, the colliders matching a mask, and bodies, with the point, the outward normal, what was hit, its id, the body part and the surface. `sightLine` asks whether one point can see another. Bodies stand in the way of sight and bullets, not sound; a new `Blocks.Sound` flag says which colliders stop sound (walls and buildings do, chain-link fences don't), and the sound engine's muffling uses it.
+
+Every human body has one shape (`src/sim/motor/shape.ts`): a head sphere at the eye, a torso capsule from the hips to the shoulders, a legs capsule, from `tuning.bodies`. Prone, it lies along the facing, head first; between stances it follows the eye. The guards' meshes are built from the same shape, so what is drawn is what can be hit.
+
+Simulation code reads the terrain through its queries (`heightAt`, `sample`, `surfaceAt`, `raycast`); an architecture test keeps the heightfield's arrays to generation, test bots and rendering, so real or chunked terrain can stand behind the same questions later.
+
+**Why:** Labs A and B would otherwise write separate visibility and hit code against different guard shapes (three sources disagreed: physics, the rangefinder and the mesh), and "if he can see your head, you can hit his" would stop being true by construction.
+
+**Guarded by** `tests/query.test.ts`: ray tests against spheres and capsules agree with marching along the ray to the millimetre; a ray at a guard's head, chest and knees names those parts; normals and surfaces of terrain and colliders; sound passes a fence but not a wall; sight between 400 random pairs of points is symmetric.
+
+The valley's fingerprint now covers every collider (it only counted them before) and the sound flag, so `GEN_VERSION` is 3. Movement is unchanged.
+
 ### Guards keep to routines, a pure function of time, and move like the player
 
 **Decision:**

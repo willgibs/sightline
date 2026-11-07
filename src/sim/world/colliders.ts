@@ -3,15 +3,16 @@ import type { Surface } from './surfaces';
 /**
  * Static collision shapes: oriented boxes and vertical cylinders.
  *
- * Each collider says what it blocks. A chain-link fence blocks movement but not sight
- * or bullets; a bush blocks sight only; a concrete wall blocks everything. Perception
- * (Phase 1) and ballistics use the same raycast with a different mask.
+ * Each collider says what it blocks. A chain-link fence blocks movement but not sight,
+ * bullets or sound; a bush blocks sight only; a wall blocks everything. Perception,
+ * hearing and ballistics use the same raycast (world/query.ts) with a different mask.
  */
 export const Blocks = {
   Move: 1,
   Sight: 2,
   Bullet: 4,
-  All: 7,
+  Sound: 8,
+  All: 15,
 } as const;
 
 interface ColliderBase {

@@ -74,6 +74,11 @@ export function worldFingerprint(w: World): string {
   for (const b of w.props.bushes) h.f64(b.x).f64(b.z);
   for (const g of w.camp.guards) h.f64(g.x).f64(g.y).f64(g.z);
   h.f64(w.spawn.x).f64(w.spawn.z).u32(w.colliders.list.length);
+  for (const c of w.colliders.list) {
+    h.str(c.kind).f64(c.x).f64(c.z).f64(c.y0).f64(c.y1).u32(c.flags).u32(c.surface);
+    if (c.kind === 'cyl') h.f64(c.r);
+    else h.f64(c.hx).f64(c.hz).f64(c.ux).f64(c.uz);
+  }
   for (const g of w.camp.guards) {
     const r = g.routine;
     h.f64(r.period).f64(r.scanAmp).f64(r.scanPeriod).f64(r.scanPhase).u32(r.legs.length);

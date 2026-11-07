@@ -2,6 +2,10 @@ import * as THREE from 'three';
 import type { GuardRole } from '../sim/gen/camp';
 import { GUARD_FIELDS, type Snapshot } from '../sim/sim';
 import { lerp } from '../sim/core/math';
+import type { Tuning } from '../config/tuning';
+import { guardSpec } from '../sim/entities/guards';
+import type { BodyState } from '../sim/motor/body';
+import { bodyShape, emptyShape } from '../sim/motor/shape';
 import { createFlatMaterial, type LookUniforms } from './materials';
 import { palette } from './palette';
 
@@ -9,12 +13,15 @@ interface GuardMesh {
   root: THREE.Group;
   head: THREE.Group;
   body: THREE.Mesh;
+  legs: THREE.Mesh;
 }
 
 /**
- * Guards as the design doc's wireframe stand-ins: a capsule body, a head sphere (a real
- * headshot target), a pale visor showing where the head points, and a rifle. Facing has
- * to read at 300 m through a scope, so the visor and rifle carry it.
+ * Guards as the design doc's wireframe stand-ins: a torso and legs as capsules, a head
+ * sphere, a pale visor showing where the head points, and a rifle. Facing has to read at
+ * 300 m through a scope, so the visor and rifle carry it. The capsules and the sphere are
+ * the body's shape (sim/motor/shape.ts), built from the same numbers sight and hits use,
+ * so what is drawn is what can be hit.
  */
 export class GuardMeshes {
   readonly group = new THREE.Group();
@@ -24,7 +31,10 @@ export class GuardMeshes {
   private readonly roleMaterials: Record<GuardRole, THREE.ShaderMaterial>;
   private readonly visorMaterial: THREE.ShaderMaterial;
   private readonly bodyGeo: THREE.BufferGeometry;
+  private readonly legsGeo: THREE.BufferGeometry;
   private readonly headGeo: THREE.BufferGeometry;
+  private readonly headY: number;
+  private readonly rifleY: number;
   private readonly visorGeo: THREE.BufferGeometry;
   private readonly rifleGeo: THREE.BufferGeometry;
   private readonly prevIndex = new Map<number, number>();
@@ -33,11 +43,23 @@ export class GuardMeshes {
   constructor(
     private readonly roleOf: (spawn: number) => GuardRole,
     private readonly look: LookUniforms,
+    tuning: Tuning,
   ) {
     this.group.name = 'guards';
-    this.bodyGeo = new THREE.CapsuleGeometry(0.27, 1.06, 3, 10);
-    this.bodyGeo.translate(0, 0.27 + 0.53, 0); // stand on the ground
-    this.headGeo = new THREE.SphereGeometry(0.115, 12, 8);
+    // A standing guard's shape at the origin.
+    const spec = guardSpec(tuning);
+    const standing = { x: 0, y: 0, z: 0, yaw: 0, stance: 'stand', eyeHeight: spec.eyeHeight.stand } as BodyState;
+    const s = bodyShape(standing, spec, tuning.bodies, emptyShape());
+    const capsule = (c: typeof s.torso, segments: number): THREE.BufferGeometry => {
+      const g = new THREE.CapsuleGeometry(c.r, c.by - c.ay, 3, segments);
+      g.translate(0, (c.ay + c.by) / 2, 0);
+      return g;
+    };
+    this.bodyGeo = capsule(s.torso, 10);
+    this.legsGeo = capsule(s.legs, 8);
+    this.headY = s.head.y;
+    this.rifleY = (s.torso.ay + s.torso.by) / 2 + 0.1;
+    this.headGeo = new THREE.SphereGeometry(s.head.r, 12, 8);
     this.visorGeo = new THREE.BoxGeometry(0.17, 0.05, 0.07);
     this.visorGeo.translate(0, 0.015, -0.1);
     this.rifleGeo = new THREE.BoxGeometry(0.05, 0.06, 0.95);
@@ -52,17 +74,19 @@ export class GuardMeshes {
 
   private make(role: GuardRole): GuardMesh {
     const root = new THREE.Group();
-    const body = new THREE.Mesh(this.bodyGeo, this.debugTint ? this.roleMaterials[role] : this.honestMaterial);
+    const material = this.debugTint ? this.roleMaterials[role] : this.honestMaterial;
+    const body = new THREE.Mesh(this.bodyGeo, material);
     body.userData.role = role;
+    const legs = new THREE.Mesh(this.legsGeo, material);
     const head = new THREE.Group();
-    head.position.set(0, 1.71, 0);
+    head.position.set(0, this.headY, 0);
     head.add(new THREE.Mesh(this.headGeo, this.honestMaterial), new THREE.Mesh(this.visorGeo, this.visorMaterial));
     const rifle = new THREE.Mesh(this.rifleGeo, this.honestMaterial);
-    rifle.position.set(0.2, 1.22, -0.18);
+    rifle.position.set(0.2, this.rifleY, -0.18);
     rifle.rotation.set(-0.35, 0.25, 0.2);
-    root.add(body, head, rifle);
+    root.add(legs, body, head, rifle);
     this.group.add(root);
-    return { root, head, body };
+    return { root, head, body, legs };
   }
 
   /** Debug view tints guards by role; the honest view keeps them uniform. */
@@ -72,6 +96,7 @@ export class GuardMeshes {
     for (const g of this.guards.values()) {
       const role = g.body.userData.role as GuardRole;
       g.body.material = on ? this.roleMaterials[role] : this.honestMaterial;
+      g.legs.material = g.body.material;
     }
   }
 
@@ -115,7 +140,7 @@ export class GuardMeshes {
   }
 
   dispose(): void {
-    for (const geo of [this.bodyGeo, this.headGeo, this.visorGeo, this.rifleGeo]) geo.dispose();
+    for (const geo of [this.bodyGeo, this.legsGeo, this.headGeo, this.visorGeo, this.rifleGeo]) geo.dispose();
     this.honestMaterial.dispose();
     this.visorMaterial.dispose();
     for (const m of Object.values(this.roleMaterials)) m.dispose();

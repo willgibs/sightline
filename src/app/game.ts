@@ -6,8 +6,9 @@ import { exposure } from '../sim/perception/visibility';
 import { generateWorld, simTuningKey, worldTuningKey, type SpawnKind, type World } from '../sim/gen/world';
 import { neutralInput } from '../sim/input';
 import { Recorder } from '../sim/record/recording';
-import { GUARD_FIELDS, Simulation, type Snapshot } from '../sim/sim';
-import { Blocks, type Collider, type RayHit } from '../sim/world/colliders';
+import { Simulation, type Snapshot } from '../sim/sim';
+import { Blocks, type Collider } from '../sim/world/colliders';
+import { emptyHit, raycast, type QueryBody } from '../sim/world/query';
 import { Surface, surfaceName } from '../sim/world/surfaces';
 import { GameRenderer, type CameraPose } from '../render/renderer';
 import { Hud } from './hud';
@@ -64,7 +65,8 @@ export class Game {
   private clock: FixedStepClock;
   private readonly stats = new FrameStats();
   private readonly raw = neutralInput();
-  private readonly hit: RayHit = { dist: 0, id: -1 };
+  private readonly hit = emptyHit();
+  private readonly queryBodies: QueryBody[] = [];
   private readonly spawnKind: SpawnKind;
   private debug: boolean;
   private colliders = false;
@@ -417,25 +419,13 @@ export class Game {
     const dx = -Math.sin(pose.yaw) * cp;
     const dy = Math.sin(pose.pitch);
     const dz = -Math.cos(pose.yaw) * cp;
-    const max = 2000;
-    let t = this.world.terrain.raycast(pose.x, pose.y, pose.z, dx, dy, dz, max);
-    let what = 'terrain';
-    this.world.colliders.raycast(pose.x, pose.y, pose.z, dx, dy, dz, max, Blocks.Bullet, this.hit);
-    if (this.hit.id >= 0 && this.hit.dist > 0.2 && this.hit.dist < t) {
-      t = this.hit.dist;
-      what = colliderLabel(this.world.colliders.list[this.hit.id]!);
-    }
-    const g = this.curr.guards;
-    for (let i = 0; i < g.length / GUARD_FIELDS; i++) {
-      const o = i * GUARD_FIELDS;
-      const d = rayUpright(pose.x, pose.y, pose.z, dx, dy, dz, g[o]!, g[o + 1]!, g[o + 2]!, this.tuning.guards.radius, this.tuning.guards.height);
-      if (d > 0 && d < t) {
-        t = d;
-        what = `guard ${i + 1}`;
-      }
-    }
-    if (Number.isFinite(t)) {
-      this.aim = (this.aim ?? new THREE.Vector3()).set(pose.x + dx * t, pose.y + dy * t, pose.z + dz * t);
+    // The same query sight and shots use, ignoring the player's own body.
+    const hit = raycast(this.world, this.sim.queryBodies(this.queryBodies), pose.x, pose.y, pose.z, dx, dy, dz, 2000, Blocks.Bullet, this.hit, this.sim.playerId);
+    if (hit.what !== 'none') {
+      const t = hit.dist;
+      const what =
+        hit.what === 'body' ? `guard ${hit.id} · ${hit.part}` : hit.what === 'collider' ? colliderLabel(this.world.colliders.list[hit.id]!) : 'terrain';
+      this.aim = (this.aim ?? new THREE.Vector3()).set(hit.x, hit.y, hit.z);
       this.aimText = `${t < 10 ? t.toFixed(1) : Math.round(t)} m · ${what}`;
     } else {
       this.aim = null;
@@ -667,29 +657,3 @@ function colliderLabel(c: Collider): string {
 }
 
 /** Ray against an upright cylinder standing at (x, y, z). */
-function rayUpright(
-  ox: number,
-  oy: number,
-  oz: number,
-  dx: number,
-  dy: number,
-  dz: number,
-  x: number,
-  y: number,
-  z: number,
-  r: number,
-  h: number,
-): number {
-  const px = ox - x;
-  const pz = oz - z;
-  const a = dx * dx + dz * dz;
-  if (a < 1e-12) return -1;
-  const b = px * dx + pz * dz;
-  const c = px * px + pz * pz - r * r;
-  const disc = b * b - a * c;
-  if (disc < 0) return -1;
-  const t = (-b - Math.sqrt(disc)) / a;
-  if (t < 0) return -1;
-  const hy = oy + dy * t;
-  return hy >= y && hy <= y + h ? t : -1;
-}

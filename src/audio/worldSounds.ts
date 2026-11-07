@@ -49,7 +49,7 @@ export function makeMuffle(world: World): MuffleFn {
     const oy = sy + 0.3;
     const reach = d - 0.3;
     if (world.terrain.raycast(sx, oy, sz, ux, uy, uz, reach) < reach) return MUFFLED;
-    world.colliders.raycast(sx, oy, sz, ux, uy, uz, reach, Blocks.Bullet, hit);
+    world.colliders.raycast(sx, oy, sz, ux, uy, uz, reach, Blocks.Sound, hit);
     if (hit.id >= 0 && hit.dist < reach) return MUFFLED;
     return null;
   };

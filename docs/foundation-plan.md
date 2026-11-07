@@ -60,9 +60,12 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [ ] Later, if perception's budget needs it: a fast path for bodies standing still (eight bodies cost about 80 µs a tick headless).
 
 ### M6 · World, bodies, environment
-- [ ] `world/query.ts`: raycasts with hit point, normal, id, body part and surface; segment sweeps against moving bodies; sight lines. Colliders that can be inserted, moved and removed at runtime. `Blocks.Sound`. The rangefinder uses `raycast` instead of its own guard test.
-- [ ] A `TerrainQuery` interface (`heightAt`, `sample`, `surfaceAt`, `raycast`, `bounds`) for simulation systems; only generation and rendering read the heightfield's arrays.
-- [ ] Body shapes (`bodyShape()` in `src/sim/motor/`): head, torso and legs from each pose, from `tuning.bodies`; meshes and hitboxes built from the same numbers. The motor's `BodySpec` moves to `tuning.bodies` too, with gravity going to the environment.
+- [x] `world/query.ts`: raycasts with hit point, normal, id, body part and surface; sight lines. `Blocks.Sound`. The rangefinder uses `raycast` instead of its own guard test.
+- [ ] Segment sweeps against moving bodies (the bullet's path against each part between two ticks' poses), with lab B.
+- [ ] Colliders that can be inserted, moved and removed at runtime: doors, the escape vehicle, the reinforcement truck. They are simulation state, so entities with a solid shape, which the motor and queries see alongside the world's colliders.
+- [x] Simulation code reads the terrain through its queries; an architecture test keeps the heightfield's arrays to generation, bots and rendering.
+- [x] Body shapes (`bodyShape()` in `src/sim/motor/shape.ts`): head, torso and legs from each pose, from `tuning.bodies`; the guards' meshes built from the same numbers.
+- [ ] The motor's `BodySpec` moves to `tuning.bodies` too (player and guard), with gravity going to the environment.
 - [ ] `EnvState` in the simulation: clock, wind, air (density, speed of sound); the sun's direction from deterministic math; the renderer reads the sun from the simulation.
 - [ ] One spatial grid: a 2.5 m map layer and a 0.5 m site layer recording walkable, blocks sound, cover height, indoors, surface and ambient masking.
 

@@ -1,7 +1,6 @@
 import type { Tuning } from '../config/tuning';
 import { assertTuning, frozenTuning } from '../config/validate';
 import { Rng } from './core/rng';
-import { createGuard } from './entities/guards';
 import { createPlayer, type PlayerControl } from './entities/player';
 import type { EventDraft, SimEvent } from './events';
 import { generateWorld, type SpawnKind, type World } from './gen/world';
@@ -9,6 +8,9 @@ import { neutralInput, quantizeInput, type InputFrame, type TickInput } from './
 import { missionSpec } from './mission';
 import type { BodyState, Gait, Stance } from './motor/body';
 import type { MoveIntent } from './motor/motor';
+import { bodyShape, emptyShape } from './motor/shape';
+import type { QueryBody } from './world/query';
+import { createGuard, guardSpec } from './entities/guards';
 import {
   Faction,
   PLAYER_ID,
@@ -278,6 +280,20 @@ export class Simulation {
       s.guards[o + 5] = b.speed > 0.1 ? 1 : 0;
     }
     return s;
+  }
+
+  /** Every body's shape as it stands now, for queries (world/query.ts). Reuses `out` and its shapes. */
+  queryBodies(out: QueryBody[] = []): QueryBody[] {
+    const all = [{ id: this.index.player.id, body: this.index.player.body, spec: this.current.player }];
+    const G = guardSpec(this.current);
+    for (const g of this.index.guards) all.push({ id: g.id, body: g.body, spec: G });
+    out.length = all.length;
+    all.forEach((e, k) => {
+      const q = (out[k] ??= { id: 0, shape: emptyShape() });
+      q.id = e.id;
+      bodyShape(e.body, e.spec, this.current.bodies, q.shape);
+    });
+    return out;
   }
 
   /** A hash of the complete dynamic state, for determinism checks: the whole state tree. */
