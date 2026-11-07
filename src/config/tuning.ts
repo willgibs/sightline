@@ -1,0 +1,99 @@
+/**
+ * Every tunable number in the game, in one place.
+ *
+ * Starting values come from the design doc (Part 2) and get tuned in play. In the dev
+ * build, saving this file hot-reloads it into the running game: movement, noise and
+ * view values apply immediately; world and prop values regenerate the valley in place.
+ *
+ * Units: metres, seconds, degrees (where named *Deg), multipliers otherwise.
+ */
+export const defaultTuning = {
+  sim: {
+    tickHz: 30, // fixed simulation rate (design doc · Platform and architecture)
+    recordHz: 10, // state samples per second in recordings
+  },
+
+  world: {
+    size: 1280, // terrain square, centred on the camp
+    cellSize: 2.5, // heightfield spacing; render and physics share these triangles
+    playMargin: 70, // out-of-bounds band at the terrain edge
+    padRadius: 78, // flattened camp pad
+    padBlend: 36, // blend from the pad into the valley floor
+    padHeight: 0.5, // pad elevation; kept off the 5 m contour lines
+    ridgeRadius: [215, 430], // crest distance from the camp, varying around the valley
+    ridgeHeight: [32, 78], // crest height above the pad
+    saddleCount: [3, 4], // low passes through the ridges: the creek uses two, the road one
+    saddleDepth: [0.6, 0.82], // share of the crest height a saddle removes
+    saddleHalfWidthDeg: [15, 24],
+    warpAmplitude: 70, // breaks the bowl's symmetry
+    hills: 15, // broad rolling relief
+    crags: 9, // ridged relief on the slopes
+    detail: 0.9, // fine relief
+    creekWidth: 7, // flat creek bed
+    creekBankSlope: 0.8, // bank rise per metre (about 39°)
+    roadWidth: 6,
+    maxGenAttempts: 6, // re-rolls before accepting a valley that fails validation
+  },
+
+  props: {
+    treeSpacing: 6, // jittered-grid cell for tree candidates
+    treeCover: 0.42, // share of forest cells that grow a tree
+    rockSpacing: 13,
+    bushSpacing: 7,
+  },
+
+  player: {
+    radius: 0.3,
+    height: { stand: 1.8, crouch: 1.2, prone: 0.5 },
+    eyeHeight: { stand: 1.65, crouch: 1.05, prone: 0.32 },
+    speed: { sprint: 5.5, walk: 3.0, crouch: 1.8, crawl: 0.7 }, // design doc · Player · Movement
+    backwardFactor: 0.7, // speed multiplier walking backwards
+    accel: 16, // m/s² toward the wished speed
+    decel: 20, // m/s² when slowing down
+    stanceTime: { crouch: 0.22, prone: 0.75 }, // seconds to change stance
+    maxSlopeDeg: 42, // steeper ground cannot be climbed
+    uphillSlowdown: 0.55, // speed multiplier climbing at the maximum slope
+    stepHeight: 0.45, // ledges up to this height are stepped onto
+    gravity: 9.81,
+    groundSnap: 0.6, // stay glued to the ground walking downhill
+    stride: { sprint: 1.7, walk: 1.25, crouch: 0.85, crawl: 0.6 }, // metres between footsteps
+  },
+
+  noise: {
+    // Loudness = movement × surface; heard radius = loudness × radiusPerUnit (no masking).
+    // Sprinting on gravel is about three times as loud as crouch-walking on grass.
+    movement: { sprint: 1.5, walk: 1.0, crouch: 0.6, crawl: 0.3 },
+    surface: { grass: 0.85, dirt: 1.0, gravel: 1.15, rock: 1.05, water: 1.35, metal: 1.4, wood: 1.2 },
+    radiusPerUnit: 12,
+  },
+
+  visibility: {
+    // Multipliers from design doc · Enemy perception · Sight. Phase 1 builds detection on them.
+    stance: { stand: 1.0, crouch: 0.6, prone: 0.3 },
+    movement: { still: 0.4, moving: 1.0, sprinting: 1.6 },
+    light: { lit: 1.0, dusk: 0.6, dark: 0.25 },
+    skyline: 1.5,
+    coneCoreDeg: 60,
+    conePeripheralDeg: 120,
+  },
+
+  guards: {
+    walkSpeed: 1.35,
+    turnRate: 2.6, // rad/s
+    waitTime: [2, 5], // seconds paused at each waypoint
+    headScanDeg: 50, // sentries sweep this far either side
+    headScanPeriod: 7,
+    stride: 0.75,
+  },
+
+  view: {
+    fov: 58, // vertical degrees, about 91° horizontal at 16:9
+    zoomFov: 9, // binocular-style zoom while holding the right mouse button
+    zoomTime: 0.16,
+    lookSensitivity: 0.0022, // radians per pixel at the base field of view
+    headBob: 1, // 0 turns camera bob off
+    fogDensity: 0.0012, // exp² fog: about 30% at 500 m, 75% at 1 km
+  },
+};
+
+export type Tuning = typeof defaultTuning;

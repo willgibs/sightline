@@ -1,0 +1,98 @@
+import { beforeAll, describe, expect, it } from 'vitest';
+import { defaultTuning } from '../src/config/tuning';
+import { Hasher } from '../src/sim/core/hash';
+import { closestOnPolyline, type PathHit } from '../src/sim/gen/paths';
+import { generateWorld, type World } from '../src/sim/gen/world';
+import { makeTerrainSample } from '../src/sim/world/heightfield';
+
+/** A fingerprint of everything generation decides: terrain, surfaces, props, camp, spawn. */
+function fingerprint(w: World): string {
+  const h = new Hasher();
+  h.bytes(new Uint8Array(w.terrain.heights.buffer));
+  h.bytes(w.terrain.surfaces);
+  for (const t of w.props.trees) h.f64(t.x).f64(t.z).f64(t.canopyH);
+  for (const r of w.props.rocks) h.f64(r.x).f64(r.z).f64(r.sy);
+  for (const b of w.props.bushes) h.f64(b.x).f64(b.z);
+  for (const g of w.camp.guards) h.f64(g.x).f64(g.y).f64(g.z);
+  h.f64(w.spawn.x).f64(w.spawn.z).u32(w.colliders.list.length);
+  return h.digest();
+}
+
+let tal: World;
+beforeAll(() => {
+  tal = generateWorld('TAL-4471', defaultTuning);
+});
+
+describe('world generation', () => {
+  it('builds the same valley from the same seed', () => {
+    const again = generateWorld('TAL-4471', defaultTuning);
+    expect(fingerprint(again)).toBe(fingerprint(tal));
+  });
+
+  it('builds different valleys from different seeds', () => {
+    const other = generateWorld('KOR-1188', defaultTuning);
+    expect(fingerprint(other)).not.toBe(fingerprint(tal));
+  });
+
+  it('keeps old seeds stable', () => {
+    // Daily contracts and shared seeds depend on a seed always building the same valley.
+    // If you change generation on purpose, update this value and note it in docs/decisions.md.
+    expect(fingerprint(tal)).toBe(GOLDEN_TAL_4471);
+  });
+
+  it('flattens the camp pad', () => {
+    const { terrain } = tal;
+    const pad = defaultTuning.world.padRadius;
+    for (let r = 0; r < pad; r += 7) {
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * 2 * Math.PI;
+        expect(terrain.heightAt(Math.cos(a) * r, Math.sin(a) * r)).toBeCloseTo(defaultTuning.world.padHeight, 5);
+      }
+    }
+  });
+
+  it('passes validation with overwatch and access from several directions', () => {
+    expect(tal.report.ok).toBe(true);
+    expect(tal.report.overwatchSectors).toBeGreaterThanOrEqual(3);
+    expect(tal.report.accessSectors).toBeGreaterThanOrEqual(4);
+    for (const p of tal.report.perches) {
+      expect(p.heightAbovePad).toBeGreaterThanOrEqual(12);
+      expect(p.dist).toBeGreaterThanOrEqual(150);
+      expect(p.dist).toBeLessThanOrEqual(500);
+    }
+  });
+
+  it('spawns the player on walkable ground inside the play area, facing the camp', () => {
+    const { spawn, terrain, playHalf } = tal;
+    expect(Math.abs(spawn.x)).toBeLessThan(playHalf);
+    expect(Math.abs(spawn.z)).toBeLessThan(playHalf);
+    const s = terrain.sample(spawn.x, spawn.z, makeTerrainSample());
+    expect(s.slopeTan).toBeLessThan(Math.tan((30 * Math.PI) / 180));
+    const toCamp = -(spawn.x * spawn.faceX + spawn.z * spawn.faceZ) / Math.hypot(spawn.x, spawn.z);
+    expect(toCamp).toBeCloseTo(1, 6);
+  });
+
+  it('puts guards on the ground or on their towers', () => {
+    for (const g of tal.camp.guards) {
+      const ground = tal.terrain.heightAt(g.x, g.z);
+      if (g.elevated) expect(g.y).toBeGreaterThan(ground + 5);
+      else expect(g.y).toBeCloseTo(ground, 5);
+    }
+    expect(tal.camp.guards.length).toBeGreaterThanOrEqual(6);
+    expect(tal.camp.guards.length).toBeLessThanOrEqual(16);
+  });
+
+  it('keeps cover off the pad, the road and the creek bed', () => {
+    const W = defaultTuning.world;
+    const hit: PathHit = { dist: 0, s: 0, x: 0, z: 0 };
+    for (const p of [...tal.props.trees, ...tal.props.bushes, ...tal.props.rocks]) {
+      expect(Math.hypot(p.x, p.z)).toBeGreaterThan(W.padRadius);
+      expect(closestOnPolyline(tal.features.road, p.x, p.z, W.roadWidth / 2, hit).dist).toBe(Infinity);
+      expect(closestOnPolyline(tal.features.creek, p.x, p.z, W.creekWidth / 2, hit).dist).toBe(Infinity);
+    }
+    expect(tal.props.trees.length).toBeGreaterThan(2000);
+    expect(tal.props.bushes.length).toBeGreaterThan(500);
+  });
+});
+
+const GOLDEN_TAL_4471 = '2ea333d491d7568c';

@@ -1,0 +1,32 @@
+{
+  "name": "sightline",
+  "version": "0.0.1",
+  "private": true,
+  "description": "A first-person stealth-sniper game. Phase 0: foundations.",
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "sim": "tsx src/headless/cli.ts",
+    "seeds": "tsx src/headless/seeds.ts",
+    "check": "npm run typecheck && npm run test"
+  },
+  "dependencies": {
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/three": "0.186.0",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}

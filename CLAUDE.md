@@ -1,0 +1,46 @@
+# Sightline: working rules
+
+The design doc is the source of truth: [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j). Build phase by phase. Each system's spec, starting numbers and **Done when** test come from Part 2 of that doc. Taste calls belong to the owner. Work proceeds on the doc's recommended defaults until the owner overrides them.
+
+## Where we are
+
+Phase 0 (Foundations) is complete, and the owner passed its gate on Nov 7, 2026; see `docs/phase-0-report.md`. The owner approved the wireframe look as the canvas for the next phases. Next is Phase 1: five labs, each an isolated wireframe scene built to its exit test.
+
+| Lab | Builds | Exit test |
+| --- | --- | --- |
+| A | Perception and awareness | Testers predict detection 80% of the time in the honest view |
+| B | Shooting | A 300 m shot at a walking target feels earned |
+| C | Movement and body | Players predict their own noise and visibility |
+| D | Camp generator | 90 of 100 seeds pass validation on the first try |
+| E | Camp brain | Escalation can be caused, contained and interrupted |
+
+Art stays out until the core passes Concept proven (end of Phase 2). Feel is in scope: camera motion, sound timing and readability.
+
+## Rules that must hold
+
+1. **The simulation stands alone.** `src/sim` never imports three.js, `src/render` or `src/app`, and never touches the DOM. The renderer reads snapshots and never writes simulation state.
+2. **Determinism.** Inside `src/sim`, use only exactly specified math: `+ - * /`, `Math.floor/round/abs/sign/min/max/sqrt/fround`, and `src/sim/core/detmath.ts` (`dsin`, `dcos`, `datan`, `datan2`, `dtanDeg`). Never use `Math.sin/cos/tan/atan2/pow/exp/log/hypot` or `**` there: Chrome and Node really do disagree in the last bit. Never use `Math.random` (`randomSeed()` in `seed.ts` is UI-only).
+3. **Random streams are forked by label.** A new feature gets `rng.fork('new-label')` and never draws from an existing stream, so old seeds keep producing the same valleys.
+4. **Every gameplay number lives in `src/config/tuning.ts`.** It hot-reloads in the dev build.
+5. **Live play equals its recording.** `Simulation.step()` quantizes its input and keeps it as `sim.lastInput`, and `Recorder.record(sim, events)` stores exactly that after every tick. Anything new that affects simulation state must flow through `InputFrame` or the seed.
+6. **Generation changes are deliberate.** If `tests/world.test.ts` reports a new fingerprint for TAL-4471, decide whether the change is intended. If it is, update `GOLDEN_TAL_4471` and add a line to `docs/decisions.md`.
+7. **One set of terrain triangles.** Physics, raycasts and rendering split each cell along the diagonal from (i, j) to (i+1, j+1). Change all three together or none.
+8. **Every system ships explainable.** New systems come with a debug-view overlay and a test for their Done-when criteria.
+9. **New state is hashed.** Add every new piece of simulation state to `Simulation.hash()`, or determinism checks won't see it.
+10. **The controller's invariants hold.** The player never ends a tick inside anything solid or under the terrain, and never rises more than `stepHeight` in one tick. `tests/invariants.test.ts` checks this over long bot runs. Movement changes go through `resolveMove` in `src/sim/entities/player.ts`, which resolves guards, then terrain slope, then static colliders.
+
+## Checking work
+
+- `npm run check`: typecheck plus all tests. Must pass before you hand anything back.
+- `npm run sim -- --minutes 10`: bot run, recording and bit-exact re-simulation, with timing.
+- `npm run seeds -- --count 100`: generation health across many seeds.
+- In the browser, `window.sightline` exposes automation hooks for scripted screenshots and playtests: `play`, `debug(on)`, `fly(x, y, z, headingDeg, pitchDeg)`, `body()`, `hold([codes])`, `tap('KeyC' | 'KeyZ')`, `zoom(on)`, `state()`, `dump()`, `recording()`.
+- Look at the result. Render the honest and debug views and judge them, rather than trusting that code which compiles also reads well.
+
+## Conventions
+
+- TypeScript strict, ES modules, no default exports except where a tool requires one.
+- Units are metres, seconds and radians. Tuning uses degrees where a name ends in `Deg`.
+- Yaw 0 faces north (−z) and increases turning left. Use `yawFromDirection` and `headingDegrees` from `src/sim/core/math.ts`.
+- Comments explain why, not what. Module headers state the module's job and its invariants.
+- Pin dependency versions exactly, and prefer releases at least two weeks old.

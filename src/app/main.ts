@@ -1,0 +1,38 @@
+import { defaultTuning } from '../config/tuning';
+import { normalizeSeed } from '../sim/core/seed';
+import type { SpawnKind } from '../sim/gen/world';
+import { Game } from './game';
+import './styles.css';
+
+/**
+ * Entry point. URL parameters:
+ *   ?seed=TAL-4471   which valley to generate
+ *   ?view=debug      start in the debug view
+ *   ?spawn=edge      start where the road leaves the map instead of on an overlook
+ *   ?bench           run the 20-second performance flythrough and report
+ *   ?dpr=2           render resolution multiplier (default: device ratio, capped at 1.5)
+ */
+const params = new URLSearchParams(window.location.search);
+const canvas = document.querySelector<HTMLCanvasElement>('#view')!;
+const dprParam = Number(params.get('dpr'));
+
+const game = new Game({
+  canvas,
+  hud: document.querySelector<HTMLElement>('#hud')!,
+  overlay: document.querySelector<HTMLElement>('#overlay')!,
+  seed: normalizeSeed(params.get('seed')),
+  tuning: defaultTuning,
+  debug: params.get('view') === 'debug',
+  spawn: (params.get('spawn') === 'edge' ? 'edge' : 'overlook') as SpawnKind,
+  bench: params.has('bench'),
+  pixelRatio: dprParam > 0 ? dprParam : Math.min(window.devicePixelRatio || 1, 1.5),
+});
+game.start();
+(window as unknown as { sightline: unknown }).sightline = game.automation();
+
+// Saving src/config/tuning.ts applies the new numbers to the running game.
+if (import.meta.hot) {
+  import.meta.hot.accept('../config/tuning', (mod) => {
+    if (mod) game.applyTuning((mod as unknown as typeof import('../config/tuning')).defaultTuning);
+  });
+}

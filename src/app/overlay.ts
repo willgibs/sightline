@@ -1,0 +1,104 @@
+import { normalizeSeed, randomSeed } from '../sim/core/seed';
+
+/**
+ * The start and pause screen: the seed, how to play, and the way back in. Kept to one
+ * focal point: the click that puts you in the valley.
+ */
+
+export interface OverlayHandlers {
+  onResume: () => void;
+  onGenerate: (seed: string) => void;
+  onSaveRecording: () => void;
+}
+
+export type OverlayMode = 'loading' | 'start' | 'paused' | 'report';
+
+export class Overlay {
+  private readonly seedInput: HTMLInputElement;
+  private readonly status: HTMLElement;
+  private readonly title: HTMLElement;
+  private readonly go: HTMLButtonElement;
+  private readonly report: HTMLElement;
+  private mode: OverlayMode = 'loading';
+
+  constructor(
+    private readonly root: HTMLElement,
+    handlers: OverlayHandlers,
+  ) {
+    root.innerHTML = `
+      <div class="overlay-panel">
+        <div class="wordmark">SIGHTLINE</div>
+        <div class="overlay-title">Phase 0 · Foundations</div>
+        <button class="go" type="button">Click to begin</button>
+        <div class="seed-row">
+          <label for="seed">Seed</label>
+          <input id="seed" spellcheck="false" autocomplete="off" maxlength="40" />
+          <button class="icon" type="button" data-act="reroll" title="Random seed">↻</button>
+          <button class="small" type="button" data-act="generate">Generate</button>
+        </div>
+        <div class="keys">
+          <span><kbd>W A S D</kbd> move</span>
+          <span><kbd>Shift</kbd> sprint</span>
+          <span><kbd>C</kbd> crouch</span>
+          <span><kbd>Z</kbd> prone</span>
+          <span><kbd>Right mouse</kbd> or <kbd>F</kbd> zoom</span>
+          <span><kbd>F3</kbd> or <kbd>\`</kbd> debug view</span>
+          <span><kbd>Esc</kbd> pause</span>
+        </div>
+        <pre class="report"></pre>
+        <div class="overlay-foot">
+          <span class="status"></span>
+          <button class="link" type="button" data-act="save">Save recording</button>
+        </div>
+      </div>`;
+    this.seedInput = root.querySelector('#seed')!;
+    this.status = root.querySelector('.status')!;
+    this.title = root.querySelector('.overlay-title')!;
+    this.go = root.querySelector('.go')!;
+    this.report = root.querySelector('.report')!;
+    this.go.addEventListener('click', () => handlers.onResume());
+    root.querySelector('[data-act="reroll"]')!.addEventListener('click', () => {
+      this.seedInput.value = randomSeed();
+      handlers.onGenerate(this.seedInput.value);
+    });
+    root.querySelector('[data-act="generate"]')!.addEventListener('click', () => handlers.onGenerate(normalizeSeed(this.seedInput.value)));
+    root.querySelector('[data-act="save"]')!.addEventListener('click', () => handlers.onSaveRecording());
+    this.seedInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') handlers.onGenerate(normalizeSeed(this.seedInput.value));
+    });
+  }
+
+  show(mode: OverlayMode): void {
+    this.mode = mode;
+    this.root.classList.remove('is-hidden');
+    this.root.dataset.mode = mode;
+    this.title.textContent =
+      mode === 'paused' ? 'Paused' : mode === 'loading' ? 'Generating the valley…' : mode === 'report' ? 'Benchmark' : 'Phase 0 · Foundations';
+    this.go.textContent = mode === 'paused' ? 'Click to resume' : mode === 'report' ? 'Click to play this valley' : 'Click to begin';
+  }
+
+  hide(): void {
+    this.root.classList.add('is-hidden');
+  }
+
+  get visible(): boolean {
+    return !this.root.classList.contains('is-hidden');
+  }
+
+  get currentMode(): OverlayMode {
+    return this.mode;
+  }
+
+  setSeed(seed: string): void {
+    this.seedInput.value = seed;
+  }
+
+  setStatus(text: string): void {
+    this.status.textContent = text;
+  }
+
+  setReport(text: string): void {
+    this.report.textContent = text;
+  }
+}
