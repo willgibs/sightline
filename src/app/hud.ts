@@ -35,6 +35,7 @@ export class Hud {
       ['F3 / `', 'view'],
       ['B', 'colliders'],
       ['O', 'overwatch'],
+      ['G', 'grid'],
       ['N', 'fly camera'],
       ['[ ]', 'time scale'],
       ['R', 'restart run'],

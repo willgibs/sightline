@@ -48,6 +48,7 @@ export class GameRenderer {
   private debugOn = false;
   private collidersOn = false;
   private perchesOn = false;
+  private gridOn = false;
 
   constructor(canvas: HTMLCanvasElement, tuning: Tuning, pixelRatio: number) {
     this.gl = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -78,6 +79,7 @@ export class GameRenderer {
     this.debug.group.visible = this.debugOn;
     this.debug.setCollidersVisible(this.collidersOn);
     this.debug.setPerchesVisible(this.perchesOn);
+    this.debug.setGridVisible(this.gridOn);
     this.worldGroup.add(this.debug.group);
     this.guards.setDebugTint(this.debugOn);
   }
@@ -114,6 +116,11 @@ export class GameRenderer {
   setColliders(on: boolean): void {
     this.collidersOn = on;
     this.debug?.setCollidersVisible(on);
+  }
+
+  setGrid(on: boolean): void {
+    this.gridOn = on;
+    this.debug?.setGridVisible(on);
   }
 
   setPerches(on: boolean): void {

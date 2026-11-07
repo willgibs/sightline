@@ -10,12 +10,15 @@ import { buildTestCamp, type Camp } from './camp';
 import { scatterProps, type Props } from './props';
 import { generateTerrain, type Backdrop, type TerrainFeatures } from './terrain';
 import { assertTuning } from '../../config/validate';
+import { buildGrid, type SpatialGrid } from '../world/grid';
 
 /**
  * Everything static about a mission, built from the seed: terrain, cover, the camp,
  * guard posts and routes, the analysis report and the player's spawn.
  */
 export interface World {
+  /** Walking, sound, shelter and cover, cell by cell (world/grid.ts). */
+  grid: SpatialGrid;
   /** What this world was built from. */
   spec: MissionSpec;
   seed: string;
@@ -105,7 +108,9 @@ export function generateWorld(spec: MissionSpec, tuning: Tuning, clock?: () => n
     if (!report.ok && attempt < attempts - 1) continue;
     const playHalf = terrain.heightfield.size / 2 - G.world.playMargin;
     const spawn = chooseSpawn(spec.insertion, terrain.heightfield, terrain.features, colliders, report, playHalf);
+    const grid = buildGrid(terrain.heightfield, colliders, siteBounds(camp, colliders, G.grid.siteMargin), G);
     return {
+      grid,
       spec,
       seed,
       attempt,
@@ -216,3 +221,23 @@ const RING16 = [
   { x: 0.7071067811865476, z: -0.7071067811865476 },
   { x: 0.9238795325112867, z: -0.3826834323650898 },
 ];
+
+/** The area the fine grid covers: every camp structure's footprint and a margin. Nothing assumes where the camp is. */
+export function siteBounds(camp: Camp, colliders: ColliderSet, margin: number): { minX: number; minZ: number; maxX: number; maxZ: number } {
+  let minX = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxZ = -Infinity;
+  for (const st of camp.structures) {
+    for (const id of st.colliders) {
+      const c = colliders.list[id]!;
+      const e = c.kind === 'cyl' ? c.r : Math.abs(c.ux) * c.hx + Math.abs(c.uz) * c.hz + Math.abs(c.uz) * c.hx + Math.abs(c.ux) * c.hz;
+      minX = Math.min(minX, c.x - e);
+      maxX = Math.max(maxX, c.x + e);
+      minZ = Math.min(minZ, c.z - e);
+      maxZ = Math.max(maxZ, c.z + e);
+    }
+  }
+  if (minX > maxX) return { minX: -margin, minZ: -margin, maxX: margin, maxZ: margin };
+  return { minX: minX - margin, minZ: minZ - margin, maxX: maxX + margin, maxZ: maxZ + margin };
+}

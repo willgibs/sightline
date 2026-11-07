@@ -52,6 +52,16 @@ export const defaultTuning = {
     // keeps the two equal.
     walkableSlopeDeg: 42,
 
+    // The spatial grid (world/grid.ts) is built for a standard body; tests keep these
+    // equal to the player's.
+    grid: {
+      bodyRadius: 0.3,
+      stepHeight: 0.45,
+      bodyHeight: 1.8,
+      siteCell: 0.5, // metres: fine enough for a 1 m doorway
+      siteMargin: 12, // metres of fine grid beyond the camp's outermost structures
+    },
+
     // The camp's rhythm: how its guards walk their routines (gen/routine.ts). Part of the
     // camp, like its layout: lab D validates the timing windows these make.
     routines: {

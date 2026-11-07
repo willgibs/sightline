@@ -6,6 +6,7 @@ import { PLAYER_ID } from '../sim/state';
 import type { World } from '../sim/gen/world';
 import { GUARD_FIELDS, type Snapshot } from '../sim/sim';
 import { routinePose, type RoutinePose } from '../sim/gen/routine';
+import { Cell } from '../sim/world/grid';
 import { Blocks } from '../sim/world/colliders';
 import { palette } from './palette';
 
@@ -60,6 +61,7 @@ export class DebugLayer {
   private readonly aim: THREE.LineSegments;
   private colliders: THREE.LineSegments | null = null;
   private perches: THREE.Group | null = null;
+  private grid: THREE.Points | null = null;
   private readonly coreHalf: number;
   private readonly wideHalf: number;
 
@@ -159,6 +161,15 @@ export class DebugLayer {
     if (this.colliders) {
       if (on && !this.colliders.parent) this.group.add(this.colliders);
       if (!on && this.colliders.parent) this.group.remove(this.colliders);
+    }
+  }
+
+  /** The fine grid around the camp (sim/world/grid.ts): where bodies can't stand, what stops sound, what is roofed. Built on first use. */
+  setGridVisible(on: boolean): void {
+    if (on && !this.grid) this.grid = buildGridPoints(this.world);
+    if (this.grid) {
+      if (on && !this.grid.parent) this.group.add(this.grid);
+      if (!on && this.grid.parent) this.group.remove(this.grid);
     }
   }
 
@@ -461,4 +472,31 @@ function buildPerches(world: World): THREE.Group {
     group.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.8, fog: true })));
   }
   return group;
+}
+
+/** One point per fine-grid cell that matters: orange where no body fits, purple where sound stops, blue where roofed. */
+function buildGridPoints(world: World): THREE.Points {
+  const L = world.grid.site;
+  const pos: number[] = [];
+  const col: number[] = [];
+  const blocked = new THREE.Color(palette.debug.gridBlocked);
+  const sound = new THREE.Color(palette.debug.gridSound);
+  const roof = new THREE.Color(palette.debug.gridRoof);
+  for (let j = 0; j < L.nz; j++) {
+    for (let i = 0; i < L.nx; i++) {
+      const f = L.flags[j * L.nx + i]!;
+      const c = f & Cell.BlocksSound ? sound : (f & Cell.Walkable) === 0 ? blocked : f & Cell.Roofed ? roof : null;
+      if (!c) continue;
+      const x = L.x0 + (i + 0.5) * L.cell;
+      const z = L.z0 + (j + 0.5) * L.cell;
+      pos.push(x, world.terrain.heightAt(x, z) + 0.15, z);
+      col.push(c.r, c.g, c.b);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const points = new THREE.Points(geo, new THREE.PointsMaterial({ size: 3, sizeAttenuation: false, vertexColors: true }));
+  points.frustumCulled = false;
+  return points;
 }

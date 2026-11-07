@@ -6,6 +6,14 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### One grid for walking, sound, shelter and cover
+
+**Decision:** Generation builds one spatial grid (`src/sim/world/grid.ts`) with the world: a 2.5 m map layer over the whole terrain, lined up with its cells, and a 0.5 m site layer over the camp and a 12 m margin (from the camp's own structures, not the origin). Each cell says whether a standing body fits (slope, and anything solid between a step and the top of the head, within the body's radius), whether a wall stops sound, whether it is roofed, and how tall the sight-blocking cover is. Each cell also says whether a body can walk from its centre to its east and north neighbours': a fence thinner than a cell can sit between two centres that both fit a body, and only the edge between them knows. G shows the fine layer in the debug view.
+
+The grid is built for a standard body (`gen.grid`, kept equal to the player's by a test), because generation reads only `tuning.gen`. It adds about 0.2 s to generating a valley. Ambient masking (how loud the creek and the generator are at a point) stays a function of the world's steady sources and the noise tuning, for lab A, rather than a layer frozen at generation.
+
+**Why:** Hearing (sound travels along walkable paths, not through walls), lab E's pathfinding and lab D's infiltration and access checks would otherwise each build their own grid, and sound would travel where guards can't walk. Generation's validation still uses its own slope-only map; lab D moves it onto the grid with its own fingerprint change.
+
 ### The simulation owns the sun, the wind and the air
 
 **Decision:** The mission spec carries its environment (`src/sim/env.ts`): the time of day and how fast it runs, the latitude and day of the year, a steady wind, the altitude and the temperature. From these the simulation derives the sun's direction (deterministic math, a standard solar model), the wind's velocity, the air's density and the speed of sound, and the light at any point: in the sun, in the shade of terrain or anything that blocks sight, at dusk or in the dark. The renderer lights the scene and the sky from the simulation's sun; the default environment (a mid-October afternoon at 33° N, 14:24) puts it exactly where the wireframe look had it. The debug panel shows whether you stand in sun or shade, and the sound engine takes the mission air's speed of sound.

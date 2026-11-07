@@ -42,7 +42,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 - `npm run sim -- --minutes 10`: bot run, recording and bit-exact re-simulation, with timing. Add `--profile` for the time each system takes.
 - `npm run seeds -- --count 100`: generation health across many seeds.
 - `npm run sim -- --replay <file>`: re-simulate a recording saved in the browser; it says where a run diverged, or why it can't re-simulate in this build.
-- In the browser, `window.sightline` exposes automation hooks for scripted screenshots and playtests: `play`, `debug(on)`, `fly(x, y, z, headingDeg, pitchDeg)`, `body()`, `hold([codes])`, `tap('KeyC' | 'KeyZ')`, `click()`, `zoom(on)`, `state()`, `dump()`, `recording()`.
+- In the browser, `window.sightline` exposes automation hooks for scripted screenshots and playtests: `play`, `debug(on)`, `grid(on)`, `fly(x, y, z, headingDeg, pitchDeg)`, `body()`, `hold([codes])`, `tap('KeyC' | 'KeyZ')`, `click()`, `zoom(on)`, `state()`, `dump()`, `recording()`.
 - Look at the result. Render the honest and debug views and judge them, rather than trusting that code which compiles also reads well.
 
 ## Workflow

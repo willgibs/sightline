@@ -8,6 +8,7 @@ import { Blocks, ColliderSet, circleOverlaps, type ColliderInput } from '../src/
 import { Heightfield } from '../src/sim/world/heightfield';
 import { Surface } from '../src/sim/world/surfaces';
 import { missionSpec } from '../src/sim/mission';
+import { buildGrid } from '../src/sim/world/grid';
 
 /** A deep copy of the default tuning that tests can change freely. */
 export function tuningCopy(): Tuning {
@@ -57,7 +58,10 @@ export function testWorld(opts: TestWorldOptions = {}): World {
     { x: size, z: size },
     { x: size + 1, z: size },
   ]);
+  const half = size / 2;
   return {
+    // The fine layer covers the whole test world.
+    grid: buildGrid(hf, colliders, { minX: -half, minZ: -half, maxX: half, maxZ: half }, defaultTuning.gen),
     spec: missionSpec('TEST-0000', 'edge'),
     seed: 'TEST-0000',
     attempt: 0,

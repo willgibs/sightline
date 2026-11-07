@@ -68,6 +68,7 @@ export class Game {
   private readonly raw = neutralInput();
   private readonly hit = emptyHit();
   private readonly queryBodies: QueryBody[] = [];
+  private gridShown = false;
   private readonly spawnKind: SpawnKind;
   private debug: boolean;
   private colliders = false;
@@ -243,6 +244,12 @@ export class Game {
         this.perches = !this.perches;
         this.renderer.setPerches(this.perches);
         this.hud.toast(this.perches ? `Overwatch on · ${this.world.report.perches.length} perches` : 'Overwatch off');
+        break;
+      case 'KeyG':
+        if (!this.debug) return;
+        this.gridShown = !this.gridShown;
+        this.renderer.setGrid(this.gridShown);
+        this.hud.toast(this.gridShown ? 'Grid on · orange no body fits, purple stops sound, blue roofed' : 'Grid off');
         break;
       case 'KeyN':
         if (!this.debug) return;
@@ -509,6 +516,10 @@ export class Game {
       colliders: (on: boolean) => {
         this.colliders = on;
         this.renderer.setColliders(on);
+      },
+      grid: (on: boolean) => {
+        this.gridShown = on;
+        this.renderer.setGrid(on);
       },
       overwatch: (on: boolean) => {
         this.perches = on;

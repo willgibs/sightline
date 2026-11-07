@@ -67,7 +67,8 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [x] Body shapes (`bodyShape()` in `src/sim/motor/shape.ts`): head, torso and legs from each pose, from `tuning.bodies`; the guards' meshes built from the same numbers.
 - [ ] The motor's `BodySpec` moves to `tuning.bodies` too (player and guard), with gravity going to the environment.
 - [x] The environment in the mission spec, owned by the simulation: clock, wind, air (density, speed of sound); the sun's direction from deterministic math; light at a point (sun, shade, dusk, dark); the renderer reads the sun from the simulation.
-- [ ] One spatial grid: a 2.5 m map layer and a 0.5 m site layer recording walkable, blocks sound, cover height, indoors, surface and ambient masking.
+- [x] One spatial grid: a 2.5 m map layer and a 0.5 m site layer recording walkable, blocks sound, roofed and cover height, with walkable edges between cells (a fence between two centres); G shows it.
+- [ ] Ambient masking from the world's steady sources (the creek, the generator), with lab A; the sources move from `audio/worldSounds.ts` into the simulation then. Validation (`analysis.ts`) moves onto the grid with lab D.
 
 ### M7 · Sites, camps, scenes and the perception boundary
 - [ ] `Site` and `CampSpec`: camps live at a site with its own origin and axis; nothing assumes the camp is at (0, 0). The Phase 0 camp converted.
