@@ -15,6 +15,7 @@ import { InputController } from './input';
 import { Overlay } from './overlay';
 import { FrameStats, percentile } from './perf';
 import { missionSpec } from '../sim/mission';
+import { tuningProblems } from '../config/validate';
 
 /**
  * The browser game loop: real time in, fixed simulation ticks out, interpolated frames
@@ -168,6 +169,13 @@ export class Game {
 
   /** Hot-reloaded tuning (dev only). */
   applyTuning(next: Tuning): void {
+    const problems = tuningProblems(next);
+    if (problems.length > 0) {
+      // Keep playing on the last good numbers rather than handing bad ones to the simulation.
+      this.hud.toast(`Tuning not applied: ${problems[0]}${problems.length > 1 ? ` (+${problems.length - 1} more)` : ''}`);
+      console.warn('Tuning not applied:', problems);
+      return;
+    }
     const worldChanged = worldTuningKey(next) !== worldTuningKey(this.tuning);
     const simChanged = simTuningKey(next) !== simTuningKey(this.tuning);
     const tickChanged = next.sim.tickHz !== this.tuning.sim.tickHz || next.sim.recordHz !== this.tuning.sim.recordHz;

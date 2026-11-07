@@ -7,6 +7,7 @@ import type { SimEvent } from './events';
 import { generateWorld, type SpawnKind, type World } from './gen/world';
 import { neutralInput, quantizeInput, type InputFrame } from './input';
 import { missionSpec } from './mission';
+import { assertTuning } from '../config/validate';
 
 /**
  * The simulation: pure TypeScript, no rendering, no DOM, fixed timestep.
@@ -48,6 +49,7 @@ export class Simulation {
   readonly lastInput: InputFrame = neutralInput();
 
   constructor(world: World, tuning: Tuning) {
+    assertTuning(tuning);
     this.world = world;
     this.tuning = tuning;
     this.dt = 1 / tuning.sim.tickHz;
@@ -86,6 +88,7 @@ export class Simulation {
 
   /** Swaps in new tuning (hot reload). World values need a new Simulation instead. */
   setTuning(tuning: Tuning): void {
+    assertTuning(tuning);
     this.tuning = tuning;
   }
 

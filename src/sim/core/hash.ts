@@ -28,8 +28,12 @@ export class Hasher {
     return this;
   }
 
-  /** Hashes the exact bits of a double. */
+  /**
+   * Hashes the exact bits of a double. Every NaN hashes alike: engines and CPUs give NaN
+   * different bit patterns (x64 V8 and ARM differ, as do V8 and JavaScriptCore).
+   */
   f64(v: number): this {
+    if (v !== v) return this.u32(0x7ff80000).u32(0);
     scratch.setFloat64(0, v, true);
     for (let i = 0; i < 8; i++) this.byte(scratch.getUint8(i));
     return this;

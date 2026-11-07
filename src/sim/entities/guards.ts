@@ -77,10 +77,12 @@ export function stepGuards(
             const step = Math.min(G.walkSpeed * dt, dist);
             g.x += (dx / dist) * step;
             g.z += (dz / dist) * step;
+            // Height before the footstep, so the sound comes from where the foot lands.
+            g.y = spawn.elevated ? spawn.y : world.terrain.heightAt(g.x, g.z);
             g.moving = true;
             g.stride += step;
             if (g.stride >= G.stride) {
-              g.stride -= G.stride;
+              g.stride = Math.min(g.stride - G.stride, G.stride);
               const surface = world.terrain.surfaceAt(g.x, g.z);
               const loudness = tuning.noise.movement.walk * surfaceLoudness(surface, tuning);
               emit({

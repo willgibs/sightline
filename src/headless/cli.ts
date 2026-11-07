@@ -108,7 +108,8 @@ if (out) {
 }
 
 const loaded = Recording.fromBytes(bytes);
-const re = resimulate(loaded, world, now);
+// Regenerate the world from the recording's own header, so the check covers generation too.
+const re = resimulate(loaded, undefined, now);
 console.log(`hash    ${rec.header.finalHash}`);
 console.log(
   `resim   ${re.finalHash} ${re.ok ? '✓ identical' : '✗ DIVERGED'} · ${rec.header.checkpoints.length} checkpoints · ${fmt.ms(re.ms)}` +

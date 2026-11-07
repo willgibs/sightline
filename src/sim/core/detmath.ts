@@ -82,9 +82,13 @@ export function dcos(x: number): number {
   }
 }
 
-/** tan of an angle in degrees, for slope limits. */
+/** tan of an angle in degrees, for slope limits. Straight up (±90°) is infinitely steep. */
 export function dtanDeg(deg: number): number {
-  return dsin(deg * DEG) / dcos(deg * DEG);
+  const c = dcos(deg * DEG);
+  const s = dsin(deg * DEG);
+  // dcos(π/2) is exactly −0 here, which would make tan(90°) −Infinity.
+  if (c === 0) return s > 0 ? Infinity : -Infinity;
+  return s / c;
 }
 
 export function dcosDeg(deg: number): number {
@@ -122,8 +126,17 @@ export function datan(x: number): number {
   return neg ? -r : r;
 }
 
-/** atan2(y, x), deterministic, matching Math.atan2's quadrant conventions. */
+/**
+ * atan2(y, x), deterministic, matching Math.atan2's quadrants, NaN and infinities. One
+ * difference, kept on purpose because changing it would move existing angles: +0 and −0
+ * are treated alike, so datan2(±0, x < 0) is +π and the sign of a zero result is +.
+ */
 export function datan2(y: number, x: number): number {
+  if (x !== x || y !== y) return NaN;
+  if (y === Infinity || y === -Infinity) {
+    const q = x === Infinity ? PI / 4 : x === -Infinity ? (3 * PI) / 4 : HALF_PI;
+    return y > 0 ? q : -q;
+  }
   if (x > 0) return datan(y / x);
   if (x < 0) return y >= 0 ? datan(y / x) + PI : datan(y / x) - PI;
   if (y > 0) return HALF_PI;

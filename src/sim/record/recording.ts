@@ -7,6 +7,7 @@ import { InputFlag, type InputFrame } from '../input';
 import type { Simulation } from '../sim';
 import type { Surface } from '../world/surfaces';
 import { ByteReader, ByteWriter } from './bytes';
+import { assertTuning } from '../../config/validate';
 
 /**
  * Mission recordings.
@@ -186,6 +187,29 @@ export class Recorder {
   }
 }
 
+/**
+ * A recording is often a file from elsewhere. Check the header before its tuning drives
+ * generation: the tuning must be valid and match its hash, and the counts must agree
+ * with the data. (Recording format v2 replaces this with a full validator.)
+ */
+function checkHeader(h: RecordingHeader, inputBytes: number): void {
+  const fail = (what: string): never => {
+    throw new Error(`Corrupt recording: ${what}`);
+  };
+  if (!h || typeof h !== 'object') fail('no header');
+  if (typeof h.seed !== 'string' || (h.spawn !== 'overlook' && h.spawn !== 'edge')) fail('seed or spawn');
+  const whole = (v: unknown, min: number) => typeof v === 'number' && Number.isInteger(v) && v >= min;
+  if (!whole(h.ticks, 0) || h.ticks * INPUT_SIZE !== inputBytes) fail(`${String(h.ticks)} ticks but ${inputBytes / INPUT_SIZE} inputs`);
+  if (!whole(h.checkpointEvery, 1) || !whole(h.stateEvery, 1) || !whole(h.guardCount, 0) || h.guardCount > 4096) fail('counts');
+  if (!Array.isArray(h.checkpoints) || h.checkpoints.length !== Math.floor(h.ticks / h.checkpointEvery)) fail('checkpoints');
+  try {
+    assertTuning(h.tuning);
+  } catch (e) {
+    fail(e instanceof Error ? e.message : 'tuning');
+  }
+  if (hashValue(h.tuning) !== h.tuningHash) fail('tuning does not match its hash');
+}
+
 export class Recording {
   constructor(
     readonly header: RecordingHeader,
@@ -296,6 +320,7 @@ export class Recording {
     const inputs = r.take(r.u32());
     const states = r.take(r.u32());
     const events = r.take(r.u32());
+    checkHeader(header, inputs.length);
     return new Recording(header, inputs, states, events);
   }
 }

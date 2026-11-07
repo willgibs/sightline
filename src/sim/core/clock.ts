@@ -19,7 +19,8 @@ export class FixedStepClock {
 
   /** Feed elapsed real seconds (already scaled by any time scale). Returns ticks to run. */
   advance(elapsed: number): number {
-    this.acc += Math.min(Math.max(elapsed, 0), this.maxFrame);
+    // NaN fails both comparisons, so it counts as no time rather than poisoning the clock.
+    this.acc += elapsed > 0 ? Math.min(elapsed, this.maxFrame) : 0;
     let ticks = Math.floor(this.acc / this.dt);
     if (ticks > this.maxTicksPerFrame) {
       ticks = this.maxTicksPerFrame;

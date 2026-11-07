@@ -12,7 +12,7 @@ export class ByteWriter {
 
   private ensure(extra: number): void {
     if (this.length + extra <= this.buf.length) return;
-    let size = this.buf.length * 2;
+    let size = Math.max(1, this.buf.length) * 2;
     while (size < this.length + extra) size *= 2;
     const next = new Uint8Array(size);
     next.set(this.buf.subarray(0, this.length));

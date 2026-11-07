@@ -49,8 +49,10 @@ describe('architecture', () => {
 
   it('uses only engine-identical math anywhere in the simulation', () => {
     // These are implementation-defined in JavaScript; engines differ in the last bit.
+    // Also caught: aliasing Math (`= Math`, `const { sin } = Math`), computed members
+    // (`Math['sin']`), and locale-dependent formatting and comparison.
     const forbidden =
-      /Math\.(sin|cos|tan|asin|acos|atan|atan2|asinh|acosh|atanh|sinh|cosh|tanh|exp|expm1|log|log2|log10|log1p|pow|hypot|cbrt)\b|\*\*/;
+      /Math\.(sin|cos|tan|asin|acos|atan|atan2|asinh|acosh|atanh|sinh|cosh|tanh|exp|expm1|log|log2|log10|log1p|pow|hypot|cbrt)\b|\*\*|=\s*Math\s*[;,)\n]|\}\s*=\s*Math\b|Math\s*\[|\blocaleCompare\b|\btoLocale\w*\b|\bIntl\b/;
     const offenders = files(join(root, 'src/sim'))
       .filter((f) => forbidden.test(code(f)))
       .map((f) => relative(root, f));

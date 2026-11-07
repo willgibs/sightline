@@ -9,6 +9,7 @@ import { analyzeTerrain, type TerrainReport } from './analysis';
 import { buildTestCamp, type Camp } from './camp';
 import { scatterProps, type Props } from './props';
 import { generateTerrain, type Backdrop, type TerrainFeatures } from './terrain';
+import { assertTuning } from '../../config/validate';
 
 /**
  * Everything static about a mission, built from the seed: terrain, cover, the camp,
@@ -61,6 +62,8 @@ export function simTuningKey(t: Tuning): string {
  * clock (milliseconds) to have the generation time reported in `genMs`.
  */
 export function generateWorld(spec: MissionSpec, tuning: Tuning, clock?: () => number): World {
+  // Bounds on sizes, spacings and attempts, so bad tuning fails here instead of hanging.
+  assertTuning(tuning);
   const started = clock ? clock() : 0;
   const G = tuning.gen;
   const seed = spec.seed;

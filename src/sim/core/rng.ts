@@ -54,8 +54,12 @@ export class Rng {
     for (let i = 0; i < 15; i++) this.nextU32();
   }
 
-  /** An independent stream for a named consumer. */
+  /**
+   * An independent stream for a named consumer. Labels can't contain '/', because
+   * fork('a/b') and fork('a').fork('b') would otherwise be the same stream.
+   */
   fork(label: string): Rng {
+    if (label.includes('/') || label.includes('␟')) throw new Error(`Rng.fork: label "${label}" contains a separator`);
     return new Rng(this.seed, `${this.path}/${label}`);
   }
 
