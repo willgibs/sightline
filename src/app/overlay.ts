@@ -1,5 +1,7 @@
 import { normalizeSeed, randomSeed } from '../sim/core/seed';
 import { labelKeys } from './keys';
+import { ActionMap, keysHtml, type Action } from './actions';
+import type { Settings } from './settings';
 
 /**
  * The start and pause screen: the seed, how to play, and the way back in. Kept to one
@@ -12,6 +14,8 @@ export interface OverlayHandlers {
   onSaveRecording: () => void;
   /** The action under an error or an outcome: what it does depends on what happened (game.ts). */
   onRetry: () => void;
+  /** A setting changed: apply it and keep it. */
+  onSettings: (s: Settings) => void;
 }
 
 export type OverlayMode = 'loading' | 'start' | 'paused' | 'report' | 'error' | 'outcome';
@@ -23,13 +27,26 @@ export class Overlay {
   private readonly go: HTMLButtonElement;
   private readonly report: HTMLElement;
   private mode: OverlayMode = 'loading';
+  private readonly settingsRoot: HTMLElement;
+  /** The tuned field of view, which the slider starts at when the player hasn't chosen one. */
+  private tunedFov = 58;
   /** The start screen's title: the phase, or the scene being played. */
   private startTitle = 'Phase 0 · Foundations';
 
   constructor(
     private readonly root: HTMLElement,
     handlers: OverlayHandlers,
+    map: ActionMap = new ActionMap(),
   ) {
+    const legend: Array<[Action[], string]> = [
+      [['forward', 'left', 'back', 'right'], 'move'],
+      [['sprint'], 'sprint'],
+      [['crouch'], 'crouch'],
+      [['prone'], 'prone'],
+      [['zoom'], 'zoom'],
+      [['debugView'], 'debug view'],
+    ];
+    const keys = legend.map(([actions, text]) => `<span>${keysHtml(map, actions)} ${text}</span>`).join('\n          ');
     root.innerHTML = `
       <div class="overlay-panel">
         <div class="wordmark">SIGHTLINE</div>
@@ -42,14 +59,17 @@ export class Overlay {
           <button class="small" type="button" data-act="generate">Generate</button>
         </div>
         <div class="keys">
-          <span><kbd data-code="KeyW KeyA KeyS KeyD">W A S D</kbd> move</span>
-          <span><kbd>Shift</kbd> sprint</span>
-          <span><kbd data-code="KeyC">C</kbd> crouch</span>
-          <span><kbd data-code="KeyZ">Z</kbd> prone</span>
-          <span><kbd>Right mouse</kbd> or <kbd data-code="KeyF">F</kbd> zoom</span>
-          <span><kbd>F3</kbd> or <kbd>\`</kbd> debug view</span>
+          ${keys}
           <span><kbd>Esc</kbd> pause</span>
         </div>
+        <details class="settings">
+          <summary>Settings</summary>
+          <label>Mouse sensitivity <input type="range" data-set="sensitivity" min="-2" max="2" step="0.05" /> <output data-for="sensitivity"></output></label>
+          <label>Field of view <input type="range" data-set="fov" min="45" max="90" step="1" /> <output data-for="fov"></output></label>
+          <label>Volume <input type="range" data-set="volume" min="0" max="1" step="0.05" /> <output data-for="volume"></output></label>
+          <label class="check"><input type="checkbox" data-set="invertY" /> Invert the mouse</label>
+          <label class="check"><input type="checkbox" data-set="rawMouse" /> Raw mouse input (no system acceleration, where the browser offers it)</label>
+        </details>
         <pre class="report"></pre>
         <div class="overlay-foot">
           <span class="status"></span>
@@ -57,6 +77,10 @@ export class Overlay {
         </div>
       </div>`;
     labelKeys(root);
+    this.settingsRoot = root.querySelector('.settings')!;
+    this.settingsRoot.addEventListener('input', () => handlers.onSettings(this.readSettings()));
+    // The panel's keys are for the panel: don't let them reach the game.
+    this.settingsRoot.addEventListener('keydown', (e) => e.stopPropagation());
     this.seedInput = root.querySelector('#seed')!;
     this.status = root.querySelector('.status')!;
     this.title = root.querySelector('.overlay-title')!;
@@ -109,6 +133,39 @@ export class Overlay {
 
   get currentMode(): OverlayMode {
     return this.mode;
+  }
+
+  /** Shows these settings in the controls. `tunedFov` is what a field of view of 0 (the default) means. */
+  showSettings(s: Settings, tunedFov: number): void {
+    this.tunedFov = tunedFov;
+    const input = (name: string) => this.settingsRoot.querySelector<HTMLInputElement>(`[data-set="${name}"]`)!;
+    input('sensitivity').value = String(Math.log2(s.sensitivity));
+    input('fov').value = String(s.fov || tunedFov);
+    input('volume').value = String(s.volume);
+    input('invertY').checked = s.invertY;
+    input('rawMouse').checked = s.rawMouse;
+    this.showValues(s);
+  }
+
+  private readSettings(): Settings {
+    const input = (name: string) => this.settingsRoot.querySelector<HTMLInputElement>(`[data-set="${name}"]`)!;
+    const fov = Number(input('fov').value);
+    const s: Settings = {
+      sensitivity: 2 ** Number(input('sensitivity').value),
+      fov: fov === this.tunedFov ? 0 : fov,
+      volume: Number(input('volume').value),
+      invertY: input('invertY').checked,
+      rawMouse: input('rawMouse').checked,
+    };
+    this.showValues(s);
+    return s;
+  }
+
+  private showValues(s: Settings): void {
+    const out = (name: string) => this.settingsRoot.querySelector<HTMLOutputElement>(`[data-for="${name}"]`)!;
+    out('sensitivity').textContent = `×${s.sensitivity.toFixed(2)}`;
+    out('fov').textContent = `${s.fov || this.tunedFov}°${s.fov ? '' : ' (default)'}`;
+    out('volume').textContent = `${Math.round(s.volume * 100)}%`;
   }
 
   setSeed(seed: string): void {

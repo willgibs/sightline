@@ -14,6 +14,12 @@ The first scene is the movement course: stairs, a 1 m and a 2 m drop, ramps of 3
 
 **Why:** each Phase 1 lab is a scene built to its exit test, and needs to be playable, scriptable and replayable without building its own harness. A regression test that needs more than one tick is a scene too.
 
+### Keys are bound to actions, in a table; settings belong to the player
+
+**Decision:** Every key and button is bound to a named action in a context (on foot, always, the debug view, the fly camera) in one data table (`src/app/actions.ts`). The input controller tracks what is held and fires what is pressed, by action; the game handles actions, never key codes; the legends on the start screen and in the debug view are drawn from the table. The player's settings (sensitivity, field of view, invert, volume, raw mouse input) live in this browser's storage, not in tuning or recordings: a recording stores the view angles the mouse produced, whatever the sensitivity.
+
+**Why:** each lab adds controls (lab B's breath and optic, lab C's lean); with a table, they add rows instead of key checks scattered through the input code, and rebinding, a gamepad or a touch layout later is data. Settings are a person's, so they follow the person, not the build.
+
 ### Systems explain themselves through a debug channel
 
 **Decision:** A system draws for the debug view with `ctx.debug(draw => …)` (`src/sim/debugDraw.ts`): lines, points, circles and labels, coloured by meaning. The callback runs only while the debug view is on; what it draws isn't state, isn't hashed or recorded, and nothing in the simulation reads it back. The renderer draws the newest tick's lines, and the HUD places its labels. The first user is the controller overlay: the player's body circle, rim probes, heading, a label with slope against the limit, sliding, footing and mode, and every push of the resolve passes.

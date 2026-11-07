@@ -15,6 +15,8 @@ import { emptyHit, raycast } from '../sim/world/query';
 import { entityOfCollider } from '../sim/world/solids';
 import { Surface, surfaceName } from '../sim/world/surfaces';
 import { GameRenderer, type CameraPose } from '../render/renderer';
+import type { Action } from './actions';
+import { loadSettings, saveSettings, type Settings } from './settings';
 import { palette } from '../render/palette';
 import { Hud } from './hud';
 import { InputController } from './input';
@@ -125,6 +127,8 @@ export class Game {
   private savedTick = 0;
   /** The seed being generated or last generated. */
   private seed = '';
+  /** The player's own settings (settings.ts): kept in this browser. */
+  private settings: Settings = loadSettings();
   /** The rules decided the run during the last ticks: show the outcome once they're drawn. */
   private decided = false;
   private readonly drawnLabels: Array<{ x: number; y: number; text: string; color: string }> = [];
@@ -144,7 +148,8 @@ export class Game {
     this.clock = new FixedStepClock(this.tuning.sim.tickHz);
     this.renderer = new GameRenderer(opts.canvas, this.tuning, opts.pixelRatio);
     this.input = new InputController(opts.canvas);
-    this.hud = new Hud(opts.hud);
+    if (this.debug) this.input.contexts.add('debug');
+    this.hud = new Hud(opts.hud, this.input.map);
     this.overlay = new Overlay(opts.overlay, {
       onResume: () => this.resume(),
       onGenerate: (seed) => {
@@ -153,13 +158,16 @@ export class Game {
         this.generate(seed);
       },
       onSaveRecording: () => this.saveRecording(),
+      onSettings: (s) => this.applySettings(s),
       onRetry: () => {
         const retry = this.retry;
         this.failure = null;
         this.retry = () => undefined;
         retry();
       },
-    });
+    }, this.input.map);
+    this.overlay.showSettings(this.settings, this.tuning.view.fov);
+    this.applySettings(this.settings);
     this.input.onAction = (code) => this.action(code);
     this.input.onLockChange = (locked) => (locked ? this.onLocked() : this.onUnlocked());
     this.input.onLockRefused = () => {
@@ -280,6 +288,15 @@ export class Game {
     }
     this.restartRun();
     this.overlay.show('start');
+  }
+
+  /** A setting changed in the overlay: it applies now and is kept for next time. */
+  private applySettings(s: Settings): void {
+    this.settings = s;
+    saveSettings(s);
+    this.input.invertY = s.invertY;
+    this.input.rawMouse = s.rawMouse;
+    this.redraws++;
   }
 
   /** Tells the player something: in the HUD while playing, in the overlay's status line while it is up. */
@@ -414,48 +431,42 @@ export class Game {
     if (this.overlay.currentMode !== 'loading' || !this.overlay.visible) this.overlay.show('paused');
   }
 
-  private action(code: string): void {
-    switch (code) {
-      case 'F3':
-      case 'Backquote':
+  /** A pressed action outside the tick (actions.ts); the input controller only passes those of active contexts. */
+  private action(action: Action): void {
+    switch (action) {
+      case 'debugView':
         this.setDebugView(!this.debug);
         break;
-      case 'KeyB':
-        if (!this.debug) return;
+      case 'colliders':
         this.colliders = !this.colliders;
         this.renderer.setColliders(this.colliders);
         this.hud.toast(this.colliders ? 'Colliders on · purple blocks all, blue movement, green sight' : 'Colliders off');
         break;
-      case 'KeyO':
-        if (!this.debug) return;
+      case 'overwatch':
         this.perches = !this.perches;
         this.renderer.setPerches(this.perches);
         this.hud.toast(this.perches ? `Overwatch on · ${this.world.report.perches.length} perches` : 'Overwatch off');
         break;
-      case 'KeyG':
-        if (!this.debug) return;
+      case 'grid':
         this.gridShown = !this.gridShown;
         this.renderer.setGrid(this.gridShown);
         this.hud.toast(this.gridShown ? 'Grid on · orange no body fits, purple stops sound, blue roofed' : 'Grid off');
         break;
-      case 'KeyN':
-        if (!this.debug) return;
+      case 'flyCamera':
         this.setDetached(!this.detached);
         break;
-      case 'BracketLeft':
-      case 'BracketRight': {
-        if (!this.debug) return;
-        const d = code === 'BracketLeft' ? -1 : 1;
+      case 'slower':
+      case 'faster': {
+        const d = action === 'slower' ? -1 : 1;
         this.timeScaleIndex = Math.max(0, Math.min(TIME_SCALES.length - 1, this.timeScaleIndex + d));
         this.hud.toast(`Time ×${TIME_SCALES[this.timeScaleIndex]}`);
         break;
       }
-      case 'KeyR':
-        if (!this.debug) return;
+      case 'restart':
         this.restartRun();
         this.hud.toast('Run restarted');
         break;
-      case 'KeyM': {
+      case 'mark': {
         // A marker in the recording: "look at this moment" for a playtest or a bug report.
         this.recorder.annotate('marker');
         this.hud.toast(`Marked ${clock(this.sim.tick / this.tuning.sim.tickHz)} in the recording`);
@@ -466,6 +477,8 @@ export class Game {
 
   private setDebugView(on: boolean): void {
     this.debug = on;
+    if (on) this.input.contexts.add('debug');
+    else this.input.contexts.delete('debug');
     if (this.sim) this.sim.drawDebug = on;
     this.renderer.setDebug(on);
     this.hud.setDebug(on);
@@ -479,6 +492,8 @@ export class Game {
   private setDetached(on: boolean): void {
     if (on === this.detached) return;
     this.detached = on;
+    if (on) this.input.contexts.add('fly');
+    else this.input.contexts.delete('fly');
     if (on) {
       this.heldYaw = this.input.yaw;
       this.heldPitch = this.input.pitch;
@@ -544,9 +559,10 @@ export class Game {
     this.zoom = moveTowards(this.zoom, this.input.zoomHeld && !this.paused ? 1 : 0, dt / Math.max(V.zoomTime, 1e-3));
     const eased = this.zoom * this.zoom * (3 - 2 * this.zoom);
     // The window's shape sets the view, within limits; zooming keeps its magnification.
-    const base = fitFov(V.fov, window.innerWidth / Math.max(1, window.innerHeight));
+    const chosen = this.settings.fov || V.fov;
+    const base = fitFov(chosen, window.innerWidth / Math.max(1, window.innerHeight));
     const fov = zoomFov(base, scaleFov(V.zoomFov, Math.tan((base * Math.PI) / 360) / Math.tan((V.fov * Math.PI) / 360)), eased);
-    this.input.sensitivity = V.lookSensitivity;
+    this.input.sensitivity = V.lookSensitivity * this.settings.sensitivity;
     this.input.sensitivityScale = Math.tan((fov * Math.PI) / 360) / Math.tan((base * Math.PI) / 360);
     this.input.pitchLimit = this.tuning.bodies.player.pitchLimit;
 

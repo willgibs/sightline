@@ -79,8 +79,8 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 
 ### M8 · Presentation seams and feel
 - [x] Cues and debug drawings as separate channels out of the simulation: the honest view draws only snapshots and events (what the shipped game can show); systems explain themselves through `ctx.debug(draw => …)` (`sim/debugDraw.ts`: lines, points, circles, labels), which runs only while the debug view is on, isn't state and never changes an outcome.
-- [ ] An action-map layer: device bindings to named actions by context (on foot, optic, menu, debug), defaults in a data table.
-- [ ] Settings with persistence: sensitivity, field of view, invert, volume. Raw mouse input where the browser supports it.
+- [x] An action map (`src/app/actions.ts`): every key and button bound to a named action in a context (on foot, always, the debug view, the fly camera), as a data table; the input controller and the game ask for actions, never keys; the legends are drawn from the table (and relabelled for the keyboard layout). A test keeps one action per input. A gamepad or rebinding is a change of table.
+- [x] Settings (`src/app/settings.ts`), kept in the browser: mouse sensitivity, field of view, invert, volume, and raw mouse input where the browser offers it (falling back when it doesn't). A fold on the start and pause screens.
 - [ ] Sound wired into the game: events, ambient sources, muffling, pause ducking.
 - [ ] The camera never renders from inside a guard: a guard's mesh hides while the eye is inside its capsule. (Guards that step around a cornered player come with lab E.)
 - [ ] Tree canopies drawn so an eye inside one sees it, not a hole (they are single-sided cones today).

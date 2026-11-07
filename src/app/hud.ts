@@ -1,5 +1,6 @@
 import { headingDegrees } from '../sim/core/math';
 import { labelKeys } from './keys';
+import { ActionMap, keysHtml, type Action } from './actions';
 
 /**
  * The heads-up display. The honest view shows only what the shipped game will: a
@@ -22,7 +23,10 @@ export class Hud {
   /** The compass's drawn width in CSS pixels: what the stylesheet gives it (narrower on small screens). */
   private compassWidth = 440;
 
-  constructor(private readonly root: HTMLElement) {
+  constructor(
+    private readonly root: HTMLElement,
+    map: ActionMap = new ActionMap(),
+  ) {
     root.innerHTML = `
       <canvas class="compass" width="440" height="34"></canvas>
       <pre class="debug-panel"></pre>
@@ -39,18 +43,17 @@ export class Hud {
     this.range = root.querySelector('.range')!;
     this.toastEl = root.querySelector('.toast')!;
     this.labelLayer = root.querySelector('.debug-labels')!;
-    this.legend.innerHTML = [
-      ['F3 / `', '', 'view'],
-      ['B', 'KeyB', 'colliders'],
-      ['O', 'KeyO', 'overwatch'],
-      ['G', 'KeyG', 'grid'],
-      ['N', 'KeyN', 'fly camera'],
-      ['[ ]', 'BracketLeft BracketRight', 'time scale'],
-      ['R', 'KeyR', 'restart run'],
-      ['M', 'KeyM', 'mark moment'],
-    ]
-      .map(([k, code, v]) => `<span><kbd${code ? ` data-code="${code}"` : ''}>${k}</kbd>${v}</span>`)
-      .join('');
+    const legend: Array<[Action[], string]> = [
+      [['debugView'], 'view'],
+      [['colliders'], 'colliders'],
+      [['overwatch'], 'overwatch'],
+      [['grid'], 'grid'],
+      [['flyCamera'], 'fly camera'],
+      [['slower', 'faster'], 'time scale'],
+      [['restart'], 'restart run'],
+      [['mark'], 'mark moment'],
+    ];
+    this.legend.innerHTML = legend.map(([actions, text]) => `<span>${keysHtml(map, actions)}${text}</span>`).join('');
     labelKeys(this.legend);
     this.resizeCompass();
   }

@@ -2,15 +2,15 @@ import { Optic, type InputFrame } from '../sim/input';
 import type { Command } from '../sim/commands';
 import { CommandLatch } from './commandLatch';
 import { wrapAngle } from '../sim/core/math';
+import { ActionMap, type Action, type Context } from './actions';
 
 /**
- * Keyboard and mouse. Mouse look updates the view angles every frame for responsiveness;
- * movement keys and stance toggles are sampled once per simulation tick. Stance keys are
- * latched between ticks so a quick tap is never lost, and clicks are latched against the
- * frame on screen (commandLatch.ts), so a shot goes where the crosshair was.
+ * Keyboard and mouse, through the action map (actions.ts): code asks for actions, never
+ * keys. Mouse look updates the view angles every frame for responsiveness; held actions
+ * (moving, sprint, zoom) are sampled once per simulation tick. Stance toggles are latched
+ * between ticks so a quick tap is never lost, and clicks are latched against the frame
+ * on screen (commandLatch.ts), so a shot goes where the crosshair was.
  */
-
-const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'Space', 'KeyQ', 'KeyE']);
 
 /** A single mouse event further than this is a browser glitch (a jump on locking), not a flick. */
 const MAX_MOUSE_STEP = 400;
@@ -19,38 +19,45 @@ export class InputController {
   yaw = 0;
   pitch = 0;
   locked = false;
-  /** Zoom held by the key (F) or by the right button; either keeps it, so each is tracked. */
-  zoomKey = false;
-  zoomButton = false;
   /** Radians per pixel; the game scales it while zoomed. */
   sensitivity = 0.0022;
   sensitivityScale = 1;
+  /** Mouse up looks down (a setting). */
+  invertY = false;
+  /** Ask the browser for raw mouse movement, without the system's acceleration (a setting, where supported). */
+  rawMouse = false;
   /** How far the view can tilt up or down (tuning.bodies.player.pitchLimit, set by the game). */
   pitchLimit = 1.45;
-  onAction: ((code: string) => void) | null = null;
+  /** Actions that happen once per press, outside the tick: the debug keys, the marker. */
+  onAction: ((action: Action) => void) | null = null;
   onLockChange: ((locked: boolean) => void) | null = null;
+  /** Called when the browser refuses the pointer lock (a frame without permission, a re-lock right after Esc). */
+  onLockRefused: (() => void) | null = null;
   /** Clicks waiting for the next tick, each remembering its frame. The game reports frames to it. */
   readonly latch = new CommandLatch();
+  /** The contexts whose bindings count now (actions.ts); the game keeps it current. */
+  readonly contexts = new Set<Context>(['play', 'always']);
   private readonly commands: Command[] = [];
-  private readonly keys = new Set<string>();
-  private crouchLatched = false;
-  private proneLatched = false;
+  /** Inputs held down: key codes, and Mouse0 to Mouse4. */
+  private readonly down = new Set<string>();
+  /** Pressed-kind actions since the last tick sampled them (stance toggles). */
+  private readonly pressed = new Set<Action>();
   /** Browsers can report one huge jump right after the lock changes: the next event is skipped. */
   private skipMove = false;
   private readonly cleanup: Array<() => void> = [];
 
-  constructor(private readonly canvas: HTMLCanvasElement) {}
+  constructor(
+    private readonly canvas: HTMLCanvasElement,
+    readonly map = new ActionMap(),
+  ) {}
 
   attach(): void {
     const on = <K extends keyof WindowEventMap>(target: Window | Document, type: K, fn: (e: WindowEventMap[K]) => void) => {
       target.addEventListener(type, fn as EventListener);
       this.cleanup.push(() => target.removeEventListener(type, fn as EventListener));
     };
-    on(window, 'keydown', (e) => this.keyDown(e));
-    on(window, 'keyup', (e) => {
-      this.keys.delete(e.code);
-      if (e.code === 'KeyF') this.zoomKey = false;
-    });
+    on(window, 'keydown', (e) => this.inputDown(e.code, e));
+    on(window, 'keyup', (e) => this.down.delete(e.code));
     on(window, 'blur', () => this.releaseAll());
     on(document, 'mousemove', (e) => {
       if (!this.locked) return;
@@ -64,16 +71,12 @@ export class InputController {
       const k = this.sensitivity * this.sensitivityScale;
       if (!Number.isFinite(k)) return;
       this.yaw = wrapAngle(this.yaw - mx * k);
-      this.pitch = Math.max(-this.pitchLimit, Math.min(this.pitchLimit, this.pitch - my * k));
+      this.pitch = Math.max(-this.pitchLimit, Math.min(this.pitchLimit, this.pitch - (this.invertY ? -my : my) * k));
     });
     on(document, 'mousedown', (e) => {
-      if (!this.locked) return;
-      if (e.button === 2) this.zoomButton = true;
-      else if (e.button === 0) this.latch.latch('fire');
+      if (this.locked) this.inputDown(`Mouse${e.button}`, null);
     });
-    on(document, 'mouseup', (e) => {
-      if (e.button === 2) this.zoomButton = false;
-    });
+    on(document, 'mouseup', (e) => this.down.delete(`Mouse${e.button}`));
     on(document, 'contextmenu', (e) => {
       if (this.locked) e.preventDefault();
     });
@@ -95,33 +98,47 @@ export class InputController {
     this.cleanup.push(() => document.removeEventListener('pointerlockerror', lockError));
   }
 
-  /** Called when the browser refuses the pointer lock (a frame without permission, a re-lock right after Esc). */
-  onLockRefused: (() => void) | null = null;
-
-  get zoomHeld(): boolean {
-    return this.zoomKey || this.zoomButton;
-  }
-
-  /** Automation: hold or release the zoom. */
-  set zoomHeld(on: boolean) {
-    this.zoomKey = on;
-    this.zoomButton = false;
-  }
-
-  private releaseAll(): void {
-    this.keys.clear();
-    this.zoomKey = false;
-    this.zoomButton = false;
-  }
-
   detach(): void {
     for (const fn of this.cleanup.splice(0)) fn();
   }
 
+  /** Whether any input bound to a held action is down, in the active contexts. */
+  held(action: Action): boolean {
+    if (!this.contexts.has(this.map.actions[action].context)) return false;
+    for (const input of this.map.actions[action].inputs) if (this.down.has(input)) return true;
+    return false;
+  }
+
+  /** Zoom (binoculars) is held: the right button or F. */
+  get zoomHeld(): boolean {
+    return this.held('zoom');
+  }
+
+  /** Automation: hold or release the zoom. */
+  set zoomHeld(on: boolean) {
+    const input = this.map.actions.zoom.inputs[0]!;
+    if (on) this.down.add(input);
+    else for (const i of this.map.actions.zoom.inputs) this.down.delete(i);
+  }
+
+  private releaseAll(): void {
+    this.down.clear();
+  }
+
   requestLock(): void {
     try {
-      const p = this.canvas.requestPointerLock() as unknown as Promise<void> | undefined;
-      p?.catch?.(() => this.onLockRefused?.());
+      // Raw movement where the browser offers it and the player asked; otherwise the system's.
+      const options = this.rawMouse ? ({ unadjustedMovement: true } as const) : undefined;
+      const p = (this.canvas.requestPointerLock as (o?: { unadjustedMovement?: boolean }) => Promise<void> | undefined).call(this.canvas, options);
+      p?.catch?.(() => {
+        if (options) {
+          // Not supported here (or refused with it): try once more without.
+          this.rawMouse = false;
+          this.requestLock();
+        } else {
+          this.onLockRefused?.();
+        }
+      });
     } catch {
       // Browsers refuse a re-lock for about a second after Esc; the overlay stays up and says so.
       this.onLockRefused?.();
@@ -132,46 +149,47 @@ export class InputController {
     if (document.pointerLockElement) document.exitPointerLock();
   }
 
-  isDown(code: string): boolean {
-    return this.keys.has(code);
-  }
-
   /** Automation: hold exactly these keys (KeyboardEvent.code values), no pointer lock needed. */
   holdKeys(codes: readonly string[]): void {
     if (!Array.isArray(codes) || codes.some((c) => typeof c !== 'string')) throw new TypeError('hold() takes a list of key codes, such as ["KeyW"]');
-    this.keys.clear();
-    for (const c of codes) this.keys.add(c);
+    this.down.clear();
+    for (const c of codes) this.down.add(c);
   }
 
   /** Automation: request a stance toggle as if C or Z were tapped. */
   tap(code: 'KeyC' | 'KeyZ'): void {
-    if (code === 'KeyC') this.crouchLatched = true;
-    else if (code === 'KeyZ') this.proneLatched = true;
+    if (code === 'KeyC') this.pressed.add('crouch');
+    else if (code === 'KeyZ') this.pressed.add('prone');
     else throw new TypeError(`tap() takes 'KeyC' or 'KeyZ', not ${String(code)}`);
   }
 
-  private keyDown(e: KeyboardEvent): void {
-    // F3 and the backquote toggle views even while paused.
-    if (e.code === 'F3' || e.code === 'Backquote') {
-      e.preventDefault();
-      if (!e.repeat) this.onAction?.(e.code);
+  /** A key or button went down: hold it, and trigger what it is bound to in the active contexts. */
+  private inputDown(input: string, e: KeyboardEvent | null): void {
+    const repeat = e?.repeat ?? false;
+    const actions = this.map.actionsOf(input, this.contexts);
+    // The debug view toggles even while paused.
+    if (actions.includes('debugView')) {
+      e?.preventDefault();
+      if (!repeat) this.onAction?.('debugView');
       return;
     }
     if (!this.locked) {
-      // A movement key pressed before the lock is still held when play resumes.
-      if (MOVE_KEYS.has(e.code) && !e.repeat) this.keys.add(e.code);
+      // A held action's key pressed before the lock still counts when play resumes.
+      if (!repeat && actions.some((a) => this.map.actions[a].kind === 'held')) this.down.add(input);
       return;
     }
     // While playing, keys are the game's: Tab would move the focus, and browser shortcuts
     // (reload, find, print, save) would take the window away mid-run. Ctrl+Shift stays the
     // browser's, for its developer tools.
-    if (MOVE_KEYS.has(e.code) || e.code.startsWith('F') || e.code === 'Tab' || ((e.ctrlKey || e.metaKey) && !e.shiftKey)) e.preventDefault();
-    if (e.repeat) return;
-    this.keys.add(e.code);
-    if (e.code === 'KeyF') this.zoomKey = true; // binoculars, for trackpads without an easy right button
-    else if (e.code === 'KeyC') this.crouchLatched = true;
-    else if (e.code === 'KeyZ') this.proneLatched = true;
-    else if (!MOVE_KEYS.has(e.code)) this.onAction?.(e.code);
+    if (e && (this.map.isBound(input) || input.startsWith('F') || input === 'Tab' || ((e.ctrlKey || e.metaKey) && !e.shiftKey))) e.preventDefault();
+    if (repeat) return;
+    this.down.add(input);
+    for (const a of actions) {
+      if (this.map.actions[a].kind !== 'pressed') continue;
+      if (a === 'fire') this.latch.latch('fire');
+      else if (a === 'crouch' || a === 'prone') this.pressed.add(a);
+      else this.onAction?.(a);
+    }
   }
 
   /** Automation: click, as if the left button were pressed now. */
@@ -184,14 +202,12 @@ export class InputController {
    * `startTick` is the simulation's tick before this one runs, which dates the clicks.
    */
   sampleTick(out: InputFrame, frozen: boolean, startTick: number): InputFrame {
-    const k = this.keys;
-    out.moveX = frozen ? 0 : (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0);
-    out.moveZ = frozen ? 0 : (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
-    out.sprint = !frozen && (k.has('ShiftLeft') || k.has('ShiftRight'));
-    out.crouch = !frozen && this.crouchLatched;
-    out.prone = !frozen && this.proneLatched;
-    this.crouchLatched = false;
-    this.proneLatched = false;
+    out.moveX = frozen ? 0 : (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0);
+    out.moveZ = frozen ? 0 : (this.held('forward') ? 1 : 0) - (this.held('back') ? 1 : 0);
+    out.sprint = !frozen && this.held('sprint');
+    out.crouch = !frozen && this.pressed.has('crouch');
+    out.prone = !frozen && this.pressed.has('prone');
+    this.pressed.clear();
     out.yaw = this.yaw;
     out.pitch = this.pitch;
     out.optic = !frozen && this.zoomHeld ? Optic.Binoculars : Optic.None;
@@ -205,14 +221,13 @@ export class InputController {
     return out;
   }
 
-  /** Free-flight axes for the detached debug camera. */
+  /** Free-flight axes for the detached debug camera: the movement keys, up and down, sprint for speed. */
   flyAxes(): { x: number; y: number; z: number; fast: boolean } {
-    const k = this.keys;
     return {
-      x: (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0),
-      y: (k.has('Space') || k.has('KeyE') ? 1 : 0) - (k.has('KeyQ') ? 1 : 0),
-      z: (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0),
-      fast: k.has('ShiftLeft') || k.has('ShiftRight'),
+      x: (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0),
+      y: (this.held('flyUp') ? 1 : 0) - (this.held('flyDown') ? 1 : 0),
+      z: (this.held('forward') ? 1 : 0) - (this.held('back') ? 1 : 0),
+      fast: this.held('sprint'),
     };
   }
 }

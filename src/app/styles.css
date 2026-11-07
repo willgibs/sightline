@@ -316,6 +316,53 @@ body {
   color: var(--panel-soft);
 }
 
+/* The player's settings: a quiet fold under the seed. */
+.settings {
+  margin-top: 16px;
+  font: 11.5px/1.5 var(--sans);
+  color: var(--panel-soft);
+}
+
+.settings summary {
+  cursor: pointer;
+  color: var(--panel-ink);
+  font: 600 11px/1.4 var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.settings label {
+  display: grid;
+  grid-template-columns: 9.5em 1fr 5.5em;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.settings label.check {
+  display: flex;
+  gap: 8px;
+}
+
+.settings input {
+  accent-color: var(--panel-ink);
+}
+
+.settings input[type='range'] {
+  width: 100%;
+}
+
+.settings output {
+  font: 11px/1 var(--mono);
+  color: var(--panel-ink);
+}
+
+#overlay[data-mode='loading'] .settings,
+#overlay[data-mode='error'] .settings,
+#overlay[data-mode='outcome'] .settings,
+#overlay[data-mode='report'] .settings {
+  display: none;
+}
+
 .report {
   display: none;
   margin: 18px 0 0;
