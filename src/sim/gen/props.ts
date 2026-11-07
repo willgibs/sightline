@@ -1,4 +1,4 @@
-import type { Tuning } from '../../config/tuning';
+import type { GenTuning } from '../../config/tuning';
 import { dtanDeg } from '../core/detmath';
 import { smoothstep } from '../core/math';
 import type { Rng } from '../core/rng';
@@ -62,10 +62,10 @@ export function scatterProps(
   hf: Heightfield,
   features: TerrainFeatures,
   colliders: ColliderSet,
-  tuning: Tuning,
+  gen: GenTuning,
 ): Props {
-  const P = tuning.props;
-  const W = tuning.world;
+  const P = gen.props;
+  const W = gen.world;
   const forest = new Noise2D(rng.fork('forest'));
   const sample = makeTerrainSample();
   const hit: PathHit = { dist: 0, s: 0, x: 0, z: 0 };

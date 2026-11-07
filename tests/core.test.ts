@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FixedStepClock } from '../src/sim/core/clock';
-import { circleDirections, datan, datan2, dcos, dsin } from '../src/sim/core/detmath';
+import { circleDirections, datan, datan2, dcos, dexp, dlog, dpow, dsin } from '../src/sim/core/detmath';
 import { Hasher, hashValue, stableStringify } from '../src/sim/core/hash';
 import { headingDegrees, turnTowards, wrapAngle, yawFromDirection } from '../src/sim/core/math';
 import { Rng } from '../src/sim/core/rng';
@@ -93,6 +93,39 @@ describe('deterministic math', () => {
     expect(datan2(1, 0)).toBeCloseTo(Math.PI / 2, 15);
     expect(datan2(-1, 0)).toBeCloseTo(-Math.PI / 2, 15);
     expect(datan2(0, 0)).toBe(0);
+  });
+
+  it('matches Math.exp, Math.log and Math.pow closely', () => {
+    const rel = (a: number, b: number) => Math.abs(a - b) / Math.abs(b);
+    for (let x = -700; x <= 700; x += 0.0517) expect(rel(dexp(x), Math.exp(x))).toBeLessThan(1e-15);
+    for (let p = -300; p <= 300; p += 0.0373) {
+      const x = Math.pow(10, p);
+      expect(Math.abs(dlog(x) - Math.log(x))).toBeLessThan(1e-15 * Math.max(1, Math.abs(Math.log(x))));
+    }
+    const r = new Rng('pow');
+    for (let k = 0; k < 5000; k++) {
+      const x = r.range(0.001, 50);
+      const y = r.range(-6, 6);
+      expect(rel(dpow(x, y), Math.pow(x, y))).toBeLessThan(1e-13);
+    }
+  });
+
+  it('follows Math.exp, Math.log and Math.pow at the edges', () => {
+    expect(dexp(0)).toBe(1);
+    expect(dexp(710)).toBe(Infinity);
+    expect(dexp(-746)).toBe(0);
+    expect(dexp(709.7) / Math.exp(709.7)).toBeCloseTo(1, 14);
+    expect(Number.isNaN(dexp(NaN))).toBe(true);
+    expect(dlog(1)).toBe(0);
+    expect(dlog(0)).toBe(-Infinity);
+    expect(Number.isNaN(dlog(-1))).toBe(true);
+    expect(dlog(5e-324)).toBeCloseTo(Math.log(5e-324), 10);
+    expect(dpow(2, 10)).toBe(1024);
+    expect(dpow(2, -2)).toBe(0.25);
+    expect(dpow(-2, 3)).toBe(-8);
+    expect(Number.isNaN(dpow(-2, 0.5))).toBe(true);
+    expect(dpow(0, -1)).toBe(Infinity);
+    expect(dpow(5, 0)).toBe(1);
   });
 
   it('builds evenly spaced unit directions', () => {

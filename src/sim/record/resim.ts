@@ -2,6 +2,7 @@ import { generateWorld, type World } from '../gen/world';
 import { neutralInput } from '../input';
 import { Simulation } from '../sim';
 import type { Recording } from './recording';
+import { missionSpec } from '../mission';
 
 export interface ResimResult {
   ok: boolean;
@@ -15,12 +16,12 @@ export interface ResimResult {
 
 /**
  * Replays a recording's inputs through a fresh simulation and checks every checkpoint
- * hash. Pass a prebuilt world to skip generation.
+ * hash. Pass a prebuilt world to skip generation, and a clock (milliseconds) to time it.
  */
-export function resimulate(rec: Recording, world?: World): ResimResult {
-  const started = globalThis.performance?.now() ?? Date.now();
+export function resimulate(rec: Recording, world?: World, clock?: () => number): ResimResult {
+  const started = clock ? clock() : 0;
   const { header } = rec;
-  const w = world ?? generateWorld(header.seed, header.tuning, header.spawn);
+  const w = world ?? generateWorld(missionSpec(header.seed, header.spawn), header.tuning);
   const sim = new Simulation(w, header.tuning);
   const input = neutralInput();
   let checkpoint = 0;
@@ -40,6 +41,6 @@ export function resimulate(rec: Recording, world?: World): ResimResult {
     finalHash,
     expectedHash: header.finalHash,
     firstDivergence,
-    ms: (globalThis.performance?.now() ?? Date.now()) - started,
+    ms: clock ? clock() - started : 0,
   };
 }

@@ -2,8 +2,13 @@
  * Every tunable number in the game, in one place.
  *
  * Starting values come from the design doc (Part 2) and get tuned in play. In the dev
- * build, saving this file hot-reloads it into the running game: movement, noise and
- * view values apply immediately; world and prop values regenerate the valley in place.
+ * build, saving this file hot-reloads it into the running game: simulation and view
+ * values apply immediately; `gen` values regenerate the valley in place.
+ *
+ * Three owners, so each change knows what it invalidates:
+ *   gen   what generation reads (and only that): a change means a different valley;
+ *   view  presentation only: never changes an outcome, never invalidates a recording;
+ *   the rest is the simulation's: a change mid-run marks the recording as unreplayable.
  *
  * Units: metres, seconds, degrees (where named *Deg), multipliers otherwise.
  */
@@ -13,33 +18,39 @@ export const defaultTuning = {
     recordHz: 10, // state samples per second in recordings
   },
 
-  world: {
-    size: 1280, // terrain square, centred on the camp
-    cellSize: 2.5, // heightfield spacing; render and physics share these triangles
-    playMargin: 70, // out-of-bounds band at the terrain edge
-    padRadius: 78, // flattened camp pad
-    padBlend: 36, // blend from the pad into the valley floor
-    padHeight: 0.5, // pad elevation; kept off the 5 m contour lines
-    ridgeRadius: [215, 430], // crest distance from the camp, varying around the valley
-    ridgeHeight: [32, 78], // crest height above the pad
-    saddleCount: [3, 4], // low passes through the ridges: the creek uses two, the road one
-    saddleDepth: [0.6, 0.82], // share of the crest height a saddle removes
-    saddleHalfWidthDeg: [15, 24],
-    warpAmplitude: 70, // breaks the bowl's symmetry
-    hills: 15, // broad rolling relief
-    crags: 9, // ridged relief on the slopes
-    detail: 0.9, // fine relief
-    creekWidth: 7, // flat creek bed
-    creekBankSlope: 0.8, // bank rise per metre (about 39°)
-    roadWidth: 6,
-    maxGenAttempts: 6, // re-rolls before accepting a valley that fails validation
-  },
+  // Everything generation reads, and nothing else: changing any of it rebuilds the valley.
+  gen: {
+    world: {
+      size: 1280, // terrain square, centred on the camp
+      cellSize: 2.5, // heightfield spacing; render and physics share these triangles
+      playMargin: 70, // out-of-bounds band at the terrain edge
+      padRadius: 78, // flattened camp pad
+      padBlend: 36, // blend from the pad into the valley floor
+      padHeight: 0.5, // pad elevation; kept off the 5 m contour lines
+      ridgeRadius: [215, 430], // crest distance from the camp, varying around the valley
+      ridgeHeight: [32, 78], // crest height above the pad
+      saddleCount: [3, 4], // low passes through the ridges: the creek uses two, the road one
+      saddleDepth: [0.6, 0.82], // share of the crest height a saddle removes
+      saddleHalfWidthDeg: [15, 24],
+      warpAmplitude: 70, // breaks the bowl's symmetry
+      hills: 15, // broad rolling relief
+      crags: 9, // ridged relief on the slopes
+      detail: 0.9, // fine relief
+      creekWidth: 7, // flat creek bed
+      creekBankSlope: 0.8, // bank rise per metre (about 39°)
+      roadWidth: 6,
+      maxGenAttempts: 6, // re-rolls before accepting a valley that fails validation
+    },
 
-  props: {
-    treeSpacing: 6, // jittered-grid cell for tree candidates
-    treeCover: 0.42, // share of forest cells that grow a tree
-    rockSpacing: 13,
-    bushSpacing: 7,
+    props: {
+      treeSpacing: 6, // jittered-grid cell for tree candidates
+      treeCover: 0.42, // share of forest cells that grow a tree
+      rockSpacing: 13,
+      bushSpacing: 7,
+    },
+    // Validation measures walkability with the controller's own slope limit; a test
+    // keeps the two equal.
+    walkableSlopeDeg: 42,
   },
 
   player: {
@@ -100,3 +111,5 @@ export const defaultTuning = {
 };
 
 export type Tuning = typeof defaultTuning;
+/** The slice of tuning that generation reads; generation code never sees the rest. */
+export type GenTuning = Tuning['gen'];

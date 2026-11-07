@@ -5,6 +5,7 @@ import type { World } from '../src/sim/gen/world';
 import { ColliderSet, type ColliderInput } from '../src/sim/world/colliders';
 import { Heightfield } from '../src/sim/world/heightfield';
 import { Surface } from '../src/sim/world/surfaces';
+import { missionSpec } from '../src/sim/mission';
 
 /** A deep copy of the default tuning that tests can change freely. */
 export function tuningCopy(): Tuning {
@@ -40,6 +41,7 @@ export function testWorld(opts: TestWorldOptions = {}): World {
     { x: size + 1, z: size },
   ]);
   return {
+    spec: missionSpec('TEST-0000', 'edge'),
     seed: 'TEST-0000',
     attempt: 0,
     terrain: hf,

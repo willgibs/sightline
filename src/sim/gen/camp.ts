@@ -1,4 +1,4 @@
-import type { Tuning } from '../../config/tuning';
+import type { GenTuning } from '../../config/tuning';
 import type { Rng } from '../core/rng';
 import { Blocks, type ColliderSet } from '../world/colliders';
 import type { Heightfield } from '../world/heightfield';
@@ -59,8 +59,8 @@ export interface Camp {
   fenceHalf: number;
 }
 
-export function buildTestCamp(rng: Rng, hf: Heightfield, features: TerrainFeatures, colliders: ColliderSet, tuning: Tuning): Camp {
-  const padH = tuning.world.padHeight;
+export function buildTestCamp(rng: Rng, hf: Heightfield, features: TerrainFeatures, colliders: ColliderSet, gen: GenTuning): Camp {
+  const padH = gen.world.padHeight;
   const u = features.campAxis;
   const mirror = rng.chance(0.5) ? -1 : 1;
   const v = { x: -u.z * mirror, z: u.x * mirror };

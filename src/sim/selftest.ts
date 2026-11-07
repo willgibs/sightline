@@ -1,10 +1,11 @@
 import { defaultTuning } from '../config/tuning';
 import { WanderBot } from './bots/wander';
-import { datan, datan2, dcos, dsin, dtanDeg } from './core/detmath';
+import { datan, datan2, dcos, dexp, dlog, dpow, dsin, dtanDeg } from './core/detmath';
 import { Hasher } from './core/hash';
 import { generateWorld, type World } from './gen/world';
 import { neutralInput } from './input';
 import { Simulation } from './sim';
+import { missionSpec } from './mission';
 
 /**
  * A determinism self-test that runs anywhere the simulation runs: Node, Bun, and inside
@@ -18,8 +19,8 @@ import { Simulation } from './sim';
  */
 
 export const GOLDEN = {
-  /** Bits of dsin, dcos, datan, datan2 and dtanDeg over 20,000 inputs. */
-  detmath: 'b5dffdc0e102567a',
+  /** Bits of every deterministic math function over 4,000 inputs each. */
+  detmath: '8d55144e8e74968f',
   /** Everything generation decides for TAL-4471 (also pinned in tests/world.test.ts). */
   world: '2ea333d491d7568c',
   /** State hash after 60 s of bot play on TAL-4471, and on MUD-9031. */
@@ -56,6 +57,7 @@ export function detmathFingerprint(): string {
     const x = (i - 2000) * 0.0071234567;
     const y = (i % 97) * 0.731 - 35;
     h.f64(dsin(x)).f64(dcos(x)).f64(datan(x * 3.1)).f64(datan2(y, x)).f64(dtanDeg((i % 179) - 89.5));
+    h.f64(dexp(x * 50)).f64(dlog(Math.abs(x) * 1e3 + 1e-9)).f64(dpow(Math.abs(y) + 0.5, x));
   }
   return h.digest();
 }
@@ -80,8 +82,8 @@ export function runSelfTest(now: () => number = () => 0): SelfTestResult[] {
   };
   check('deterministic math', GOLDEN.detmath, detmathFingerprint);
   let tal: World | null = null;
-  check('valley TAL-4471', GOLDEN.world, () => worldFingerprint((tal = generateWorld('TAL-4471', defaultTuning))));
+  check('valley TAL-4471', GOLDEN.world, () => worldFingerprint((tal = generateWorld(missionSpec('TAL-4471'), defaultTuning))));
   check('60 s of play on TAL-4471', GOLDEN.playTAL, () => playFingerprint(tal!, 60));
-  check('60 s of play on MUD-9031', GOLDEN.playMUD, () => playFingerprint(generateWorld('MUD-9031', defaultTuning), 60));
+  check('60 s of play on MUD-9031', GOLDEN.playMUD, () => playFingerprint(generateWorld(missionSpec('MUD-9031'), defaultTuning), 60));
   return results;
 }

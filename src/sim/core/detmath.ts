@@ -153,3 +153,99 @@ export function circleDirections(count: number): Array<{ x: number; z: number }>
   }
   return out;
 }
+
+// ── Exponentials and logarithms ──────────────────────────────────────────────────────────
+// Built the same way: exact range reduction (the exponent field read and written through a
+// DataView, which is exactly specified), then a short series on a small interval.
+
+const LN2_HI = 6.93147180369123816490e-1; // ln 2 split so k·LN2_HI is exact for |k| < 2^20
+const LN2_LO = 1.90821492927058770002e-10;
+const INV_LN2 = 1.44269504088896338700;
+const SQRT1_2 = 0.7071067811865476;
+const bits = new DataView(new ArrayBuffer(8));
+
+/** 2^k for an integer k, exactly, including subnormal results. */
+function pow2i(k: number): number {
+  if (k > 1023) return Infinity;
+  if (k < -1074) return 0;
+  if (k < -1022) return pow2i(k + 1022) * pow2i(-1022);
+  bits.setUint32(0, (k + 1023) << 20, false);
+  bits.setUint32(4, 0, false);
+  return bits.getFloat64(0, false);
+}
+
+/** e^x, deterministic. Relative error under 1e-15 across the double range. */
+export function dexp(x: number): number {
+  if (x !== x) return x;
+  if (x > 709.782712893384) return Infinity;
+  if (x < -745.1332191019412) return 0;
+  const k = Math.round(x * INV_LN2);
+  const r = x - k * LN2_HI - k * LN2_LO; // |r| ≤ ln2/2
+  // Taylor series for e^r to r^14 in Horner form: the last term is under 1e-17 here.
+  let sum = 1;
+  for (let i = 14; i >= 1; i--) sum = 1 + (r / i) * sum;
+  // Split the scale at either end of the range, where 2^k alone would overflow or
+  // lose bits to the subnormal range.
+  if (k > 1000) return sum * pow2i(k - 60) * pow2i(60);
+  if (k < -1000) return sum * pow2i(k + 60) * pow2i(-60);
+  return sum * pow2i(k);
+}
+
+/** Natural logarithm, deterministic. Relative error under 1e-15 for positive inputs. */
+export function dlog(x: number): number {
+  if (x !== x || x < 0) return NaN;
+  if (x === 0) return -Infinity;
+  if (x === Infinity) return Infinity;
+  let scale = 0;
+  if (x < 2.2250738585072014e-308) {
+    // Subnormal: lift it into the normal range first.
+    x *= 18014398509481984; // 2^54
+    scale = -54;
+  }
+  bits.setFloat64(0, x, false);
+  const hi = bits.getUint32(0, false);
+  let e = ((hi >>> 20) & 0x7ff) - 1023 + scale;
+  // Mantissa as a number in [1, 2).
+  bits.setUint32(0, (hi & 0x000fffff) | 0x3ff00000, false);
+  let m = bits.getFloat64(0, false);
+  if (m > 2 * SQRT1_2) {
+    m /= 2;
+    e += 1;
+  }
+  // log(m) = 2·atanh(s) with s = (m − 1) / (m + 1), |s| ≤ 0.1716.
+  const s = (m - 1) / (m + 1);
+  const s2 = s * s;
+  let term = s;
+  let sum = s;
+  for (let i = 3; i <= 27; i += 2) {
+    term *= s2;
+    sum += term / i;
+  }
+  return e * LN2_HI + (2 * sum + e * LN2_LO);
+}
+
+/**
+ * x^y, deterministic. Exact for integer exponents up to 2^31 by repeated squaring;
+ * otherwise e^(y·log x), with relative error growing with |y·log x| (about 1e-14 at 30).
+ * Follows Math.pow's special cases for zeros, infinities and negative bases.
+ */
+export function dpow(x: number, y: number): number {
+  if (y === 0) return 1;
+  if (x !== x || y !== y) return NaN;
+  const yInt = Math.floor(y) === y;
+  if (yInt && Math.abs(y) <= 2147483648) {
+    let base = y < 0 ? 1 / x : x;
+    let n = Math.abs(y);
+    let result = 1;
+    while (n > 0) {
+      if (n % 2 === 1) result *= base;
+      base *= base;
+      n = Math.floor(n / 2);
+    }
+    return result;
+  }
+  if (x < 0) return NaN; // a negative base needs an integer exponent
+  if (x === 0) return y > 0 ? 0 : Infinity;
+  if (x === Infinity) return y > 0 ? Infinity : 0;
+  return dexp(y * dlog(x));
+}

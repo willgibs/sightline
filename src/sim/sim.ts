@@ -6,6 +6,7 @@ import { createPlayer, stepPlayer, type MoveMode, type PlayerContext, type Playe
 import type { SimEvent } from './events';
 import { generateWorld, type SpawnKind, type World } from './gen/world';
 import { neutralInput, quantizeInput, type InputFrame } from './input';
+import { missionSpec } from './mission';
 
 /**
  * The simulation: pure TypeScript, no rendering, no DOM, fixed timestep.
@@ -64,7 +65,7 @@ export class Simulation {
   }
 
   static create(seed: string, tuning: Tuning, spawn: SpawnKind = 'overlook'): Simulation {
-    return new Simulation(generateWorld(seed, tuning, spawn), tuning);
+    return new Simulation(generateWorld(missionSpec(seed, spawn), tuning), tuning);
   }
 
   /**

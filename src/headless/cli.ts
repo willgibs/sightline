@@ -15,8 +15,10 @@ import { resimulate } from '../sim/record/resim';
 import { Simulation } from '../sim/sim';
 import { WanderBot } from '../sim/bots/wander';
 import { fmt, parseArgs } from './args';
+import { missionSpec } from '../sim/mission';
 
 const args = parseArgs(process.argv.slice(2));
+const now = (): number => performance.now();
 
 const replay = args.get('replay');
 if (replay) {
@@ -25,7 +27,7 @@ if (replay) {
   console.log(`\nSIGHTLINE replay · ${replay}`);
   console.log(`seed ${h.seed} · ${h.ticks.toLocaleString('en-US')} ticks (${fmt.clock(h.ticks / h.tickHz)}) · recorded ${h.createdAt}`);
   if (h.tuningChanged) console.log('note    tuning was hot-reloaded during this run, so it cannot re-simulate exactly');
-  const re = resimulate(rec);
+  const re = resimulate(rec, undefined, now);
   console.log(
     `resim   ${re.finalHash} vs recorded ${h.finalHash} · ${re.ok ? '✓ identical' : '✗ DIVERGED'}` +
       (re.firstDivergence !== null ? ` · first divergence at tick ${re.firstDivergence}` : '') +
@@ -40,10 +42,9 @@ const spawn = (args.get('spawn') ?? 'overlook') as SpawnKind;
 const out = args.get('out');
 const tuning = defaultTuning;
 
-const now = () => performance.now();
 console.log(`\nSIGHTLINE headless · seed ${seed} · ${minutes} min · bot wander\n`);
 
-const world = generateWorld(seed, tuning, spawn);
+const world = generateWorld(missionSpec(seed, spawn), tuning, now);
 const r = world.report;
 console.log(
   `world   generated in ${fmt.ms(world.genMs)}${world.attempt ? ` (${world.attempt} re-roll${world.attempt > 1 ? 's' : ''})` : ''}` +
@@ -94,7 +95,7 @@ console.log(
     `targets reached ${bot.reached}, abandoned ${bot.abandoned}`,
 );
 
-const rec = recorder.finish(sim);
+const rec = recorder.finish(sim, new Date().toISOString());
 const bytes = rec.toBytes();
 const sizes = recorder.sizes;
 console.log(
@@ -107,7 +108,7 @@ if (out) {
 }
 
 const loaded = Recording.fromBytes(bytes);
-const re = resimulate(loaded, world);
+const re = resimulate(loaded, world, now);
 console.log(`hash    ${rec.header.finalHash}`);
 console.log(
   `resim   ${re.finalHash} ${re.ok ? '✓ identical' : '✗ DIVERGED'} · ${rec.header.checkpoints.length} checkpoints · ${fmt.ms(re.ms)}` +

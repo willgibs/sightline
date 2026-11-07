@@ -1,4 +1,4 @@
-import type { Tuning } from '../../config/tuning';
+import type { GenTuning } from '../../config/tuning';
 import { DEG, dcos, dcosDeg, dsin, dtanDeg } from '../core/detmath';
 import { clamp, lerp, smoothstep } from '../core/math';
 import type { Rng } from '../core/rng';
@@ -67,8 +67,8 @@ export interface TerrainResult {
   backdrop: Backdrop;
 }
 
-export function generateTerrain(rng: Rng, tuning: Tuning): TerrainResult {
-  const W = tuning.world;
+export function generateTerrain(rng: Rng, gen: GenTuning): TerrainResult {
+  const W = gen.world;
   const shape = new Noise2D(rng.fork('shape'));
   const warp = new Noise2D(rng.fork('warp'));
   const relief = new Noise2D(rng.fork('relief'));

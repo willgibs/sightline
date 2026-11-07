@@ -4,6 +4,7 @@ import { Hasher } from '../src/sim/core/hash';
 import { closestOnPolyline, type PathHit } from '../src/sim/gen/paths';
 import { generateWorld, type World } from '../src/sim/gen/world';
 import { makeTerrainSample } from '../src/sim/world/heightfield';
+import { missionSpec } from '../src/sim/mission';
 
 /** A fingerprint of everything generation decides: terrain, surfaces, props, camp, spawn. */
 function fingerprint(w: World): string {
@@ -20,17 +21,21 @@ function fingerprint(w: World): string {
 
 let tal: World;
 beforeAll(() => {
-  tal = generateWorld('TAL-4471', defaultTuning);
+  tal = generateWorld(missionSpec('TAL-4471'), defaultTuning);
 });
 
 describe('world generation', () => {
+  it('validates walkability with the controller\'s own slope limit', () => {
+    expect(defaultTuning.gen.walkableSlopeDeg).toBe(defaultTuning.player.maxSlopeDeg);
+  });
+
   it('builds the same valley from the same seed', () => {
-    const again = generateWorld('TAL-4471', defaultTuning);
+    const again = generateWorld(missionSpec('TAL-4471'), defaultTuning);
     expect(fingerprint(again)).toBe(fingerprint(tal));
   });
 
   it('builds different valleys from different seeds', () => {
-    const other = generateWorld('KOR-1188', defaultTuning);
+    const other = generateWorld(missionSpec('KOR-1188'), defaultTuning);
     expect(fingerprint(other)).not.toBe(fingerprint(tal));
   });
 
@@ -42,11 +47,11 @@ describe('world generation', () => {
 
   it('flattens the camp pad', () => {
     const { terrain } = tal;
-    const pad = defaultTuning.world.padRadius;
+    const pad = defaultTuning.gen.world.padRadius;
     for (let r = 0; r < pad; r += 7) {
       for (let k = 0; k < 16; k++) {
         const a = (k / 16) * 2 * Math.PI;
-        expect(terrain.heightAt(Math.cos(a) * r, Math.sin(a) * r)).toBeCloseTo(defaultTuning.world.padHeight, 5);
+        expect(terrain.heightAt(Math.cos(a) * r, Math.sin(a) * r)).toBeCloseTo(defaultTuning.gen.world.padHeight, 5);
       }
     }
   });
@@ -83,7 +88,7 @@ describe('world generation', () => {
   });
 
   it('keeps cover off the pad, the road and the creek bed', () => {
-    const W = defaultTuning.world;
+    const W = defaultTuning.gen.world;
     const hit: PathHit = { dist: 0, s: 0, x: 0, z: 0 };
     for (const p of [...tal.props.trees, ...tal.props.bushes, ...tal.props.rocks]) {
       expect(Math.hypot(p.x, p.z)).toBeGreaterThan(W.padRadius);

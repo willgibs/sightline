@@ -9,6 +9,7 @@ import { Rng } from '../sim/core/rng';
 import { randomSeed } from '../sim/core/seed';
 import { generateWorld } from '../sim/gen/world';
 import { fmt, parseArgs } from './args';
+import { missionSpec } from '../sim/mission';
 
 const args = parseArgs(process.argv.slice(2));
 const count = Number(args.get('count') ?? 50);
@@ -24,7 +25,7 @@ const steep: number[] = [];
 const trees: number[] = [];
 const failures: string[] = [];
 for (const seed of seeds) {
-  const w = generateWorld(seed, defaultTuning);
+  const w = generateWorld(missionSpec(seed), defaultTuning, () => performance.now());
   times.push(w.genMs);
   attempts.set(w.attempt, (attempts.get(w.attempt) ?? 0) + 1);
   overwatch.push(w.report.overwatchSectors);

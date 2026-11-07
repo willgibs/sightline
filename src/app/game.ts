@@ -14,6 +14,7 @@ import { Hud } from './hud';
 import { InputController } from './input';
 import { Overlay } from './overlay';
 import { FrameStats, percentile } from './perf';
+import { missionSpec } from '../sim/mission';
 
 /**
  * The browser game loop: real time in, fixed simulation ticks out, interpolated frames
@@ -130,7 +131,7 @@ export class Game {
     this.overlay.setStatus('');
     // Let the loading state paint before the main thread is busy generating.
     window.setTimeout(() => {
-      const world = generateWorld(seed, this.tuning, this.spawnKind);
+      const world = generateWorld(missionSpec(seed, this.spawnKind), this.tuning, () => performance.now());
       this.world = world;
       this.renderer.setWorld(world, this.tuning);
       this.restartRun();
@@ -158,7 +159,7 @@ export class Game {
     // Start looking at the camp so the first frame frames the valley.
     const p = this.sim.player;
     const dist = Math.hypot(p.x, p.z);
-    const drop = this.tuning.world.padHeight + 1 - (p.y + p.eyeHeight);
+    const drop = this.tuning.gen.world.padHeight + 1 - (p.y + p.eyeHeight);
     this.input.pitch = dist > 1 ? Math.max(-0.35, Math.min(0.1, Math.atan2(drop, dist))) : 0;
     this.clock.reset();
     this.bobPhase = 0;
@@ -455,7 +456,7 @@ export class Game {
 
   private saveRecording(): void {
     if (!this.sim) return;
-    const rec = this.recorder.finish(this.sim);
+    const rec = this.recorder.finish(this.sim, new Date().toISOString());
     const blob = new Blob([rec.toBytes() as BlobPart], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -514,7 +515,7 @@ export class Game {
       dump: () => ({ tick: this.sim.tick, hash: this.sim.hash(), player: { ...this.sim.player }, guards: this.sim.guards.map((g) => ({ ...g })) }),
       /** The current run's recording as base64, for re-simulating it outside the browser. */
       recording: () => {
-        const bytes = this.recorder.finish(this.sim).toBytes();
+        const bytes = this.recorder.finish(this.sim, new Date().toISOString()).toBytes();
         let bin = '';
         for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!);
         return btoa(bin);

@@ -6,10 +6,11 @@ import { neutralInput } from '../src/sim/input';
 import { Recorder, Recording } from '../src/sim/record/recording';
 import { resimulate } from '../src/sim/record/resim';
 import { Simulation } from '../src/sim/sim';
+import { missionSpec } from '../src/sim/mission';
 
 let world: World;
 beforeAll(() => {
-  world = generateWorld('VEX-0042', defaultTuning);
+  world = generateWorld(missionSpec('VEX-0042'), defaultTuning);
 });
 
 /** Plays `seconds` with the wander bot and returns the simulation and its recording. */

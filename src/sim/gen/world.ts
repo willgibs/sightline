@@ -1,4 +1,5 @@
 import type { Tuning } from '../../config/tuning';
+import type { MissionSpec } from '../mission';
 import { dtanDeg } from '../core/detmath';
 import { hashValue } from '../core/hash';
 import { Rng } from '../core/rng';
@@ -14,6 +15,8 @@ import { generateTerrain, type Backdrop, type TerrainFeatures } from './terrain'
  * guard posts and routes, the analysis report and the player's spawn.
  */
 export interface World {
+  /** What this world was built from. */
+  spec: MissionSpec;
   seed: string;
   /** Re-rolls needed before the valley passed validation (0 = first try). */
   attempt: number;
@@ -27,7 +30,7 @@ export interface World {
   spawn: Spawn;
   /** Half-size of the playable square; beyond it is out of bounds. */
   playHalf: number;
-  /** Generation time in milliseconds (informational; not part of the deterministic output). */
+  /** Generation time in milliseconds, if a clock was given (informational, not deterministic). */
   genMs: number;
 }
 
@@ -42,33 +45,39 @@ export interface Spawn {
 
 export type SpawnKind = Spawn['kind'];
 
-const now = (): number => globalThis.performance?.now() ?? Date.now();
-
 /** Everything generation reads from tuning. If this changes, the valley must be rebuilt. */
 export function worldTuningKey(t: Tuning): string {
-  return hashValue({ world: t.world, props: t.props, maxSlopeDeg: t.player.maxSlopeDeg });
+  return hashValue(t.gen);
 }
 
-/** Everything the running simulation reads from tuning (view settings excluded). */
+/** Everything the running simulation reads from tuning: all of it except generation and view. */
 export function simTuningKey(t: Tuning): string {
-  return hashValue({ sim: t.sim, player: t.player, noise: t.noise, guards: t.guards });
+  const { gen: _gen, view: _view, ...simulation } = t;
+  return hashValue(simulation);
 }
 
-export function generateWorld(seed: string, tuning: Tuning, spawnKind: SpawnKind = 'overlook'): World {
-  const started = now();
-  const attempts = Math.max(1, tuning.world.maxGenAttempts);
+/**
+ * Builds a mission's world from its spec. Generation reads only `tuning.gen`. Pass a
+ * clock (milliseconds) to have the generation time reported in `genMs`.
+ */
+export function generateWorld(spec: MissionSpec, tuning: Tuning, clock?: () => number): World {
+  const started = clock ? clock() : 0;
+  const G = tuning.gen;
+  const seed = spec.seed;
+  const attempts = Math.max(1, G.world.maxGenAttempts);
   for (let attempt = 0; ; attempt++) {
     const rng = new Rng(seed, attempt === 0 ? 'world' : `world#${attempt}`);
-    const terrain = generateTerrain(rng.fork('terrain'), tuning);
-    const colliders = new ColliderSet(tuning.world.size);
-    const camp = buildTestCamp(rng.fork('camp'), terrain.heightfield, terrain.features, colliders, tuning);
-    const props = scatterProps(rng.fork('props'), terrain.heightfield, terrain.features, colliders, tuning);
+    const terrain = generateTerrain(rng.fork('terrain'), G);
+    const colliders = new ColliderSet(G.world.size);
+    const camp = buildTestCamp(rng.fork('camp'), terrain.heightfield, terrain.features, colliders, G);
+    const props = scatterProps(rng.fork('props'), terrain.heightfield, terrain.features, colliders, G);
     colliders.build();
-    const report = analyzeTerrain(terrain.heightfield, colliders, tuning);
+    const report = analyzeTerrain(terrain.heightfield, colliders, G);
     if (!report.ok && attempt < attempts - 1) continue;
-    const playHalf = terrain.heightfield.size / 2 - tuning.world.playMargin;
-    const spawn = chooseSpawn(spawnKind, terrain.heightfield, terrain.features, colliders, report, playHalf);
+    const playHalf = terrain.heightfield.size / 2 - G.world.playMargin;
+    const spawn = chooseSpawn(spec.insertion, terrain.heightfield, terrain.features, colliders, report, playHalf);
     return {
+      spec,
       seed,
       attempt,
       terrain: terrain.heightfield,
@@ -80,7 +89,7 @@ export function generateWorld(seed: string, tuning: Tuning, spawnKind: SpawnKind
       report,
       spawn,
       playHalf,
-      genMs: now() - started,
+      genMs: clock ? clock() - started : 0,
     };
   }
 }

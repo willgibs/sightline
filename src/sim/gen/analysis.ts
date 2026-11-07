@@ -1,4 +1,4 @@
-import type { Tuning } from '../../config/tuning';
+import type { GenTuning } from '../../config/tuning';
 import { circleDirections, dtanDeg } from '../core/detmath';
 import { Blocks, type ColliderSet, type RayHit } from '../world/colliders';
 import type { Heightfield } from '../world/heightfield';
@@ -42,8 +42,8 @@ const PERCH_MIN_HEIGHT = 12;
 const PERCH_RANGE: [number, number] = [150, 500];
 const EYE = 0.6; // a prone shooter's rifle over grass
 
-export function analyzeTerrain(hf: Heightfield, colliders: ColliderSet, tuning: Tuning): TerrainReport {
-  const padH = tuning.world.padHeight;
+export function analyzeTerrain(hf: Heightfield, colliders: ColliderSet, gen: GenTuning): TerrainReport {
+  const padH = gen.world.padHeight;
   const problems: string[] = [];
   const dirs = circleDirections(DIRECTIONS);
   const target = { x: 0, y: padH + 1.4, z: 0 }; // chest height at the camp centre
@@ -110,9 +110,9 @@ export function analyzeTerrain(hf: Heightfield, colliders: ColliderSet, tuning: 
 
   // --- Access: flood the walkable cells outward from the camp. -----------------------
   const { cells, n, heights, cell } = hf;
-  const maxTan = dtanDeg(tuning.player.maxSlopeDeg);
+  const maxTan = dtanDeg(gen.walkableSlopeDeg);
   const walk = new Uint8Array(cells * cells);
-  const playHalf = hf.size / 2 - tuning.world.playMargin;
+  const playHalf = hf.size / 2 - gen.world.playMargin;
   let steep = 0;
   let inPlay = 0;
   for (let j = 0; j < cells; j++) {

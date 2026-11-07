@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
  * 1. The simulation never touches rendering or the browser, so it runs headless.
  * 2. The simulation only uses math that is bit-identical in every JavaScript engine, so
  *    a seed builds the same valley everywhere and a recording replays anywhere.
+ * 3. A tick depends only on the state and the input: no clock, no timers, no async, no
+ *    network, and no hidden module-level state.
  */
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -51,6 +53,26 @@ describe('architecture', () => {
       /Math\.(sin|cos|tan|asin|acos|atan|atan2|asinh|acosh|atanh|sinh|cosh|tanh|exp|expm1|log|log2|log10|log1p|pow|hypot|cbrt)\b|\*\*/;
     const offenders = files(join(root, 'src/sim'))
       .filter((f) => forbidden.test(code(f)))
+      .map((f) => relative(root, f));
+    expect(offenders).toEqual([]);
+  });
+
+  it('never reads the clock, waits, or reaches outside inside the simulation', () => {
+    // Wall-clock time, timers, async code and network or dynamic imports would make a
+    // tick depend on more than its state and input. Callers pass a clock in when they
+    // want timings.
+    const forbidden = /\b(Date|performance|setTimeout|setInterval|setImmediate|queueMicrotask|requestIdleCallback|fetch|XMLHttpRequest|WebSocket|Worker)\b|\basync\b|\bawait\b|\bimport\s*\(/;
+    const offenders = files(join(root, 'src/sim'))
+      .filter((f) => forbidden.test(code(f)))
+      .map((f) => relative(root, f));
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps no mutable module-level state in the simulation', () => {
+    // State that outlives a tick belongs in the simulation's state, where it is hashed and
+    // saved. Module-level scratch buffers are fine as consts that are fully rewritten on use.
+    const offenders = files(join(root, 'src/sim'))
+      .filter((f) => /^(export\s+)?(let|var)\s/m.test(code(f)))
       .map((f) => relative(root, f));
     expect(offenders).toEqual([]);
   });

@@ -5,6 +5,7 @@ import { generateWorld } from '../src/sim/gen/world';
 import { neutralInput } from '../src/sim/input';
 import { Simulation } from '../src/sim/sim';
 import { Blocks, pushOutCircle } from '../src/sim/world/colliders';
+import { missionSpec } from '../src/sim/mission';
 
 /**
  * Long bot runs over real valleys, checking after every tick that the player is never
@@ -18,7 +19,7 @@ describe('controller invariants on generated valleys', () => {
     let below = 0;
     let worst = 0;
     for (const seed of ['TAL-4471', 'MUD-9031']) {
-      const world = generateWorld(seed, T);
+      const world = generateWorld(missionSpec(seed), T);
       const sim = new Simulation(world, T);
       const bot = new WanderBot(seed);
       const raw = neutralInput();

@@ -163,7 +163,8 @@ export class Recorder {
     return { inputs: this.inputs.length, states: this.states.length, events: this.events.length };
   }
 
-  finish(sim: Simulation): Recording {
+  /** Closes the recording. `createdAt` is an ISO timestamp from the caller (the simulation has no clock). */
+  finish(sim: Simulation, createdAt = ''): Recording {
     const header: RecordingHeader = {
       format: 'sightline-recording',
       version: RECORDING_VERSION,
@@ -179,7 +180,7 @@ export class Recorder {
       finalHash: sim.hash(),
       checkpoints: [...this.checkpoints],
       tuningChanged: this.tuningChanged,
-      createdAt: new Date().toISOString(),
+      createdAt,
     };
     return new Recording(header, this.inputs.toBytes(), this.states.toBytes(), this.events.toBytes());
   }
