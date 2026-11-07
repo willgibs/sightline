@@ -43,15 +43,15 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [x] Movement split into intent (input or AI to a `MoveIntent`) and one shared motor with modes (ground and air now), usable by any body with its own spec. The guards join it in M5.
 - [x] The self-test pins `behaviour` (observable, every tick) separately from `state` (the whole tree), with the fuzzing bot added, so refactors prove themselves.
 
-### M4 · Timed commands, the event log, recording v2
+### M4 · Timed commands, the event log, recording v2 ✓
 - [x] Tick input gains held states (optic, breath, lean) and a list of commands; precise commands carry the lag and view angles of the frame the player saw. Pose history of two ticks for hits between ticks. A `fire` command emits a `shot` event from the eye the player saw; a test proves it at six frame rates.
 - [x] One event registry: typed, with ids, times in seconds and causes; `explain(id)` walks the chain. Every event carries its source as an entity id. Footsteps carry the gait, so sound picks its voice from what the legs did rather than from loudness.
-- [ ] Recording v2: tagged tracks (header, inputs, states, events, annotations), build and version stamps, markers; snapshots cached in memory for exact seeking.
-- [ ] A strict loader: a bounds-checked reader, a `RecordingFormatError`, whole-record sizes, a size cap, no trailing bytes. The header adds the simulation tuning key, the world fingerprint and the tick-0 hash.
-- [ ] Tuning is frozen when a simulation or recorder takes it, and a tuning change mid-run becomes a track in the recording instead of a flag. A recorder records only the simulation it was made for.
-- [ ] Checkpoints carry a digest per system, so a desync names the system that diverged.
-- [ ] Long sessions: saving a 24-hour recording peaked at 191 MB; the writer streams instead.
-- [ ] A golden recording in the tests, re-simulated bit for bit.
+- [x] Recording v2: tagged tracks (header, inputs, checkpoints, tuning changes, states, events, annotations), build and version stamps, markers (M); save-states cached in memory for exact seeking (`ReplaySeeker`).
+- [x] A strict loader: a bounds-checked reader, a `RecordingFormatError`, every header field checked, a size cap, no trailing bytes. The header carries the world fingerprint and the tick-0 hash, and re-simulation says why it can't run.
+- [x] Tuning is frozen when a simulation takes it, and a tuning change mid-run becomes a track in the recording instead of a flag. A recorder records only the simulation it was made for.
+- [x] Checkpoints hash each part of the state, so a desync names where it diverged (an entity, the random streams).
+- [x] Long sessions: the writer fills 64 KB chunks instead of doubling a buffer, and saving hands the chunks to a Blob. Saving still copies each track once.
+- [x] A golden recording in the tests, re-simulated bit for bit (`npm run golden` rewrites it).
 
 ### M5 · Deliberate behaviour changes
 - [ ] A random stream per entity and purpose; the shared `sim` stream retired.
@@ -85,7 +85,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [ ] Head bob is drawn but not simulated, so a shot leaves from the eye without it. Turn bob off with an optic up, or make it a pure function of simulation time that both sides evaluate (with lab B).
 
 ### M9 · The playtest loop
-- [ ] Every dev session saves its recording and a telemetry report into `playtests/`; a marker key flags moments.
+- [ ] Every dev session saves its recording and a telemetry report into `playtests/` (the marker key, M, already records moments).
 - [ ] `npm run playtest -- <file>` re-simulates and summarizes a session.
 - [ ] A replay viewer with scrubbing.
 - [ ] Determinism checked in Chromium, Firefox and WebKit, and under Bun (JavaScriptCore), in CI. A long fuzzing-bot invariant run joins the weekly platform runs. First, find out why the first browser-test run after a source change sometimes hangs (likely Vite's dependency optimizer); a rerun passes.
@@ -103,6 +103,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - The controller hardened from its audit: steep ground is a barrier from every angle, falls land audibly, the body is as tall as it is (`SIM_VERSION` 2).
 - M2: one plain-data state tree, save-states, entity ids through the renderer.
 - M3: declared system phases with rates, profiling and a schedule; the shared motor with ground and air modes; behaviour and state fingerprints.
+- M4: the event registry with ids, times, sources and causes; clicks dated against the frame on screen, with pose history; recordings as checked, tagged tracks with seeking, tuning changes and markers.
 
 ## Deliberately later
 

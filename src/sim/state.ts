@@ -105,6 +105,27 @@ export function hashState(s: SimState): string {
   return h.digest();
 }
 
+/**
+ * The tree's parts, each hashed on its own: every top-level field, and every entity. When
+ * two runs disagree, comparing parts says where: a guard, the player, the random streams.
+ */
+export function stateParts(s: SimState): Array<[name: string, hash: string]> {
+  const out: Array<[string, string]> = [];
+  const tree = s as unknown as Record<string, unknown>;
+  for (const key of Object.keys(tree).sort()) {
+    if (key === 'entities') continue;
+    const h = new Hasher();
+    hashValueInto(h, tree[key]);
+    out.push([key, h.digest()]);
+  }
+  for (const e of s.entities) {
+    const h = new Hasher();
+    hashValueInto(h, e);
+    out.push([`${e.kind}:${e.id}`, h.digest()]);
+  }
+  return out;
+}
+
 function hashValueInto(h: Hasher, v: unknown): void {
   switch (typeof v) {
     case 'number':

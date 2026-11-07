@@ -60,6 +60,23 @@ export function tuningProblems(t: unknown): string[] {
   return problems;
 }
 
+/**
+ * A private, frozen copy of a tuning: what a simulation runs on. Changing the caller's
+ * object afterwards changes nothing, and nothing can change the copy, so every change
+ * to a running simulation's tuning goes through setTuning, where the recorder sees it.
+ */
+export function frozenTuning(t: Tuning): Tuning {
+  return deepFreeze(structuredClone(t));
+}
+
+function deepFreeze<T>(v: T): T {
+  if (v && typeof v === 'object') {
+    for (const x of Object.values(v)) deepFreeze(x);
+    Object.freeze(v);
+  }
+  return v;
+}
+
 export function assertTuning(t: unknown): asserts t is Tuning {
   const problems = tuningProblems(t);
   if (problems.length > 0) throw new TuningError(problems);

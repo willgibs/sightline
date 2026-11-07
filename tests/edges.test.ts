@@ -52,7 +52,7 @@ describe('input quantization', () => {
   it('records a south-facing run that replays exactly', () => {
     const world = testWorld();
     const sim = new Simulation(world, defaultTuning);
-    const rec = new Recorder(sim, 'edge');
+    const rec = new Recorder(sim);
     for (let i = 0; i < 400; i++) {
       const f: InputFrame = { ...neutralInput(i < 200 ? Math.PI : -Math.PI), moveZ: 1 };
       rec.record(sim, sim.step(f));
@@ -160,13 +160,13 @@ describe('tuning validation', () => {
   it('refuses a recording whose header was tampered with', () => {
     const world = testWorld();
     const sim = new Simulation(world, defaultTuning);
-    const rec = new Recorder(sim, 'edge');
+    const rec = new Recorder(sim);
     for (let i = 0; i < 60; i++) rec.record(sim, sim.step(neutralInput()));
     const good = rec.finish(sim);
     const tamper = (edit: (h: Record<string, unknown>) => void): Uint8Array => {
       const h = structuredClone(good.header) as unknown as Record<string, unknown>;
       edit(h);
-      return new Recording(h as never, good.inputs, good.states, good.events).toBytes();
+      return new Recording(h as never, good.tracks).toBytes();
     };
     expect(() => Recording.fromBytes(good.toBytes())).not.toThrow();
     expect(() => Recording.fromBytes(tamper((h) => ((h.tuning as typeof defaultTuning).gen.props.treeSpacing = 0)))).toThrow(/treeSpacing/);

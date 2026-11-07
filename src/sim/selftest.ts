@@ -3,7 +3,9 @@ import { ChaosBot } from './bots/chaos';
 import { WanderBot } from './bots/wander';
 import { datan, datan2, dcos, dexp, dlog, dpow, dsin, dtanDeg } from './core/detmath';
 import { Hasher } from './core/hash';
-import { generateWorld, type World } from './gen/world';
+import { generateWorld, worldFingerprint, type World } from './gen/world';
+
+export { worldFingerprint };
 import { EVENTS, type FieldCodec, type SimEvent } from './events';
 import { neutralInput } from './input';
 import { Simulation } from './sim';
@@ -46,19 +48,6 @@ export interface SelfTestResult {
   expected: string;
   ok: boolean;
   ms: number;
-}
-
-/** A fingerprint of everything generation decides: terrain, surfaces, props, camp, spawn. */
-export function worldFingerprint(w: World): string {
-  const h = new Hasher();
-  h.bytes(new Uint8Array(w.terrain.heights.buffer));
-  h.bytes(w.terrain.surfaces);
-  for (const t of w.props.trees) h.f64(t.x).f64(t.z).f64(t.canopyH);
-  for (const r of w.props.rocks) h.f64(r.x).f64(r.z).f64(r.sy);
-  for (const b of w.props.bushes) h.f64(b.x).f64(b.z);
-  for (const g of w.camp.guards) h.f64(g.x).f64(g.y).f64(g.z);
-  h.f64(w.spawn.x).f64(w.spawn.z).u32(w.colliders.list.length);
-  return h.digest();
 }
 
 /** Bits of the deterministic trigonometry over a fixed spread of inputs. */

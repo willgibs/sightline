@@ -1,5 +1,5 @@
 import type { Tuning } from '../config/tuning';
-import { assertTuning } from '../config/validate';
+import { assertTuning, frozenTuning } from '../config/validate';
 import { Rng } from './core/rng';
 import { createGuard, type GuardState } from './entities/guards';
 import { createPlayer, type PlayerControl } from './entities/player';
@@ -68,7 +68,7 @@ export interface Snapshot {
 export class Simulation {
   readonly world: World;
   readonly dt: number;
-  tuning: Tuning;
+  private current: Tuning;
   /** All dynamic state. Systems write into it; nothing else holds simulation state. */
   state: SimState;
   /** The exact (quantized) input the last tick ran on. Recorders store this. */
@@ -89,7 +89,7 @@ export class Simulation {
   constructor(world: World, tuning: Tuning, systems: readonly System[] = SYSTEMS) {
     assertTuning(tuning);
     this.world = world;
-    this.tuning = tuning;
+    this.current = frozenTuning(tuning);
     this.dt = 1 / tuning.sim.tickHz;
     this.systems = systems;
     this.every = planSystems(systems, tuning.sim.tickHz);
@@ -134,6 +134,11 @@ export class Simulation {
 
   get tick(): number {
     return this.state.tick;
+  }
+
+  /** The tuning this simulation runs on: a frozen copy. Change it with setTuning. */
+  get tuning(): Tuning {
+    return this.current;
   }
 
   /** The player's body: a live reference into the state tree. */
@@ -200,7 +205,7 @@ export class Simulation {
   /** Swaps in new tuning (hot reload). World values need a new Simulation instead. */
   setTuning(tuning: Tuning): void {
     assertTuning(tuning);
-    this.tuning = tuning;
+    this.current = frozenTuning(tuning);
   }
 
   /** A save-state: a deep copy of everything dynamic. */

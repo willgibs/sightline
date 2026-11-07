@@ -1,62 +1,96 @@
 import type { Tuning } from '../../config/tuning';
+import { assertTuning } from '../../config/validate';
 import { hashValue } from '../core/hash';
-import type { Gait, Stance } from '../motor/body';
 import type { SimEvent } from '../events';
-import type { SpawnKind } from '../gen/world';
+import { worldFingerprint } from '../gen/world';
 import { neutralInput, type TickInput } from '../input';
+import type { MissionSpec } from '../mission';
+import type { Gait, Stance } from '../motor/body';
 import type { Simulation } from '../sim';
-import { ByteReader, ByteWriter, RecordingFormatError } from './bytes';
+import { STATE_SCHEMA, stateParts } from '../state';
+import { GEN_VERSION, SIM_VERSION } from '../version';
+import { ByteReader, ByteWriter, RecordingFormatError, concat } from './bytes';
 import { readEvent, writeEvent } from './eventCodec';
 import { readInput, writeInput } from './inputCodec';
-import { assertTuning } from '../../config/validate';
 
 /**
- * Mission recordings.
+ * Mission recordings: a file of tagged tracks.
  *
- * A recording holds two things. The input track (every tick, 13 bytes and any commands) can re-simulate
- * the mission exactly, which turns any playtest into a reproducible bug report or a
- * regression test. The state track (10 Hz) and the event track drive the debrief replay
- * in Phase 2 and playtest telemetry, without re-simulating anything.
+ *   HEAD  the header (JSON): versions, the build, the mission spec, the tuning at the
+ *         start, fingerprints of the world and the first state, counts.
+ *   INPT  every tick's input. Re-simulates the mission exactly: the source of truth.
+ *   CHKP  the state's hash every 10 s, whole and part by part, so a re-simulation that
+ *         disagrees says when and where (a guard, the player, the random streams).
+ *   TUNE  tuning changed mid-run (hot reload) and the tick it applies from, so a run
+ *         tuned while playing still re-simulates.
+ *   STAT  the state at 10 Hz, for the replay and telemetry without re-simulating.
+ *   EVNT  every event.
+ *   ANNO  what isn't simulation: markers, notes, pauses, view changes.
  *
- * File layout: "SLRC", u32 version, then four length-prefixed blocks: header JSON,
- * inputs, states, events. All numbers little-endian.
+ * STAT and EVNT are derived from INPT, and the same build can regenerate them. A reader
+ * skips tracks it doesn't know, so adding a track needs no new version.
+ *
+ * File: "SLRC", u32 version, u32 track count, then each track: a 4-byte tag, a u32
+ * length and its bytes. Little-endian; nothing after the last track. A recording is
+ * often a file from elsewhere, so reading checks everything before trusting anything:
+ * sizes, the header's every field, and that each track holds what the header says.
  */
 
-/**
- * 2: checkpoints hash the whole state tree (sim/state.ts).
- * 3: the tree's layout changed (STATE_SCHEMA 2), so older checkpoints can't be compared.
- * 4: events from the registry (ids, times, sources, causes); STATE_SCHEMA 3.
- * 5: held states and commands in the input track; STATE_SCHEMA 4 (pose history).
- */
-export const RECORDING_VERSION = 5;
+/** 6: tagged tracks; checkpoints part by part; tuning changes and annotations recorded. */
+export const RECORDING_VERSION = 6;
 const MAGIC = [0x53, 0x4c, 0x52, 0x43]; // SLRC
+/** Larger than a day of play. Anything bigger is not a recording. */
+export const MAX_RECORDING_BYTES = 512 * 1024 * 1024;
+const MAX_HEADER_BYTES = 1024 * 1024;
 
 export interface RecordingHeader {
   format: 'sightline-recording';
   version: number;
-  seed: string;
-  spawn: SpawnKind;
-  /** The exact tuning played with, so re-simulation never depends on today's defaults. */
+  /** The build that made it (a commit), or '' if unknown. */
+  build: string;
+  simVersion: number;
+  genVersion: number;
+  stateSchema: number;
+  mission: MissionSpec;
+  /** The exact tuning at the start, so re-simulation never depends on today's defaults. */
   tuning: Tuning;
   tuningHash: string;
+  /** What generation built; a different valley is caught before re-simulating. */
+  worldFingerprint: string;
+  /** The state's hash before the first tick. */
+  startHash: string;
   tickHz: number;
   /** Ticks between state samples. */
   stateEvery: number;
-  /** Ticks between checkpoint hashes. */
+  /** Ticks between checkpoints. */
   checkpointEvery: number;
-  guardCount: number;
   ticks: number;
   finalHash: string;
-  checkpoints: string[];
-  /** Set when tuning changed mid-mission (hot reload); such recordings can't be re-simulated. */
-  tuningChanged: boolean;
   createdAt: string;
+}
+
+export interface Checkpoint {
+  tick: number;
+  hash: string;
+  /** The state's parts and their hashes (state.ts, stateParts). */
+  parts: Array<[name: string, hash: string]>;
+}
+
+export interface TuningChange {
+  /** The first tick that runs with it. */
+  tick: number;
+  tuning: Tuning;
+}
+
+/** Something that isn't simulation, at a tick: a marker, a note, a pause. */
+export interface Annotation {
+  tick: number;
+  kind: string;
+  text?: string;
 }
 
 const STANCES: Stance[] = ['stand', 'crouch', 'prone'];
 const GAITS: Gait[] = ['idle', 'sprint', 'walk', 'crouch', 'crawl'];
-const STATE_BASE = 36;
-const STATE_PER_GUARD = 20;
 
 export interface RecordedState {
   tick: number;
@@ -69,32 +103,40 @@ export interface RecordedState {
   speed: number;
   stance: Stance;
   gait: Gait;
-  /** x, y, z, yaw, headYaw per guard. */
-  guards: Float32Array;
+  /** Guard entity ids, and x, y, z, yaw, headYaw per guard. */
+  guardIds: number[];
+  guards: number[];
 }
 
 export class Recorder {
-  readonly seed: string;
-  readonly spawn: SpawnKind;
+  readonly mission: MissionSpec;
   readonly tuning: Tuning;
   readonly stateEvery: number;
   readonly checkpointEvery: number;
-  private readonly guardCount: number;
-  private readonly inputs = new ByteWriter(64 * 1024);
-  private readonly states = new ByteWriter(64 * 1024);
-  private readonly events = new ByteWriter(16 * 1024);
-  private readonly checkpoints: string[] = [];
-  private tuningChanged = false;
+  private readonly sim: Simulation;
+  private readonly startHash: string;
+  private readonly fingerprint: string;
+  private readonly inputs = new ByteWriter();
+  private readonly states = new ByteWriter();
+  private readonly events = new ByteWriter();
+  private readonly checkpoints = new ByteWriter();
+  private readonly tunings: TuningChange[] = [];
+  private readonly annotations: Annotation[] = [];
   ticks = 0;
 
-  constructor(sim: Simulation, spawn: SpawnKind, checkpointSeconds = 10) {
+  constructor(
+    sim: Simulation,
+    private readonly build = '',
+    checkpointSeconds = 10,
+  ) {
     if (sim.tick !== 0) throw new Error('Recorder must start on a fresh simulation (tick 0)');
-    this.seed = sim.world.seed;
-    this.spawn = spawn;
+    this.sim = sim;
+    this.mission = structuredClone(sim.world.spec);
     this.tuning = structuredClone(sim.tuning);
     this.stateEvery = Math.max(1, Math.round(sim.tuning.sim.tickHz / sim.tuning.sim.recordHz));
     this.checkpointEvery = Math.max(1, Math.round(sim.tuning.sim.tickHz * checkpointSeconds));
-    this.guardCount = sim.guards.length;
+    this.startHash = sim.hash();
+    this.fingerprint = worldFingerprint(sim.world);
   }
 
   /**
@@ -102,41 +144,27 @@ export class Recorder {
    * input the simulation ran on (`sim.lastInput`), so a recording always replays.
    */
   record(sim: Simulation, events: readonly SimEvent[]): void {
+    if (sim !== this.sim) throw new Error('Recorder records only the simulation it was made for');
     if (sim.tick !== this.ticks + 1) throw new Error(`Recorder missed a tick: at ${sim.tick}, recorded ${this.ticks}`);
     writeInput(this.inputs, sim.lastInput);
-
-    if (sim.tick % this.stateEvery === 0) {
-      const p = sim.player;
-      const s = this.states;
-      s.u32(sim.tick);
-      s.f32(p.x);
-      s.f32(p.y);
-      s.f32(p.z);
-      s.f32(p.yaw);
-      s.f32(p.pitch);
-      s.f32(p.eyeHeight);
-      s.f32(p.speed);
-      s.u8(STANCES.indexOf(p.stance));
-      s.u8(GAITS.indexOf(p.gait));
-      s.u16(0);
-      for (const g of sim.guards) {
-        s.f32(g.x);
-        s.f32(g.y);
-        s.f32(g.z);
-        s.f32(g.yaw);
-        s.f32(g.headYaw);
-      }
-    }
-
+    if (sim.tick % this.stateEvery === 0) writeState(this.states, sim);
     for (const e of events) writeEvent(this.events, e);
-
-    if (sim.tick % this.checkpointEvery === 0) this.checkpoints.push(sim.hash());
+    if (sim.tick % this.checkpointEvery === 0) writeCheckpoint(this.checkpoints, sim);
     this.ticks++;
   }
 
-  /** Marks the recording as not re-simulatable (tuning changed mid-mission). */
-  markTuningChanged(): void {
-    this.tuningChanged = true;
+  /** The simulation's tuning changed (hot reload): it applies from the next tick. */
+  tuningChanged(sim: Simulation): void {
+    if (sim !== this.sim) throw new Error('Recorder records only the simulation it was made for');
+    const change = { tick: sim.tick + 1, tuning: structuredClone(sim.tuning) };
+    // Two changes between the same two ticks: the later one is what the next tick runs with.
+    if (this.tunings.at(-1)?.tick === change.tick) this.tunings[this.tunings.length - 1] = change;
+    else this.tunings.push(change);
+  }
+
+  /** Notes something that isn't simulation at the current tick: a marker, a pause. */
+  annotate(kind: string, text?: string): void {
+    this.annotations.push(text === undefined ? { tick: this.sim.tick, kind } : { tick: this.sim.tick, kind, text });
   }
 
   get sizes(): { inputs: number; states: number; events: number } {
@@ -145,169 +173,397 @@ export class Recorder {
 
   /** Closes the recording. `createdAt` is an ISO timestamp from the caller (the simulation has no clock). */
   finish(sim: Simulation, createdAt = ''): Recording {
+    if (sim !== this.sim) throw new Error('Recorder records only the simulation it was made for');
     const header: RecordingHeader = {
       format: 'sightline-recording',
       version: RECORDING_VERSION,
-      seed: this.seed,
-      spawn: this.spawn,
-      tuning: this.tuning,
+      build: this.build,
+      simVersion: SIM_VERSION,
+      genVersion: GEN_VERSION,
+      stateSchema: STATE_SCHEMA,
+      mission: structuredClone(this.mission),
+      tuning: structuredClone(this.tuning),
       tuningHash: hashValue(this.tuning),
+      worldFingerprint: this.fingerprint,
+      startHash: this.startHash,
       tickHz: this.tuning.sim.tickHz,
       stateEvery: this.stateEvery,
       checkpointEvery: this.checkpointEvery,
-      guardCount: this.guardCount,
       ticks: this.ticks,
       finalHash: sim.hash(),
-      checkpoints: [...this.checkpoints],
-      tuningChanged: this.tuningChanged,
       createdAt,
     };
-    return new Recording(header, this.inputs.toBytes(), this.states.toBytes(), this.events.toBytes());
+    return new Recording(header, {
+      INPT: concat(this.inputs.parts()),
+      CHKP: concat(this.checkpoints.parts()),
+      TUNE: encodeJson(this.tunings),
+      STAT: concat(this.states.parts()),
+      EVNT: concat(this.events.parts()),
+      ANNO: encodeJson(this.annotations),
+    });
   }
 }
 
-/**
- * A recording is often a file from elsewhere. Check the header before its tuning drives
- * generation: the tuning must be valid and match its hash, and the counts must agree
- * with the data. (Recording format v2 replaces this with a full validator.)
- */
-function checkHeader(h: RecordingHeader, inputBytes: number): void {
-  const fail = (what: string): never => {
-    throw new Error(`Corrupt recording: ${what}`);
-  };
-  if (!h || typeof h !== 'object') fail('no header');
-  if (typeof h.seed !== 'string' || (h.spawn !== 'overlook' && h.spawn !== 'edge')) fail('seed or spawn');
-  const whole = (v: unknown, min: number) => typeof v === 'number' && Number.isInteger(v) && v >= min;
-  // Every tick's input takes at least 13 bytes; checked before anything is sized by `ticks`.
-  if (!whole(h.ticks, 0) || h.ticks * 13 > inputBytes) fail(`${String(h.ticks)} ticks in ${inputBytes} bytes of input`);
-  if (!whole(h.checkpointEvery, 1) || !whole(h.stateEvery, 1) || !whole(h.guardCount, 0) || h.guardCount > 4096) fail('counts');
-  if (!Array.isArray(h.checkpoints) || h.checkpoints.length !== Math.floor(h.ticks / h.checkpointEvery)) fail('checkpoints');
-  try {
-    assertTuning(h.tuning);
-  } catch (e) {
-    fail(e instanceof Error ? e.message : 'tuning');
-  }
-  if (hashValue(h.tuning) !== h.tuningHash) fail('tuning does not match its hash');
+function writeState(w: ByteWriter, sim: Simulation): void {
+  const p = sim.player;
+  w.u32(sim.tick);
+  w.f32(p.x);
+  w.f32(p.y);
+  w.f32(p.z);
+  w.f32(p.yaw);
+  w.f32(p.pitch);
+  w.f32(p.eyeHeight);
+  w.f32(p.speed);
+  w.u8(STANCES.indexOf(p.stance));
+  w.u8(GAITS.indexOf(p.gait));
+  const ids = sim.snapshot().guardIds;
+  w.u16(ids.length);
+  sim.guards.forEach((g, i) => {
+    w.u32(ids[i]!);
+    w.f32(g.x);
+    w.f32(g.y);
+    w.f32(g.z);
+    w.f32(g.yaw);
+    w.f32(g.headYaw);
+  });
 }
+
+function writeCheckpoint(w: ByteWriter, sim: Simulation): void {
+  w.u32(sim.tick);
+  writeDigest(w, sim.hash());
+  const parts = stateParts(sim.state);
+  w.u16(parts.length);
+  for (const [name, hash] of parts) {
+    const bytes = new TextEncoder().encode(name);
+    w.u8(bytes.length);
+    w.bytes(bytes);
+    writeDigest(w, hash);
+  }
+}
+
+/** A 64-bit digest (16 hex digits) in 8 bytes. */
+function writeDigest(w: ByteWriter, hex: string): void {
+  w.u32(parseInt(hex.slice(0, 8), 16));
+  w.u32(parseInt(hex.slice(8, 16), 16));
+}
+
+function readDigest(r: ByteReader): string {
+  return r.u32().toString(16).padStart(8, '0') + r.u32().toString(16).padStart(8, '0');
+}
+
+function encodeJson(v: unknown): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(v));
+}
+
+function decodeJson(bytes: Uint8Array, what: string): unknown {
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  } catch {
+    throw new RecordingFormatError(`Corrupt recording: ${what} is not readable`);
+  }
+}
+
+type TrackTag = 'INPT' | 'CHKP' | 'TUNE' | 'STAT' | 'EVNT' | 'ANNO';
+const TRACKS: readonly TrackTag[] = ['INPT', 'CHKP', 'TUNE', 'STAT', 'EVNT', 'ANNO'];
 
 export class Recording {
+  private inputIndex: Uint32Array | null = null;
+  private stateIndex: Uint32Array | null = null;
+  private decodedEvents: SimEvent[] | null = null;
+  private decodedCheckpoints: Checkpoint[] | null = null;
+
   constructor(
     readonly header: RecordingHeader,
-    readonly inputs: Uint8Array,
-    readonly states: Uint8Array,
-    readonly events: Uint8Array,
+    readonly tracks: Readonly<Record<TrackTag, Uint8Array>>,
   ) {}
 
-  get stateCount(): number {
-    return this.states.length / (STATE_BASE + STATE_PER_GUARD * this.header.guardCount);
+  get inputs(): Uint8Array {
+    return this.tracks.INPT;
   }
 
-  private decoded: SimEvent[] | null = null;
-
-  get eventCount(): number {
-    return this.decodedEvents().length;
-  }
-
-  private decodedEvents(): SimEvent[] {
-    if (!this.decoded) {
-      const r = new ByteReader(this.events);
-      const out: SimEvent[] = [];
-      while (r.remaining > 0) out.push(readEvent(r));
-      this.decoded = out;
-    }
-    return this.decoded;
-  }
-
-  private inputIndex: Uint32Array | null = null;
-
-  /** Indexes the input track, checking it holds exactly `ticks` inputs. */
-  indexInputs(): void {
+  /** Reads and checks every track against the header; throws RecordingFormatError on any mismatch. */
+  validate(): void {
     this.offsets();
+    this.states();
+    this.events();
+    const cps = this.checkpoints();
+    if (cps.length !== Math.floor(this.header.ticks / this.header.checkpointEvery)) {
+      throw new RecordingFormatError('Corrupt recording: checkpoints and ticks disagree');
+    }
+    cps.forEach((c, k) => {
+      if (c.tick !== (k + 1) * this.header.checkpointEvery) throw new RecordingFormatError('Corrupt recording: a checkpoint is out of place');
+    });
+    let last = 0;
+    for (const t of this.tuningChanges()) {
+      if (t.tick <= last || t.tick > this.header.ticks + 1) throw new RecordingFormatError('Corrupt recording: tuning changes out of order');
+      last = t.tick;
+    }
+    this.annotations();
   }
 
-  /** Where each tick's input starts in the input track. */
+  /** Where each tick's input starts in the input track, checking it holds exactly `ticks` inputs. */
   private offsets(): Uint32Array {
     if (!this.inputIndex) {
-      const index = new Uint32Array(this.header.ticks);
-      const r = new ByteReader(this.inputs);
+      const n = this.header.ticks;
+      const index = new Uint32Array(n);
+      const r = new ByteReader(this.tracks.INPT);
       const scratch = neutralInput();
-      for (let i = 0; i < this.header.ticks; i++) {
+      for (let i = 0; i < n; i++) {
         index[i] = r.offset;
         readInput(r, scratch);
       }
-      if (r.remaining !== 0) throw new RecordingFormatError(`Corrupt recording: input past tick ${this.header.ticks}`);
+      if (r.remaining !== 0) throw new RecordingFormatError(`Corrupt recording: input past tick ${n}`);
       this.inputIndex = index;
     }
     return this.inputIndex;
   }
 
   readInput(i: number, out: TickInput): TickInput {
-    const r = new ByteReader(this.inputs);
+    const r = new ByteReader(this.tracks.INPT);
     r.offset = this.offsets()[i]!;
     return readInput(r, out);
   }
 
+  private states(): Uint32Array {
+    if (!this.stateIndex) {
+      const r = new ByteReader(this.tracks.STAT);
+      const at: number[] = [];
+      while (r.remaining > 0) {
+        at.push(r.offset);
+        r.offset += 34;
+        const n = r.u16();
+        r.offset += n * 24;
+        if (r.offset > this.tracks.STAT.length) throw new RecordingFormatError('Corrupt recording: a state sample is truncated');
+      }
+      this.stateIndex = Uint32Array.from(at);
+    }
+    return this.stateIndex;
+  }
+
+  get stateCount(): number {
+    return this.states().length;
+  }
 
   readState(k: number, out?: RecordedState): RecordedState {
-    const n = this.header.guardCount;
-    const size = STATE_BASE + STATE_PER_GUARD * n;
-    const v = new DataView(this.states.buffer, this.states.byteOffset + k * size, size);
-    const s: RecordedState = out ?? {
-      tick: 0,
-      px: 0,
-      py: 0,
-      pz: 0,
-      yaw: 0,
-      pitch: 0,
-      eye: 0,
-      speed: 0,
-      stance: 'stand',
-      gait: 'idle',
-      guards: new Float32Array(n * 5),
-    };
-    s.tick = v.getUint32(0, true);
-    s.px = v.getFloat32(4, true);
-    s.py = v.getFloat32(8, true);
-    s.pz = v.getFloat32(12, true);
-    s.yaw = v.getFloat32(16, true);
-    s.pitch = v.getFloat32(20, true);
-    s.eye = v.getFloat32(24, true);
-    s.speed = v.getFloat32(28, true);
-    s.stance = STANCES[v.getUint8(32)] ?? 'stand';
-    s.gait = GAITS[v.getUint8(33)] ?? 'idle';
-    for (let i = 0; i < n * 5; i++) s.guards[i] = v.getFloat32(STATE_BASE + i * 4, true);
+    const r = new ByteReader(this.tracks.STAT);
+    r.offset = this.states()[k]!;
+    const s: RecordedState = out ?? { tick: 0, px: 0, py: 0, pz: 0, yaw: 0, pitch: 0, eye: 0, speed: 0, stance: 'stand', gait: 'idle', guardIds: [], guards: [] };
+    s.tick = r.u32();
+    s.px = r.f32();
+    s.py = r.f32();
+    s.pz = r.f32();
+    s.yaw = r.f32();
+    s.pitch = r.f32();
+    s.eye = r.f32();
+    s.speed = r.f32();
+    s.stance = STANCES[r.u8()] ?? 'stand';
+    s.gait = GAITS[r.u8()] ?? 'idle';
+    const n = r.u16();
+    s.guardIds.length = n;
+    s.guards.length = n * 5;
+    for (let i = 0; i < n; i++) {
+      s.guardIds[i] = r.u32();
+      for (let f = 0; f < 5; f++) s.guards[i * 5 + f] = r.f32();
+    }
     return s;
+  }
+
+  private events(): SimEvent[] {
+    if (!this.decodedEvents) {
+      const r = new ByteReader(this.tracks.EVNT);
+      const out: SimEvent[] = [];
+      while (r.remaining > 0) out.push(readEvent(r));
+      this.decodedEvents = out;
+    }
+    return this.decodedEvents;
+  }
+
+  get eventCount(): number {
+    return this.events().length;
   }
 
   /** Every recorded event, decoded (copies: change them freely). */
   readEvents(): SimEvent[] {
-    return this.decodedEvents().map((e) => ({ ...e }));
+    return this.events().map((e) => ({ ...e }));
+  }
+
+  checkpoints(): Checkpoint[] {
+    if (!this.decodedCheckpoints) {
+      const r = new ByteReader(this.tracks.CHKP);
+      const out: Checkpoint[] = [];
+      const text = new TextDecoder('utf-8', { fatal: true });
+      while (r.remaining > 0) {
+        const tick = r.u32();
+        const hash = readDigest(r);
+        const n = r.u16();
+        const parts: Array<[string, string]> = [];
+        for (let k = 0; k < n; k++) {
+          let name: string;
+          try {
+            name = text.decode(r.take(r.u8()));
+          } catch (e) {
+            if (e instanceof RecordingFormatError) throw e;
+            throw new RecordingFormatError('Corrupt recording: a checkpoint part name is not text');
+          }
+          parts.push([name, readDigest(r)]);
+        }
+        out.push({ tick, hash, parts });
+      }
+      this.decodedCheckpoints = out;
+    }
+    return this.decodedCheckpoints;
+  }
+
+  tuningChanges(): TuningChange[] {
+    const list = decodeJson(this.tracks.TUNE, 'the tuning track');
+    if (!Array.isArray(list)) throw new RecordingFormatError('Corrupt recording: the tuning track is not a list');
+    return list.map((t: unknown) => {
+      const c = t as TuningChange;
+      if (!c || typeof c !== 'object' || !Number.isInteger(c.tick)) throw new RecordingFormatError('Corrupt recording: a tuning change has no tick');
+      try {
+        assertTuning(c.tuning);
+      } catch (e) {
+        throw new RecordingFormatError(`Corrupt recording: tuning change at tick ${c.tick}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      if (hashValue(c.tuning.gen) !== hashValue(this.header.tuning.gen)) {
+        throw new RecordingFormatError(`Corrupt recording: tuning change at tick ${c.tick} changes generation`);
+      }
+      return { tick: c.tick, tuning: c.tuning };
+    });
+  }
+
+  annotations(): Annotation[] {
+    const list = decodeJson(this.tracks.ANNO, 'the annotation track');
+    if (!Array.isArray(list)) throw new RecordingFormatError('Corrupt recording: the annotation track is not a list');
+    for (const a of list as Annotation[]) {
+      if (!a || !Number.isInteger(a.tick) || typeof a.kind !== 'string' || (a.text !== undefined && typeof a.text !== 'string')) {
+        throw new RecordingFormatError('Corrupt recording: an annotation is malformed');
+      }
+    }
+    return list as Annotation[];
+  }
+
+  /** The file, as parts for a Blob (no single copy of the whole recording). */
+  toParts(): Uint8Array[] {
+    const head = encodeJson(this.header);
+    const w = new ByteWriter(64);
+    for (const b of MAGIC) w.u8(b);
+    w.u32(RECORDING_VERSION);
+    w.u32(1 + TRACKS.length);
+    const parts: Uint8Array[] = [w.toBytes()];
+    const track = (tag: string, bytes: Uint8Array): void => {
+      const t = new ByteWriter(16);
+      for (let i = 0; i < 4; i++) t.u8(tag.charCodeAt(i));
+      t.u32(bytes.length);
+      parts.push(t.toBytes(), bytes);
+    };
+    track('HEAD', head);
+    for (const tag of TRACKS) track(tag, this.tracks[tag]);
+    return parts;
   }
 
   toBytes(): Uint8Array {
-    const w = new ByteWriter(this.inputs.length + this.states.length + this.events.length + 8192);
-    for (const b of MAGIC) w.u8(b);
-    w.u32(RECORDING_VERSION);
-    const header = new TextEncoder().encode(JSON.stringify(this.header));
-    for (const block of [header, this.inputs, this.states, this.events]) {
-      w.u32(block.length);
-      w.bytes(block);
-    }
-    return w.toBytes();
+    return concat(this.toParts());
   }
 
   static fromBytes(bytes: Uint8Array): Recording {
+    if (bytes.length > MAX_RECORDING_BYTES) throw new RecordingFormatError('Not a Sightline recording: far too large');
     const r = new ByteReader(bytes);
-    for (const b of MAGIC) if (r.u8() !== b) throw new Error('Not a Sightline recording');
+    for (const b of MAGIC) if (r.remaining === 0 || r.u8() !== b) throw new RecordingFormatError('Not a Sightline recording');
     const version = r.u32();
-    if (version !== RECORDING_VERSION) throw new Error(`Unsupported recording version ${version}`);
-    const header = JSON.parse(new TextDecoder().decode(r.take(r.u32()))) as RecordingHeader;
-    const inputs = r.take(r.u32());
-    const states = r.take(r.u32());
-    const events = r.take(r.u32());
-    checkHeader(header, inputs.length);
-    const rec = new Recording(header, inputs, states, events);
-    rec.indexInputs(); // refuses an input track of the wrong length
+    if (version !== RECORDING_VERSION) throw new RecordingFormatError(`Recording format ${version} is not ${RECORDING_VERSION}; it was made by another build`);
+    const count = r.u32();
+    if (count > 64) throw new RecordingFormatError('Corrupt recording: too many tracks');
+    const found = new Map<string, Uint8Array>();
+    for (let k = 0; k < count; k++) {
+      const tag = String.fromCharCode(r.u8(), r.u8(), r.u8(), r.u8());
+      const length = r.u32();
+      if (found.has(tag)) throw new RecordingFormatError(`Corrupt recording: two ${tag} tracks`);
+      found.set(tag, r.sub(length)); // unknown tags are kept but ignored
+    }
+    if (r.remaining !== 0) throw new RecordingFormatError('Corrupt recording: bytes after the last track');
+    const head = found.get('HEAD');
+    if (!head) throw new RecordingFormatError('Corrupt recording: no header');
+    if (head.length > MAX_HEADER_BYTES) throw new RecordingFormatError('Corrupt recording: the header is too large');
+    const header = checkHeader(decodeJson(head, 'the header'));
+    for (const tag of ['INPT', 'CHKP'] as const) if (!found.has(tag)) throw new RecordingFormatError(`Corrupt recording: no ${tag} track`);
+    // Every tick's input takes at least 13 bytes: checked before anything is sized by `ticks`.
+    const inputBytes = found.get('INPT')!.length;
+    if (header.ticks * 13 > inputBytes) throw new RecordingFormatError(`Corrupt recording: ${header.ticks} ticks in ${inputBytes} bytes of input`);
+    const empty = new Uint8Array(0);
+    const list = new TextEncoder().encode('[]');
+    const rec = new Recording(header, {
+      INPT: found.get('INPT')!,
+      CHKP: found.get('CHKP')!,
+      TUNE: found.get('TUNE') ?? list,
+      STAT: found.get('STAT') ?? empty,
+      EVNT: found.get('EVNT') ?? empty,
+      ANNO: found.get('ANNO') ?? list,
+    });
+    rec.validate();
     return rec;
   }
+}
+
+/**
+ * Checks every field of a header from a file before it is trusted: its tuning drives
+ * generation and its counts size arrays. Unknown fields are refused too: they mean a
+ * format this build doesn't know.
+ */
+function checkHeader(v: unknown): RecordingHeader {
+  const fail = (what: string): never => {
+    throw new RecordingFormatError(`Corrupt recording: ${what}`);
+  };
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return fail('no header');
+  const h = v as Record<string, unknown>;
+  const KEYS = [
+    'format',
+    'version',
+    'build',
+    'simVersion',
+    'genVersion',
+    'stateSchema',
+    'mission',
+    'tuning',
+    'tuningHash',
+    'worldFingerprint',
+    'startHash',
+    'tickHz',
+    'stateEvery',
+    'checkpointEvery',
+    'ticks',
+    'finalHash',
+    'createdAt',
+  ];
+  for (const k of Object.keys(h)) if (!KEYS.includes(k)) fail(`unknown header field ${k}`);
+  for (const k of KEYS) if (!(k in h)) fail(`no ${k}`);
+  const whole = (x: unknown, min: number, max: number): boolean => typeof x === 'number' && Number.isInteger(x) && x >= min && x <= max;
+  const text = (x: unknown, max: number): boolean => typeof x === 'string' && x.length <= max;
+  const digest = (x: unknown): boolean => typeof x === 'string' && /^[0-9a-f]{16}$/.test(x);
+  if (h.format !== 'sightline-recording' || h.version !== RECORDING_VERSION) fail('format');
+  if (!text(h.build, 200) || !text(h.createdAt, 64)) fail('build or date');
+  if (!whole(h.simVersion, 1, 1e6) || !whole(h.genVersion, 1, 1e6) || !whole(h.stateSchema, 1, 1e6)) fail('versions');
+  const m = h.mission as Record<string, unknown> | null;
+  if (
+    !m ||
+    typeof m !== 'object' ||
+    Object.keys(m).sort().join() !== 'genVersion,insertion,seed,terrain' ||
+    !text(m.seed, 64) ||
+    !whole(m.genVersion, 1, 1e6) ||
+    (m.insertion !== 'overlook' && m.insertion !== 'edge') ||
+    JSON.stringify(m.terrain) !== '{"kind":"procedural","generator":"valley"}'
+  ) {
+    fail('mission');
+  }
+  try {
+    assertTuning(h.tuning);
+  } catch (e) {
+    fail(e instanceof Error ? e.message : 'tuning');
+  }
+  if (hashValue(h.tuning) !== h.tuningHash) fail('tuning does not match its hash');
+  if (!digest(h.worldFingerprint) || !digest(h.startHash) || !digest(h.finalHash)) fail('fingerprints');
+  const tuning = h.tuning as Tuning;
+  if (h.tickHz !== tuning.sim.tickHz) fail('tick rate');
+  if (!whole(h.stateEvery, 1, 1e6) || !whole(h.checkpointEvery, 1, 1e8) || !whole(h.ticks, 0, 2147483647)) fail('counts');
+  return h as unknown as RecordingHeader;
 }

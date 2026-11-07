@@ -1,7 +1,7 @@
 import type { Tuning } from '../../config/tuning';
 import type { MissionSpec } from '../mission';
 import { dtanDeg } from '../core/detmath';
-import { hashValue } from '../core/hash';
+import { Hasher, hashValue } from '../core/hash';
 import { Rng } from '../core/rng';
 import { Blocks, ColliderSet, footprintContains } from '../world/colliders';
 import { makeTerrainSample, type Heightfield } from '../world/heightfield';
@@ -61,6 +61,22 @@ export function simTuningKey(t: Tuning): string {
  * Builds a mission's world from its spec. Generation reads only `tuning.gen`. Pass a
  * clock (milliseconds) to have the generation time reported in `genMs`.
  */
+/**
+ * A fingerprint of everything generation decides: terrain, surfaces, props, camp, spawn.
+ * Recordings carry it, so a valley generated differently is caught before re-simulating.
+ */
+export function worldFingerprint(w: World): string {
+  const h = new Hasher();
+  h.bytes(new Uint8Array(w.terrain.heights.buffer));
+  h.bytes(w.terrain.surfaces);
+  for (const t of w.props.trees) h.f64(t.x).f64(t.z).f64(t.canopyH);
+  for (const r of w.props.rocks) h.f64(r.x).f64(r.z).f64(r.sy);
+  for (const b of w.props.bushes) h.f64(b.x).f64(b.z);
+  for (const g of w.camp.guards) h.f64(g.x).f64(g.y).f64(g.z);
+  h.f64(w.spawn.x).f64(w.spawn.z).u32(w.colliders.list.length);
+  return h.digest();
+}
+
 export function generateWorld(spec: MissionSpec, tuning: Tuning, clock?: () => number): World {
   // Bounds on sizes, spacings and attempts, so bad tuning fails here instead of hanging.
   assertTuning(tuning);

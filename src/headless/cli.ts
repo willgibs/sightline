@@ -19,6 +19,7 @@ import { SystemProfile } from '../sim/profile';
 import { fmt, parseArgs } from './args';
 import { missionSpec } from '../sim/mission';
 import { PLAYER_ID } from '../sim/state';
+import { buildStamp } from './build';
 
 const args = parseArgs(process.argv.slice(2));
 const now = (): number => performance.now();
@@ -28,12 +29,20 @@ if (replay) {
   const rec = Recording.fromBytes(new Uint8Array(readFileSync(replay)));
   const h = rec.header;
   console.log(`\nSIGHTLINE replay · ${replay}`);
-  console.log(`seed ${h.seed} · ${h.ticks.toLocaleString('en-US')} ticks (${fmt.clock(h.ticks / h.tickHz)}) · recorded ${h.createdAt}`);
-  if (h.tuningChanged) console.log('note    tuning was hot-reloaded during this run, so it cannot re-simulate exactly');
+  console.log(
+    `seed ${h.mission.seed} · ${h.ticks.toLocaleString('en-US')} ticks (${fmt.clock(h.ticks / h.tickHz)}) · recorded ${h.createdAt || '(no date)'} by build ${h.build || '(unknown)'}`,
+  );
+  const changes = rec.tuningChanges().length;
+  const notes = rec.annotations().length;
+  if (changes || notes) console.log(`        ${changes} tuning change${changes === 1 ? '' : 's'} · ${notes} annotation${notes === 1 ? '' : 's'}`);
   const re = resimulate(rec, undefined, now);
+  if (re.problem) {
+    console.log(`resim   ✗ can't re-simulate here: ${re.problem}\n`);
+    process.exit(1);
+  }
   console.log(
     `resim   ${re.finalHash} vs recorded ${h.finalHash} · ${re.ok ? '✓ identical' : '✗ DIVERGED'}` +
-      (re.firstDivergence !== null ? ` · first divergence at tick ${re.firstDivergence}` : '') +
+      (re.firstDivergence !== null ? ` · first divergence at tick ${re.firstDivergence}, in ${re.divergedParts.join(', ')}` : '') +
       ` · ${fmt.ms(re.ms)}\n`,
   );
   process.exit(re.ok ? 0 : 1);
@@ -65,7 +74,7 @@ console.log(
 const sim = new Simulation(world, tuning);
 const profile = args.has('profile') ? new SystemProfile(now) : null;
 sim.profiler = profile;
-const recorder = new Recorder(sim, spawn);
+const recorder = new Recorder(sim, buildStamp());
 const bot = new WanderBot(seed);
 const raw = neutralInput();
 const ticks = Math.round(minutes * 60 * tuning.sim.tickHz);
@@ -127,8 +136,9 @@ const loaded = Recording.fromBytes(bytes);
 const re = resimulate(loaded, undefined, now);
 console.log(`hash    ${rec.header.finalHash}`);
 console.log(
-  `resim   ${re.finalHash} ${re.ok ? '✓ identical' : '✗ DIVERGED'} · ${rec.header.checkpoints.length} checkpoints · ${fmt.ms(re.ms)}` +
-    (re.firstDivergence !== null ? ` · first divergence at tick ${re.firstDivergence}` : ''),
+  `resim   ${re.finalHash} ${re.ok ? '✓ identical' : '✗ DIVERGED'} · ${rec.checkpoints().length} checkpoints · ${fmt.ms(re.ms)}` +
+    (re.problem ? ` · ${re.problem}` : '') +
+    (re.firstDivergence !== null ? ` · first divergence at tick ${re.firstDivergence}, in ${re.divergedParts.join(', ')}` : ''),
 );
 console.log('');
 process.exit(re.ok ? 0 : 1);

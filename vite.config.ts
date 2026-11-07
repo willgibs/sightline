@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitest/config';
+import { buildStamp } from './src/headless/build';
 
 export default defineConfig({
+  define: { 'import.meta.env.VITE_BUILD': JSON.stringify(buildStamp()) },
   server: { port: 5173 },
   build: {
     target: 'es2022',

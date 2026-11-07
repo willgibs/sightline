@@ -38,6 +38,7 @@ export class Hud {
       ['N', 'fly camera'],
       ['[ ]', 'time scale'],
       ['R', 'restart run'],
+      ['M', 'mark moment'],
     ]
       .map(([k, v]) => `<span><kbd>${k}</kbd>${v}</span>`)
       .join('');

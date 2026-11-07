@@ -1,23 +1,11 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning } from '../src/config/tuning';
-import { Hasher } from '../src/sim/core/hash';
 import { closestOnPolyline, type PathHit } from '../src/sim/gen/paths';
-import { generateWorld, type World } from '../src/sim/gen/world';
+import { generateWorld, worldFingerprint, type World } from '../src/sim/gen/world';
 import { makeTerrainSample } from '../src/sim/world/heightfield';
 import { missionSpec } from '../src/sim/mission';
 
-/** A fingerprint of everything generation decides: terrain, surfaces, props, camp, spawn. */
-function fingerprint(w: World): string {
-  const h = new Hasher();
-  h.bytes(new Uint8Array(w.terrain.heights.buffer));
-  h.bytes(w.terrain.surfaces);
-  for (const t of w.props.trees) h.f64(t.x).f64(t.z).f64(t.canopyH);
-  for (const r of w.props.rocks) h.f64(r.x).f64(r.z).f64(r.sy);
-  for (const b of w.props.bushes) h.f64(b.x).f64(b.z);
-  for (const g of w.camp.guards) h.f64(g.x).f64(g.y).f64(g.z);
-  h.f64(w.spawn.x).f64(w.spawn.z).u32(w.colliders.list.length);
-  return h.digest();
-}
+const fingerprint = worldFingerprint;
 
 let tal: World;
 beforeAll(() => {

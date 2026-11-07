@@ -6,6 +6,21 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### Recordings are tagged tracks, checked before they are trusted
+
+**Decision:** A recording (`RECORDING_VERSION` 6) is a header and tagged tracks: inputs (the source of truth), checkpoints, tuning changes, states at 10 Hz, events and annotations. A reader skips tracks it doesn't know.
+
+- **The header** carries the build, `SIM_VERSION`, `GEN_VERSION`, `STATE_SCHEMA`, the mission spec, the tuning at the start, and fingerprints of the generated valley and the first state. Re-simulation stops with a reason, before running, when any of these disagree with this build.
+- **Checkpoints** hash the state whole and part by part (each entity, the random streams, the schedule), so a divergence says where: "first divergence at tick 600, in player:1".
+- **Tuning changed while playing** is recorded with the tick it applies from, so a run tuned by hot reload still re-simulates. A simulation runs on a frozen copy of its tuning, so the only way to change it is `setTuning`, which the recorder sees.
+- **Seeking** (`record/seek.ts`) re-simulates once, keeping a save-state every 5 s, and then reaches any tick exactly.
+- **Markers:** M marks a moment in the recording.
+- **Reading is strict:** sizes, every header field (unknown fields refused), track contents against the header, no trailing bytes, a 512 MB cap. Everything fails as a `RecordingFormatError` that says what's wrong.
+- **Writing** uses 64 KB chunks instead of a buffer that doubles, and saving hands the chunks to the browser as they are.
+- **A golden recording** (`tests/golden/`) re-simulates bit for bit in the tests. Rewrite it with `npm run golden` when a version changes.
+
+**Why:** Recordings are how bugs get reproduced and playtests analysed, and how daily runs will be verified later. A recording that can't say why it doesn't replay, or that a hostile file can hang, isn't a tool. The chunked writer's first test found that a value written as a chunk filled went into the previous chunk: every recording over 64 KB a track would have been corrupt.
+
 ### A click is about the frame the player saw
 
 **Decision:** The tick input carries held states (an optic up, breath held, a lean) and a list of commands. A precise command such as `fire` carries what was on screen: its `lag` (how many ticks before the consuming tick's start state the frame was, from 0 to 2, stored to 1/120 of a tick) and that frame's view angles. The browser latches each click against the frame on screen (`app/commandLatch.ts`): 1 − α, plus a tick for each tick that ran since. Bodies keep their pose at the end of the last two ticks, and the simulation resolves a precise command against that history (`poseAt`), so a shot leaves from the eye the player saw, along the crosshair they saw. Each `fire` emits a `shot` event, timed when it happened; the debug view draws it to where it stops.

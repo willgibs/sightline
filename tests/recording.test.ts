@@ -16,7 +16,7 @@ beforeAll(() => {
 /** Plays `seconds` with the wander bot and returns the simulation and its recording. */
 function play(seconds: number): { sim: Simulation; rec: Recording } {
   const sim = new Simulation(world, defaultTuning);
-  const recorder = new Recorder(sim, 'overlook');
+  const recorder = new Recorder(sim);
   const bot = new WanderBot(world.seed);
   const raw = neutralInput();
   for (let i = 0; i < seconds * 30; i++) {
@@ -31,7 +31,7 @@ describe('determinism', () => {
     const a = play(90);
     const b = play(90);
     expect(a.sim.hash()).toBe(b.sim.hash());
-    expect(a.rec.header.checkpoints).toEqual(b.rec.header.checkpoints);
+    expect(a.rec.checkpoints()).toEqual(b.rec.checkpoints());
     // And the bot really went somewhere.
     expect(Math.hypot(a.sim.player.x - world.spawn.x, a.sim.player.z - world.spawn.z)).toBeGreaterThan(20);
   });
@@ -42,8 +42,7 @@ describe('recordings', () => {
     const { rec } = play(60);
     const back = Recording.fromBytes(rec.toBytes());
     expect(back.header).toEqual(rec.header);
-    expect(back.inputs).toEqual(rec.inputs);
-    expect(back.states).toEqual(rec.states);
+    expect(back.tracks).toEqual(rec.tracks);
     expect(back.readEvents()).toEqual(rec.readEvents());
     expect(back.stateCount).toBe(60 * 10);
   });
@@ -72,7 +71,7 @@ describe('recordings', () => {
     // tick's input is 13 bytes.
     const at = 900 * 13 + 1;
     bytes[at] = bytes[at] === 127 ? 0 : 127;
-    const tampered = new Recording(rec.header, bytes, rec.states, rec.events);
+    const tampered = new Recording(rec.header, { ...rec.tracks, INPT: bytes });
     const result = resimulate(tampered, world);
     expect(result.ok).toBe(false);
     expect(result.firstDivergence).toBe(1200); // the first checkpoint after the change
@@ -80,7 +79,7 @@ describe('recordings', () => {
 
   it('replay even when the caller never quantized its input', () => {
     const sim = new Simulation(world, defaultTuning);
-    const recorder = new Recorder(sim, 'overlook');
+    const recorder = new Recorder(sim);
     for (let i = 0; i < 300; i++) {
       const events = sim.step({
         moveX: 0.5, // not a multiple of 1/127
@@ -99,7 +98,7 @@ describe('recordings', () => {
 
   it('refuse to skip a tick', () => {
     const sim = new Simulation(world, defaultTuning);
-    const recorder = new Recorder(sim, 'overlook');
+    const recorder = new Recorder(sim);
     sim.step(neutralInput());
     sim.step(neutralInput());
     expect(() => recorder.record(sim, [])).toThrow(/missed a tick/);

@@ -16,6 +16,7 @@ import { Overlay } from './overlay';
 import { FrameStats, percentile } from './perf';
 import { missionSpec } from '../sim/mission';
 import { SystemProfile } from '../sim/profile';
+import { BUILD } from './build';
 import { tuningProblems } from '../config/validate';
 
 /**
@@ -157,7 +158,7 @@ export class Game {
 
   private restartRun(): void {
     this.sim = new Simulation(this.world, this.tuning);
-    this.recorder = new Recorder(this.sim, this.spawnKind);
+    this.recorder = new Recorder(this.sim, BUILD);
     this.prev = this.sim.snapshot();
     this.curr = this.sim.snapshot();
     this.input.yaw = this.sim.player.yaw;
@@ -194,7 +195,7 @@ export class Game {
       this.hud.toast(`Tick rate ${next.sim.tickHz} Hz · run restarted`);
     } else if (simChanged) {
       this.sim.setTuning(next);
-      this.recorder.markTuningChanged();
+      this.recorder.tuningChanged(this.sim);
       this.hud.toast('Tuning reloaded');
     } else {
       this.hud.toast('View tuning reloaded');
@@ -257,6 +258,12 @@ export class Game {
         this.restartRun();
         this.hud.toast('Run restarted');
         break;
+      case 'KeyM': {
+        // A marker in the recording: "look at this moment" for a playtest or a bug report.
+        this.recorder.annotate('marker');
+        this.hud.toast(`Marked ${clock(this.sim.tick / this.tuning.sim.tickHz)} in the recording`);
+        break;
+      }
     }
   }
 
@@ -451,7 +458,7 @@ export class Game {
     const kb = (n: number) => (n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`);
     const mode = this.detached ? 'fly camera' : `${TIME_SCALES[this.timeScaleIndex]}× speed`;
     const lines = [
-      `SIGHTLINE · PHASE 0 · DEBUG VIEW`,
+      `SIGHTLINE · PHASE 0 · DEBUG VIEW · build ${BUILD}`,
       `seed ${w.seed} · tick ${this.sim.tick.toLocaleString('en-US')} · ${clock(played)} played · ${mode}`,
       `${s.fps.toFixed(0)} fps · frame ${s.frameMs.toFixed(1)} ms (p95 ${s.p95Ms.toFixed(1)}) · cpu ${s.cpuMs.toFixed(1)} ms · sim ${(this.tickMs * 1000).toFixed(0)} µs/tick`,
       `${r.calls} draws · ${(r.triangles / 1000).toFixed(0)}k tris · ${(r.lines / 1000).toFixed(0)}k lines`,
@@ -476,7 +483,7 @@ export class Game {
   private saveRecording(): void {
     if (!this.sim) return;
     const rec = this.recorder.finish(this.sim, new Date().toISOString());
-    const blob = new Blob([rec.toBytes() as BlobPart], { type: 'application/octet-stream' });
+    const blob = new Blob(rec.toParts() as BlobPart[], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
