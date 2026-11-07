@@ -8,3 +8,4 @@ coverage/
 
 # Playtest sessions saved by the dev server
 playtests/
+.vitest/

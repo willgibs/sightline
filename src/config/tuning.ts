@@ -65,6 +65,9 @@ export const defaultTuning = {
     movement: { sprint: 1.5, walk: 1.0, crouch: 0.6, crawl: 0.3 },
     surface: { grass: 0.85, dirt: 1.0, gravel: 1.15, rock: 1.05, water: 1.35, metal: 1.4, wood: 1.2 },
     radiusPerUnit: 12,
+    speedOfSound: 343, // m/s: distant sounds arrive late (crack-thump, footsteps across the camp)
+    // Steady sources, as heard radii. Phase 1 makes them mask other sounds for guards too.
+    ambient: { creek: 38, generator: 70 },
   },
 
   visibility: {
