@@ -73,7 +73,9 @@ export function scatterProps(
   const tan38 = dtanDeg(38);
   const tan18 = dtanDeg(18);
   const tan40 = dtanDeg(40);
-  const keepClear = W.padRadius + 14;
+  // Clear of the camp's pad: distances below are from the site's centre.
+  const site = features.site;
+  const keepClear = site.radius + 14;
 
   const nearPath = (x: number, z: number, roadPad: number, creekPad: number): boolean => {
     closestOnPolyline(features.road, x, z, W.roadWidth / 2 + roadPad, hit);
@@ -91,7 +93,7 @@ export function scatterProps(
       const x = gx + tc * trng.range(0.15, 0.85);
       const z = gz + tc * trng.range(0.15, 0.85);
       const roll = trng.next();
-      const r0 = Math.sqrt(x * x + z * z);
+      const r0 = Math.sqrt((x - site.x) * (x - site.x) + (z - site.z) * (z - site.z));
       if (r0 < keepClear) continue;
       hf.sample(x, z, sample);
       if (sample.slopeTan > tan38 || sample.surface === Surface.Water || sample.surface === Surface.Rock) continue;
@@ -136,7 +138,7 @@ export function scatterProps(
       const x = gx + rc * rrng.range(0.1, 0.9);
       const z = gz + rc * rrng.range(0.1, 0.9);
       const roll = rrng.next();
-      const r0 = Math.sqrt(x * x + z * z);
+      const r0 = Math.sqrt((x - site.x) * (x - site.x) + (z - site.z) * (z - site.z));
       if (r0 < keepClear - 6) continue;
       hf.sample(x, z, sample);
       if (sample.surface === Surface.Water) continue;
@@ -182,7 +184,7 @@ export function scatterProps(
       const x = gx + bc * brng.range(0.1, 0.9);
       const z = gz + bc * brng.range(0.1, 0.9);
       const roll = brng.next();
-      const r0 = Math.sqrt(x * x + z * z);
+      const r0 = Math.sqrt((x - site.x) * (x - site.x) + (z - site.z) * (z - site.z));
       if (r0 < keepClear - 4) continue;
       hf.sample(x, z, sample);
       if (sample.slopeTan > tan38 || sample.surface === Surface.Water || sample.surface === Surface.Rock) continue;

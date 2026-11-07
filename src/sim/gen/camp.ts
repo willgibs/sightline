@@ -5,6 +5,7 @@ import { Blocks, type ColliderSet } from '../world/colliders';
 import type { Heightfield } from '../world/heightfield';
 import { Surface } from '../world/surfaces';
 import type { Point2 } from './paths';
+import type { Site } from './site';
 import type { TerrainFeatures } from './terrain';
 
 /**
@@ -12,7 +13,8 @@ import type { TerrainFeatures } from './terrain';
  * the road, mirrored at random so seeds differ a little. Phase 1 (lab D) replaces it
  * with the procedural camp generator.
  *
- * Layout coordinates are (a, b): a runs toward the gate, b across the camp.
+ * Layout coordinates are (a, b) in the site's frame (site.ts): a runs from the site's
+ * centre toward the gate, b across the camp.
  */
 
 export type StructureKind =
@@ -58,6 +60,8 @@ export interface GuardSpawn {
 }
 
 export interface Camp {
+  /** Where it stands: its centre, its gate's direction, its pad. */
+  site: Site;
   structures: Structure[];
   guards: GuardSpawn[];
   /** Fence half-size. */
@@ -69,11 +73,17 @@ export interface Camp {
  * the layout's draws are the same as before routines existed.
  */
 export function buildTestCamp(rng: Rng, hf: Heightfield, features: TerrainFeatures, colliders: ColliderSet, gen: GenTuning, routines: Rng): Camp {
-  const padH = gen.world.padHeight;
-  const u = features.campAxis;
+  const site = features.site;
+  const padH = site.height;
+  const u = { x: site.ux, z: site.uz };
   const mirror = rng.chance(0.5) ? -1 : 1;
   const v = { x: -u.z * mirror, z: u.x * mirror };
-  const at = (a: number, b: number): Point2 => ({ x: u.x * a + v.x * b, z: u.z * a + v.z * b });
+  // Directions in the camp's frame, and points: the site's centre plus a direction's worth.
+  const along = (a: number, b: number): Point2 => ({ x: u.x * a + v.x * b, z: u.z * a + v.z * b });
+  const at = (a: number, b: number): Point2 => {
+    const d = along(a, b);
+    return { x: site.x + d.x, z: site.z + d.z };
+  };
   const jitter = () => rng.range(-1.2, 1.2);
 
   const structures: Structure[] = [];
@@ -203,7 +213,7 @@ export function buildTestCamp(rng: Rng, hf: Heightfield, features: TerrainFeatur
   // --- Guards: Phase 0 dummies with fixed posts and simple routes. -------------------
   const guards: GuardSpawn[] = [];
   const face = (fa: number, fb: number) => {
-    const p = at(fa, fb);
+    const p = along(fa, fb);
     const l = Math.sqrt(p.x * p.x + p.z * p.z);
     return { x: p.x / l, z: p.z / l };
   };
@@ -245,5 +255,5 @@ export function buildTestCamp(rng: Rng, hf: Heightfield, features: TerrainFeatur
     spawn.routine = buildRoutine(spawn, gen.routines, routines.fork(`guard${p.id}`));
     guards.push(spawn);
   }
-  return { structures, guards, fenceHalf: F };
+  return { site, structures, guards, fenceHalf: F };
 }

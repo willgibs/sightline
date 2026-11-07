@@ -7,6 +7,7 @@ import { Blocks, ColliderSet, footprintContains } from '../world/colliders';
 import { makeTerrainSample, type Heightfield } from '../world/heightfield';
 import { analyzeTerrain, type TerrainReport } from './analysis';
 import { buildTestCamp, type Camp } from './camp';
+import type { Site } from './site';
 import { scatterProps, type Props } from './props';
 import { generateTerrain, type Backdrop, type TerrainFeatures } from './terrain';
 import { assertTuning } from '../../config/validate';
@@ -105,10 +106,10 @@ export function generateWorld(spec: MissionSpec, tuning: Tuning, clock?: () => n
     const camp = buildTestCamp(rng.fork('camp'), terrain.heightfield, terrain.features, colliders, G, rng.fork('routines'));
     const props = scatterProps(rng.fork('props'), terrain.heightfield, terrain.features, colliders, G);
     colliders.build();
-    const report = analyzeTerrain(terrain.heightfield, colliders, G);
+    const report = analyzeTerrain(terrain.heightfield, colliders, G, camp.site);
     if (!report.ok && attempt < attempts - 1) continue;
     const playHalf = terrain.heightfield.size / 2 - G.world.playMargin;
-    const spawn = chooseSpawn(spec.insertion, terrain.heightfield, terrain.features, colliders, report, playHalf);
+    const spawn = chooseSpawn(spec.insertion, terrain.heightfield, terrain.features, colliders, report, playHalf, camp.site);
     const grid = buildGrid(terrain.heightfield, colliders, siteBounds(camp, colliders, G.grid.siteMargin), G);
     return {
       grid,
@@ -131,7 +132,8 @@ export function generateWorld(spec: MissionSpec, tuning: Tuning, clock?: () => n
 
 /**
  * Overlook: just behind the best perch, facing the camp, so the first view is the
- * valley. Edge: at the end of the road where it leaves the play area.
+ * valley. Edge: at the end of the road where it leaves the play area. Either way facing
+ * the camp's site.
  */
 function chooseSpawn(
   kind: SpawnKind,
@@ -140,6 +142,7 @@ function chooseSpawn(
   colliders: ColliderSet,
   report: TerrainReport,
   playHalf: number,
+  site: Site,
 ): Spawn {
   const sample = makeTerrainSample();
   const maxTan = dtanDeg(28);
@@ -168,8 +171,10 @@ function chooseSpawn(
     return { x, z };
   };
   const facing = (x: number, z: number) => {
-    const l = Math.sqrt(x * x + z * z) || 1;
-    return { faceX: -x / l, faceZ: -z / l };
+    const dx = x - site.x;
+    const dz = z - site.z;
+    const l = Math.sqrt(dx * dx + dz * dz) || 1;
+    return { faceX: -dx / l, faceZ: -dz / l };
   };
 
   if (kind === 'overlook' && report.perches.length > 0) {
@@ -184,9 +189,11 @@ function chooseSpawn(
         best = p;
       }
     }
-    const l = Math.sqrt(best.x * best.x + best.z * best.z);
+    const ox = best.x - site.x;
+    const oz = best.z - site.z;
+    const l = Math.sqrt(ox * ox + oz * oz);
     const back = 5;
-    const spot = settle(best.x + (best.x / l) * back, best.z + (best.z / l) * back);
+    const spot = settle(best.x + (ox / l) * back, best.z + (oz / l) * back);
     return { ...spot, ...facing(spot.x, spot.z), kind: 'overlook' };
   }
 

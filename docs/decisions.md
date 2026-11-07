@@ -14,6 +14,12 @@ The first scene is the movement course: stairs, a 1 m and a 2 m drop, ramps of 3
 
 **Why:** each Phase 1 lab is a scene built to its exit test, and needs to be playable, scriptable and replayable without building its own harness. A regression test that needs more than one tick is a scene too.
 
+### Camps stand at sites
+
+**Decision:** A camp is laid out in the frame of its site (`gen/site.ts`): the camp's centre, the direction its gate faces, and its pad. Everything that looks for the camp asks the site rather than the origin: validation's perches and approaches, the spawn's facing, the props kept clear of the pad, the first view, the benchmark's flight and the debug view's sight lines. The procedural valley still builds one site at the origin, so nothing moved: the valley's fingerprint is unchanged. A test builds the same camp at a site 380 m away and finds every collider, guard and routine simply moved.
+
+**Why:** lab D's camp generator, several bases in one map and camps on real terrain all start from "build a camp here"; converting the camp's coordinates later would mean finding every place that quietly meant (0, 0).
+
 ### Brains decide from what they perceive
 
 **Decision:** A guard's brain lives in `src/sim/ai` and decides from a `GuardMind` (`ai/mind.ts`): his own body, his post and routine, the static world, the tuning, the time, and his percepts. The mind is built outside the boundary from the guard's own state and perception's output (`entities/guards.ts`, `guardMind`). An architecture test allows `src/sim/ai` to import only the core, generation, the static world, the motor's types, events, the environment and the tuning's type: never the state, the simulation or the systems. Keeping to the routine is the first brain (`ai/routine.ts`), with behaviour unchanged.

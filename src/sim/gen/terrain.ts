@@ -1,3 +1,4 @@
+import type { Site } from './site';
 import type { GenTuning } from '../../config/tuning';
 import { DEG, dcos, dcosDeg, dsin, dtanDeg } from '../core/detmath';
 import { clamp, lerp, smoothstep } from '../core/math';
@@ -50,8 +51,8 @@ export interface TerrainFeatures {
   road: Polyline;
   creekPasses: [number, number];
   roadPass: number;
-  /** Unit vector from the camp toward the road pass; the camp's gate faces this way. */
-  campAxis: Point2;
+  /** Where the valley's camp stands: the pad at the origin, its gate facing the road pass. */
+  site: Site;
 }
 
 export interface Backdrop {
@@ -353,7 +354,7 @@ export function generateTerrain(rng: Rng, gen: GenTuning): TerrainResult {
       road: roadLine,
       creekPasses: [creekA, creekB],
       roadPass,
-      campAxis,
+      site: { x: 0, z: 0, ux: campAxis.x, uz: campAxis.z, radius: padR, height: W.padHeight },
     },
     backdrop: { size: bSize, cell: bCell, n: bn, heights: bHeights },
   };

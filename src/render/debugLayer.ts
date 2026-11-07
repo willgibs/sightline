@@ -466,7 +466,8 @@ function buildColliderLines(world: World): THREE.LineSegments {
 
 function buildPerches(world: World): THREE.Group {
   const group = new THREE.Group();
-  const target = new THREE.Vector3(0, 0.5 + 1.4, 0);
+  const site = world.camp.site;
+  const target = new THREE.Vector3(site.x, site.height + 1.4, site.z);
   for (const p of world.report.perches) {
     const color = palette.debug.ridges[p.ridge % palette.debug.ridges.length]!;
     const top = new THREE.Vector3(p.x, p.y + 6, p.z);

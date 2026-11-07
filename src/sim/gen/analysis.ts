@@ -1,3 +1,4 @@
+import type { Site } from './site';
 import type { GenTuning } from '../../config/tuning';
 import { circleDirections, dtanDeg } from '../core/detmath';
 import { Blocks, type ColliderSet, type RayHit } from '../world/colliders';
@@ -42,11 +43,12 @@ const PERCH_MIN_HEIGHT = 12;
 const PERCH_RANGE: [number, number] = [150, 500];
 const EYE = 0.6; // a prone shooter's rifle over grass
 
-export function analyzeTerrain(hf: Heightfield, colliders: ColliderSet, gen: GenTuning): TerrainReport {
-  const padH = gen.world.padHeight;
+/** Checks a valley for its camp at `site`: perches that overlook it, and approaches to it on foot. */
+export function analyzeTerrain(hf: Heightfield, colliders: ColliderSet, gen: GenTuning, site: Site): TerrainReport {
+  const padH = site.height;
   const problems: string[] = [];
   const dirs = circleDirections(DIRECTIONS);
-  const target = { x: 0, y: padH + 1.4, z: 0 }; // chest height at the camp centre
+  const target = { x: site.x, y: padH + 1.4, z: site.z }; // chest height at the camp centre
   const hit: RayHit = { dist: Infinity, id: -1 };
 
   // --- Perches: the highest point along each direction that can see the camp. -------
@@ -55,8 +57,8 @@ export function analyzeTerrain(hf: Heightfield, colliders: ColliderSet, gen: Gen
     const dir = dirs[d]!;
     let found: Perch | null = null;
     for (let r = PERCH_RANGE[0]; r <= PERCH_RANGE[1]; r += 10) {
-      const x = dir.x * r;
-      const z = dir.z * r;
+      const x = site.x + dir.x * r;
+      const z = site.z + dir.z * r;
       const ground = hf.heightAt(x, z);
       const above = ground - padH;
       if (above < PERCH_MIN_HEIGHT || (found && above <= found.heightAbovePad)) continue;
@@ -138,9 +140,11 @@ export function analyzeTerrain(hf: Heightfield, colliders: ColliderSet, gen: Gen
   const queue = new Int32Array(cells * cells);
   let head = 0;
   let tail = 0;
-  const c0 = Math.floor(cells / 2);
-  queue[tail++] = c0 * cells + c0;
-  seen[c0 * cells + c0] = 1;
+  // From the cell under the site's centre.
+  const i0 = Math.max(0, Math.min(cells - 1, Math.floor((site.x - hf.min) / cell)));
+  const j0 = Math.max(0, Math.min(cells - 1, Math.floor((site.z - hf.min) / cell)));
+  queue[tail++] = j0 * cells + i0;
+  seen[j0 * cells + i0] = 1;
   const sectorDirs = circleDirections(16);
   const sectors = new Uint8Array(16);
   while (head < tail) {
@@ -153,7 +157,7 @@ export function analyzeTerrain(hf: Heightfield, colliders: ColliderSet, gen: Gen
       let bestDot = -2;
       let bestS = 0;
       for (let s = 0; s < 16; s++) {
-        const dot = cx * sectorDirs[s]!.x + cz * sectorDirs[s]!.z;
+        const dot = (cx - site.x) * sectorDirs[s]!.x + (cz - site.z) * sectorDirs[s]!.z;
         if (dot > bestDot) {
           bestDot = dot;
           bestS = s;

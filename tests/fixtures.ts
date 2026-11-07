@@ -1,13 +1,13 @@
 import type { QueryBody, QueryView } from '../src/sim/world/query';
 import { Solids } from '../src/sim/world/solids';
 import { defaultTuning, type Tuning } from '../src/config/tuning';
-import type { Camp, GuardSpawn } from '../src/sim/gen/camp';
+import type { GuardSpawn } from '../src/sim/gen/camp';
 import { buildRoutine, type Routine } from '../src/sim/gen/routine';
 import { Rng } from '../src/sim/core/rng';
 import type { World } from '../src/sim/gen/world';
 import { Blocks, circleOverlaps, type ColliderInput } from '../src/sim/world/colliders';
 import { Surface } from '../src/sim/world/surfaces';
-import { buildWorld } from '../src/sim/gen/handmade';
+import { buildWorld, type HandmadeSpec } from '../src/sim/gen/handmade';
 
 /** A deep copy of the default tuning that tests can change freely. */
 export function tuningCopy(): Tuning {
@@ -23,7 +23,7 @@ export interface TestWorldOptions {
   spawn?: { x: number; z: number; faceX?: number; faceZ?: number };
   /** The spawn is meant to be on top of a collider (a roof, a crate). Otherwise a spawn that lands on one is an error. */
   spawnOnTop?: boolean;
-  camp?: Camp;
+  camp?: HandmadeSpec['camp'];
 }
 
 /** A small hand-built world for controller and collision tests (gen/handmade.ts). */

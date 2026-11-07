@@ -350,8 +350,9 @@ export class Game {
     this.input.yaw = this.sim.player.yaw;
     // Start looking at the camp so the first frame frames the valley.
     const p = this.sim.player;
-    const dist = Math.hypot(p.x, p.z);
-    const drop = this.tuning.gen.world.padHeight + 1 - (p.y + p.eyeHeight);
+    const site = this.world.camp.site;
+    const dist = Math.hypot(p.x - site.x, p.z - site.z);
+    const drop = site.height + 1 - (p.y + p.eyeHeight);
     this.input.pitch = dist > 1 ? Math.max(-0.35, Math.min(0.1, Math.atan2(drop, dist))) : 0;
     this.bobPhase = 0;
     if (this.detached) this.setDetached(false);
@@ -841,7 +842,7 @@ export class Game {
         overlay: this.overlay.currentMode,
         overlayVisible: this.overlay.visible,
         spawn: this.world?.spawn,
-        camp: this.world ? { axis: this.world.features.campAxis, perches: this.world.report.perches.length } : null,
+        camp: this.world ? { site: this.world.camp.site, perches: this.world.report.perches.length } : null,
       }),
     };
   }
@@ -849,19 +850,23 @@ export class Game {
   // --- Benchmark (?bench). ---------------------------------------------------------------
 
   private startBench(): void {
-    const s = this.world.spawn;
-    const sy = this.world.terrain.heightAt(s.x, s.z);
-    const opposite = this.world.report.perches.reduce(
-      (best, p) => (p.x * s.x + p.z * s.z < best.x * s.x + best.z * s.z ? p : best),
-      this.world.report.perches[0] ?? { x: -s.x, y: sy, z: -s.z },
+    // From the spawn, over the camp, to the perch across from it: all relative to the camp's site.
+    const c = this.world.camp.site;
+    const s = { x: this.world.spawn.x - c.x, z: this.world.spawn.z - c.z };
+    const sy = this.world.terrain.heightAt(this.world.spawn.x, this.world.spawn.z);
+    const far = this.world.report.perches.reduce(
+      (best, p) => ((p.x - c.x) * s.x + (p.z - c.z) * s.z < (best.x - c.x) * s.x + (best.z - c.z) * s.z ? p : best),
+      this.world.report.perches[0] ?? { x: c.x - s.x, y: sy, z: c.z - s.z },
     );
+    const o = { x: far.x - c.x, z: far.z - c.z };
+    const at = (x: number, y: number, z: number) => new THREE.Vector3(c.x + x, c.height + y, c.z + z);
     const pts = [
-      new THREE.Vector3(s.x, sy + 1.7, s.z),
-      new THREE.Vector3(s.x * 0.55, sy + 25, s.z * 0.55),
-      new THREE.Vector3(s.x * 0.15, 12, s.z * 0.15),
-      new THREE.Vector3(-s.x * 0.05 + 8, 2.2, -s.z * 0.05),
-      new THREE.Vector3(opposite.x * 0.5, 18, opposite.z * 0.5),
-      new THREE.Vector3(opposite.x, opposite.y + 2, opposite.z),
+      new THREE.Vector3(c.x + s.x, sy + 1.7, c.z + s.z),
+      new THREE.Vector3(c.x + s.x * 0.55, sy + 25, c.z + s.z * 0.55),
+      at(s.x * 0.15, 11.5, s.z * 0.15),
+      at(-s.x * 0.05 + 8, 1.7, -s.z * 0.05),
+      at(o.x * 0.5, 17.5, o.z * 0.5),
+      new THREE.Vector3(far.x, far.y + 2, far.z),
     ];
     this.bench = { start: 0, path: new THREE.CatmullRomCurve3(pts), frames: [], cpu: [], calls: [], triangles: [] };
     this.paused = false;
@@ -876,7 +881,9 @@ export class Game {
     const t = Math.min(1, (now - b.start) / 1000 / BENCH_SECONDS);
     const p = b.path.getPointAt(t);
     const ahead = b.path.getPointAt(Math.min(1, t + 0.02));
-    const target = t < 0.55 ? new THREE.Vector3(0, 2, 0) : t > 0.9 ? new THREE.Vector3(0, 2, 0) : ahead;
+    const site = this.world.camp.site;
+    const camp = new THREE.Vector3(site.x, site.height + 1.5, site.z);
+    const target = t < 0.55 || t > 0.9 ? camp : ahead;
     const d = target.clone().sub(p);
     const yaw = Math.atan2(-d.x, -d.z);
     const pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));

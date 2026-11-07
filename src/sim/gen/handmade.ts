@@ -7,6 +7,7 @@ import { buildGrid } from '../world/grid';
 import { Heightfield } from '../world/heightfield';
 import { Surface } from '../world/surfaces';
 import type { Camp } from './camp';
+import { siteAt, type Site } from './site';
 import { makePolyline } from './paths';
 import type { World } from './world';
 
@@ -28,7 +29,8 @@ export interface HandmadeSpec {
   colliders?: readonly ColliderInput[];
   /** Where the player starts, and the way they face (a unit vector; north by default). */
   spawn?: { x: number; z: number; faceX?: number; faceZ?: number };
-  camp?: Camp;
+  /** A camp, at a site of its own or at the origin. */
+  camp?: Omit<Camp, 'site'> & { site?: Site };
   env?: EnvSpec;
 }
 
@@ -54,7 +56,8 @@ export function buildWorld(spec: HandmadeSpec, gen: GenTuning): World {
   }
   hf.finalize();
   const colliders = new ColliderSet(size);
-  const camp: Camp = spec.camp ? { ...spec.camp, structures: [...spec.camp.structures] } : { structures: [], guards: [], fenceHalf: 0 };
+  const site = spec.camp?.site ?? siteAt(0, 0);
+  const camp: Camp = spec.camp ? { ...spec.camp, site, structures: [...spec.camp.structures] } : { site, structures: [], guards: [], fenceHalf: 0 };
   const owned = new Set(camp.structures.flatMap((st) => st.colliders));
   for (const c of spec.colliders ?? []) {
     const id = colliders.add(c);
@@ -76,7 +79,7 @@ export function buildWorld(spec: HandmadeSpec, gen: GenTuning): World {
     seed: spec.name,
     attempt: 0,
     terrain: hf,
-    features: { saddles: [], passes: [], creek: line, road: line, creekPasses: [0, 1], roadPass: 0, campAxis: { x: 1, z: 0 } },
+    features: { saddles: [], passes: [], creek: line, road: line, creekPasses: [0, 1], roadPass: 0, site },
     backdrop: { size: 0, cell: 1, n: 0, heights: new Float32Array(0) },
     colliders,
     props: { trees: [], rocks: [], bushes: [] },
