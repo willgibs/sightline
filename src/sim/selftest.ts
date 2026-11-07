@@ -24,8 +24,8 @@ export const GOLDEN = {
   /** Everything generation decides for TAL-4471 (also pinned in tests/world.test.ts). */
   world: '2ea333d491d7568c',
   /** State hash after 60 s of bot play on TAL-4471, and on MUD-9031. */
-  playTAL: 'd3551b835fbdb532',
-  playMUD: '9c4b1f6ada6b5647',
+  playTAL: '1fab1b3eeaae2d23',
+  playMUD: '20a4e6b5789af039',
 } as const;
 
 export interface SelfTestResult {

@@ -65,6 +65,8 @@ export const defaultTuning = {
     maxSlopeDeg: 42, // steeper ground cannot be climbed
     uphillSlowdown: 0.55, // speed multiplier climbing at the maximum slope
     stepHeight: 0.45, // ledges up to this height are stepped onto
+    pitchLimit: 1.45, // radians the view can tilt up or down
+    shoveMax: 0.08, // most a guard shoves the body per resolve pass; small enough that walls always win
     gravity: 9.81,
     groundSnap: 0.6, // stay glued to the ground walking downhill
     stride: { sprint: 1.7, walk: 1.25, crouch: 0.85, crawl: 0.6 }, // metres between footsteps
@@ -76,6 +78,9 @@ export const defaultTuning = {
     movement: { sprint: 1.5, walk: 1.0, crouch: 0.6, crawl: 0.3 },
     surface: { grass: 0.85, dirt: 1.0, gravel: 1.15, rock: 1.05, water: 1.35, metal: 1.4, wood: 1.2 },
     radiusPerUnit: 12,
+    // Landing from a fall or a slide: loudness grows with impact speed (m/s), from a soft
+    // drop at minSpeed to the cap. A 1 m drop lands at 4.4 m/s, about a walking step.
+    landing: { minSpeed: 2.5, perSpeed: 0.25, max: 3 },
     speedOfSound: 343, // m/s: distant sounds arrive late (crack-thump, footsteps across the camp)
     // Steady sources, as heard radii. Phase 1 makes them mask other sounds for guards too.
     ambient: { creek: 38, generator: 70 },
@@ -92,6 +97,8 @@ export const defaultTuning = {
   },
 
   guards: {
+    radius: 0.3, // collision body (the drawn capsule is set in render/guardMeshes.ts until bodies are unified)
+    height: 1.85,
     walkSpeed: 1.35,
     turnRate: 2.6, // rad/s
     waitTime: [2, 5], // seconds paused at each waypoint

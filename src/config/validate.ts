@@ -37,6 +37,9 @@ const BOUNDS: ReadonlyArray<readonly [path: string, min: number, max: number, in
   ['player.maxSlopeDeg', 1, 89],
   ['player.stepHeight', 0, 2],
   ['player.radius', 0.05, 2],
+  ['player.stanceTime.crouch', 0, 5],
+  ['player.stanceTime.prone', 0, 5],
+  ['player.pitchLimit', 0, 1.5],
 ];
 
 export function tuningProblems(t: unknown): string[] {

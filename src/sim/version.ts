@@ -9,4 +9,4 @@
 export const GEN_VERSION = 1;
 
 /** How the simulation behaves for given inputs. */
-export const SIM_VERSION = 1;
+export const SIM_VERSION = 2;

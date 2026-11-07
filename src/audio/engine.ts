@@ -189,6 +189,17 @@ export class SoundEngine {
             footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), gait, amp),
           );
         }
+      } else if (e.type === 'land') {
+        // A landing is a heavy footfall: the sprint voice at the landing's own loudness.
+        const gait = 1.5;
+        if (e.source === PLAYER_SOURCE) {
+          const amp = THRESHOLD * audibility(e.radius, earToFeet);
+          this.voice(amp, (when) => footstep(this.ctx, this.body, this.noise, this.rand, when, surfaceName(e.surface), gait, amp));
+        } else {
+          this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) =>
+            footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), gait, amp),
+          );
+        }
       } else if (e.type === 'stance') {
         const length = e.to === 'prone' || e.from === 'prone' ? 0.5 : 0.22;
         const amp = THRESHOLD * 2.5;

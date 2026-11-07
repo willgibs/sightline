@@ -2,7 +2,7 @@ import { defaultTuning, type Tuning } from '../src/config/tuning';
 import type { Camp } from '../src/sim/gen/camp';
 import { makePolyline } from '../src/sim/gen/paths';
 import type { World } from '../src/sim/gen/world';
-import { ColliderSet, type ColliderInput } from '../src/sim/world/colliders';
+import { Blocks, ColliderSet, circleOverlaps, type ColliderInput } from '../src/sim/world/colliders';
 import { Heightfield } from '../src/sim/world/heightfield';
 import { Surface } from '../src/sim/world/surfaces';
 import { missionSpec } from '../src/sim/mission';
@@ -19,6 +19,8 @@ export interface TestWorldOptions {
   surface?: Surface;
   colliders?: ColliderInput[];
   spawn?: { x: number; z: number; faceX?: number; faceZ?: number };
+  /** The spawn is meant to be on top of a collider (a roof, a crate). Otherwise a spawn that lands on one is an error. */
+  spawnOnTop?: boolean;
   camp?: Camp;
 }
 
@@ -36,6 +38,19 @@ export function testWorld(opts: TestWorldOptions = {}): World {
   const colliders = new ColliderSet(size);
   for (const c of opts.colliders ?? []) colliders.add(c);
   colliders.build();
+  if (!opts.spawnOnTop) {
+    // A spawn inside something solid puts the body on top of it, and a test then silently
+    // checks the wrong thing. Make that a loud mistake instead.
+    const sx = opts.spawn?.x ?? 0;
+    const sz = opts.spawn?.z ?? 0;
+    const ground = hf.heightAt(sx, sz);
+    const T = defaultTuning.player;
+    for (const c of colliders.list) {
+      if ((c.flags & Blocks.Move) !== 0 && c.y1 > ground + T.stepHeight && c.y0 < ground + T.height.stand && circleOverlaps(c, sx, sz, T.radius)) {
+        throw new Error(`testWorld: the spawn (${sx}, ${sz}) is inside collider ${c.id}; move it or pass spawnOnTop`);
+      }
+    }
+  }
   const line = makePolyline([
     { x: size, z: size },
     { x: size + 1, z: size },

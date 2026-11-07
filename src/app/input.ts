@@ -16,6 +16,8 @@ export class InputController {
   /** Radians per pixel; the game scales it while zoomed. */
   sensitivity = 0.0022;
   sensitivityScale = 1;
+  /** How far the view can tilt up or down (tuning.player.pitchLimit, set by the game). */
+  pitchLimit = 1.45;
   onAction: ((code: string) => void) | null = null;
   onLockChange: ((locked: boolean) => void) | null = null;
   private readonly keys = new Set<string>();
@@ -43,7 +45,7 @@ export class InputController {
       if (!this.locked) return;
       const k = this.sensitivity * this.sensitivityScale;
       this.yaw -= e.movementX * k;
-      this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch - e.movementY * k));
+      this.pitch = Math.max(-this.pitchLimit, Math.min(this.pitchLimit, this.pitch - e.movementY * k));
     });
     on(document, 'mousedown', (e) => {
       if (this.locked && e.button === 2) this.zoomHeld = true;

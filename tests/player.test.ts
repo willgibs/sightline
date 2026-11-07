@@ -91,7 +91,7 @@ describe('player movement', () => {
     expect(sim.player.surface).toBe(Surface.Wood);
 
     const roof = { kind: 'box' as const, x: 0, z: 0, y0: -1, y1: 3, hx: 2, hz: 2, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Metal };
-    const high = new Simulation(testWorld({ colliders: [roof] }), tuningCopy());
+    const high = new Simulation(testWorld({ colliders: [roof], spawnOnTop: true }), tuningCopy());
     expect(high.player.y).toBeCloseTo(3, 6);
     hold(high, 2, { moveZ: 1 });
     expect(high.player.y).toBeCloseTo(0, 6);
@@ -278,5 +278,171 @@ describe('footstep noise', () => {
     hold(sim, 1, { moveZ: 1 });
     const events = hold(sim, 5, { moveZ: 1 });
     expect(events.filter((e) => e.type === 'footstep')).toHaveLength(0);
+  });
+});
+
+describe('controller edge cases (from the second audit)', () => {
+  const NORTH_YAW = 0;
+  const box = (x: number, z: number, hx: number, hz: number, y0: number, y1: number, surface: Surface = Surface.Wood) => ({
+    kind: 'box' as const,
+    x,
+    z,
+    hx,
+    hz,
+    y0,
+    y1,
+    ux: 1,
+    uz: 0,
+    flags: Blocks.All,
+    surface,
+  });
+
+  it('keeps the eye below a slab the body dives under', () => {
+    // A 0.6 m crawl space: slab underside at 0.6 m from x = 8 on. Dive prone at many points.
+    const slab = box(14, 0, 6, 4, 0.6, 0.7);
+    let worst = -Infinity;
+    for (let start = 4; start <= 7.5; start += 0.25) {
+      const sim = new Simulation(testWorld({ colliders: [slab], spawn: { x: 0, z: 0 } }), tuningCopy());
+      const run = { ...neutralInput(EAST), moveZ: 1, sprint: true };
+      while (sim.player.x < start) sim.step(run);
+      sim.step({ ...run, prone: true });
+      for (let i = 0; i < 90; i++) {
+        sim.step({ ...run, sprint: false });
+        const p = sim.player;
+        if (p.x > 8 - 0.3) worst = Math.max(worst, p.y + p.eyeHeight - slab.y0);
+      }
+    }
+    // Never above the underside, and never within the camera's near-plane reach of it.
+    expect(worst).toBeLessThan(-0.12);
+  });
+
+  it('only gets less visible once the body is actually down', () => {
+    const sim = new Simulation(testWorld(), tuningCopy());
+    hold(sim, 0.5, {});
+    const standing = sim.player.eyeHeight;
+    hold(sim, 1 / HZ, {}, { prone: true });
+    expect(sim.player.stance).toBe('prone');
+    expect(sim.player.eyeHeight).toBeGreaterThan(standing * 0.95);
+    hold(sim, 1, {});
+    expect(sim.player.eyeHeight).toBeCloseTo(tuningCopy().player.eyeHeight.prone, 6);
+  });
+
+  it('falls off a cliff instead of walking down it, and lands with a sound', () => {
+    const s = Math.tan((80 * Math.PI) / 180);
+    // A plateau 30 m up for x < 0, then an 80° face down to the valley floor.
+    const world = testWorld({ size: 400, cell: 1, height: (x) => Math.max(0, Math.min(30, -x * s)), spawn: { x: -8, z: 0 } });
+    const sim = new Simulation(world, tuningCopy());
+    let airborne = 0;
+    let ticks = 0;
+    const lands: number[] = [];
+    while (sim.player.y > 0.01 && ticks < 300) {
+      for (const e of sim.step({ ...neutralInput(EAST), moveZ: 1 })) if (e.type === 'land') lands.push(e.speed);
+      if (!sim.player.grounded) airborne++;
+      ticks++;
+    }
+    for (let i = 0; i < 10; i++) for (const e of sim.step(neutralInput(EAST))) if (e.type === 'land') lands.push(e.speed);
+    expect(sim.player.y).toBeLessThan(0.01);
+    expect(airborne).toBeGreaterThan(60); // about 2.4 s of free fall
+    expect(Math.max(...lands)).toBeGreaterThan(20);
+  });
+
+  it('lands louder from higher, and steps down a small ledge silently', () => {
+    const landing = (h: number): number => {
+      const sim = new Simulation(testWorld({ colliders: [box(0, 0, 2, 2, -1, h)], spawnOnTop: true }), tuningCopy());
+      let loud = 0;
+      for (const e of hold(sim, 3, { moveZ: 1 })) if (e.type === 'land') loud = Math.max(loud, e.loudness);
+      return loud;
+    };
+    expect(landing(0.5)).toBe(0);
+    expect(landing(1)).toBeGreaterThan(0);
+    expect(landing(3)).toBeGreaterThan(landing(1));
+  });
+
+  it('slides down ground too steep to stand on', () => {
+    const s = Math.tan((55 * Math.PI) / 180);
+    const world = testWorld({ size: 200, cell: 1, height: (x) => Math.max(0, Math.min(8, (6 - x) * s)), spawn: { x: 3, z: 0 } });
+    const sim = new Simulation(world, tuningCopy());
+    hold(sim, 4, {});
+    expect(sim.player.y).toBeLessThan(0.01);
+    expect(sim.player.x).toBeGreaterThan(5.9);
+  });
+
+  it('stands on a crate only when the body actually touches it', () => {
+    const crate = box(0, 5, 0.6, 0.6, 0, 0.4);
+    for (const gap of [0.005, 0.05]) {
+      // Walk north past the crate's east side, `gap` clear of it.
+      const sim = new Simulation(testWorld({ colliders: [crate], spawn: { x: 0.6 + 0.3 + gap, z: 12 } }), tuningCopy());
+      let highest = 0;
+      for (let i = 0; i < 150; i++) {
+        sim.step({ ...neutralInput(NORTH_YAW), moveZ: 1 });
+        highest = Math.max(highest, sim.player.y);
+      }
+      expect(highest).toBe(0);
+    }
+  });
+
+  it('can get up beside a table corner', () => {
+    const table = box(0, 0, 0.5, 0.5, 0.75, 1.0);
+    // Prone 2 cm diagonally clear of the corner, with nothing overhead.
+    const d = 0.5 + (0.3 + 0.02) / Math.SQRT2;
+    const sim = new Simulation(testWorld({ colliders: [table], spawn: { x: d, z: d } }), tuningCopy());
+    hold(sim, 1, {}, { prone: true });
+    hold(sim, 1, {}, { crouch: true });
+    expect(sim.player.stance).toBe('crouch');
+  });
+
+  it('slides out from under the edge of an overhang instead of freezing', () => {
+    const roof = box(10, -5, 30, 5, 1.9, 2.1);
+    const slope = Math.tan((6 * Math.PI) / 180);
+    for (const overlap of [0.01, 0.1, 0.25]) {
+      const sim = new Simulation(testWorld({ colliders: [roof], height: (x) => Math.max(0, x) * slope, spawn: { x: -3, z: 2 } }), tuningCopy());
+      sim.player.z = 0.3 - overlap;
+      for (let i = 0; i < 180; i++) sim.step({ ...neutralInput(EAST), moveZ: 1 });
+      expect(sim.player.x).toBeGreaterThan(10);
+    }
+  });
+
+  it('never fires two footsteps in a row, and a shoved body takes no steps', () => {
+    const wall = box(10, 0, 0.5, 20, 0, 3);
+    for (const inc of [20, 45, 75]) {
+      const a = (inc * Math.PI) / 180;
+      const sim = new Simulation(testWorld({ colliders: [wall] }), tuningCopy());
+      let last = -10;
+      for (let i = 0; i < 150; i++) {
+        for (const e of sim.step({ ...neutralInput(Math.atan2(-Math.cos(a), -Math.sin(a))), moveZ: 1, sprint: true })) {
+          if (e.type !== 'footstep' || e.source !== -1) continue;
+          expect(sim.tick - last).toBeGreaterThan(1);
+          last = sim.tick;
+        }
+      }
+    }
+  });
+
+  it('walks diagonally backward at the backward speed', () => {
+    const sim = new Simulation(testWorld(), tuningCopy());
+    hold(sim, 3, { moveX: -1, moveZ: -1 });
+    const T = tuningCopy().player;
+    expect(sim.player.speed).toBeCloseTo(T.speed.walk * (1 - (1 - T.backwardFactor) * Math.SQRT1_2), 1);
+  });
+
+  it('copes with an instant stance change', () => {
+    const t = tuningCopy();
+    t.player.stanceTime.prone = 0;
+    t.player.stanceTime.crouch = 0;
+    const sim = new Simulation(testWorld(), t);
+    hold(sim, 0.2, {}, { prone: true });
+    expect(sim.player.proneTransition).toBe(false);
+    hold(sim, 0.2, {}, { crouch: true });
+    hold(sim, 1, { moveZ: 1, sprint: true });
+    expect(sim.player.stance).toBe('stand');
+    expect(sim.player.mode).toBe('sprint');
+  });
+
+  it('can stand up under a slab exactly at standing height', () => {
+    const slab = box(0, 0, 3, 3, 1.8, 2.0);
+    const sim = new Simulation(testWorld({ colliders: [slab] }), tuningCopy());
+    hold(sim, 1, {}, { crouch: true });
+    hold(sim, 1, {}, { crouch: true });
+    expect(sim.player.stance).toBe('stand');
   });
 });

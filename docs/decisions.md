@@ -4,6 +4,39 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 ## 2026-11-07 · Phase 0 hardening
 
+### Steep ground is a barrier from every angle, and leaving it is a fall
+
+**Decision:** Ground steeper than `maxSlopeDeg` (42°) is not ground you can stand on.
+
+- No move gains height on it, whatever the angle of approach: the uphill part of the wish, the move and the velocity is removed, so you slide along its contour.
+- On it there is no traction. You slide down, with gravity along the slope.
+- Walking off an edge steeper than gravity can follow is a fall.
+- Every fall or slide ends in a landing event with a sound whose loudness grows with impact speed (`tuning.noise.landing`). A 1 m drop lands about as loud as a walking step; a 0.5 m step down is silent.
+- The body is a circle against the terrain as well as against objects. Terrain rising more than a step inside its rim pushes it back, so a face never comes within the camera's near plane.
+
+**Why:** A second fresh-eyes audit found that the slope limit applied only along the direction of travel. Walking across a cliff at a shallow angle climbed it: 545 m of height gained on 33 faces in three valleys, while generation's validation counted those faces as barriers. Walking down an 80° face stayed glued to the ground, faster than free fall and silent.
+
+**Guarded by:**
+- `tests/steep.test.ts`: the steepest real faces of three valleys, attempted from nine headings; the worst gain is under 5 cm.
+- The invariant run, which now also checks rise per tick, height gained on steep ground and NaN, at a 0.1 mm tolerance, with a fuzzing bot (`src/sim/bots/chaos.ts`) alongside the person-like one. The old version of the test passed two deliberately broken controllers.
+- A regression test for each finding in `tests/player.test.ts`.
+
+### The body is as tall as it actually is
+
+**Decision:** During a stance change, collision, headroom and sight use the body's actual height: its eye plus the target stance's head clearance, never less than the target height (`bodyHeight`). Visibility's stance factor is interpolated by eye height.
+
+**Why:** The stance switched to the target at once while the eye eased down over up to 0.75 s. Diving prone at a crawl space let the body slide under a slab while the camera was still above it, then inside it. And pressing prone cut visibility by 70% on the first tick, for a body still standing.
+
+### Smaller controller fixes from the second audit
+
+- Standing and headroom use an exact circle test. The padded square floated the body on crates it wasn't touching and refused getting up beside table corners.
+- A spawn stands where a body walking there would. Only a spawn inside something solid goes on top of it, and hand-built test worlds must say so (`spawnOnTop`), because the old behaviour quietly put tests on roofs.
+- The edge of an overhang slides the body out from under it instead of freezing it; a body whose centre is under a ceiling it no longer fits beneath still stops.
+- Footsteps come from the legs: a body shoved by a guard takes no steps, and a sudden slow-down no longer fires two steps 33 ms apart.
+- Walking diagonally backward was 8% too fast; an instant stance time no longer locks the controller; headroom and movement agree at exact heights.
+- The guards' body size and the shove limit are tuning values, and the pitch limit is one tuning value shared by the app and the simulation.
+- These are deliberate behaviour changes: `SIM_VERSION` is 2, with new golden values. Generation is unchanged.
+
 ### Version control, CI and a playable link
 
 **Decision:** The project lives in a private GitHub repository, `willgibs/sightline`, and `main` is always green.

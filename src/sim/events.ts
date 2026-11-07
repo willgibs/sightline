@@ -22,6 +22,21 @@ export interface FootstepEvent {
   radius: number;
 }
 
+/** A body hitting the ground after a fall or a slide. */
+export interface LandEvent {
+  type: 'land';
+  tick: number;
+  source: number;
+  x: number;
+  y: number;
+  z: number;
+  surface: Surface;
+  /** Impact speed, m/s. */
+  speed: number;
+  loudness: number;
+  radius: number;
+}
+
 export interface StanceEvent {
   type: 'stance';
   tick: number;
@@ -31,4 +46,4 @@ export interface StanceEvent {
 
 export type StanceName = 'stand' | 'crouch' | 'prone';
 
-export type SimEvent = FootstepEvent | StanceEvent;
+export type SimEvent = FootstepEvent | LandEvent | StanceEvent;

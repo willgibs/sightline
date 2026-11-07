@@ -142,6 +142,16 @@ export class Recorder {
         ev.f32(e.z);
         ev.f32(e.loudness);
         ev.f32(e.radius);
+      } else if (e.type === 'land') {
+        ev.u8(3);
+        ev.u8(e.surface);
+        ev.i16(e.source);
+        ev.u32(e.tick);
+        ev.f32(e.x);
+        ev.f32(e.y);
+        ev.f32(e.z);
+        ev.f32(e.loudness);
+        ev.f32(e.speed);
       } else {
         ev.u8(2);
         ev.u8(STANCES.indexOf(e.from));
@@ -286,6 +296,20 @@ export class Recording {
           z: v.getFloat32(16, true),
           loudness: v.getFloat32(20, true),
           radius: v.getFloat32(24, true),
+        });
+      } else if (type === 3) {
+        const loudness = v.getFloat32(20, true);
+        out.push({
+          type: 'land',
+          surface: v.getUint8(1) as Surface,
+          source: v.getInt16(2, true),
+          tick: v.getUint32(4, true),
+          x: v.getFloat32(8, true),
+          y: v.getFloat32(12, true),
+          z: v.getFloat32(16, true),
+          loudness,
+          speed: v.getFloat32(24, true),
+          radius: loudness * this.header.tuning.noise.radiusPerUnit,
         });
       } else if (type === 2) {
         out.push({

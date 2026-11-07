@@ -19,7 +19,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 ## Rules that must hold
 
 1. **The simulation stands alone.** `src/sim` never imports three.js, `src/render` or `src/app`, and never touches the DOM. The renderer reads snapshots and never writes simulation state.
-2. **Determinism.** Inside `src/sim`, use only exactly specified math: `+ - * /`, `Math.floor/round/abs/sign/min/max/sqrt/fround`, and `src/sim/core/detmath.ts` (`dsin`, `dcos`, `datan`, `datan2`, `dtanDeg`). Never use `Math.sin/cos/tan/atan2/pow/exp/log/hypot` or `**` there: Chrome and Node really do disagree in the last bit. Never use `Math.random` (`randomSeed()` in `seed.ts` is UI-only).
+2. **Determinism.** Inside `src/sim`, use only exactly specified math: `+ - * /`, `Math.floor/round/abs/sign/min/max/sqrt/fround`, and `src/sim/core/detmath.ts` (`dsin`, `dcos`, `datan`, `datan2`, `dtanDeg`, `dexp`, `dlog`, `dpow`). Never use `Math.sin/cos/tan/atan2/pow/exp/log/hypot` or `**` there: Chrome and Node really do disagree in the last bit. Never use `Math.random` (`randomSeed()` in `seed.ts` is UI-only). No clocks, timers, async code or network in `src/sim` either: a tick depends only on its state and input. `tests/architecture.test.ts` enforces all of this.
 3. **Random streams are forked by label.** A new feature gets `rng.fork('new-label')` and never draws from an existing stream, so old seeds keep producing the same valleys.
 4. **Every gameplay number lives in `src/config/tuning.ts`.** It hot-reloads in the dev build.
 5. **Live play equals its recording.** `Simulation.step()` quantizes its input and keeps it as `sim.lastInput`, and `Recorder.record(sim, events)` stores exactly that after every tick. Anything new that affects simulation state must flow through `InputFrame` or the seed.
@@ -27,7 +27,8 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 7. **One set of terrain triangles.** Physics, raycasts and rendering split each cell along the diagonal from (i, j) to (i+1, j+1). Change all three together or none.
 8. **Every system ships explainable.** New systems come with a debug-view overlay and a test for their Done-when criteria.
 9. **New state is hashed.** Add every new piece of simulation state to `Simulation.hash()`, or determinism checks won't see it.
-10. **The controller's invariants hold.** The player never ends a tick inside anything solid or under the terrain, and never rises more than `stepHeight` in one tick. `tests/invariants.test.ts` checks this over long bot runs. Movement changes go through `resolveMove` in `src/sim/entities/player.ts`, which resolves guards, then terrain slope, then static colliders.
+10. **The controller's invariants hold.** The player never ends a tick inside anything solid or under the terrain, never rises more than `stepHeight` in one tick, and never gains height on ground steeper than `maxSlopeDeg`, from any angle. `tests/invariants.test.ts` (a person-like bot and a fuzzing bot) and `tests/steep.test.ts` check this. Movement changes go through `resolveMove` in `src/sim/entities/player.ts`, which resolves guards, then terrain, then static colliders.
+11. **Behaviour changes are deliberate.** If `src/sim/selftest.ts` reports new golden values, decide whether the change is intended. If it is, update the values, bump `SIM_VERSION` (or `GEN_VERSION` for generation) in `src/sim/version.ts`, and add a line to `docs/decisions.md`.
 
 ## Checking work
 

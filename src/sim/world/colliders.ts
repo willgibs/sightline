@@ -255,6 +255,27 @@ export function footprintContains(c: Collider, x: number, z: number, pad: number
 }
 
 /**
+ * True if a circle (x, z, r) truly overlaps a collider's footprint: its closest point is
+ * nearer than r. Exact for boxes, unlike padding the box by r, whose square corners
+ * reach up to 0.4·r beyond the circle.
+ */
+export function circleOverlaps(c: Collider, x: number, z: number, r: number): boolean {
+  const px = x - c.x;
+  const pz = z - c.z;
+  if (c.kind === 'cyl') {
+    const rr = c.r + r;
+    return px * px + pz * pz < rr * rr;
+  }
+  const lx = px * c.ux + pz * c.uz;
+  const lz = -px * c.uz + pz * c.ux;
+  const ex = Math.abs(lx) - c.hx;
+  const ez = Math.abs(lz) - c.hz;
+  const dx = ex > 0 ? ex : 0;
+  const dz = ez > 0 ? ez : 0;
+  return dx * dx + dz * dz < r * r;
+}
+
+/**
  * Pushes a circle (x, z, r) out of a collider's footprint. Writes the correction into
  * `out` and returns true when the circle overlapped.
  */

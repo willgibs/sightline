@@ -304,6 +304,7 @@ export class Game {
     const fov = zoomFov(V.fov, V.zoomFov, eased);
     this.input.sensitivity = V.lookSensitivity;
     this.input.sensitivityScale = Math.tan((fov * Math.PI) / 360) / Math.tan((V.fov * Math.PI) / 360);
+    this.input.pitchLimit = this.tuning.player.pitchLimit;
 
     if (!this.paused) {
       const ticks = this.clock.advance(dt * (this.debug ? TIME_SCALES[this.timeScaleIndex]! : 1));
@@ -411,7 +412,7 @@ export class Game {
     const g = this.curr.guards;
     for (let i = 0; i < g.length / GUARD_FIELDS; i++) {
       const o = i * GUARD_FIELDS;
-      const d = rayUpright(pose.x, pose.y, pose.z, dx, dy, dz, g[o]!, g[o + 1]!, g[o + 2]!, 0.3, 1.85);
+      const d = rayUpright(pose.x, pose.y, pose.z, dx, dy, dz, g[o]!, g[o + 1]!, g[o + 2]!, this.tuning.guards.radius, this.tuning.guards.height);
       if (d > 0 && d < t) {
         t = d;
         what = `guard ${i + 1}`;

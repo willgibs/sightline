@@ -142,7 +142,7 @@ export class Simulation {
     h.f64(p.x).f64(p.y).f64(p.z).f64(p.vx).f64(p.vy).f64(p.vz).f64(p.yaw).f64(p.pitch);
     h.str(p.stance).f64(p.stanceTimer).f64(p.stanceDuration).f64(p.eyeFrom).f64(p.eyeHeight).f64(p.stride);
     h.u32(p.grounded ? 1 : 0).u32(p.standingOn + 1).u32(p.proneTransition ? 1 : 0).str(p.queuedStance ?? '');
-    h.u32(p.sprintHeld ? 1 : 0).u32(p.sprintSuppressed ? 1 : 0);
+    h.u32(p.sprintSuppressed ? 1 : 0).u32(p.sliding ? 1 : 0);
     for (const g of this.guards) {
       h.f64(g.x).f64(g.y).f64(g.z).f64(g.yaw).f64(g.headYaw).u32(g.waypoint).f64(g.wait).f64(g.stride).f64(g.scanTime);
     }
