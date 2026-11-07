@@ -1,0 +1,77 @@
+name: CI
+
+# Every push and pull request runs the full check on Linux. Once a week (and on demand)
+# the same run repeats on macOS and Windows, and the final simulation hashes from all
+# three must match: a recording made anywhere has to replay identically everywhere.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 7 * * 1'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+      - name: 20-minute bot run, recorded and re-simulated
+        shell: bash
+        run: npm run sim -- --minutes 20 | tee sim.log && grep '^hash' sim.log | awk '{print $2}' > hash-linux.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hash-linux
+          path: hash-linux.txt
+
+  platforms:
+    name: Check (${{ matrix.os }})
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - name: 20-minute bot run, recorded and re-simulated
+        shell: bash
+        run: npm run sim -- --minutes 20 | tee sim.log && grep '^hash' sim.log | awk '{print $2}' > hash-${{ matrix.os }}.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hash-${{ matrix.os }}
+          path: hash-${{ matrix.os }}.txt
+
+  same-everywhere:
+    name: Same hash on every platform
+    needs: [check, platforms]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: hash-*
+          merge-multiple: true
+      - shell: bash
+        run: |
+          cat hash-*.txt
+          test "$(cat hash-*.txt | sort -u | wc -l)" -eq 1
