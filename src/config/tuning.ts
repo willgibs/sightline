@@ -103,7 +103,6 @@ export const defaultTuning = {
     // Landing from a fall or a slide: loudness grows with impact speed (m/s), from a soft
     // drop at minSpeed to the cap. A 1 m drop lands at 4.4 m/s, about a walking step.
     landing: { minSpeed: 2.5, perSpeed: 0.25, max: 3 },
-    speedOfSound: 343, // m/s: distant sounds arrive late (crack-thump, footsteps across the camp)
     // Steady sources, as heard radii. Phase 1 makes them mask other sounds for guards too.
     ambient: { creek: 38, generator: 70 },
   },
@@ -112,7 +111,7 @@ export const defaultTuning = {
     // Multipliers from design doc · Enemy perception · Sight. Phase 1 builds detection on them.
     stance: { stand: 1.0, crouch: 0.6, prone: 0.3 },
     movement: { still: 0.4, moving: 1.0, sprinting: 1.6 },
-    light: { lit: 1.0, dusk: 0.6, dark: 0.25 },
+    light: { lit: 1.0, shade: 0.6, dusk: 0.6, dark: 0.25 }, // shade: out of the sun in daylight (starting value; lab A tunes it)
     skyline: 1.5,
     coneCoreDeg: 60,
     conePeripheralDeg: 120,

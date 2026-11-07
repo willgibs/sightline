@@ -1,4 +1,5 @@
 import type { SpawnKind } from './gen/world';
+import { defaultEnv, type EnvSpec } from './env';
 import { GEN_VERSION } from './version';
 
 /**
@@ -20,8 +21,10 @@ export interface MissionSpec {
   terrain: { kind: 'procedural'; generator: 'valley' };
   /** Where the player starts. */
   insertion: SpawnKind;
+  /** The time of day, the wind and the air (env.ts). Generation doesn't read it. */
+  env: EnvSpec;
 }
 
-export function missionSpec(seed: string, insertion: SpawnKind = 'overlook'): MissionSpec {
-  return { seed, genVersion: GEN_VERSION, terrain: { kind: 'procedural', generator: 'valley' }, insertion };
+export function missionSpec(seed: string, insertion: SpawnKind = 'overlook', env: EnvSpec = defaultEnv()): MissionSpec {
+  return { seed, genVersion: GEN_VERSION, terrain: { kind: 'procedural', generator: 'valley' }, insertion, env };
 }

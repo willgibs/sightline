@@ -154,7 +154,7 @@ describe('tuning validation', () => {
     expect(bad((t) => (t.gen.world.size = 40000))[0]).toMatch(/size is 40000/);
     expect(bad((t) => (t.gen.world.maxGenAttempts = 1e308))[0]).toMatch(/maxGenAttempts/);
     expect(bad((t) => ((t.player as Record<string, unknown>).extra = 1))).toEqual(['tuning.player.extra is not a tuning value']);
-    expect(bad((t) => delete (t.noise as Partial<typeof t.noise>).speedOfSound)).toEqual(['tuning.noise.speedOfSound is missing']);
+    expect(bad((t) => delete (t.noise as Partial<typeof t.noise>).radiusPerUnit)).toEqual(['tuning.noise.radiusPerUnit is missing']);
   });
 
   it('refuses a recording whose header was tampered with', () => {

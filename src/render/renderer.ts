@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { sunDirection } from '../sim/env';
 import type { Tuning } from '../config/tuning';
 import type { SimEvent } from '../sim/events';
 import type { World } from '../sim/gen/world';
@@ -32,7 +33,8 @@ export interface RenderStats {
 }
 
 /** Afternoon sun from the south-west, 35° up. */
-const SUN = new THREE.Vector3(-0.579, 0.574, 0.579).normalize();
+/** The sun until a world says where it is (the simulation owns it: sim/env.ts). */
+const NO_WORLD_SUN = new THREE.Vector3(-0.579, 0.574, 0.579).normalize();
 
 export class GameRenderer {
   readonly gl: THREE.WebGLRenderer;
@@ -53,15 +55,22 @@ export class GameRenderer {
     this.gl.setClearColor(palette.fog);
     this.camera = new THREE.PerspectiveCamera(tuning.view.fov, 1, 0.08, 7000);
     this.camera.rotation.order = 'YXZ';
-    this.look = createLook(SUN, tuning.view.fogDensity);
+    this.look = createLook(NO_WORLD_SUN, tuning.view.fogDensity);
     this.scene.fog = new THREE.FogExp2(palette.fog, tuning.view.fogDensity);
     this.scene.background = new THREE.Color(palette.fog);
-    this.sky = createSky(SUN);
+    this.sky = createSky(NO_WORLD_SUN);
     this.scene.add(this.sky, this.worldGroup);
+  }
+
+  /** Lights the scene and the sky from the simulation's sun (sim/env.ts). */
+  setSun(dir: { x: number; y: number; z: number }): void {
+    this.look.uSunDir.value.set(dir.x, dir.y, dir.z).normalize();
+    ((this.sky.material as THREE.ShaderMaterial).uniforms.uSun!.value as THREE.Vector3).set(dir.x, dir.y, dir.z).normalize();
   }
 
   setWorld(world: World, tuning: Tuning): void {
     this.clearWorld();
+    this.setSun(sunDirection(world.spec.env, 0, { x: 0, y: 0, z: 0 }));
     this.worldGroup.add(buildTerrain(world, this.look), buildBackdrop(world, this.look), buildProps(world, this.look), buildCamp(world, this.look));
     this.guards = new GuardMeshes((spawn) => world.camp.guards[spawn]?.role ?? 'patrol', this.look, tuning);
     this.worldGroup.add(this.guards.group);

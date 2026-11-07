@@ -6,6 +6,14 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### The simulation owns the sun, the wind and the air
+
+**Decision:** The mission spec carries its environment (`src/sim/env.ts`): the time of day and how fast it runs, the latitude and day of the year, a steady wind, the altitude and the temperature. From these the simulation derives the sun's direction (deterministic math, a standard solar model), the wind's velocity, the air's density and the speed of sound, and the light at any point: in the sun, in the shade of terrain or anything that blocks sight, at dusk or in the dark. The renderer lights the scene and the sky from the simulation's sun; the default environment (a mid-October afternoon at 33° N, 14:24) puts it exactly where the wireframe look had it. The debug panel shows whether you stand in sun or shade, and the sound engine takes the mission air's speed of sound.
+
+**Why:** Glint, shade as cover, a skyline and lab C's "players predict their own visibility" all need the sun the player sees to be the sun the simulation tests against. A renderer constant would have diverged the first time anyone changed the time of day. Altitude and temperature cost nothing now and are what real-world terrain (Everest's thin air) and lab B's drag will need.
+
+**Starting values:** shade multiplies visibility by 0.6, like dusk; lab A tunes it. Steady daylight (clock rate 0) for the core mission, as the design doc says. `RECORDING_VERSION` 7 (the header's mission has an environment).
+
 ### One query for what a line hits, and one shape for every body
 
 **Decision:** `src/sim/world/query.ts` answers "what does this line hit" for sight, hearing, shots and the rangefinder alike: the terrain, the colliders matching a mask, and bodies, with the point, the outward normal, what was hit, its id, the body part and the surface. `sightLine` asks whether one point can see another. Bodies stand in the way of sight and bullets, not sound; a new `Blocks.Sound` flag says which colliders stop sound (walls and buildings do, chain-link fences don't), and the sound engine's muffling uses it.

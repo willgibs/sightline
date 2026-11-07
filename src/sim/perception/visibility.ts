@@ -10,9 +10,9 @@ import type { BodyState } from '../motor/body';
  * you've stopped.
  */
 
-/** Stance × movement × daylight, with no cover. */
-export function exposure(b: BodyState, tuning: Tuning): number {
-  return stanceVisibility(b, tuning) * movementVisibility(b, tuning) * tuning.visibility.light.lit;
+/** Stance × movement × light (env.ts, lightAt; full sun by default), with no cover. */
+export function exposure(b: BodyState, tuning: Tuning, light = tuning.visibility.light.lit): number {
+  return stanceVisibility(b, tuning) * movementVisibility(b, tuning) * light;
 }
 
 /** The stance factor for how tall the body is: interpolated by eye height between the table's rows. */

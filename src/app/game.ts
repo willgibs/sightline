@@ -3,6 +3,7 @@ import type { Tuning } from '../config/tuning';
 import { FixedStepClock } from '../sim/core/clock';
 import { headingDegrees, lerp, moveTowards } from '../sim/core/math';
 import { exposure } from '../sim/perception/visibility';
+import { lightAt } from '../sim/env';
 import { generateWorld, simTuningKey, worldTuningKey, type SpawnKind, type World } from '../sim/gen/world';
 import { neutralInput } from '../sim/input';
 import { Recorder } from '../sim/record/recording';
@@ -441,7 +442,10 @@ export class Game {
     const T = this.tuning;
     const played = this.sim.tick / T.sim.tickHz;
     const slopeDeg = (Math.atan(p.slopeTan) * 180) / Math.PI;
-    const exp = exposure(p, T);
+    // The light where the player's chest is: in the sun, or shaded by terrain or something solid.
+    const light = lightAt(w, w.spec.env, this.sim.tick / T.sim.tickHz, p.x, p.y + p.eyeHeight * 0.75, p.z, T.visibility);
+    const lightName = light === T.visibility.light.lit ? 'sun' : light === T.visibility.light.shade ? 'shade' : light === T.visibility.light.dusk ? 'dusk' : 'dark';
+    const exp = exposure(p, T, light);
     const V = T.visibility;
     const moveFactor = p.gait === 'idle' ? V.movement.still : p.gait === 'sprint' ? V.movement.sprinting : V.movement.moving;
     const sizes = this.recorder.sizes;
@@ -458,7 +462,7 @@ export class Game {
       `pos ${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)} · heading ${headingDegrees(p.yaw).toFixed(0)}° · pitch ${((p.pitch * 180) / Math.PI).toFixed(0)}°`,
       `${p.stance}${p.proneTransition ? ' (changing)' : ''} · ${p.gait} ${p.speed.toFixed(2)} m/s · ${surfaceName(p.surface)}${p.standingOn >= 0 ? ' (object)' : `, slope ${slopeDeg.toFixed(0)}°`}`,
       `noise ${p.loudness.toFixed(2)} → heard within ${(p.loudness * T.noise.radiusPerUnit).toFixed(1)} m`,
-      `seen ×${exp.toFixed(2)} = ${p.stance} ${V.stance[p.stance]} × ${p.gait === 'idle' ? 'still' : 'moving'} ${moveFactor} × daylight ${V.light.lit}`,
+      `seen ×${exp.toFixed(2)} = ${p.stance} ${V.stance[p.stance]} × ${p.gait === 'idle' ? 'still' : 'moving'} ${moveFactor} × ${lightName} ${light}`,
       `aim ${this.aimText ?? '—'}`,
       ``,
       `WORLD`,

@@ -52,6 +52,8 @@ export interface AmbientSource {
 
 export interface SoundOptions {
   tuning: Tuning;
+  /** The mission air's speed of sound (sim/env.ts, air), m/s. Default 343. */
+  speedOfSound?: number;
   muffle?: MuffleFn;
   seed?: number;
 }
@@ -75,6 +77,7 @@ const WIND_LEVEL = 0.065;
 export class SoundEngine {
   readonly ctx: BaseAudioContext;
   private readonly tuning: Tuning;
+  private readonly speedOfSound: number;
   private readonly muffle: MuffleFn | null;
   private readonly rand: Rand;
   private readonly noise: NoiseBuffers;
@@ -94,6 +97,7 @@ export class SoundEngine {
   constructor(ctx: BaseAudioContext, opts: SoundOptions) {
     this.ctx = ctx;
     this.tuning = opts.tuning;
+    this.speedOfSound = opts.speedOfSound ?? 343;
     this.muffle = opts.muffle ?? null;
     this.rand = makeRand(opts.seed ?? 0x5167);
     this.noise = makeNoiseBuffers(ctx, this.rand);
@@ -233,7 +237,7 @@ export class SoundEngine {
     const m = this.muffle ? this.muffle(x, y, z, l.x, l.y, l.z) : null;
     if (m) amp *= m.gain;
     if (!this.claimVoice()) return false;
-    const when = this.ctx.currentTime + LOOKAHEAD + travelTime(d, this.tuning.noise.speedOfSound);
+    const when = this.ctx.currentTime + LOOKAHEAD + travelTime(d, this.speedOfSound);
     const panner = this.panner(x, y, z);
     let out: AudioNode = panner;
     if (m) {

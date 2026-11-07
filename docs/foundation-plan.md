@@ -66,7 +66,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [x] Simulation code reads the terrain through its queries; an architecture test keeps the heightfield's arrays to generation, bots and rendering.
 - [x] Body shapes (`bodyShape()` in `src/sim/motor/shape.ts`): head, torso and legs from each pose, from `tuning.bodies`; the guards' meshes built from the same numbers.
 - [ ] The motor's `BodySpec` moves to `tuning.bodies` too (player and guard), with gravity going to the environment.
-- [ ] `EnvState` in the simulation: clock, wind, air (density, speed of sound); the sun's direction from deterministic math; the renderer reads the sun from the simulation.
+- [x] The environment in the mission spec, owned by the simulation: clock, wind, air (density, speed of sound); the sun's direction from deterministic math; light at a point (sun, shade, dusk, dark); the renderer reads the sun from the simulation.
 - [ ] One spatial grid: a 2.5 m map layer and a 0.5 m site layer recording walkable, blocks sound, cover height, indoors, surface and ambient masking.
 
 ### M7 · Sites, camps, scenes and the perception boundary

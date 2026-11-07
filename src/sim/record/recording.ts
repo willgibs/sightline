@@ -36,8 +36,11 @@ import { readInput, writeInput } from './inputCodec';
  * sizes, the header's every field, and that each track holds what the header says.
  */
 
-/** 6: tagged tracks; checkpoints part by part; tuning changes and annotations recorded. */
-export const RECORDING_VERSION = 6;
+/**
+ * 6: tagged tracks; checkpoints part by part; tuning changes and annotations recorded.
+ * 7: the mission spec carries its environment.
+ */
+export const RECORDING_VERSION = 7;
 const MAGIC = [0x53, 0x4c, 0x52, 0x43]; // SLRC
 /** Larger than a day of play. Anything bigger is not a recording. */
 export const MAX_RECORDING_BYTES = 512 * 1024 * 1024;
@@ -546,7 +549,8 @@ function checkHeader(v: unknown): RecordingHeader {
   if (
     !m ||
     typeof m !== 'object' ||
-    Object.keys(m).sort().join() !== 'genVersion,insertion,seed,terrain' ||
+    Object.keys(m).sort().join() !== 'env,genVersion,insertion,seed,terrain' ||
+    !envOk(m.env) ||
     !text(m.seed, 64) ||
     !whole(m.genVersion, 1, 1e6) ||
     (m.insertion !== 'overlook' && m.insertion !== 'edge') ||
@@ -565,4 +569,26 @@ function checkHeader(v: unknown): RecordingHeader {
   if (h.tickHz !== tuning.sim.tickHz) fail('tick rate');
   if (!whole(h.stateEvery, 1, 1e6) || !whole(h.checkpointEvery, 1, 1e8) || !whole(h.ticks, 0, 2147483647)) fail('counts');
   return h as unknown as RecordingHeader;
+}
+
+/** An environment from a file: every field present, finite and within reason. */
+function envOk(v: unknown): boolean {
+  if (!v || typeof v !== 'object') return false;
+  const e = v as Record<string, unknown>;
+  if (Object.keys(e).sort().join() !== 'altitudeM,clockRate,dayOfYear,latitudeDeg,temperatureC,timeOfDayMin,wind') return false;
+  const num = (x: unknown, lo: number, hi: number): boolean => typeof x === 'number' && Number.isFinite(x) && x >= lo && x <= hi;
+  const w = e.wind as Record<string, unknown> | null;
+  return (
+    num(e.timeOfDayMin, 0, 1440) &&
+    num(e.clockRate, 0, 3600) &&
+    num(e.latitudeDeg, -90, 90) &&
+    num(e.dayOfYear, 0, 366) &&
+    num(e.altitudeM, -500, 9000) &&
+    num(e.temperatureC, -60, 60) &&
+    !!w &&
+    typeof w === 'object' &&
+    Object.keys(w).sort().join() === 'fromDeg,speed' &&
+    num(w.speed, 0, 60) &&
+    num(w.fromDeg, -360, 360)
+  );
 }
