@@ -6,7 +6,7 @@ import { PLAYER_ID } from '../src/sim/state';
 import type { SimEvent } from '../src/sim/events';
 import { Blocks } from '../src/sim/world/colliders';
 import { Surface } from '../src/sim/world/surfaces';
-import { EAST, testWorld, tuningCopy } from './fixtures';
+import { EAST, testGuard, testWorld, tuningCopy } from './fixtures';
 
 const HZ = 30;
 
@@ -180,7 +180,7 @@ describe('controller edge cases (from code review)', () => {
         structures: [],
         fenceHalf: 0,
         guards: [
-          {
+          testGuard({
             id: 0,
             role: 'patrol' as const,
             x: 16,
@@ -196,7 +196,7 @@ describe('controller edge cases (from code review)', () => {
             routeStart: 1,
             scanPhase: 0,
             scanScale: 1,
-          },
+          }),
         ],
       };
       const sim = new Simulation(testWorld({ colliders: [fence], camp, spawn: { x: 10.45, z: 0 } }), tuningCopy());

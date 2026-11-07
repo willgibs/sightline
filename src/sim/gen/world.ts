@@ -74,6 +74,11 @@ export function worldFingerprint(w: World): string {
   for (const b of w.props.bushes) h.f64(b.x).f64(b.z);
   for (const g of w.camp.guards) h.f64(g.x).f64(g.y).f64(g.z);
   h.f64(w.spawn.x).f64(w.spawn.z).u32(w.colliders.list.length);
+  for (const g of w.camp.guards) {
+    const r = g.routine;
+    h.f64(r.period).f64(r.scanAmp).f64(r.scanPeriod).f64(r.scanPhase).u32(r.legs.length);
+    for (const l of r.legs) h.f64(l.t0).f64(l.t1);
+  }
   return h.digest();
 }
 
@@ -88,7 +93,7 @@ export function generateWorld(spec: MissionSpec, tuning: Tuning, clock?: () => n
     const rng = new Rng(seed, attempt === 0 ? 'world' : `world#${attempt}`);
     const terrain = generateTerrain(rng.fork('terrain'), G);
     const colliders = new ColliderSet(G.world.size);
-    const camp = buildTestCamp(rng.fork('camp'), terrain.heightfield, terrain.features, colliders, G);
+    const camp = buildTestCamp(rng.fork('camp'), terrain.heightfield, terrain.features, colliders, G, rng.fork('routines'));
     const props = scatterProps(rng.fork('props'), terrain.heightfield, terrain.features, colliders, G);
     colliders.build();
     const report = analyzeTerrain(terrain.heightfield, colliders, G);

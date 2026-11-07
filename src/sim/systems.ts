@@ -1,12 +1,13 @@
 import type { Tuning } from '../config/tuning';
 import { dcos, dsin } from './core/detmath';
 import type { Rng } from './core/rng';
-import { stepGuards } from './entities/guards';
+import type { BodySpec, BodyState } from './motor/body';
+import { guardIntent, guardSpec } from './entities/guards';
 import { playerIntent } from './entities/player';
 import type { EventDraft } from './events';
 import type { World } from './gen/world';
 import type { TickInput } from './input';
-import { poseAt, type PoseSample } from './motor/body';
+import { bodyHeight, poseAt, type PoseSample } from './motor/body';
 import { idleIntent, stepMotor, type Cylinder, type MoveIntent } from './motor/motor';
 import { popDue, scheduleAt, ticksAfter, type Scheduled } from './schedule';
 import type { EntityId, GuardEntity, PlayerEntity, SimState } from './state';
@@ -57,14 +58,19 @@ export interface TickContext {
   readonly index: EntityIndex;
   /** This tick's input, already quantized. */
   readonly input: TickInput;
-  /** The shared random stream, until M5 gives each entity its own. */
-  readonly rng: Rng;
+
   /** What each body wants this tick, by entity id: written in 'intent', read in 'motor'. */
   readonly intents: Map<EntityId, MoveIntent>;
   /** Records an event and returns its id, for the events it causes. */
   emit(e: EventDraft): number;
   /** Schedules `kind` to run in the 'schedule' phase `seconds` from now (at least one tick). */
   schedule(seconds: number, kind: string, a?: number, b?: number): void;
+  /**
+   * Draws from an entity's own random stream for a purpose, kept in the state tree. A
+   * stream belongs to one entity, so what one guard draws never shifts another's
+   * numbers. Use the Rng only inside `use`.
+   */
+  draw<T>(id: EntityId, purpose: string, use: (rng: Rng) => T): T;
 }
 
 export interface System {
@@ -93,6 +99,17 @@ const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
 /** Scratch: the other bodies the moving one collides with, rewritten for each body. */
 const others: Cylinder[] = [];
 const cylinders: Cylinder[] = [];
+const bodies: Array<{ id: EntityId; body: BodyState; spec: BodySpec }> = [];
+
+/** Every body in entity order, with its spec. */
+function bodiesOf(ctx: TickContext): typeof bodies {
+  bodies.length = 0;
+  const p = ctx.index.player;
+  bodies.push({ id: p.id, body: p.body, spec: ctx.tuning.player });
+  const G = guardSpec(ctx.tuning);
+  for (const g of ctx.index.guards) bodies.push({ id: g.id, body: g.body, spec: G });
+  return bodies;
+}
 
 /** The 'schedule' phase: runs every entry due this tick, in order, through its kind's handler. */
 export function scheduleSystem(handlers: Readonly<Record<string, ScheduleHandler>>): System {
@@ -148,33 +165,37 @@ export const SYSTEMS: readonly System[] = [
     },
   },
   {
-    // Phase 0's guard dummies walk their routes on their own. M5 splits them into a
-    // routine (intent) and the shared motor, like the player.
-    name: 'guards',
-    phase: 'motor',
-    run(ctx, dt) {
-      stepGuards(ctx.index.guards, ctx.world, ctx.tuning, dt, ctx.rng, ctx.emit);
+    // Guards keep to their routines (gen/routine.ts) until a brain says otherwise (lab E).
+    name: 'guard-routines',
+    phase: 'intent',
+    run(ctx) {
+      for (const g of ctx.index.guards) guardIntent(g.body, g.guard, ctx.world, ctx.tuning, ctx.tick, intentFor(ctx, g.id));
     },
   },
   {
+    // Every body, in entity order, each against where the others are at that moment.
     name: 'motor',
     phase: 'motor',
     run(ctx, dt) {
-      const p = ctx.index.player;
-      const G = ctx.tuning.guards;
-      others.length = 0;
-      ctx.index.guards.forEach((e, k) => {
-        const c = (cylinders[k] ??= { x: 0, y: 0, z: 0, radius: 0, height: 0 });
-        c.x = e.guard.x;
-        c.y = e.guard.y;
-        c.z = e.guard.z;
-        c.radius = G.radius;
-        c.height = G.height;
-        others.push(c);
-      });
-      let intent = intentFor(ctx, p.id);
-      if (intent.tick !== ctx.tick) intent = idleIntent(p.body, ctx.tick, intent);
-      stepMotor(p.body, intent, ctx.tuning.player, { world: ctx.world, tuning: ctx.tuning, dt, tick: ctx.tick, source: p.id, others, emit: ctx.emit });
+      const bodies = bodiesOf(ctx);
+      for (let k = 0; k < bodies.length; k++) {
+        const { id, body, spec } = bodies[k]!;
+        others.length = 0;
+        for (let j = 0; j < bodies.length; j++) {
+          if (j === k) continue;
+          const o = bodies[j]!;
+          const c = (cylinders[j] ??= { x: 0, y: 0, z: 0, radius: 0, height: 0 });
+          c.x = o.body.x;
+          c.y = o.body.y;
+          c.z = o.body.z;
+          c.radius = o.spec.radius;
+          c.height = bodyHeight(o.body, o.spec);
+          others.push(c);
+        }
+        let intent = intentFor(ctx, id);
+        if (intent.tick !== ctx.tick) intent = idleIntent(body, ctx.tick, intent);
+        stepMotor(body, intent, spec, { world: ctx.world, tuning: ctx.tuning, dt, tick: ctx.tick, source: id, others, emit: ctx.emit });
+      }
     },
   },
 ];

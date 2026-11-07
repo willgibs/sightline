@@ -51,6 +51,16 @@ export const defaultTuning = {
     // Validation measures walkability with the controller's own slope limit; a test
     // keeps the two equal.
     walkableSlopeDeg: 42,
+
+    // The camp's rhythm: how its guards walk their routines (gen/routine.ts). Part of the
+    // camp, like its layout: lab D validates the timing windows these make.
+    routines: {
+      pace: 1.35, // m/s along a patrol route
+      holdTime: [2, 5], // seconds paused at each waypoint
+      turnRate: 2.6, // rad/s while turning at a waypoint
+      headScanDeg: 50, // sentries sweep this far either side
+      headScanPeriod: 7, // seconds per sweep
+    },
   },
 
   player: {
@@ -97,14 +107,14 @@ export const defaultTuning = {
   },
 
   guards: {
+    // Their bodies; everything else comes from the player's (entities/guards.ts, guardSpec).
     radius: 0.3, // collision body (the drawn capsule is set in render/guardMeshes.ts until bodies are unified)
     height: 1.85,
-    walkSpeed: 1.35,
-    turnRate: 2.6, // rad/s
-    waitTime: [2, 5], // seconds paused at each waypoint
-    headScanDeg: 50, // sentries sweep this far either side
-    headScanPeriod: 7,
+    eyeHeight: 1.71,
+    walkSpeed: 1.35, // their normal walk; footsteps are as loud as a walk at this speed
     stride: 0.75,
+    accel: 30, // m/s², speeding up and slowing down: brisker than the player, so a guard keeps to his routine within a few centimetres
+    catchUp: 1.5, // how much faster than walking a guard may hurry back to his routine
   },
 
   view: {

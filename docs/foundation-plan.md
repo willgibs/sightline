@@ -53,10 +53,11 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [x] Long sessions: the writer fills 64 KB chunks instead of doubling a buffer, and saving hands the chunks to a Blob. Saving still copies each track once.
 - [x] A golden recording in the tests, re-simulated bit for bit (`npm run golden` rewrites it).
 
-### M5 · Deliberate behaviour changes
-- [ ] A random stream per entity and purpose; the shared `sim` stream retired.
-- [ ] Patrol routines as pure functions of time, generated with the camp, so stopping one guard never shifts another's timetable.
-- [ ] Guards move with the shared motor, so they collide with the world like the player.
+### M5 · Deliberate behaviour changes ✓
+- [x] A random stream per entity and purpose (`ctx.draw`); the shared `sim` stream retired.
+- [x] Patrol routines as pure functions of time, generated with the camp, so stopping one guard never shifts another's timetable. The debug view shows where each guard will be in 10 s.
+- [x] Guards move with the shared motor, so they collide with the world like the player.
+- [ ] Later, if perception's budget needs it: a fast path for bodies standing still (eight bodies cost about 80 µs a tick headless).
 
 ### M6 · World, bodies, environment
 - [ ] `world/query.ts`: raycasts with hit point, normal, id, body part and surface; segment sweeps against moving bodies; sight lines. Colliders that can be inserted, moved and removed at runtime. `Blocks.Sound`. The rangefinder uses `raycast` instead of its own guard test.
@@ -104,6 +105,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - M2: one plain-data state tree, save-states, entity ids through the renderer.
 - M3: declared system phases with rates, profiling and a schedule; the shared motor with ground and air modes; behaviour and state fingerprints.
 - M4: the event registry with ids, times, sources and causes; clicks dated against the frame on screen, with pose history; recordings as checked, tagged tracks with seeking, tuning changes and markers.
+- M5: routines as pure functions of time, generated with the camp; guards as bodies moved by the shared motor; a random stream per entity (`GEN_VERSION` 2, `SIM_VERSION` 4).
 
 ## Deliberately later
 

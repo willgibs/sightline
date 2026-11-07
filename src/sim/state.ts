@@ -21,9 +21,9 @@ import { emptySchedule, type ScheduleState } from './schedule';
 /**
  * Bumped when the tree's layout changes, so an old save-state is refused rather than
  * misread. 2: the player is a body and its controls; the schedule. 3: event ids.
- * 4: bodies keep their last two poses.
+ * 4: bodies keep their last two poses. 5: guards are bodies; random streams per entity.
  */
-export const STATE_SCHEMA = 4;
+export const STATE_SCHEMA = 5;
 
 export type EntityId = number;
 
@@ -50,6 +50,8 @@ export interface GuardEntity {
   id: EntityId;
   kind: 'guard';
   faction: number;
+  /** The physical body, moved by the shared motor. */
+  body: BodyState;
   guard: GuardState;
 }
 
@@ -65,7 +67,10 @@ export interface SimState {
   nextEventId: number;
   /** In ascending id order; systems iterate in this order. */
   entities: Entity[];
-  /** Named random streams owned by the simulation. */
+  /**
+   * Random streams, one per entity and purpose ("4.wander"), made on first use. A stream
+   * belongs to one entity, so removing a guard never shifts another's numbers.
+   */
   rng: Record<string, RngWords>;
   /** Delayed effects, in the order they fall due (schedule.ts). */
   schedule: ScheduleState;

@@ -216,16 +216,15 @@ function writeState(w: ByteWriter, sim: Simulation): void {
   w.f32(p.speed);
   w.u8(STANCES.indexOf(p.stance));
   w.u8(GAITS.indexOf(p.gait));
-  const ids = sim.snapshot().guardIds;
-  w.u16(ids.length);
-  sim.guards.forEach((g, i) => {
-    w.u32(ids[i]!);
-    w.f32(g.x);
-    w.f32(g.y);
-    w.f32(g.z);
-    w.f32(g.yaw);
-    w.f32(g.headYaw);
-  });
+  w.u16(sim.guards.length);
+  for (const g of sim.guards) {
+    w.u32(g.id);
+    w.f32(g.body.x);
+    w.f32(g.body.y);
+    w.f32(g.body.z);
+    w.f32(g.body.yaw);
+    w.f32(g.guard.headYaw);
+  }
 }
 
 function writeCheckpoint(w: ByteWriter, sim: Simulation): void {

@@ -5,6 +5,7 @@ import { isSound, type SimEvent } from '../sim/events';
 import { PLAYER_ID } from '../sim/state';
 import type { World } from '../sim/gen/world';
 import { GUARD_FIELDS, type Snapshot } from '../sim/sim';
+import { routinePose, type RoutinePose } from '../sim/gen/routine';
 import { Blocks } from '../sim/world/colliders';
 import { palette } from './palette';
 
@@ -21,6 +22,8 @@ const CONE_RINGS = 6;
 const RING_POINTS = 48;
 const RING_POOL = 64;
 const RING_LIFE = 0.9;
+/** How far ahead the debug view shows where each guard's routine takes him. */
+const PREVIEW_SECONDS = 10;
 const SHOT_POOL = 8;
 const SHOT_LIFE = 8;
 const SHOT_RANGE = 1500;
@@ -45,6 +48,10 @@ export class DebugLayer {
   private readonly prevIndex = new Map<number, number>();
   private facingCapacity: number;
   private readonly facing: THREE.LineSegments;
+  /** Where each guard's routine puts him in PREVIEW_SECONDS: a post, and a line from him to it. */
+  private readonly preview: THREE.LineSegments;
+  private readonly routinePose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
+  private readonly tickHz: number;
   private readonly rings: SoundRing[] = [];
   private nextRing = 0;
   private readonly shots: Array<{ line: THREE.LineSegments; material: THREE.LineBasicMaterial; start: number; active: boolean }> = [];
@@ -69,6 +76,12 @@ export class DebugLayer {
     this.facing = new THREE.LineSegments(facingGeo, new THREE.LineBasicMaterial({ color: palette.debug.facing }));
     this.facing.frustumCulled = false;
     this.group.add(this.facing);
+    this.tickHz = tuning.sim.tickHz;
+    const previewGeo = new THREE.BufferGeometry();
+    previewGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.facingCapacity * 12), 3));
+    this.preview = new THREE.LineSegments(previewGeo, new THREE.LineBasicMaterial({ color: palette.debug.route, transparent: true, opacity: 0.7 }));
+    this.preview.frustumCulled = false;
+    this.group.add(this.preview);
 
     // Patrol routes, dashed along the ground.
     for (const g of world.camp.guards) {
@@ -211,9 +224,13 @@ export class DebugLayer {
     if (n > this.facingCapacity) {
       this.facingCapacity = n * 2;
       this.facing.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.facingCapacity * 6), 3));
+      this.preview.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.facingCapacity * 12), 3));
     }
     this.facing.geometry.setDrawRange(0, n * 2);
+    this.preview.geometry.setDrawRange(0, n * 4);
     const facing = this.facing.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const preview = this.preview.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const ahead = (curr.tick - 1 + alpha) / this.tickHz + PREVIEW_SECONDS;
     this.prevIndex.clear();
     prev.guardIds.forEach((id, i) => this.prevIndex.set(id, i));
     for (let i = 0; i < n; i++) {
@@ -240,8 +257,19 @@ export class DebugLayer {
       const fz = -Math.cos(look);
       facing.setXYZ(i * 2, x, y + 1.7, z);
       facing.setXYZ(i * 2 + 1, x + fx * 6, y + 1.7, z + fz * 6);
+      const spawn = this.world.camp.guards[curr.guardSpawns[i]!];
+      if (spawn) {
+        const p = routinePose(spawn.routine, ahead, this.routinePose);
+        // On the ground there, or level with him where he stands above it (a tower).
+        const py = spawn.elevated ? y : hf.heightAt(p.x, p.z);
+        preview.setXYZ(i * 4, p.x, py, p.z);
+        preview.setXYZ(i * 4 + 1, p.x, py + 1.8, p.z);
+        preview.setXYZ(i * 4 + 2, x, y + 0.15, z);
+        preview.setXYZ(i * 4 + 3, p.x, py + 0.15, p.z);
+      }
     }
     facing.needsUpdate = true;
+    preview.needsUpdate = true;
     this.facing.geometry.computeBoundingSphere();
     if (this.cones.size > n) {
       for (const [id, cone] of this.cones) {

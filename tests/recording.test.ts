@@ -53,7 +53,7 @@ describe('recordings', () => {
     expect(last.tick).toBe(sim.tick);
     expect(last.px).toBeCloseTo(sim.player.x, 3);
     expect(last.pz).toBeCloseTo(sim.player.z, 3);
-    expect(last.guards[0]).toBeCloseTo(sim.guards[0]!.x, 3);
+    expect(last.guards[0]).toBeCloseTo(sim.guards[0]!.body.x, 3);
   });
 
   it('re-simulate bit for bit', () => {

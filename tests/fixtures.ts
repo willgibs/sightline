@@ -1,5 +1,7 @@
 import { defaultTuning, type Tuning } from '../src/config/tuning';
-import type { Camp } from '../src/sim/gen/camp';
+import type { Camp, GuardSpawn } from '../src/sim/gen/camp';
+import { buildRoutine, type Routine } from '../src/sim/gen/routine';
+import { Rng } from '../src/sim/core/rng';
 import { makePolyline } from '../src/sim/gen/paths';
 import type { World } from '../src/sim/gen/world';
 import { Blocks, ColliderSet, circleOverlaps, type ColliderInput } from '../src/sim/world/colliders';
@@ -70,6 +72,13 @@ export function testWorld(opts: TestWorldOptions = {}): World {
     playHalf: size / 2 - 5,
     genMs: 0,
   };
+}
+
+/** A guard spawn for a hand-built camp, with its routine built the way generation builds it. */
+export function testGuard(s: Omit<GuardSpawn, 'routine'>): GuardSpawn {
+  const spawn: GuardSpawn = { ...s, routine: null as unknown as Routine };
+  spawn.routine = buildRoutine(spawn, defaultTuning.gen.routines, new Rng('TEST-0000', 'routine').fork(`guard${s.id}`));
+  return spawn;
 }
 
 export const NORTH = 0; // yaw facing -z

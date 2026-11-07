@@ -33,12 +33,12 @@ export const GOLDEN = {
   /** Bits of every deterministic math function over 4,000 inputs each. */
   detmath: '8d55144e8e74968f',
   /** Everything generation decides for TAL-4471 (also pinned in tests/world.test.ts). */
-  world: '2ea333d491d7568c',
+  world: 'e18ab41cbe67c919',
   /** 60 s of play: the person-like bot in two valleys, the fuzzing bot in one. */
   play: {
-    'TAL-4471 wander': { behaviour: '140cae1b09e871be', state: '69fe3c17ff1dfcea' },
-    'MUD-9031 wander': { behaviour: 'dee3211739445415', state: 'd2c68d76c846c434' },
-    'TAL-4471 chaos': { behaviour: '68fd0635afb0746d', state: '4480a7cf9d64c71b' },
+    'TAL-4471 wander': { behaviour: '0f49c7a0561251a9', state: 'e869f4a79a68f34b' },
+    'MUD-9031 wander': { behaviour: '8af56c8be1ff3f42', state: 'e8a332c9746cce3c' },
+    'TAL-4471 chaos': { behaviour: '100a20f7d94cbf02', state: '29887fc4e9583be7' },
   },
 } as const;
 
@@ -83,10 +83,10 @@ function behaviourInto(h: Hasher, sim: Simulation, events: readonly SimEvent[]):
   const p = sim.player;
   h.u32(sim.tick);
   h.f64(p.x).f64(p.y).f64(p.z).f64(p.yaw).f64(p.pitch).f64(p.eyeHeight).f64(p.speed).str(p.stance).str(p.gait);
-  const ids = sim.snapshot().guardIds;
-  sim.guards.forEach((g, i) => {
-    h.u32(ids[i]!).f64(g.x).f64(g.y).f64(g.z).f64(g.yaw).f64(g.headYaw).u32(g.moving ? 1 : 0);
-  });
+  for (const g of sim.guards) {
+    const b = g.body;
+    h.u32(g.id).f64(b.x).f64(b.y).f64(b.z).f64(b.yaw).f64(g.guard.headYaw).f64(b.speed).str(b.stance).str(b.gait);
+  }
   // Events grouped by source, keeping each source's own order: which entity acted first
   // within a tick is a detail of how systems are scheduled, not behaviour. Every field
   // the registry stores is covered, so a new event type is covered too.

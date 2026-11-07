@@ -89,14 +89,18 @@ const ids: number[] = [];
 /**
  * A body standing at (x, z) facing (faceX, faceZ): where a body walking there would
  * stand, on the terrain or anything low enough to step onto. Only if that would be
- * inside something solid does it stand on top.
+ * inside something solid does it stand on top. `standY` raises where to look, for a
+ * body that starts up on something: a sentry on his tower's deck.
  */
-export function createBody(world: World, spec: BodySpec, x: number, z: number, faceX: number, faceZ: number): BodyState {
-  const terrainY = world.terrain.heightAt(x, z);
-  let y = groundBelow(world, x, z, terrainY + spec.stepHeight, spec.radius).height;
-  if (solidAround(world, x, z, y + spec.stepHeight, y + spec.height.stand, spec.radius)) {
-    y = groundBelow(world, x, z, Infinity, spec.radius).height;
+export function createBody(world: World, spec: BodySpec, x: number, z: number, faceX: number, faceZ: number, standY?: number): BodyState {
+  const from = standY ?? world.terrain.heightAt(x, z);
+  let ground = groundBelow(world, x, z, from + spec.stepHeight, spec.radius);
+  if (solidAround(world, x, z, ground.height + spec.stepHeight, ground.height + spec.height.stand, spec.radius)) {
+    ground = groundBelow(world, x, z, Infinity, spec.radius);
   }
+  const y = ground.height;
+  const surface = ground.surface;
+  const standingOn = ground.collider;
   const yaw = yawFromDirection(faceX, faceZ);
   const pose = (): PoseSample => ({ x, y, z, yaw, pitch: 0, eyeHeight: spec.eyeHeight.stand });
   return {
@@ -119,10 +123,10 @@ export function createBody(world: World, spec: BodySpec, x: number, z: number, f
     stride: 0,
     gait: 'idle',
     speed: 0,
-    surface: world.terrain.surfaceAt(x, z),
+    surface,
     slopeTan: 0,
     loudness: 0,
-    standingOn: -1,
+    standingOn,
     history: [pose(), pose()],
   };
 }

@@ -1,4 +1,5 @@
 import type { GenTuning } from '../../config/tuning';
+import { buildRoutine, type Routine } from './routine';
 import type { Rng } from '../core/rng';
 import { Blocks, type ColliderSet } from '../world/colliders';
 import type { Heightfield } from '../world/heightfield';
@@ -50,6 +51,8 @@ export interface GuardSpawn {
   /** Phase offset for head scanning, so sentries don't sweep in lockstep. */
   scanPhase: number;
   scanScale: number;
+  /** What he does all mission, as a pure function of time (routine.ts). */
+  routine: Routine;
 }
 
 export interface Camp {
@@ -59,7 +62,11 @@ export interface Camp {
   fenceHalf: number;
 }
 
-export function buildTestCamp(rng: Rng, hf: Heightfield, features: TerrainFeatures, colliders: ColliderSet, gen: GenTuning): Camp {
+/**
+ * `routines` draws each guard's waits from its own fork, after the camp is laid out, so
+ * the layout's draws are the same as before routines existed.
+ */
+export function buildTestCamp(rng: Rng, hf: Heightfield, features: TerrainFeatures, colliders: ColliderSet, gen: GenTuning, routines: Rng): Camp {
   const padH = gen.world.padHeight;
   const u = features.campAxis;
   const mirror = rng.chance(0.5) ? -1 : 1;
@@ -205,8 +212,8 @@ export function buildTestCamp(rng: Rng, hf: Heightfield, features: TerrainFeatur
   const guard = (role: GuardRole, a: number, b: number, fa: number, fb: number, opts: Partial<GuardSpawn> = {}) => {
     const p = at(a, b);
     const f = face(fa, fb);
-    guards.push({
-      id: guards.length,
+    const spawn: Omit<GuardSpawn, 'routine'> = {
+      id: pending.length,
       role,
       x: p.x,
       y: opts.elevated ? opts.y! : ground(a, b),
@@ -218,8 +225,10 @@ export function buildTestCamp(rng: Rng, hf: Heightfield, features: TerrainFeatur
       routeStart: opts.routeStart ?? 0,
       scanPhase: rng.range(0, 1),
       scanScale: opts.scanScale ?? 1,
-    });
+    };
+    pending.push(spawn);
   };
+  const pending: Array<Omit<GuardSpawn, 'routine'>> = [];
   guard('sentry', towerA.a, towerA.b, -1, -1, { elevated: true, y: deckA });
   guard('sentry', towerB.a, towerB.b, 1, 1, { elevated: true, y: deckB });
   guard('sentry', 48, 3, 1, 0);
@@ -229,5 +238,10 @@ export function buildTestCamp(rng: Rng, hf: Heightfield, features: TerrainFeatur
   guard('patrol', 2, 0, 0, 1, { route: [at(2, 0), at(-8, 14), at(24, 12), at(24, -12), at(6, -16)], routeStart: 1 });
   guard('worker', 0.6, -10, -1, 0, { scanScale: 0.35 });
 
+  for (const p of pending) {
+    const spawn = { ...p, routine: null as unknown as Routine };
+    spawn.routine = buildRoutine(spawn, gen.routines, routines.fork(`guard${p.id}`));
+    guards.push(spawn);
+  }
   return { structures, guards, fenceHalf: F };
 }

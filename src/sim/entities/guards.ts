@@ -1,111 +1,81 @@
 import type { Tuning } from '../../config/tuning';
-import { DEG, TWO_PI, datan2, dsin } from '../core/detmath';
-import { turnTowards, wrapAngle, yawFromDirection } from '../core/math';
-import type { Rng } from '../core/rng';
-import type { EventDraft } from '../events';
 import type { World } from '../gen/world';
-import { surfaceLoudness } from '../world/surfaces';
+import { routinePose, type RoutinePose } from '../gen/routine';
+import { createBody, type BodySpec, type BodyState } from '../motor/body';
+import type { MoveIntent } from '../motor/motor';
 
 /**
- * Phase 0 guard dummies: sentries that hold a post and sweep their gaze, and patrols
- * that walk their routes and pause at each waypoint. No perception yet; that arrives in
- * Phase 1 (labs A and E). They exist now to test scale, readability at range, the debug
- * cones and the recorder.
+ * Guards, before Phase 1 gives them senses and a brain: each keeps to his routine
+ * (gen/routine.ts), a pure function of mission time, and moves with the shared motor
+ * like the player, so he collides with the world, steps, slopes and makes footsteps
+ * under the same rules. Labs A and E add perception and the brain that can pull a
+ * guard off his routine; a guard who returns rejoins it where it says he should be.
  */
 export interface GuardState {
   /** Which of the camp's guard spawns (world.camp.guards) this guard came from. */
   spawn: number;
-  x: number;
-  y: number;
-  z: number;
-  /** Body facing. */
-  yaw: number;
   /** Head turn relative to the body. */
   headYaw: number;
-  waypoint: number;
-  wait: number;
-  moving: boolean;
-  stride: number;
-  scanTime: number;
 }
 
-/** A guard's starting state, from the camp's spawn at `index`. */
-export function createGuard(world: World, index: number): GuardState {
-  const s = world.camp.guards[index]!;
-  return {
-    spawn: index,
-    x: s.x,
-    y: s.y,
-    z: s.z,
-    yaw: yawFromDirection(s.faceX, s.faceZ),
-    headYaw: 0,
-    waypoint: s.routeStart,
-    wait: 0,
-    moving: false,
-    stride: 0,
-    scanTime: 0,
-  };
-}
+const specs = new WeakMap<Tuning, BodySpec>();
 
-export function stepGuards(
-  guards: ReadonlyArray<{ id: number; guard: GuardState }>,
-  world: World,
-  tuning: Tuning,
-  dt: number,
-  rng: Rng,
-  emit: (e: EventDraft) => number,
-): void {
-  const G = tuning.guards;
-  for (const e of guards) {
-    const g = e.guard;
-    const spawn = world.camp.guards[g.spawn]!;
-    g.scanTime += dt;
-    g.moving = false;
-    const route = spawn.route;
-    if (route && route.length > 1) {
-      if (g.wait > 0) {
-        g.wait = Math.max(0, g.wait - dt);
-      } else {
-        const target = route[g.waypoint]!;
-        const dx = target.x - g.x;
-        const dz = target.z - g.z;
-        const dist = Math.sqrt(dx * dx + dz * dz);
-        if (dist < 0.25) {
-          g.waypoint = (g.waypoint + 1) % route.length;
-          g.wait = rng.between(G.waitTime);
-        } else {
-          const want = datan2(-dx, -dz);
-          g.yaw = turnTowards(g.yaw, want, G.turnRate * dt);
-          if (Math.abs(wrapAngle(want - g.yaw)) < 0.6) {
-            const step = Math.min(G.walkSpeed * dt, dist);
-            g.x += (dx / dist) * step;
-            g.z += (dz / dist) * step;
-            // Height before the footstep, so the sound comes from where the foot lands.
-            g.y = spawn.elevated ? spawn.y : world.terrain.heightAt(g.x, g.z);
-            g.moving = true;
-            g.stride += step;
-            if (g.stride >= G.stride) {
-              g.stride = Math.min(g.stride - G.stride, G.stride);
-              const surface = world.terrain.surfaceAt(g.x, g.z);
-              const loudness = tuning.noise.movement.walk * surfaceLoudness(surface, tuning);
-              emit({
-                type: 'footstep',
-                source: e.id,
-                x: g.x,
-                y: g.y,
-                z: g.z,
-                surface,
-                loudness,
-                radius: loudness * tuning.noise.radiusPerUnit,
-                gait: 'walk',
-              });
-            }
-          }
-        }
-      }
-    }
-    g.y = spawn.elevated ? spawn.y : world.terrain.heightAt(g.x, g.z);
-    const amp = G.headScanDeg * DEG * spawn.scanScale * (g.moving ? 0.3 : 1);
-    g.headYaw = amp * dsin(TWO_PI * (g.scanTime / G.headScanPeriod + spawn.scanPhase));
+/** A guard's body: the player's, with a guard's size, eye, walking speed, stride and acceleration (M6 moves bodies into tuning). */
+export function guardSpec(tuning: Tuning): BodySpec {
+  let spec = specs.get(tuning);
+  if (!spec) {
+    const P = tuning.player;
+    const G = tuning.guards;
+    spec = {
+      ...P,
+      radius: G.radius,
+      height: { ...P.height, stand: G.height },
+      eyeHeight: { ...P.eyeHeight, stand: G.eyeHeight },
+      speed: { ...P.speed, walk: G.walkSpeed },
+      stride: { ...P.stride, walk: G.stride },
+      accel: G.accel,
+      decel: G.accel,
+    };
+    specs.set(tuning, spec);
   }
+  return spec;
+}
+
+/** A guard's starting state, from the camp's spawn at `index`: on his post, or on the deck of his tower. */
+export function createGuard(world: World, index: number, tuning: Tuning): { body: BodyState; guard: GuardState } {
+  const s = world.camp.guards[index]!;
+  const body = createBody(world, guardSpec(tuning), s.x, s.z, s.faceX, s.faceZ, s.y);
+  return { body, guard: { spawn: index, headYaw: 0 } };
+}
+
+const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
+
+/**
+ * What a guard on routine wants this tick: to be where his routine puts him at the end
+ * of it. The routine's own velocity, plus whatever closes the gap he has fallen behind
+ * (shoved, or slowed by a slope), no faster than he may hurry.
+ */
+export function guardIntent(body: BodyState, guard: GuardState, world: World, tuning: Tuning, tick: number, out: MoveIntent): MoveIntent {
+  const routine = world.camp.guards[guard.spawn]!.routine;
+  const dt = 1 / tuning.sim.tickHz;
+  routinePose(routine, tick / tuning.sim.tickHz, pose);
+  // Exactly the routine's velocity when on schedule; more, toward it, when behind.
+  let wx = (pose.x - body.x) / dt;
+  let wz = (pose.z - body.z) / dt;
+  const cap = tuning.guards.walkSpeed * tuning.guards.catchUp;
+  const w = Math.sqrt(wx * wx + wz * wz);
+  if (w > cap) {
+    wx *= cap / w;
+    wz *= cap / w;
+  }
+  // A few millimetres off is standing still, not walking.
+  const walking = pose.moving || w > 0.05;
+  out.tick = tick;
+  out.wishX = walking ? wx : 0;
+  out.wishZ = walking ? wz : 0;
+  out.gait = walking ? 'walk' : 'idle';
+  out.yaw = pose.yaw;
+  out.pitch = 0;
+  guard.headYaw = pose.headYaw;
+  return out;
 }

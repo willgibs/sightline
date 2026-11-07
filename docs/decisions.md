@@ -6,6 +6,23 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### Guards keep to routines, a pure function of time, and move like the player
+
+**Decision:**
+
+- **Routines.** Every guard has a routine (`src/sim/gen/routine.ts`): one cycle of walks and pauses, repeated all mission. Sentries and workers hold their posts and sweep their gaze; patrols walk their routes at the camp's pace, pausing at each waypoint and turning toward the next leg. `routinePose(routine, t)` says where a guard on routine is at any moment, without running the simulation.
+- **Generated with the camp.** Each guard's pauses are drawn from his own fork of a new `routines` stream when the valley is generated, so a seed always gives the same rhythm. The pace, pauses, turning rate and gaze sweep moved from `tuning.guards` to `tuning.gen.routines`: a camp's rhythm is part of the camp, and lab D validates the timing windows it makes. The valley itself is unchanged (its layout fingerprint still matches); the fingerprint now covers routines too, so `GEN_VERSION` is 2.
+- **The shared motor.** Guards are bodies. A guard's intent each tick is to be where his routine puts him at the end of it, hurrying (up to 1.5 × walking pace) when he has fallen behind. The motor gets him there under the player's rules: walls stop him, he steps and climbs, his footsteps follow his actual speed, he stands on his tower's deck. Bodies move in entity order, each against where the others are at that moment.
+- **A random stream per entity.** The shared `sim` stream is gone. `ctx.draw(id, purpose, use)` draws from an entity's own stream, kept in the state tree and made on first use.
+
+**Why:** Before, every patrol drew its pauses from one shared stream as it reached each waypoint, so stopping one guard reshuffled everyone else's timetable (measured: 4.6 s within 10 minutes). The first kill would have erased the windows the player had watched and the generator had validated. And guards walked through fences.
+
+**Guarded by** `tests/guards.test.ts`: guards keep within 5 cm of their routines for ten minutes in two valleys; removing a guard leaves every other guard's body bit for bit the same, every tick; sentries stand on their decks; a wall stops a patrol; an entity's draws don't depend on another's. Writing them caught every guard getting the same id, and so the same pauses.
+
+**Cost:** the simulation now moves eight bodies, about 80 µs a tick headless (from 25). Bodies standing still still run the full collision; a fast path is possible if perception's budget needs it.
+
+The debug view draws a line from each guard to where his routine puts him in ten seconds. `SIM_VERSION` 4, `STATE_SCHEMA` 5.
+
 ### Recordings are tagged tracks, checked before they are trusted
 
 **Decision:** A recording (`RECORDING_VERSION` 6) is a header and tagged tracks: inputs (the source of truth), checkpoints, tuning changes, states at 10 Hz, events and annotations. A reader skips tracks it doesn't know.
