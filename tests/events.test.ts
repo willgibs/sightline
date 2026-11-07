@@ -1,3 +1,4 @@
+import { SYSTEMS, decide, withSystem, type System } from '../src/sim/systems';
 import { describe, expect, it } from 'vitest';
 import { defaultTuning } from '../src/config/tuning';
 import { ChaosBot } from '../src/sim/bots/chaos';
@@ -14,7 +15,7 @@ import { Blocks } from '../src/sim/world/colliders';
 import { Surface } from '../src/sim/world/surfaces';
 import { testWorld } from './fixtures';
 
-/** A minute of the fuzzing bot (footsteps and stance changes from the player and guards), then a drop off a roof (a landing). */
+/** A minute of the fuzzing bot (footsteps and stance changes from the player and guards), then a drop off a roof (a landing), a shot and an outcome. */
 function events(): { sim: Simulation; all: SimEvent[] } {
   const sim = new Simulation(generateWorld(missionSpec('TAL-4471'), defaultTuning), defaultTuning);
   const bot = new ChaosBot('TAL-4471');
@@ -22,10 +23,11 @@ function events(): { sim: Simulation; all: SimEvent[] } {
   const all: SimEvent[] = [];
   for (let i = 0; i < 60 * 30; i++) for (const e of sim.step(bot.next(sim, raw))) all.push({ ...e });
   const roof = { kind: 'box' as const, x: 0, z: 0, y0: -1, y1: 3, hx: 2, hz: 2, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Metal };
-  const drop = new Simulation(testWorld({ colliders: [roof], spawnOnTop: true }), defaultTuning);
+  const rules: System = { name: 'test-rules', phase: 'mission', run: (ctx) => (ctx.tick === 30 ? decide(ctx, 'succeeded', 'off the roof', ctx.index.player.id) : undefined) };
+  const drop = new Simulation(testWorld({ colliders: [roof], spawnOnTop: true }), defaultTuning, withSystem(SYSTEMS, rules));
   const walk = { ...neutralInput(), moveZ: 1 };
   const landings: SimEvent[] = [];
-  for (let i = 0; i < 60; i++) for (const e of drop.step(walk)) if (e.type === 'land') landings.push({ ...e });
+  for (let i = 0; i < 60; i++) for (const e of drop.step(walk)) if (e.type === 'land' || e.type === 'outcome') landings.push({ ...e });
   for (const e of drop.step({ ...walk, commands: [{ kind: 'fire', lag: 0.5, yaw: 0.3, pitch: -0.1 }] })) if (e.type === 'shot') landings.push({ ...e });
   // Renumber after the bot's events, as if one run.
   landings.forEach((e, k) => all.push({ ...e, id: all.length + k + 1 }));
@@ -51,7 +53,7 @@ describe('events', () => {
     const ids = new Set(sim.state.entities.map((e) => e.id));
     for (const e of all) expect(ids.has(e.source)).toBe(true);
     const types = new Set(all.filter((e) => e.source === PLAYER_ID).map((e) => e.type));
-    expect([...types].sort()).toEqual(['footstep', 'land', 'shot', 'stance']);
+    expect([...types].sort()).toEqual(['footstep', 'land', 'outcome', 'shot', 'stance']);
     expect(all.some((e) => e.source !== PLAYER_ID && e.type === 'footstep')).toBe(true);
   });
 

@@ -229,6 +229,21 @@ export function planSystems(systems: readonly System[], tickHz: number): number[
   });
 }
 
+/**
+ * The rules decide the run: succeeded or failed, and why. Called by a ruleset, a system
+ * in the 'mission' phase. The first decision stands; later ones are ignored. `source`
+ * is the entity that decided it (the player who reached the end, the guard who saw
+ * him); `cause` the event that did.
+ */
+export function decide(ctx: TickContext, status: 'succeeded' | 'failed', reason: string, source: EntityId, cause = 0): void {
+  const o = ctx.state.outcome;
+  if (o.status !== 'playing') return;
+  o.status = status;
+  o.reason = reason;
+  o.tick = ctx.tick;
+  ctx.emit({ type: 'outcome', source, status, cause });
+}
+
 /** Schedules from inside a tick: `seconds` from `tick`, rounded to whole ticks. */
 export function scheduleIn(state: SimState, tick: number, dt: number, seconds: number, kind: string, a = 0, b = 0): void {
   scheduleAt(state.schedule, tick, tick + ticksAfter(seconds, dt), kind, a, b);

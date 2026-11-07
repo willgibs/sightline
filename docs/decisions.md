@@ -14,6 +14,12 @@ The first scene is the movement course: stairs, a 1 m and a 2 m drop, ramps of 3
 
 **Why:** each Phase 1 lab is a scene built to its exit test, and needs to be playable, scriptable and replayable without building its own harness. A regression test that needs more than one tick is a scene too.
 
+### The rules decide the outcome, in the state
+
+**Decision:** Every run has an outcome in the state tree: playing, then succeeded or failed, with a reason and the tick (`STATE_SCHEMA` 6). Rules are a system in the 'mission' phase that calls `decide`; the first decision stands and emits an `outcome` event, so the debrief can walk its causes. A headless scene run ends when its rules decide (unless the scene plays on), and the browser stops the run, shows the outcome and offers to play again.
+
+**Why:** each lab's exit test ends in an outcome (detected or not, the shot earned or not, the escalation contained or not), and Phase 2's mission rules plug into the same place. Kept in the state, an outcome replays and seeks like everything else.
+
 ### Falls follow gravity exactly
 
 **Decision:** A body in the air moves by the exact constant-gravity step (y += v·dt − ½g·dt², v −= g·dt), and lands at the speed it has when it reaches the ground within the tick, not at the start of that tick. A fall from h now lands at exactly √(2gh), whatever the tick rate (`SIM_VERSION` 5).

@@ -2,6 +2,7 @@ import type { SimEvent } from '../events';
 import { buildWorld } from '../gen/handmade';
 import { WaypointDriver, type Waypoint } from '../bots/waypoints';
 import type { Scene } from '../scene';
+import { decide, type System } from '../systems';
 import { Blocks, type ColliderInput } from '../world/colliders';
 import { Surface, surfaceName } from '../world/surfaces';
 
@@ -96,13 +97,23 @@ function fresh(): { stepped: Set<string>; landings: number[]; crouchedUnder: boo
   return { stepped: new Set(), landings: [], crouchedUnder: true, proneIn: true };
 }
 
+/** The course's rules: reaching the far end is a success. */
+const rules: System = {
+  name: 'course-rules',
+  phase: 'mission',
+  run(ctx) {
+    const p = ctx.index.player;
+    if (p.body.x >= COURSE.finish) decide(ctx, 'succeeded', 'reached the end of the course', p.id);
+  },
+};
+
 export function movementCourse(): Scene {
   let seen = fresh();
   return {
     name: 'movement-course',
-    version: 1,
+    version: 2, // 2: rules decide the run
     title: 'Movement course',
-    description: 'Stairs, drops, ramps, a low ceiling, a crawl space and five surfaces, west to east. Reach the far end.',
+    description: 'Stairs, drops, ramps, a low ceiling, a crawl space and six surfaces, west to east. Reach the far end.',
     world: (tuning) =>
       buildWorld(
         {
@@ -119,12 +130,16 @@ export function movementCourse(): Scene {
     setup: () => {
       seen = fresh();
     },
+    systems: [rules],
     driver: () => new WaypointDriver(ROUTE),
     seconds: 90,
     expect: [
       {
-        name: 'the walker reaches the far end',
-        after: (sim) => (sim.player.x >= COURSE.finish ? undefined : `stopped at x ${sim.player.x.toFixed(2)}, z ${sim.player.z.toFixed(2)}`),
+        name: 'the walker reaches the far end, and the rules call it a success',
+        after: (sim) => {
+          const o = sim.state.outcome;
+          if (o.status !== 'succeeded') return `stopped at x ${sim.player.x.toFixed(2)}, z ${sim.player.z.toFixed(2)}; the outcome is ${o.status}`;
+        },
       },
       {
         name: 'it is crouched under the ceiling and prone in the crawl space',

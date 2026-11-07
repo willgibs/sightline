@@ -31,6 +31,6 @@ describe('scenes', () => {
     const run = runScene(SCENES['movement-course']!(), T, { seconds: 2 });
     expect(resimulate(run.recording).problem).toMatch(/made in the scene 'movement-course', which this build doesn't have/);
     const newer = { ...SCENES['movement-course']!(), version: 99 };
-    expect(resimulate(run.recording, { scene: newer }).problem).toMatch(/version 1 of the scene .*this build has version 99/);
+    expect(resimulate(run.recording, { scene: newer }).problem).toMatch(/version \d+ of the scene .*this build has version 99/);
   });
 });

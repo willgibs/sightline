@@ -24,8 +24,9 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * misread. 2: the player is a body and its controls; the schedule. 3: event ids.
  * 4: bodies keep their last two poses. 5: guards are bodies; random streams per entity.
  * (Solid entities are a new kind, not a change of layout: existing states read the same.)
+ * 6: the outcome.
  */
-export const STATE_SCHEMA = 5;
+export const STATE_SCHEMA = 6;
 
 export type EntityId = number;
 
@@ -83,6 +84,19 @@ export function hasSolid(e: Entity): e is Extract<Entity, { solid: Collider }> {
   return 'solid' in e;
 }
 
+/**
+ * How the run stands: playing until its rules decide (a ruleset is a system in the
+ * 'mission' phase, systems.ts `decide`), then decided for good. A scene's rules decide
+ * its lab's outcome; Phase 2's mission rules decide the mission's.
+ */
+export interface Outcome {
+  status: 'playing' | 'succeeded' | 'failed';
+  /** Why, in a few words: "reached the end of the course", "spotted by a sentry". */
+  reason: string;
+  /** The tick it was decided; 0 while playing. */
+  tick: number;
+}
+
 export interface SimState {
   schema: number;
   tick: number;
@@ -99,10 +113,20 @@ export interface SimState {
   rng: Record<string, RngWords>;
   /** Delayed effects, in the order they fall due (schedule.ts). */
   schedule: ScheduleState;
+  outcome: Outcome;
 }
 
 export function emptyState(): SimState {
-  return { schema: STATE_SCHEMA, tick: 0, nextId: 1, nextEventId: 1, entities: [], rng: {}, schedule: emptySchedule() };
+  return {
+    schema: STATE_SCHEMA,
+    tick: 0,
+    nextId: 1,
+    nextEventId: 1,
+    entities: [],
+    rng: {},
+    schedule: emptySchedule(),
+    outcome: { status: 'playing', reason: '', tick: 0 },
+  };
 }
 
 /** Adds an entity with the next id. Entities stay in ascending id order. */

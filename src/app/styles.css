@@ -307,17 +307,20 @@ body {
 }
 
 #overlay[data-mode='report'] .keys,
-#overlay[data-mode='error'] .keys {
+#overlay[data-mode='error'] .keys,
+#overlay[data-mode='outcome'] .keys {
   display: none;
 }
 
-#overlay[data-mode='error'] .report {
+#overlay[data-mode='error'] .report,
+#overlay[data-mode='outcome'] .report {
   display: block;
   max-height: 40vh;
   overflow: auto;
 }
 
-#overlay[data-mode='error'] .overlay-title {
+#overlay[data-mode='error'] .overlay-title,
+#overlay[data-mode='outcome'] .overlay-title {
   color: var(--panel-ink);
 }
 

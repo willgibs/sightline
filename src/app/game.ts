@@ -124,6 +124,8 @@ export class Game {
   private savedTick = 0;
   /** The seed being generated or last generated. */
   private seed = '';
+  /** The rules decided the run during the last ticks: show the outcome once they're drawn. */
+  private decided = false;
   /** The scene being played, if any (sim/scene.ts): its world, systems and setup. */
   private scene: Scene | null;
   /** What the last drawn frame showed, so a paused screen isn't drawn again unchanged. */
@@ -220,18 +222,18 @@ export class Game {
     if (where === 'generate') {
       const seed = this.seed;
       this.retry = () => this.generate(seed);
-      this.overlay.showError(`The valley ${seed} could not be generated`, `${message}${stack}`, 'Try again');
+      this.overlay.showMessage('error', `The valley ${seed} could not be generated`, `${message}${stack}`, 'Try again');
     } else if (where === 'tick') {
       const f = this.sim.fault;
       this.retry = () => this.restartRunFromStart();
-      this.overlay.showError(
+      this.overlay.showMessage('error', 
         `The simulation failed at tick ${f?.tick ?? this.sim.tick + 1}`,
         `${f ? `${f.system}: ` : ''}${message}${stack}\n\nThe run stopped there. Save the recording to reproduce it with npm run sim -- --replay.`,
         'Restart the run',
       );
     } else if (where === 'context') {
       this.retry = () => window.location.reload();
-      this.overlay.showError(
+      this.overlay.showMessage('error', 
         'The screen was lost',
         'The browser took the graphics context away (a driver reset, or too many tabs using the GPU). The run is kept; it carries on when the browser gives the context back. Save the recording first if you reload.',
         'Reload the page',
@@ -242,8 +244,30 @@ export class Game {
         this.redraws++;
         this.overlay.show('paused');
       };
-      this.overlay.showError('Something went wrong', `${message}${stack}\n\nThe run is paused and intact.`, 'Carry on');
+      this.overlay.showMessage('error', 'Something went wrong', `${message}${stack}\n\nThe run is paused and intact.`, 'Carry on');
     }
+  }
+
+  /**
+   * The rules decided the run (a scene's, or later the mission's): stop, and say how it
+   * went. The recording can still be saved; playing again starts a fresh run.
+   */
+  private showOutcome(): void {
+    const o = this.sim.state.outcome;
+    this.paused = true;
+    this.hud.setVisible(false);
+    this.retry = () => {
+      this.restartRun();
+      this.resume();
+    };
+    const when = clock(o.tick / this.tuning.sim.tickHz);
+    this.overlay.showMessage(
+      'outcome',
+      o.status === 'succeeded' ? `Done · ${when}` : `Failed · ${when}`,
+      `${o.reason.charAt(0).toUpperCase()}${o.reason.slice(1)}.`,
+      'Play again',
+    );
+    this.input.releaseLock();
   }
 
   /** A fresh run in the same valley, from the start screen. */
@@ -380,7 +404,7 @@ export class Game {
   }
 
   private onUnlocked(): void {
-    if (this.bench || this.failure) return;
+    if (this.bench || this.failure || (this.overlay.visible && this.overlay.currentMode === 'outcome')) return;
     this.paused = true;
     this.hud.setVisible(false);
     if (this.overlay.currentMode !== 'loading' || !this.overlay.visible) this.overlay.show('paused');
@@ -526,8 +550,12 @@ export class Game {
       if (ticks > 0) {
         this.sim.profiler = this.debug ? this.profile : null;
         const t0 = performance.now();
-        for (let i = 0; i < ticks && !this.failure; i++) this.tick();
+        for (let i = 0; i < ticks && !this.failure && !this.decided; i++) this.tick();
         if (this.failure) return;
+        if (this.decided) {
+          this.decided = false;
+          this.showOutcome();
+        }
         this.tickTimeSum += performance.now() - t0;
         this.tickCount += ticks;
       }
@@ -592,6 +620,7 @@ export class Game {
     this.curr = swap;
     this.recorder.record(this.sim, events);
     this.sim.snapshot(this.curr);
+    for (const e of events) if (e.type === 'outcome') this.decided = true;
     if (events.length > 0) this.renderer.addEvents(events, this.time);
   }
 
@@ -693,6 +722,7 @@ export class Game {
       `pos ${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)} · heading ${headingDegrees(p.yaw).toFixed(0)}° · pitch ${((p.pitch * 180) / Math.PI).toFixed(0)}°`,
       `${p.stance}${p.proneTransition ? ' (changing)' : ''} · ${p.gait} ${p.speed.toFixed(2)} m/s · ${surfaceName(p.surface)}${p.standingOn >= 0 ? ' (object)' : `, slope ${slopeDeg.toFixed(0)}°`}`,
       `noise ${p.loudness.toFixed(2)} → heard within ${(p.loudness * T.noise.radiusPerUnit).toFixed(1)} m`,
+      `outcome ${this.sim.state.outcome.status}${this.sim.state.outcome.reason ? ` · ${this.sim.state.outcome.reason}` : ''}`,
       `seen ×${exp.toFixed(2)} = ${p.stance} ${V.stance[p.stance]} × ${p.gait === 'idle' ? 'still' : 'moving'} ${moveFactor} × ${lightName} ${light}`,
       `aim ${this.aimText ?? '—'}`,
       ``,

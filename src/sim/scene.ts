@@ -50,14 +50,30 @@ export interface Scene extends SceneId {
   description: string;
   /** The world: generated from a mission spec, or built by hand (gen/handmade.ts). Same tuning, same world. */
   world(tuning: Tuning): World;
-  /** Systems the scene adds to the game's own, each in its phase (a lab's, a scripted mover's). */
+  /**
+   * Systems the scene adds to the game's own, each in its phase: a lab's, a scripted
+   * mover's, and its rules (a system in the 'mission' phase that calls `decide`).
+   */
   systems?: readonly System[];
   /** Before the first tick: place the player, add entities. Runs again for every re-simulation. */
   setup?(sim: Simulation): void;
   /** Headless runs: what drives the player, and for how long. */
   driver?(): Driver;
+  /** The longest a headless run lasts. It ends sooner once the rules decide, unless `playOn`. */
   seconds?: number;
+  /** Keep running after the rules decide (to check what happens next). */
+  playOn?: boolean;
   expect?: readonly Expectation[];
+}
+
+/** Whether a headless run of the scene is over: out of time, or decided (unless it plays on). */
+export function sceneOver(scene: Scene, sim: Simulation, ticks: number): boolean {
+  return sim.tick >= ticks || (!scene.playOn && sim.state.outcome.status !== 'playing');
+}
+
+/** How many ticks a headless run of the scene lasts at most. */
+export function sceneTicks(scene: Scene, tuning: Tuning, seconds?: number): number {
+  return Math.round((seconds ?? scene.seconds ?? 10) * tuning.sim.tickHz);
 }
 
 /** The game's systems with the scene's added, each in its phase. */
@@ -95,12 +111,12 @@ export function runScene(scene: Scene, tuning: Tuning, opts: { build?: string; s
   const recorder = new Recorder(sim, opts.build ?? '');
   const driver = scene.driver?.();
   const input = neutralInput(sim.player.yaw);
-  const ticks = Math.round((opts.seconds ?? scene.seconds ?? 10) * tuning.sim.tickHz);
+  const ticks = sceneTicks(scene, tuning, opts.seconds);
   const failed = new Map<string, string>();
   const check = (e: Expectation, why: string | void): void => {
     if (why && !failed.has(e.name)) failed.set(e.name, `${e.name}: ${why} (tick ${sim.tick})`);
   };
-  for (let i = 0; i < ticks; i++) {
+  while (!sceneOver(scene, sim, ticks)) {
     const frame = driver ? driver.next(sim, input) : input;
     let events: readonly SimEvent[];
     try {

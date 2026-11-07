@@ -10,11 +10,11 @@ export interface OverlayHandlers {
   onResume: () => void;
   onGenerate: (seed: string) => void;
   onSaveRecording: () => void;
-  /** After an error: what "try again" means depends on what failed (game.ts). */
+  /** The action under an error or an outcome: what it does depends on what happened (game.ts). */
   onRetry: () => void;
 }
 
-export type OverlayMode = 'loading' | 'start' | 'paused' | 'report' | 'error';
+export type OverlayMode = 'loading' | 'start' | 'paused' | 'report' | 'error' | 'outcome';
 
 export class Overlay {
   private readonly seedInput: HTMLInputElement;
@@ -62,7 +62,7 @@ export class Overlay {
     this.title = root.querySelector('.overlay-title')!;
     this.go = root.querySelector('.go')!;
     this.report = root.querySelector('.report')!;
-    this.go.addEventListener('click', () => (this.mode === 'error' ? handlers.onRetry() : handlers.onResume()));
+    this.go.addEventListener('click', () => (this.mode === 'error' || this.mode === 'outcome' ? handlers.onRetry() : handlers.onResume()));
     root.querySelector('[data-act="reroll"]')!.addEventListener('click', () => {
       this.seedInput.value = randomSeed();
       handlers.onGenerate(this.seedInput.value);
@@ -95,12 +95,12 @@ export class Overlay {
     this.root.inert = true;
   }
 
-  /** Something failed: what, the details, and what trying again will do. */
-  showError(title: string, detail: string, retry: string): void {
-    this.show('error');
+  /** Something failed, or the rules decided the run: what happened, the details, and the action offered. */
+  showMessage(mode: 'error' | 'outcome', title: string, detail: string, action: string): void {
+    this.show(mode);
     this.title.textContent = title;
     this.report.textContent = detail;
-    this.go.textContent = retry;
+    this.go.textContent = action;
   }
 
   get visible(): boolean {

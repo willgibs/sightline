@@ -84,7 +84,13 @@ export interface StanceEvent extends EventBase {
 
 export type StanceName = 'stand' | 'crouch' | 'prone';
 
-export type SimEvent = FootstepEvent | LandEvent | StanceEvent | ShotEvent;
+/** The rules decided the run (state.ts, Outcome): the reason is in the state. */
+export interface OutcomeEvent extends EventBase {
+  type: 'outcome';
+  status: 'succeeded' | 'failed';
+}
+
+export type SimEvent = FootstepEvent | LandEvent | StanceEvent | ShotEvent | OutcomeEvent;
 export type EventType = SimEvent['type'];
 export type EventOf<K extends EventType> = Extract<SimEvent, { type: K }>;
 
@@ -118,6 +124,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   stance: { code: 2, sound: false, fields: { from: { enum: STANCES }, to: { enum: STANCES } } },
   land: { code: 3, sound: true, fields: { ...SOUND, speed: 'f32' } },
   shot: { code: 4, sound: false, fields: { x: 'f64', y: 'f64', z: 'f64', dx: 'f64', dy: 'f64', dz: 'f64' } },
+  outcome: { code: 5, sound: false, fields: { status: { enum: ['succeeded', 'failed'] } } },
 };
 
 export function isSound(e: SimEvent): e is Extract<SimEvent, SoundFields> {
