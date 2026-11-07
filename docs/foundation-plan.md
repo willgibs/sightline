@@ -81,11 +81,11 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [x] Cues and debug drawings as separate channels out of the simulation: the honest view draws only snapshots and events (what the shipped game can show); systems explain themselves through `ctx.debug(draw => …)` (`sim/debugDraw.ts`: lines, points, circles, labels), which runs only while the debug view is on, isn't state and never changes an outcome.
 - [x] An action map (`src/app/actions.ts`): every key and button bound to a named action in a context (on foot, always, the debug view, the fly camera), as a data table; the input controller and the game ask for actions, never keys; the legends are drawn from the table (and relabelled for the keyboard layout). A test keeps one action per input. A gamepad or rebinding is a change of table.
 - [x] Settings (`src/app/settings.ts`), kept in the browser: mouse sensitivity, field of view, invert, volume, and raw mouse input where the browser offers it (falling back when it doesn't). A fold on the start and pause screens.
-- [ ] Sound wired into the game: events, ambient sources, muffling, pause ducking.
+- [x] Sound wired into the game (`src/app/sound.ts`): the context starts on the first click; the listener is the camera (your eyes, or the fly camera); each event plays when the picture reaches its moment, not when its tick ran; the steady sources come from the simulation (`sim/world/ambient.ts`, the list lab A's masking will use); muffling goes through the world query, entities' solids included; pausing ducks, a hidden tab is silent, the volume setting applies; and sound is never essential (the debug panel says why it's off, what's sounding and what's in earshot).
 - [ ] The camera never renders from inside a guard: a guard's mesh hides while the eye is inside its capsule. (Guards that step around a cornered player come with lab E.)
 - [ ] Tree canopies drawn so an eye inside one sees it, not a hole (they are single-sided cones today).
 - [x] A controller debug overlay: the body's circle, its rim probes (red where the terrain rises more than a step), its heading, a label with the slope against the limit, sliding, what it stands on and its mode, and every push of the resolve passes, coloured by what pushed (rule 8).
-- [ ] Head bob is drawn but not simulated, so a shot leaves from the eye without it. Turn bob off with an optic up, or make it a pure function of simulation time that both sides evaluate (with lab B).
+- [x] Head bob is a pure function of the body's stride and speed (`sim/motor/bob.ts`): the eye dips as each foot comes down, and footsteps now happen where and when the stride runs out within the tick (`SIM_VERSION` 6), so the dip lands on the step you hear and steps keep an even rhythm. The bob fades out with an optic up, so through one the camera is the simulation's eye. Whether a shot leaves from the bobbing eye is lab B's call; the simulation can evaluate the same function.
 
 **The runtime audit** (the browser app and renderer, Nov 7; findings H1–H5, M1–M8, L1–L9):
 - [x] H1 · Tab during play moved the focus into the hidden seed field, and Enter regenerated the valley: the hidden overlay is inert, the focus drops when the lock starts, and Tab and browser shortcuts are the game's while playing (Ctrl+Shift stays the browser's).
@@ -118,7 +118,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 ## Done so far
 
 - GitHub repository, CI (Linux on every push; macOS and Windows weekly, hashes compared), Vercel deploys.
-- Sound engine, procedural voices and world sounds, with browser tests (not yet wired into the game).
+- Sound engine, procedural voices and world sounds, with browser tests (wired into the game in M8).
 - Browser test harness (`npm run test:browser`) and the determinism self-test (`npm run selftest`).
 - M1: explicit generation inputs, tuning by owner and validated, the clock kept out of the simulation, the determinism audit's fixes.
 - The controller hardened from its audit: steep ground is a barrier from every angle, falls land audibly, the body is as tall as it is (`SIM_VERSION` 2).
@@ -128,6 +128,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - M5: routines as pure functions of time, generated with the camp; guards as bodies moved by the shared motor; a random stream per entity (`GEN_VERSION` 2, `SIM_VERSION` 4).
 - M6: one world query and one body shape for sight, shots and the rangefinder; the environment (sun, wind, air, light) owned by the simulation; one spatial grid; every body a kind in tuning; entities with solid shapes, seen with the world's colliders by everything (`GEN_VERSION` 3).
 - The runtime audit: the browser game's focus, error, leak, hot-reload, input and layout findings fixed; a failed tick stops the run and its recording reproduces the failure (recording format 8).
+- M7–M8 so far: scenes, rules that decide the outcome, brains behind the perception boundary, camps at sites, the debug channel and controller overlay, the action map and settings, sound in the game timed against the picture, and the head bob on the stride (`SIM_VERSION` 6).
 
 ## Deliberately later
 

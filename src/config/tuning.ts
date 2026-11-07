@@ -170,6 +170,8 @@ export const defaultTuning = {
     zoomTime: 0.16,
     lookSensitivity: 0.0022, // radians per pixel at the base field of view
     headBob: 1, // 0 turns camera bob off
+    // How far the eye dips as each foot comes down, metres, at each gait's speed (sim/motor/bob.ts).
+    bob: { crawl: 0.01, crouch: 0.016, walk: 0.026, sprint: 0.05 },
     fogDensity: 0.0012, // exp² fog: about 30% at 500 m, 75% at 1 km
   },
 };

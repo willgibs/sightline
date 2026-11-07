@@ -15,6 +15,7 @@ export const GEN_VERSION = 3;
 /**
  * How the simulation behaves for given inputs. 3: events carry ids, times, entity sources
  * and gaits. 4: guards keep to routines and move with the shared motor. 5: falls follow
- * constant gravity exactly, and land at the speed of touchdown.
+ * constant gravity exactly, and land at the speed of touchdown. 6: a footstep happens
+ * where and when the stride runs out within its tick, not at the tick's end.
  */
-export const SIM_VERSION = 5;
+export const SIM_VERSION = 6;

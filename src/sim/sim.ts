@@ -9,6 +9,7 @@ import { missionSpec } from './mission';
 import type { BodyState, Gait, Stance } from './motor/body';
 import type { MoveIntent } from './motor/motor';
 import { bodyShape, emptyShape } from './motor/shape';
+import { stridePhase } from './motor/bob';
 import type { QueryBody, QueryView } from './world/query';
 import type { Collider } from './world/colliders';
 import { DebugCanvas, type DebugDraw } from './debugDraw';
@@ -78,6 +79,8 @@ export interface Snapshot {
   yaw: number;
   pitch: number;
   speed: number;
+  /** How far through its stride the player's body is: 0 as a foot comes down (motor/bob.ts). */
+  step: number;
   stance: Stance;
   gait: Gait;
   /** Guard entity ids, ascending; guards appear and disappear by id. */
@@ -311,6 +314,7 @@ export class Simulation {
             yaw: 0,
             pitch: 0,
             speed: 0,
+            step: 0,
             stance: 'stand',
             gait: 'idle',
             guardIds: [],
@@ -327,6 +331,7 @@ export class Simulation {
     s.yaw = p.yaw;
     s.pitch = p.pitch;
     s.speed = p.speed;
+    s.step = stridePhase(p, this.current.bodies.player, this.current.noise);
     s.stance = p.stance;
     s.gait = p.gait;
     s.guardIds.length = n;

@@ -197,6 +197,8 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
   // Noise and stride follow how fast the body actually moves, not the requested gait:
   // diving prone from a sprint is loud until you've stopped. Shoves from others move the
   // body but aren't steps.
+  const x0 = b.x;
+  const z0 = b.z;
   b.x = nx;
   b.z = nz;
   b.speed = movedDist / dt;
@@ -210,16 +212,23 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
   // actually moved. Another body shoving a still one moves it without a single step.
   const walked = Math.min(movedDist, Math.sqrt(b.vx * b.vx + b.vz * b.vz) * dt);
   if (b.motor === 'ground' && !b.sliding && walked > 0 && b.loudness > 0) {
+    const before = b.stride;
     b.stride += walked;
     if (b.stride >= step.stride) {
+      // The foot comes down part way through the tick, where the stride runs out: the step
+      // happens at that moment and place, not at the tick's end, so steps keep an even
+      // rhythm whatever the tick rate (a sprint's 9.3 ticks a step would otherwise beat 9,
+      // 9, 10), and the camera's dip (headBob) lands on the sound.
+      const f = clamp((step.stride - before) / walked, 1e-6, 1);
       // Keep less than a stride of carry-over, so a sudden slow-down never fires twice.
       b.stride = Math.min(b.stride - step.stride, 0.5 * step.stride);
       ctx.emit({
         type: 'footstep',
         source: ctx.source,
-        x: b.x,
-        y: b.y,
-        z: b.z,
+        t: ctx.tick / tuning.sim.tickHz - (1 - f) * dt,
+        x: x0 + (b.x - x0) * f,
+        y: feet + (b.y - feet) * f,
+        z: z0 + (b.z - z0) * f,
         surface: ground.surface,
         loudness: b.loudness,
         radius: b.loudness * tuning.noise.radiusPerUnit,

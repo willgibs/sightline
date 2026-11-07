@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Tuning } from '../config/tuning';
 import { FixedStepClock } from '../sim/core/clock';
 import { headingDegrees, lerp, moveTowards } from '../sim/core/math';
+import { headBob } from '../sim/motor/bob';
 import { exposure } from '../sim/perception/visibility';
 import { lightAt } from '../sim/env';
 import { generateWorld, simTuningKey, worldTuningKey, type SpawnKind, type World } from '../sim/gen/world';
@@ -21,6 +22,8 @@ import { palette } from '../render/palette';
 import { Hud } from './hud';
 import { InputController } from './input';
 import { Overlay } from './overlay';
+import { GameSound } from './sound';
+import { frameSpan, type SoundTiming } from '../audio/engine';
 import { FrameStats, percentile } from './perf';
 import { missionSpec } from '../sim/mission';
 import { startScene, type Scene } from '../sim/scene';
@@ -30,8 +33,8 @@ import { tuningProblems } from '../config/validate';
 
 /**
  * The browser game loop: real time in, fixed simulation ticks out, interpolated frames
- * drawn in between. Owns the simulation, the recorder, the renderer, input, the HUD and
- * the overlay, and the debug tools (views, fly camera, time scale, benchmark).
+ * drawn in between. Owns the simulation, the recorder, the renderer, the sound, input,
+ * the HUD and the overlay, and the debug tools (views, fly camera, time scale, benchmark).
  */
 
 export interface GameOptions {
@@ -60,7 +63,6 @@ interface Failure {
   where: 'generate' | 'tick' | 'frame' | 'page' | 'context';
   message: string;
 }
-const BOB: Record<string, number> = { sprint: 0.05, walk: 0.026, crouch: 0.016, crawl: 0.01, idle: 0 };
 const BENCH_SECONDS = 20;
 
 interface Bench {
@@ -83,6 +85,11 @@ export class Game {
   private readonly input: InputController;
   private readonly hud: Hud;
   private readonly overlay: Overlay;
+  private readonly sound: GameSound;
+  /** Where this frame's picture is on the simulation's timeline: sounds wait for it (audio/engine.ts). */
+  private readonly soundTiming: SoundTiming = { shown: 0, scale: 1, hold: 0 };
+  /** About how long a frame takes: jumps to a long frame, eases back over a second or so. */
+  private frameSpan = 0;
   private clock: FixedStepClock;
   private readonly stats = new FrameStats();
   private readonly raw = neutralInput();
@@ -102,7 +109,6 @@ export class Game {
   private lastNow = 0;
   private panelTimer = 0;
   private zoom = 0;
-  private bobPhase = 0;
   private aim: THREE.Vector3 | null = null;
   private aimText: string | null = null;
   /**
@@ -147,6 +153,7 @@ export class Game {
     this.scene = opts.scene ?? null;
     this.clock = new FixedStepClock(this.tuning.sim.tickHz);
     this.renderer = new GameRenderer(opts.canvas, this.tuning, opts.pixelRatio);
+    this.sound = new GameSound(this.tuning);
     this.input = new InputController(opts.canvas);
     if (this.debug) this.input.contexts.add('debug');
     this.hud = new Hud(opts.hud, this.input.map);
@@ -226,6 +233,8 @@ export class Game {
     this.failure = { where, message };
     if (where !== 'context') console.error(`Sightline: ${where} failed`, error);
     this.paused = true;
+    // Frames stop drawing after a failure, so the sound ducks here rather than in the next frame.
+    this.sound.setPaused(true);
     this.input.releaseLock();
     this.hud.setVisible(false);
     const stack = error instanceof Error && error.stack ? `\n\n${error.stack.split('\n').slice(1, 7).join('\n')}` : '';
@@ -296,6 +305,7 @@ export class Game {
     saveSettings(s);
     this.input.invertY = s.invertY;
     this.input.rawMouse = s.rawMouse;
+    this.sound.setVolume(s.volume);
     this.redraws++;
   }
 
@@ -331,6 +341,7 @@ export class Game {
       }
       this.world = world;
       this.renderer.setWorld(world, this.tuning);
+      this.sound.setWorld(world);
       this.restartRun();
       const url = new URL(window.location.href);
       if (this.scene) {
@@ -359,6 +370,7 @@ export class Game {
   private restartRun(): void {
     this.sim = this.scene ? startScene(this.scene, this.tuning, this.world) : new Simulation(this.world, this.tuning);
     this.recorder = new Recorder(this.sim, BUILD);
+    this.sound.setSimulation(this.sim);
     this.savedTick = 0;
     this.failure = null;
     this.sim.drawDebug = this.debug;
@@ -374,7 +386,6 @@ export class Game {
     const dist = Math.hypot(p.x - site.x, p.z - site.z);
     const drop = site.height + 1 - (p.y + p.eyeHeight);
     this.input.pitch = dist > 1 ? Math.max(-0.35, Math.min(0.1, Math.atan2(drop, dist))) : 0;
-    this.bobPhase = 0;
     if (this.detached) this.setDetached(false);
   }
 
@@ -393,6 +404,7 @@ export class Game {
     const tickChanged = next.sim.tickHz !== this.tuning.sim.tickHz || next.sim.recordHz !== this.tuning.sim.recordHz;
     this.tuning = next;
     this.renderer.setTuning(next);
+    this.sound.setTuning(next);
     if (worldChanged) {
       this.notify('World tuning changed · regenerating the valley');
       this.generate(this.world.seed);
@@ -414,6 +426,8 @@ export class Game {
 
   private resume(): void {
     if (this.overlay.currentMode === 'loading' || this.failure) return;
+    // A click or a key: the moment browsers allow sound to start.
+    this.sound.unlock();
     this.input.requestLock();
   }
 
@@ -554,6 +568,7 @@ export class Game {
     const cpuStart = performance.now();
     // Paused means still: animation time and the head bob stop with the simulation.
     if (!this.paused) this.time += dt;
+    this.frameSpan = frameSpan(this.frameSpan, dt);
 
     const V = this.tuning.view;
     this.zoom = moveTowards(this.zoom, this.input.zoomHeld && !this.paused ? 1 : 0, dt / Math.max(V.zoomTime, 1e-3));
@@ -567,8 +582,14 @@ export class Game {
     this.input.pitchLimit = this.tuning.bodies.player.pitchLimit;
 
     if (!this.paused) {
-      const ticks = this.clock.advance(dt, this.debug ? TIME_SCALES[this.timeScaleIndex]! : 1);
+      const scale = this.debug ? TIME_SCALES[this.timeScaleIndex]! : 1;
+      const ticks = this.clock.advance(dt, scale);
       if (ticks > 0) {
+        // This frame will show the state `alpha` of the way into the last of these ticks:
+        // each tick's sounds wait until the picture reaches their moment.
+        this.soundTiming.shown = (this.sim.tick + ticks - 1 + this.clock.alpha) / this.tuning.sim.tickHz;
+        this.soundTiming.scale = scale;
+        this.soundTiming.hold = Math.min(this.frameSpan, 0.05);
         this.sim.profiler = this.debug ? this.profile : null;
         const t0 = performance.now();
         for (let i = 0; i < ticks && !this.failure && !this.decided; i++) this.tick();
@@ -585,7 +606,10 @@ export class Game {
     let pose: CameraPose;
     if (this.bench) pose = this.benchPose(now, fov);
     else if (this.detached) pose = this.flyPose(dt, fov);
-    else pose = this.bodyPose(dt, fov);
+    else pose = this.bodyPose(fov, eased);
+    // The listener is the camera: your eyes, or the fly camera wherever it is.
+    this.sound.setPaused(this.paused);
+    this.sound.frame(dt, pose);
 
     if (this.debug) {
       this.updateAim(pose);
@@ -645,17 +669,28 @@ export class Game {
     this.recorder.record(this.sim, events);
     this.sim.snapshot(this.curr);
     for (const e of events) if (e.type === 'outcome') this.decided = true;
-    if (events.length > 0) this.renderer.addEvents(events, this.time);
+    if (events.length > 0) {
+      this.renderer.addEvents(events, this.time);
+      this.sound.play(events, this.sim.player.eyeHeight, this.soundTiming);
+    }
   }
 
-  private bodyPose(dt: number, fov: number): CameraPose {
+  /**
+   * The camera in your body: interpolated between the last two ticks, with the head bob
+   * of the body's own stride (sim/motor/bob.ts), so the view dips as each step sounds.
+   * The bob fades out as an optic comes up: through one, the camera is exactly where the
+   * simulation's eye is, which is where a shot leaves from.
+   */
+  private bodyPose(fov: number, optic: number): CameraPose {
     const a = this.prev;
     const b = this.curr;
     const t = this.clock.alpha;
     const speed = lerp(a.speed, b.speed, t);
-    const stride = b.gait === 'idle' ? 1 : this.tuning.bodies.player.stride[b.gait];
-    if (!this.paused) this.bobPhase += (speed / stride) * Math.PI * dt;
-    const bob = -(BOB[b.gait] ?? 0) * this.tuning.view.headBob * Math.abs(Math.sin(this.bobPhase));
+    // A foot came down between the two ticks when the phase starts over.
+    const next = b.step < a.step - 0.5 ? b.step + 1 : b.step;
+    const phase = lerp(a.step, next, t);
+    const V = this.tuning.view;
+    const bob = headBob(phase, speed, this.tuning.bodies.player, V.bob) * V.headBob * (1 - optic);
     return {
       x: lerp(a.px, b.px, t),
       y: lerp(a.py, b.py, t) + lerp(a.eye, b.eye, t) + bob,
@@ -770,6 +805,9 @@ export class Game {
       `overwatch ${w.report.overwatchSectors}/8 directions · ${w.report.perches.length} perches · reachable from ${w.report.accessSectors}/16`,
       `${w.props.trees.length.toLocaleString('en-US')} trees · ${w.props.rocks.length.toLocaleString('en-US')} rocks · ${w.props.bushes.length.toLocaleString('en-US')} bushes · ${w.camp.guards.length} guards${this.sim.solids.count ? ` · ${this.sim.solids.count} solid entities` : ''}`,
       `recording ${kb(sizes.inputs)} inputs · ${kb(sizes.states)} states · ${kb(sizes.events)} events`,
+      ``,
+      `SOUND`,
+      this.sound.report(),
     ];
     return lines.join('\n');
   }
@@ -805,6 +843,7 @@ export class Game {
     return {
       play: () => {
         ready('play');
+        this.sound.unlock();
         this.paused = false;
         this.overlay.hide();
         this.hud.setVisible(true);
@@ -869,6 +908,8 @@ export class Game {
         finite('fog', density);
         this.renderer.setTuning({ ...this.tuning, view: { ...this.tuning.view, fogDensity: Math.max(0, density) } });
       },
+      /** Whether sound runs and how many voices are sounding (a browser started without a gesture keeps it suspended). */
+      sound: () => this.sound.status(),
       state: () => ({
         seed: this.world?.seed,
         scene: this.scene?.name ?? null,

@@ -273,6 +273,29 @@ describe('footstep noise', () => {
     expect(step.surface).toBe(Surface.Gravel);
   });
 
+  it('lands each step where the stride runs out, between ticks, in an even rhythm', () => {
+    // A steady sprint on flat ground is a step every 1.7 m / 5.5 m/s = 9.27 ticks. Stamped
+    // at the end of their ticks the steps would beat 9, 9, 10; at the moment the stride
+    // runs out they come exactly a stride apart, in time and in place.
+    const t = tuningCopy();
+    const sim = new Simulation(testWorld(), t);
+    hold(sim, 2, { moveZ: 1, sprint: true });
+    const steps = hold(sim, 6, { moveZ: 1, sprint: true }).filter((e) => e.type === 'footstep');
+    const P = t.bodies.player;
+    expect(sim.player.speed).toBeCloseTo(P.speed.sprint, 9);
+    expect(steps.length).toBeGreaterThan(15);
+    for (let k = 1; k < steps.length; k++) {
+      const a = steps[k - 1]!;
+      const b = steps[k]!;
+      expect(b.t - a.t).toBeCloseTo(P.stride.sprint / P.speed.sprint, 6);
+      expect(Math.hypot(b.x - a.x, b.z - a.z)).toBeCloseTo(P.stride.sprint, 6);
+      expect(b.t).toBeGreaterThan((b.tick - 1) / HZ);
+      expect(b.t).toBeLessThanOrEqual(b.tick / HZ);
+    }
+    // The ticks that made them don't keep the beat: 9s and 10s.
+    expect(new Set(steps.slice(1).map((e, k) => e.tick - steps[k]!.tick))).toEqual(new Set([9, 10]));
+  });
+
   it('is silent when standing still or pushing into a wall', () => {
     const wall = { kind: 'box' as const, x: 1, z: 0, y0: -1, y1: 2, hx: 0.4, hz: 5, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Wood };
     const sim = new Simulation(testWorld({ colliders: [wall] }), tuningCopy());

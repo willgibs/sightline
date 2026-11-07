@@ -126,6 +126,22 @@ describe.runIf(canSuspend)('the sound engine', () => {
     expect(clear.bright - blocked.bright).toBeGreaterThan(15);
   });
 
+  it('holds a sound back until the picture shows its moment', async () => {
+    // The frame on screen is 0.1 s of simulation time behind the step: it sounds 0.1 s later.
+    const now = await render((e) => e.play([step(0, -3, 40)], 1.65));
+    const held = await render((e) => e.play([step(0, -3, 40)], 1.65, { shown: 1 / 30 - 0.1, scale: 1, hold: 0 }));
+    expect(held.onset - now.onset).toBeCloseTo(0.1, 2);
+    // At double speed the same gap passes in half the time.
+    const fast = await render((e) => e.play([step(0, -3, 40)], 1.65, { shown: 1 / 30 - 0.1, scale: 2, hold: 0 }));
+    expect(fast.onset - now.onset).toBeCloseTo(0.05, 2);
+  });
+
+  it('plays your own clothes, and nobody else\'s: a change of stance is not a sound', async () => {
+    const stance = (source: number) => ({ type: 'stance' as const, id: 1, tick: 1, t: 1 / 30, source, cause: 0, from: 'stand' as const, to: 'crouch' as const });
+    expect((await render((e) => e.play([stance(PLAYER_ID)], 1.65))).onset).toBeGreaterThan(0);
+    expect((await render((e) => e.play([stance(PLAYER_ID + 1)], 1.65))).onset).toBe(-1);
+  });
+
   it('plays your own footsteps as loud as the simulation says they are', async () => {
     // Movement × surface from the tuning table: sprint on gravel vs crouch on grass.
     const N = defaultTuning.noise;

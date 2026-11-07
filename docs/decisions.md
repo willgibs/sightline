@@ -6,6 +6,43 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### Sound plays in the game, at the moment the picture shows
+
+**Decision:** The sound engine is wired into the game (`src/app/sound.ts`):
+
+- **Starting:** the audio context is made on the first "Click to begin", the gesture browsers require, and woken on every later one.
+- **Listening:** the listener is the camera. In your body it's at your eyes; in the fly camera it's wherever the camera is, so you can fly to a guard and listen to him.
+- **Pausing:** a pause ducks everything to a quarter; a hidden tab suspends sound.
+- **Volume:** the volume setting is heard on a square law.
+- **Muffling:** the straight path is checked through the world query (`src/audio/muffle.ts`), so a gate an entity closes muffles the generator as a wall does.
+- **Timing:** each event plays when the frame on screen reaches its moment, plus about a frame. The picture runs a tick behind the newest state, so a sound waits `(t − shown) / scale + hold`, at most a quarter of a second. The hold covers a tick computed late in its frame; it tracks the frame time, jumping up for a slow frame and easing back down. A sound the picture has passed plays at once.
+- **Failures:** sound is never essential. Without Web Audio, or after any error in it, the game plays on silently and the debug panel says why. The panel also shows the context's state, latency and voices, and the steady sources in earshot.
+
+**Why:** a tick's events used to reach the speakers when the frame that ran the tick was drawn: late by up to a tick, and by a different amount each time. In a model of the loop, with frames ±25% uneven, a sprint's steps wandered 28–47 ms from their period at 24–144 fps. That's enough to hear a steady stride as uneven. Timed against the picture, they stay within 3 ms (a test holds them under 4). The added frame roughly matches the screen's own latency, so sound stays in step with what you see.
+
+### The world's steady sounds are listed by the simulation
+
+**Decision:** Where the creek and the generator sound from, and how far they carry, is a function of the world in the simulation (`src/sim/world/ambient.ts`), not of the audio. The speakers play that list.
+
+**Why:** lab A masks footsteps with these same sources. Kept in one list, the creek you hear and the creek a guard hears stay the same creek, and the hearing law stays one law.
+
+### A footstep happens where and when the stride runs out
+
+**Decision:** The motor stamps each footstep with the moment within its tick that the stride ran out, and the place the body was then. It no longer uses the tick's end. `SIM_VERSION` 6: every run's behaviour fingerprint moved, and no state did.
+
+**Why:** a sprint takes a step every 9.27 ticks. Stamped at tick ends, its steps beat 9, 9, 10: a gallop you can hear at 30 Hz. Stamped at the true moment, they come exactly a stride apart in time and space, whatever the tick rate. A test holds the sprint to its period, and the head bob below lands on these moments.
+
+### The head bob follows the body's stride
+
+**Decision:**
+
+- **What drives it:** the camera's dip is a pure function of how far through its stride the body is, and how fast it moves (`src/sim/motor/bob.ts`). It used to be a phase the renderer advanced by itself.
+- **Shape:** the eye is lowest as a foot comes down, and highest half a stride later.
+- **Depth:** it deepens with speed through each gait's depth (`tuning.view.bob`), from nothing at rest, so stopping never pops the view.
+- **Optics:** the bob fades out as an optic comes up. Through one, the camera is exactly at the simulation's eye, where a shot leaves from.
+
+**Why:** with the footsteps above, the dip lands on the step you hear, to the sample: a test checks that the interpolated stride starts over at each footstep's moment within its tick. The functions use exact arithmetic, so lab B can have the simulation evaluate the same bob if it decides shots leave from the bobbing eye.
+
 ### Scenes: one definition, run headless, played in the browser, replayed
 
 **Decision:** A scene (`src/sim/scene.ts`) is a world (generated from a mission spec, or built by hand with `gen/handmade.ts`), the systems it adds, a setup before the first tick, a driver for headless runs (a bot or a list of waypoints), and expectations checked during and after the run. The same definition runs headless (`npm run scene`, and every scene in the tests), is played in the browser (`?scene=<name>`), and re-simulates from a recording, which names the scene and its version (recording format 9). Scenes live in `src/sim/scenes`, under the simulation's rules, and the self-test pins each one's fingerprints in every engine. A hand-built world's mission spec says so (`terrain: { kind: 'handmade' }`), and only its scene can build it.

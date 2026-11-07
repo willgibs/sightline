@@ -3,6 +3,7 @@ import type { SimEvent } from '../sim/events';
 import { PLAYER_ID } from '../sim/state';
 import { audibility, travelTime } from '../sim/sound';
 import { surfaceName } from '../sim/world/surfaces';
+import type { AmbientSource } from '../sim/world/ambient';
 import { footstep, humLoop, makeNoiseBuffers, makeRand, rustle, waterLoop, windBed, type Loop, type NoiseBuffers, type Rand } from './voices';
 
 /**
@@ -17,6 +18,8 @@ import { footstep, humLoop, makeNoiseBuffers, makeRand, rustle, waterLoop, windB
  *   - Sounds are placed in 3D (HRTF), and muffled when something solid is in the way.
  *   - Your own body (footsteps, cloth) plays close and centred, at the level the
  *     simulation gives it, so you can learn your noise by ear.
+ *   - A sound plays when the picture shows its moment (`SoundTiming`), not when the tick
+ *     that made it happened to run, so steps keep the simulation's rhythm at any frame rate.
  *
  * The context is injected, so tests render through an OfflineAudioContext and measure.
  */
@@ -38,16 +41,32 @@ export interface Muffle {
 /** Returns how the path from a source to the listener is muffled, or null if it's clear. */
 export type MuffleFn = (sx: number, sy: number, sz: number, lx: number, ly: number, lz: number) => Muffle | null;
 
-export type AmbientKind = 'water' | 'hum';
+/**
+ * Where the picture is on the simulation's timeline. The frame on screen shows simulation
+ * time `shown` (seconds; interpolated between the last two ticks, so a tick behind the
+ * newest one), and simulation time runs `scale` times as fast as real time (the debug
+ * view's fast-forward). An event at time t plays (t − shown) / scale + hold seconds from
+ * now: when the picture reaches it, plus `hold`.
+ *
+ * `hold` is about a frame. A tick is computed in the first frame after it ends, up to a
+ * frame late, so without it a step early in its tick could already be due and play late
+ * by up to a frame; with it, every sound keeps its distance from the next, at any frame
+ * rate, and the frame it adds roughly matches the screen's own latency.
+ */
+export interface SoundTiming {
+  shown: number;
+  scale: number;
+  hold: number;
+}
 
-/** A fixed sound source in the world: a stretch of creek, a generator. */
-export interface AmbientSource {
-  kind: AmbientKind;
-  x: number;
-  y: number;
-  z: number;
-  /** Threshold radius, as for any sound. */
-  radius: number;
+/** No event is held back longer than this, whatever the timing says. */
+export const MAX_LEAD = 0.25;
+
+/** How a fixed source sounds from where the listener is (the debug panel). */
+export interface AmbientHeard {
+  kind: AmbientSource['kind'];
+  distance: number;
+  muffled: boolean;
 }
 
 export interface SoundOptions {
@@ -76,8 +95,8 @@ const WIND_LEVEL = 0.065;
 
 export class SoundEngine {
   readonly ctx: BaseAudioContext;
-  private readonly tuning: Tuning;
-  private readonly speedOfSound: number;
+  private tuning: Tuning;
+  private speedOfSound: number;
   private readonly muffle: MuffleFn | null;
   private readonly rand: Rand;
   private readonly noise: NoiseBuffers;
@@ -89,7 +108,7 @@ export class SoundEngine {
   private readonly voiceEnds: number[] = [];
   private wind: Loop | null = null;
   private sources: AmbientSource[] = [];
-  private readonly ambient = new Map<AmbientSource, { loop: Loop; panner: PannerNode; filter: BiquadFilterNode }>();
+  private readonly ambient = new Map<AmbientSource, { loop: Loop; panner: PannerNode; filter: BiquadFilterNode; distance: number; muffled: boolean }>();
   private ambientTimer = 0;
   private volume = 1;
   private ducked = false;
@@ -120,6 +139,11 @@ export class SoundEngine {
     if (this.wind) return;
     this.wind = windBed(this.ctx, this.bed, this.noise, this.rand);
     this.wind.setLevel(WIND_LEVEL, 2);
+  }
+
+  /** Hot-reloaded tuning: footstep voices follow its gaits. */
+  setTuning(tuning: Tuning): void {
+    this.tuning = tuning;
   }
 
   setVolume(v: number): void {
@@ -181,18 +205,20 @@ export class SoundEngine {
   /**
    * Plays one tick's events. `earToFeet` is how far your ears are above your feet, which
    * sets how loud your own footsteps are under the same hearing law as everything else.
+   * Without `timing`, everything plays at once.
    */
-  play(events: readonly SimEvent[], earToFeet: number): void {
+  play(events: readonly SimEvent[], earToFeet: number, timing?: SoundTiming): void {
     for (const e of events) {
+      const lead = timing ? leadOf(e.t, timing) : 0;
       if (e.type === 'footstep') {
         // The step's kind of sound comes from its gait; how loud it is, from its radius.
         const gait = this.tuning.noise.movement[e.gait];
         if (e.source === PLAYER_ID) {
           const amp = THRESHOLD * audibility(e.radius, earToFeet);
-          this.voice(amp, (when) => footstep(this.ctx, this.body, this.noise, this.rand, when, surfaceName(e.surface), gait, amp));
+          this.voice(amp, lead, (when) => footstep(this.ctx, this.body, this.noise, this.rand, when, surfaceName(e.surface), gait, amp));
         } else {
           this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) =>
-            footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), gait, amp),
+            footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), gait, amp), lead,
           );
         }
       } else if (e.type === 'land') {
@@ -200,32 +226,35 @@ export class SoundEngine {
         const gait = 1.5;
         if (e.source === PLAYER_ID) {
           const amp = THRESHOLD * audibility(e.radius, earToFeet);
-          this.voice(amp, (when) => footstep(this.ctx, this.body, this.noise, this.rand, when, surfaceName(e.surface), gait, amp));
+          this.voice(amp, lead, (when) => footstep(this.ctx, this.body, this.noise, this.rand, when, surfaceName(e.surface), gait, amp));
         } else {
           this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) =>
-            footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), gait, amp),
+            footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), gait, amp), lead,
           );
         }
-      } else if (e.type === 'stance') {
+      } else if (e.type === 'stance' && e.source === PLAYER_ID) {
+        // Your own clothes, at your ears. Not a sound in the simulation (nobody else hears
+        // it), so another body's change of stance is silent.
         const length = e.to === 'prone' || e.from === 'prone' ? 0.5 : 0.22;
         const amp = THRESHOLD * 2.5;
-        this.voice(amp, (when) => rustle(this.ctx, this.body, this.noise, this.rand, when, length, amp));
+        this.voice(amp, lead, (when) => rustle(this.ctx, this.body, this.noise, this.rand, when, length, amp));
       }
     }
   }
 
-  /** Schedules a non-positional voice, within the voice budget. */
-  private voice(amp: number, start: (when: number) => number): void {
+  /** Schedules a non-positional voice, within the voice budget, `lead` seconds from now. */
+  private voice(amp: number, lead: number, start: (when: number) => number): void {
     if (amp <= 0 || !this.claimVoice()) return;
-    this.voiceEnds.push(start(this.ctx.currentTime + LOOKAHEAD));
+    this.voiceEnds.push(start(this.ctx.currentTime + LOOKAHEAD + lead));
   }
 
   /**
    * Schedules a sound at a point in the world: level from the hearing law, a delay for
    * the distance travelled, a 3D position, and muffling if the path is blocked.
-   * Returns false if the sound is out of earshot.
+   * Returns false if the sound is out of earshot. `lead` holds it back until the picture
+   * shows its moment (SoundTiming); the distance's delay comes on top.
    */
-  spatial(x: number, y: number, z: number, radius: number, start: (out: AudioNode, when: number, amp: number) => number): boolean {
+  spatial(x: number, y: number, z: number, radius: number, start: (out: AudioNode, when: number, amp: number) => number, lead = 0): boolean {
     const l = this.listenerPose;
     const dx = x - l.x;
     const dy = y - l.y;
@@ -237,7 +266,7 @@ export class SoundEngine {
     const m = this.muffle ? this.muffle(x, y, z, l.x, l.y, l.z) : null;
     if (m) amp *= m.gain;
     if (!this.claimVoice()) return false;
-    const when = this.ctx.currentTime + LOOKAHEAD + travelTime(d, this.speedOfSound);
+    const when = this.ctx.currentTime + LOOKAHEAD + lead + travelTime(d, this.speedOfSound);
     const panner = this.panner(x, y, z);
     let out: AudioNode = panner;
     if (m) {
@@ -272,7 +301,13 @@ export class SoundEngine {
     return n < MAX_VOICES;
   }
 
-  /** Replaces the fixed sources (creek stretches, generators) for a new world. */
+  /** A new world: its fixed sources (sim/world/ambient.ts) and its air's speed of sound (sim/env.ts, air). */
+  setWorld(sources: readonly AmbientSource[], speedOfSound: number): void {
+    this.speedOfSound = speedOfSound > 0 ? speedOfSound : 343;
+    this.setAmbientSources(sources);
+  }
+
+  /** Replaces the fixed sources (creek stretches, generators). */
   setAmbientSources(sources: readonly AmbientSource[]): void {
     for (const a of this.ambient.values()) a.loop.stop();
     this.ambient.clear();
@@ -315,10 +350,12 @@ export class SoundEngine {
         const filter = new BiquadFilterNode(this.ctx, { type: 'lowpass', frequency: 20000, Q: 0.7 });
         filter.connect(panner).connect(this.world);
         const make = s.kind === 'water' ? waterLoop : humLoop;
-        a = { loop: make(this.ctx, filter, this.noise, this.rand), panner, filter };
+        a = { loop: make(this.ctx, filter, this.noise, this.rand), panner, filter, distance: d, muffled: false };
         this.ambient.set(s, a);
       }
       const m = this.muffle ? this.muffle(s.x, s.y, s.z, l.x, l.y, l.z) : null;
+      a.distance = d;
+      a.muffled = m !== null;
       a.filter.frequency.setTargetAtTime(m ? m.cutoff : 20000, now, 0.1);
       a.loop.setLevel(THRESHOLD * audibility(s.radius, d) * fadeOut(d, s.radius) * (m ? m.gain : 1), AMBIENT_REFRESH);
     }
@@ -334,12 +371,34 @@ export class SoundEngine {
     return this.ambient.size;
   }
 
+  /** The fixed sources in earshot, nearest first: how far, and whether something is in the way. */
+  ambientHeard(): AmbientHeard[] {
+    return [...this.ambient.entries()].map(([s, a]) => ({ kind: s.kind, distance: a.distance, muffled: a.muffled })).sort((a, b) => a.distance - b.distance);
+  }
+
   dispose(): void {
     this.setAmbientSources([]);
     this.wind?.stop();
     this.wind = null;
     this.master.disconnect();
   }
+}
+
+/** Seconds to hold an event at simulation time `t` back, so it plays when the picture shows it. */
+export function leadOf(t: number, timing: SoundTiming): number {
+  const lead = (t - timing.shown) / (timing.scale > 0 ? timing.scale : 1) + (timing.hold > 0 ? timing.hold : 0);
+  // NaN fails the comparison and plays at once.
+  return lead > 0 ? Math.min(lead, MAX_LEAD) : 0;
+}
+
+/**
+ * A running estimate of how long a frame takes, for SoundTiming's hold: it jumps to any
+ * longer frame at once and eases back over about a second of frames, so one slow frame
+ * holds sounds a little longer for a while instead of making the next ones late.
+ */
+export function frameSpan(span: number, dt: number): number {
+  if (!(dt > 0)) return span;
+  return dt > span ? dt : span + (dt - span) * 0.02;
 }
 
 /** 1 inside the radius, easing to 0 at FADE_END × radius. */
