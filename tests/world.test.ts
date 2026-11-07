@@ -14,7 +14,7 @@ beforeAll(() => {
 
 describe('world generation', () => {
   it('validates walkability with the controller\'s own slope limit', () => {
-    expect(defaultTuning.gen.walkableSlopeDeg).toBe(defaultTuning.player.maxSlopeDeg);
+    expect(defaultTuning.gen.walkableSlopeDeg).toBe(defaultTuning.bodies.player.maxSlopeDeg);
   });
 
   it('builds the same valley from the same seed', () => {

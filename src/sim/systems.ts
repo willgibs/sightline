@@ -2,7 +2,7 @@ import type { Tuning } from '../config/tuning';
 import { dcos, dsin } from './core/detmath';
 import type { Rng } from './core/rng';
 import type { BodySpec, BodyState } from './motor/body';
-import { guardIntent, guardSpec } from './entities/guards';
+import { guardIntent } from './entities/guards';
 import { playerIntent } from './entities/player';
 import type { EventDraft } from './events';
 import type { World } from './gen/world';
@@ -101,13 +101,10 @@ const others: Cylinder[] = [];
 const cylinders: Cylinder[] = [];
 const bodies: Array<{ id: EntityId; body: BodyState; spec: BodySpec }> = [];
 
-/** Every body in entity order, with its spec. */
+/** Every body in entity order, with its kind's spec. */
 function bodiesOf(ctx: TickContext): typeof bodies {
   bodies.length = 0;
-  const p = ctx.index.player;
-  bodies.push({ id: p.id, body: p.body, spec: ctx.tuning.player });
-  const G = guardSpec(ctx.tuning);
-  for (const g of ctx.index.guards) bodies.push({ id: g.id, body: g.body, spec: G });
+  for (const e of ctx.state.entities) bodies.push({ id: e.id, body: e.body, spec: ctx.tuning.bodies[e.kind] });
   return bodies;
 }
 
@@ -161,7 +158,7 @@ export const SYSTEMS: readonly System[] = [
     run(ctx) {
       const p = ctx.index.player;
       const motor = { world: ctx.world, tick: ctx.tick, source: p.id, emit: ctx.emit };
-      playerIntent(p.body, p.control, ctx.input, ctx.tuning.player, motor, intentFor(ctx, p.id));
+      playerIntent(p.body, p.control, ctx.input, ctx.tuning.bodies.player, motor, intentFor(ctx, p.id));
     },
   },
   {

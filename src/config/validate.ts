@@ -34,13 +34,27 @@ const BOUNDS: ReadonlyArray<readonly [path: string, min: number, max: number, in
   ['gen.props.bushSpacing', 1, 1000],
   ['gen.props.treeCover', 0, 1],
   ['gen.walkableSlopeDeg', 1, 89],
-  ['player.maxSlopeDeg', 1, 89],
-  ['player.stepHeight', 0, 2],
-  ['player.radius', 0.05, 2],
-  ['player.stanceTime.crouch', 0, 5],
-  ['player.stanceTime.prone', 0, 5],
-  ['player.pitchLimit', 0, 1.5],
+  // Every kind of body: sizes that set how far collision looks, and limits whose tangent is taken.
+  ...Object.keys(defaultTuning.bodies).flatMap((kind) =>
+    (
+      [
+        ['maxSlopeDeg', 1, 89],
+        ['stepHeight', 0, 2],
+        ['radius', 0.05, 2],
+        ['stanceTime.crouch', 0, 5],
+        ['stanceTime.prone', 0, 5],
+        ['pitchLimit', 0, 1.5],
+      ] as const
+    ).map(([path, min, max]) => [`bodies.${kind}.${path}`, min, max] as const),
+  ),
 ];
+
+/** Where a tuning's keys and kinds of value differ from this build's: a tuning from another build, or not a tuning at all. */
+export function tuningShapeProblems(t: unknown): string[] {
+  const problems: string[] = [];
+  compare(t, defaultTuning, 'tuning', problems, true);
+  return problems;
+}
 
 export function tuningProblems(t: unknown): string[] {
   const problems: string[] = [];
@@ -82,9 +96,10 @@ export function assertTuning(t: unknown): asserts t is Tuning {
   if (problems.length > 0) throw new TuningError(problems);
 }
 
-function compare(value: unknown, ref: unknown, path: string, out: string[]): void {
+function compare(value: unknown, ref: unknown, path: string, out: string[], shapeOnly = false): void {
   if (typeof ref === 'number') {
     if (typeof value !== 'number') out.push(`${path} should be a number`);
+    else if (shapeOnly) return;
     else if (!Number.isFinite(value)) out.push(`${path} is ${String(value)}`);
     else if (Object.is(value, -0)) out.push(`${path} is -0`);
     return;
@@ -98,7 +113,7 @@ function compare(value: unknown, ref: unknown, path: string, out: string[]): voi
       out.push(`${path} should be a list of ${ref.length}`);
       return;
     }
-    ref.forEach((r, i) => compare(value[i], r, `${path}[${i}]`, out));
+    ref.forEach((r, i) => compare(value[i], r, `${path}[${i}]`, out, shapeOnly));
     return;
   }
   if (ref && typeof ref === 'object') {
@@ -110,7 +125,7 @@ function compare(value: unknown, ref: unknown, path: string, out: string[]): voi
     const r = ref as Record<string, unknown>;
     for (const key of Object.keys(r)) {
       if (!(key in v)) out.push(`${path}.${key} is missing`);
-      else compare(v[key], r[key], `${path}.${key}`, out);
+      else compare(v[key], r[key], `${path}.${key}`, out, shapeOnly);
     }
     for (const key of Object.keys(v)) if (!(key in r)) out.push(`${path}.${key} is not a tuning value`);
   }

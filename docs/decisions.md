@@ -6,6 +6,14 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### Every body is a kind in tuning
+
+**Decision:** The player's and the guard's bodies are complete kinds in `tuning.bodies`: sizes, speeds, accelerations, limits, strides and the sizes of their parts. The motor, the body shapes, the visibility factors and the guards' meshes read a body's own kind, never the player's, and the guard is no longer the player's spec with overrides written in code. Gravity left the body for `tuning.sim.gravity`, since everything that falls shares it (bodies now, bullets and throws with lab B). It stays out of the mission's environment: Earth's gravity varies by half a percent between the equator and the poles, too little to matter, and a mission shouldn't be able to change it.
+
+A recording whose tuning is shaped differently (one from before this change, say) is refused as one made by another build, naming the build and the first differences, rather than as corrupt.
+
+**Why:** a new kind of body (a dog, a pilot in a harness, a zombie) is data, not code; recordings carry every body's numbers with the rest of the tuning; and a guard's crouch can be tuned without changing the player's. The values are unchanged: the golden recording's final hash is the same.
+
 ### One grid for walking, sound, shelter and cover
 
 **Decision:** Generation builds one spatial grid (`src/sim/world/grid.ts`) with the world: a 2.5 m map layer over the whole terrain, lined up with its cells, and a 0.5 m site layer over the camp and a 12 m margin (from the camp's own structures, not the origin). Each cell says whether a standing body fits (slope, and anything solid between a step and the top of the head, within the body's radius), whether a wall stops sound, whether it is roofed, and how tall the sight-blocking cover is. Each cell also says whether a body can walk from its centre to its east and north neighbours': a fence thinner than a cell can sit between two centres that both fit a body, and only the edge between them knows. G shows the fine layer in the debug view.

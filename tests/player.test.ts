@@ -50,10 +50,10 @@ describe('player movement', () => {
     hold(sim, 0.3, { moveZ: 1 }, { prone: true });
     expect(sim.player.stance).toBe('prone');
     expect(sim.player.gait).toBe('crawl');
-    expect(sim.player.eyeHeight).toBeGreaterThan(t.player.eyeHeight.prone);
-    expect(sim.player.eyeHeight).toBeLessThan(t.player.eyeHeight.stand);
+    expect(sim.player.eyeHeight).toBeGreaterThan(t.bodies.player.eyeHeight.prone);
+    expect(sim.player.eyeHeight).toBeLessThan(t.bodies.player.eyeHeight.stand);
     hold(sim, 0.6, {});
-    expect(sim.player.eyeHeight).toBeCloseTo(t.player.eyeHeight.prone, 6);
+    expect(sim.player.eyeHeight).toBeCloseTo(t.bodies.player.eyeHeight.prone, 6);
   });
 
   it('cannot climb ground steeper than the slope limit', () => {
@@ -80,7 +80,7 @@ describe('player movement', () => {
     const t = tuningCopy();
     const sim = new Simulation(testWorld({ colliders: [wall] }), t);
     hold(sim, 8, { moveZ: 1 });
-    expect(sim.player.x).toBeCloseTo(10 - 0.5 - t.player.radius, 2);
+    expect(sim.player.x).toBeCloseTo(10 - 0.5 - t.bodies.player.radius, 2);
   });
 
   it('steps onto low ledges and falls off high ones', () => {
@@ -126,7 +126,7 @@ describe('controller edge cases (from code review)', () => {
     const events = hold(sim, 0.5, { moveZ: 1, sprint: true }, { prone: true });
     expect(sim.player.proneTransition).toBe(true);
     expect(sim.player.gait).toBe('crawl');
-    expect(sim.player.speed).toBeLessThanOrEqual(t.player.speed.crawl + 1e-9);
+    expect(sim.player.speed).toBeLessThanOrEqual(t.bodies.player.speed.crawl + 1e-9);
     expect(events.filter((e) => e.type === 'stance')).toHaveLength(1);
   });
 
@@ -158,7 +158,7 @@ describe('controller edge cases (from code review)', () => {
   });
 
   it('cannot climb a cliff on momentum', () => {
-    const step = tuningCopy().player.stepHeight;
+    const step = tuningCopy().bodies.player.stepHeight;
     for (const deg of [50, 70, 80, 85]) {
       const steep = Math.tan((deg * Math.PI) / 180);
       const sim = new Simulation(testWorld({ height: (x) => (x > 20 ? (x - 20) * steep : 0) }), tuningCopy());
@@ -241,13 +241,13 @@ describe('footstep noise', () => {
         if (e.type !== 'footstep') continue;
         steps++;
         fastest = Math.max(fastest, sim.player.speed);
-        expect(e.loudness).toBeCloseTo(footfall(sim.player.speed, t.player, t.noise).loudness * t.noise.surface.grass, 9);
+        expect(e.loudness).toBeCloseTo(footfall(sim.player.speed, t.bodies.player, t.noise).loudness * t.noise.surface.grass, 9);
       }
     }
     expect(sim.player.gait).toBe('crawl');
     expect(steps).toBeGreaterThan(0);
     expect(steps).toBeLessThanOrEqual(2);
-    expect(fastest).toBeGreaterThan(t.player.speed.crawl);
+    expect(fastest).toBeGreaterThan(t.bodies.player.speed.crawl);
   });
 
   it('makes sprinting on gravel about three times as loud as crouching on grass', () => {
@@ -325,7 +325,7 @@ describe('controller edge cases (from the second audit)', () => {
     expect(sim.player.stance).toBe('prone');
     expect(sim.player.eyeHeight).toBeGreaterThan(standing * 0.95);
     hold(sim, 1, {});
-    expect(sim.player.eyeHeight).toBeCloseTo(tuningCopy().player.eyeHeight.prone, 6);
+    expect(sim.player.eyeHeight).toBeCloseTo(tuningCopy().bodies.player.eyeHeight.prone, 6);
   });
 
   it('falls off a cliff instead of walking down it, and lands with a sound', () => {
@@ -422,14 +422,14 @@ describe('controller edge cases (from the second audit)', () => {
   it('walks diagonally backward at the backward speed', () => {
     const sim = new Simulation(testWorld(), tuningCopy());
     hold(sim, 3, { moveX: -1, moveZ: -1 });
-    const T = tuningCopy().player;
+    const T = tuningCopy().bodies.player;
     expect(sim.player.speed).toBeCloseTo(T.speed.walk * (1 - (1 - T.backwardFactor) * Math.SQRT1_2), 1);
   });
 
   it('copes with an instant stance change', () => {
     const t = tuningCopy();
-    t.player.stanceTime.prone = 0;
-    t.player.stanceTime.crouch = 0;
+    t.bodies.player.stanceTime.prone = 0;
+    t.bodies.player.stanceTime.crouch = 0;
     const sim = new Simulation(testWorld(), t);
     hold(sim, 0.2, {}, { prone: true });
     expect(sim.player.proneTransition).toBe(false);

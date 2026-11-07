@@ -1,4 +1,3 @@
-import type { Tuning } from '../../config/tuning';
 import { dcos, dsin } from '../core/detmath';
 import type { BodySpec, BodyState } from './body';
 
@@ -47,11 +46,15 @@ export function emptyShape(): BodyShape {
   };
 }
 
+/** The sizes of a body's parts (each body kind's `parts`). */
+type Parts = BodySpec['parts'];
+
 const upright = emptyShape();
 const lying = emptyShape();
 
 /** The shape of a body as it stands now, written to `out`. */
-export function bodyShape(b: BodyState, spec: BodySpec, B: Tuning['bodies'], out: BodyShape): BodyShape {
+export function bodyShape(b: BodyState, spec: BodySpec, out: BodyShape): BodyShape {
+  const B = spec.parts;
   const E = spec.eyeHeight;
   const e = b.eyeHeight;
   if (e >= E.crouch) {
@@ -70,7 +73,7 @@ export function bodyShape(b: BodyState, spec: BodySpec, B: Tuning['bodies'], out
   return out;
 }
 
-function uprightShape(x: number, y: number, z: number, eye: number, hip: number, B: Tuning['bodies'], out: BodyShape): BodyShape {
+function uprightShape(x: number, y: number, z: number, eye: number, hip: number, B: Parts, out: BodyShape): BodyShape {
   const shoulders = Math.max(hip, eye - B.neck);
   out.head.x = x;
   out.head.y = y + eye;
@@ -81,7 +84,7 @@ function uprightShape(x: number, y: number, z: number, eye: number, hip: number,
   return out;
 }
 
-function lyingShape(b: BodyState, eye: number, B: Tuning['bodies'], out: BodyShape): BodyShape {
+function lyingShape(b: BodyState, eye: number, B: Parts, out: BodyShape): BodyShape {
   // Along the facing, centred on the body: head at the front, heels at the back.
   const fx = -dsin(b.yaw);
   const fz = -dcos(b.yaw);

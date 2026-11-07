@@ -1,7 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { Rng } from '../src/sim/core/rng';
-import { guardSpec } from '../src/sim/entities/guards';
 import { generateWorld, type World } from '../src/sim/gen/world';
 import { neutralInput } from '../src/sim/input';
 import { missionSpec } from '../src/sim/mission';
@@ -66,7 +65,12 @@ describe('ray tests against body parts', () => {
 });
 
 describe('body shapes', () => {
-  const spec = guardSpec(T);
+  const spec = T.bodies.guard;
+
+  it('come from body kinds that all have the same fields', () => {
+    const shape = (o: unknown): unknown => (o && typeof o === 'object' ? Object.fromEntries(Object.entries(o).map(([k, v]) => [k, shape(v)])) : typeof o);
+    for (const [kind, s] of Object.entries(T.bodies)) expect(shape(s), kind).toEqual(shape(T.bodies.player));
+  });
   const body = (stance: 'stand' | 'crouch' | 'prone', eye: number): BodyState => ({ x: 0, y: 0, z: 0, yaw: 0, stance, eyeHeight: eye }) as BodyState;
 
   it('put the head at the eye and the parts in order, standing and crouched', () => {
@@ -74,7 +78,7 @@ describe('body shapes', () => {
       ['stand', spec.eyeHeight.stand],
       ['crouch', spec.eyeHeight.crouch],
     ] as const) {
-      const s = bodyShape(body(stance, eye), spec, T.bodies, emptyShape());
+      const s = bodyShape(body(stance, eye), spec, emptyShape());
       expect(s.head.y).toBeCloseTo(eye, 9);
       expect(s.legs.ay).toBeLessThan(s.legs.by);
       expect(s.legs.by).toBeCloseTo(s.torso.ay, 9);
@@ -84,12 +88,12 @@ describe('body shapes', () => {
   });
 
   it('lie along the facing when prone, head first', () => {
-    const s = bodyShape(body('prone', spec.eyeHeight.prone), spec, T.bodies, emptyShape());
+    const s = bodyShape(body('prone', spec.eyeHeight.prone), spec, emptyShape());
     // Yaw 0 faces north (−z): the head is the furthest part north, the heels the furthest south.
     expect(s.head.z).toBeLessThan(s.torso.az);
     expect(s.legs.az).toBeGreaterThan(s.torso.az);
     expect(Math.max(s.head.y + s.head.r, s.torso.ay + s.torso.r, s.torso.by + s.torso.r, s.legs.ay + s.legs.r)).toBeLessThanOrEqual(spec.height.prone);
-    expect(s.head.z - s.head.r - (s.legs.az + s.legs.r)).toBeCloseTo(-T.bodies.proneLength, 6);
+    expect(s.head.z - s.head.r - (s.legs.az + s.legs.r)).toBeCloseTo(-spec.parts.proneLength, 6);
   });
 });
 

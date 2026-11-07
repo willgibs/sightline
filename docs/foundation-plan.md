@@ -27,7 +27,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 
 ### M1 · Ground rules and inputs ✓
 - [x] `MissionSpec` replaces (seed, spawn kind) as the input to generation and the recording header; `GEN_VERSION` and `SIM_VERSION`.
-- [x] Tuning split by owner: `gen` (generation), `view` (presentation), everything else (simulation). Keys derived, not hand-listed; a test proves generation reads nothing outside `gen`. The guards' body size is tuning (all body sizes move to `tuning.bodies` in M6).
+- [x] Tuning split by owner: `gen` (generation), `view` (presentation), everything else (simulation). Keys derived, not hand-listed; a test proves generation reads nothing outside `gen`. (All body sizes are kinds in `tuning.bodies` since M6.)
 - [x] Architecture tests: no wall-clock time, async code, timers, network or dynamic imports in `src/sim`; no module-level state that lasts across ticks; no aliasing around the banned math.
 - [x] Deterministic `dexp`, `dlog`, `dpow`.
 - [x] The sim-core and controller audits' findings fixed, each with a regression test. What they deferred is listed under the milestones below.
@@ -65,7 +65,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [ ] Colliders that can be inserted, moved and removed at runtime: doors, the escape vehicle, the reinforcement truck. They are simulation state, so entities with a solid shape, which the motor and queries see alongside the world's colliders.
 - [x] Simulation code reads the terrain through its queries; an architecture test keeps the heightfield's arrays to generation, bots and rendering.
 - [x] Body shapes (`bodyShape()` in `src/sim/motor/shape.ts`): head, torso and legs from each pose, from `tuning.bodies`; the guards' meshes built from the same numbers.
-- [ ] The motor's `BodySpec` moves to `tuning.bodies` too (player and guard), with gravity going to the environment.
+- [x] Every body is a complete kind in `tuning.bodies` (player and guard: sizes, limits, strides, parts); gravity is `tuning.sim.gravity`, shared by everything that falls.
 - [x] The environment in the mission spec, owned by the simulation: clock, wind, air (density, speed of sound); the sun's direction from deterministic math; light at a point (sun, shade, dusk, dark); the renderer reads the sun from the simulation.
 - [x] One spatial grid: a 2.5 m map layer and a 0.5 m site layer recording walkable, blocks sound, roofed and cover height, with walkable edges between cells (a fence between two centres); G shows it.
 - [ ] Ambient masking from the world's steady sources (the creek, the generator), with lab A; the sources move from `audio/worldSounds.ts` into the simulation then. Validation (`analysis.ts`) moves onto the grid with lab D.
@@ -96,7 +96,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [ ] Determinism checked in Chromium, Firefox and WebKit, and under Bun (JavaScriptCore), in CI. A long fuzzing-bot invariant run joins the weekly platform runs. First, find out why the first browser-test run after a source change sometimes hangs (likely Vite's dependency optimizer); a rerun passes.
 
 ### M10 · Close out
-- [ ] `CLAUDE.md` gains the audit's rules as their milestones land: AI reads only `GuardMind`; systems join the phase list, never `step()` directly; anything drawn between ticks that changes an outcome, such as sway, is a pure function in `src/sim` that both sides evaluate; generation works in site frames; body sizes come from `tuning.bodies`; content definitions (rifle, ammunition, optics, throwables) live in tuning, so recordings embed them; rates are per second times `dt`; repair loops and searches get iteration budgets, never time budgets.
+- [ ] `CLAUDE.md` gains the audit's rules as their milestones land: AI reads only `GuardMind`; systems join the phase list, never `step()` directly; anything drawn between ticks that changes an outcome, such as sway, is a pure function in `src/sim` that both sides evaluate; generation works in site frames; content definitions (rifle, ammunition, optics, throwables) live in tuning, so recordings embed them; rates are per second times `dt`; repair loops and searches get iteration budgets, never time budgets.
 - [ ] `decisions.md`, the Phase 0 report and the design doc updated; delivered; verified on the owner's Mac; an independent review of the result.
 
 ## Done so far

@@ -19,7 +19,7 @@ export class InputController {
   /** Radians per pixel; the game scales it while zoomed. */
   sensitivity = 0.0022;
   sensitivityScale = 1;
-  /** How far the view can tilt up or down (tuning.player.pitchLimit, set by the game). */
+  /** How far the view can tilt up or down (tuning.bodies.player.pitchLimit, set by the game). */
   pitchLimit = 1.45;
   onAction: ((code: string) => void) | null = null;
   onLockChange: ((locked: boolean) => void) | null = null;

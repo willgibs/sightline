@@ -11,9 +11,9 @@ const has = (L: GridLayer, x: number, z: number, flag: number): boolean => (L.fl
 
 describe('the spatial grid', () => {
   it('is built for the player-sized body the motor moves', () => {
-    expect(T.gen.grid.bodyRadius).toBe(T.player.radius);
-    expect(T.gen.grid.stepHeight).toBe(T.player.stepHeight);
-    expect(T.gen.grid.bodyHeight).toBe(T.player.height.stand);
+    expect(T.gen.grid.bodyRadius).toBe(T.bodies.player.radius);
+    expect(T.gen.grid.stepHeight).toBe(T.bodies.player.stepHeight);
+    expect(T.gen.grid.bodyHeight).toBe(T.bodies.player.height.stand);
   });
 
   it('lets a body through a 1.2 m doorway in the fine layer, which the coarse layer cannot show', () => {

@@ -134,7 +134,7 @@ export class ChaosBot {
     if (!this.steepCells) {
       this.steepCells = [];
       const hf = sim.world.terrain;
-      const tanMax = dtanDeg(sim.tuning.player.maxSlopeDeg);
+      const tanMax = dtanDeg(sim.tuning.bodies.player.maxSlopeDeg);
       let k = 0;
       for (let j = 0; j < hf.cells; j++) {
         for (let i = 0; i < hf.cells; i++) {

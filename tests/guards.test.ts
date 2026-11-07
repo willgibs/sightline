@@ -126,7 +126,7 @@ describe('guards on routine', () => {
       sim.step(neutralInput());
       nearest = Math.min(nearest, sim.guards[0]!.body.x);
     }
-    expect(nearest).toBeGreaterThanOrEqual(10 + 0.2 + T.guards.radius - 1e-6);
+    expect(nearest).toBeGreaterThanOrEqual(10 + 0.2 + T.bodies.guard.radius - 1e-6);
   });
 
   it('draw from their own random streams, kept in the state', () => {

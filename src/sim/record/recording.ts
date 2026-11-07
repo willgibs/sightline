@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import { assertTuning } from '../../config/validate';
+import { assertTuning, tuningShapeProblems } from '../../config/validate';
 import { hashValue } from '../core/hash';
 import type { SimEvent } from '../events';
 import { worldFingerprint } from '../gen/world';
@@ -557,6 +557,15 @@ function checkHeader(v: unknown): RecordingHeader {
     JSON.stringify(m.terrain) !== '{"kind":"procedural","generator":"valley"}'
   ) {
     fail('mission');
+  }
+  // Tuning that is shaped differently comes from a build with other tuning values, not
+  // from damage: say so, and which build, so the right build can replay it.
+  const shape = tuningShapeProblems(h.tuning);
+  if (shape.length > 0) {
+    const more = shape.length > 3 ? `; and ${shape.length - 3} more` : '';
+    throw new RecordingFormatError(
+      `This recording was made by ${h.build ? `build ${String(h.build)}` : 'another build'}, whose tuning differs from this one's (${shape.slice(0, 3).join('; ')}${more}); replay it with that build`,
+    );
   }
   try {
     assertTuning(h.tuning);

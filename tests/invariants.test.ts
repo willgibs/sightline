@@ -38,7 +38,7 @@ function run(seed: string, bot: { next(sim: Simulation, out: InputFrame): InputF
   const push = { x: 0, z: 0 };
   const ids: number[] = [];
   const sample = makeTerrainSample();
-  const tanMax = dtanDeg(T.player.maxSlopeDeg);
+  const tanMax = dtanDeg(T.bodies.player.maxSlopeDeg);
   const out: Run = { ticks: 0, below: 0, inside: 0, worstOverlap: 0, worstRise: 0, steepGain: 0, nan: 0 };
   for (let i = 0; i < minutes * 60 * T.sim.tickHz; i++) {
     const before = sim.player;
@@ -52,12 +52,12 @@ function run(seed: string, bot: { next(sim: Simulation, out: InputFrame): InputF
     if (p.y < world.terrain.heightAt(p.x, p.z) - 1e-6) out.below++;
     out.worstRise = Math.max(out.worstRise, p.y - y0); // in every motor mode
     if (onSteep && p.standingOn < 0) out.steepGain = Math.max(out.steepGain, p.y - y0);
-    const height = bodyHeight(p, T.player);
+    const height = bodyHeight(p, T.bodies.player);
     world.colliders.query(p.x - 1, p.z - 1, p.x + 1, p.z + 1, ids);
     for (const id of ids) {
       const c = world.colliders.list[id]!;
-      if ((c.flags & Blocks.Move) === 0 || c.y1 <= p.y + T.player.stepHeight || c.y0 >= p.y + height) continue;
-      if (!pushOutCircle(c, p.x, p.z, T.player.radius, push)) continue;
+      if ((c.flags & Blocks.Move) === 0 || c.y1 <= p.y + T.bodies.player.stepHeight || c.y0 >= p.y + height) continue;
+      if (!pushOutCircle(c, p.x, p.z, T.bodies.player.radius, push)) continue;
       const depth = Math.sqrt(push.x * push.x + push.z * push.z);
       out.worstOverlap = Math.max(out.worstOverlap, depth);
       if (depth > 1e-4) out.inside++;
@@ -71,7 +71,7 @@ function expectSound(r: Run): void {
   expect(r.below).toBe(0);
   expect(r.inside).toBe(0);
   expect(r.worstOverlap).toBeLessThan(1e-4);
-  expect(r.worstRise).toBeLessThanOrEqual(T.player.stepHeight + 1e-9);
+  expect(r.worstRise).toBeLessThanOrEqual(T.bodies.player.stepHeight + 1e-9);
   // Ground too steep to stand on never lifts the body (a hair of slack for triangle seams).
   expect(r.steepGain).toBeLessThan(0.005);
 }

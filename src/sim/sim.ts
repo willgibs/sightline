@@ -10,7 +10,7 @@ import type { BodyState, Gait, Stance } from './motor/body';
 import type { MoveIntent } from './motor/motor';
 import { bodyShape, emptyShape } from './motor/shape';
 import type { QueryBody } from './world/query';
-import { createGuard, guardSpec } from './entities/guards';
+import { createGuard } from './entities/guards';
 import {
   Faction,
   PLAYER_ID,
@@ -284,15 +284,14 @@ export class Simulation {
 
   /** Every body's shape as it stands now, for queries (world/query.ts). Reuses `out` and its shapes. */
   queryBodies(out: QueryBody[] = []): QueryBody[] {
-    const all = [{ id: this.index.player.id, body: this.index.player.body, spec: this.current.player }];
-    const G = guardSpec(this.current);
-    for (const g of this.index.guards) all.push({ id: g.id, body: g.body, spec: G });
-    out.length = all.length;
-    all.forEach((e, k) => {
+    const entities = this.state.entities;
+    out.length = entities.length;
+    for (let k = 0; k < entities.length; k++) {
+      const e = entities[k]!;
       const q = (out[k] ??= { id: 0, shape: emptyShape() });
       q.id = e.id;
-      bodyShape(e.body, e.spec, this.current.bodies, q.shape);
-    });
+      bodyShape(e.body, this.current.bodies[e.kind], q.shape);
+    }
     return out;
   }
 

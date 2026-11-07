@@ -147,13 +147,13 @@ describe('tuning validation', () => {
       edit(t);
       return tuningProblems(t);
     };
-    expect(bad((t) => (t.player.accel = Infinity))).toEqual(['tuning.player.accel is Infinity']);
-    expect(bad((t) => (t.player.decel = NaN))).toEqual(['tuning.player.decel is NaN']);
-    expect(bad((t) => (t.player.accel = -0))).toEqual(['tuning.player.accel is -0']);
+    expect(bad((t) => (t.bodies.player.accel = Infinity))).toEqual(['tuning.bodies.player.accel is Infinity']);
+    expect(bad((t) => (t.bodies.player.decel = NaN))).toEqual(['tuning.bodies.player.decel is NaN']);
+    expect(bad((t) => (t.bodies.player.accel = -0))).toEqual(['tuning.bodies.player.accel is -0']);
     expect(bad((t) => (t.gen.props.treeSpacing = 0))[0]).toMatch(/treeSpacing is 0/);
     expect(bad((t) => (t.gen.world.size = 40000))[0]).toMatch(/size is 40000/);
     expect(bad((t) => (t.gen.world.maxGenAttempts = 1e308))[0]).toMatch(/maxGenAttempts/);
-    expect(bad((t) => ((t.player as Record<string, unknown>).extra = 1))).toEqual(['tuning.player.extra is not a tuning value']);
+    expect(bad((t) => ((t.bodies.player as Record<string, unknown>).extra = 1))).toEqual(['tuning.bodies.player.extra is not a tuning value']);
     expect(bad((t) => delete (t.noise as Partial<typeof t.noise>).radiusPerUnit)).toEqual(['tuning.noise.radiusPerUnit is missing']);
   });
 
@@ -170,8 +170,13 @@ describe('tuning validation', () => {
     };
     expect(() => Recording.fromBytes(good.toBytes())).not.toThrow();
     expect(() => Recording.fromBytes(tamper((h) => ((h.tuning as typeof defaultTuning).gen.props.treeSpacing = 0)))).toThrow(/treeSpacing/);
-    expect(() => Recording.fromBytes(tamper((h) => ((h.tuning as { player: Record<string, unknown> }).player.walk = 99)))).toThrow(/Corrupt recording/);
-    expect(() => Recording.fromBytes(tamper((h) => ((h.tuning as typeof defaultTuning).player.speed.walk = 3.5)))).toThrow(/does not match its hash/);
+    expect(() => Recording.fromBytes(tamper((h) => ((h.tuning as { bodies: { player: Record<string, unknown> } }).bodies.player.walk = 99)))).toThrow(
+      /made by .*whose tuning differs from this one's \(tuning\.bodies\.player\.walk is not a tuning value\)/,
+    );
+    expect(() => Recording.fromBytes(tamper((h) => ((h.tuning as typeof defaultTuning).bodies.guard.maxSlopeDeg = 95)))).toThrow(
+      /Corrupt recording: Invalid tuning: bodies\.guard\.maxSlopeDeg is 95, outside 1–89/,
+    );
+    expect(() => Recording.fromBytes(tamper((h) => ((h.tuning as typeof defaultTuning).bodies.player.speed.walk = 3.5)))).toThrow(/does not match its hash/);
     expect(() => Recording.fromBytes(tamper((h) => (h.ticks = 1e9)))).toThrow(/ticks in/);
     expect(() => Recording.fromBytes(tamper((h) => (h.ticks = 59)))).toThrow(/Corrupt recording/);
   });

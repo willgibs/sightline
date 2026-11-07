@@ -47,7 +47,7 @@ export function testWorld(opts: TestWorldOptions = {}): World {
     const sx = opts.spawn?.x ?? 0;
     const sz = opts.spawn?.z ?? 0;
     const ground = hf.heightAt(sx, sz);
-    const T = defaultTuning.player;
+    const T = defaultTuning.bodies.player;
     for (const c of colliders.list) {
       if ((c.flags & Blocks.Move) !== 0 && c.y1 > ground + T.stepHeight && c.y0 < ground + T.height.stand && circleOverlaps(c, sx, sz, T.radius)) {
         throw new Error(`testWorld: the spawn (${sx}, ${sz}) is inside collider ${c.id}; move it or pass spawnOnTop`);

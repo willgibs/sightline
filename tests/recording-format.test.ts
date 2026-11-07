@@ -94,8 +94,8 @@ describe('the recording file', () => {
 describe('re-simulating a recording', () => {
   it('follows tuning changed mid-run, on the tick it changed', () => {
     const fast = tuningCopy();
-    fast.player.speed.walk = 3.6;
-    fast.player.accel = 22;
+    fast.bodies.player.speed.walk = 3.6;
+    fast.bodies.player.accel = 22;
     const { rec } = play(900, (sim, r) => {
       if (sim.tick === 300) {
         sim.setTuning(fast);
@@ -114,9 +114,9 @@ describe('re-simulating a recording', () => {
 
   it('keeps the last of two tuning changes between the same two ticks', () => {
     const a = tuningCopy();
-    a.player.accel = 10;
+    a.bodies.player.accel = 10;
     const b = tuningCopy();
-    b.player.accel = 12;
+    b.bodies.player.accel = 12;
     const { rec } = play(100, (sim, r) => {
       if (sim.tick === 50) {
         sim.setTuning(a);
@@ -126,7 +126,7 @@ describe('re-simulating a recording', () => {
       }
     });
     expect(rec.tuningChanges()).toHaveLength(1);
-    expect(rec.tuningChanges()[0]!.tuning.player.accel).toBe(12);
+    expect(rec.tuningChanges()[0]!.tuning.bodies.player.accel).toBe(12);
     expect(resimulate(rec, world).ok).toBe(true);
   });
 
@@ -142,7 +142,7 @@ describe('re-simulating a recording', () => {
 describe('seeking in a recording', () => {
   it('reaches any tick exactly, forwards and backwards', () => {
     const fast = tuningCopy();
-    fast.player.speed.walk = 3.4;
+    fast.bodies.player.speed.walk = 3.4;
     const { rec, hashes } = play(1200, (sim, r) => {
       if (sim.tick === 500) {
         sim.setTuning(fast);
@@ -160,11 +160,11 @@ describe('the simulation tuning', () => {
   it('is a frozen copy: changing the original changes nothing', () => {
     const t = tuningCopy();
     const sim = new Simulation(world, t);
-    t.player.speed.walk = 99;
-    expect(sim.tuning.player.speed.walk).toBe(defaultTuning.player.speed.walk);
-    expect(Object.isFrozen(sim.tuning.player.speed)).toBe(true);
+    t.bodies.player.speed.walk = 99;
+    expect(sim.tuning.bodies.player.speed.walk).toBe(defaultTuning.bodies.player.speed.walk);
+    expect(Object.isFrozen(sim.tuning.bodies.player.speed)).toBe(true);
     expect(() => {
-      (sim.tuning.player.speed as { walk: number }).walk = 5;
+      (sim.tuning.bodies.player.speed as { walk: number }).walk = 5;
     }).toThrow();
   });
 

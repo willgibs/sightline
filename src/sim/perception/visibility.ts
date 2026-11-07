@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import type { BodyState } from '../motor/body';
+import type { BodySpec, BodyState } from '../motor/body';
 
 /**
  * How visible a body is, from the design doc's sight table (stance × movement × light).
@@ -11,13 +11,13 @@ import type { BodyState } from '../motor/body';
  */
 
 /** Stance × movement × light (env.ts, lightAt; full sun by default), with no cover. */
-export function exposure(b: BodyState, tuning: Tuning, light = tuning.visibility.light.lit): number {
-  return stanceVisibility(b, tuning) * movementVisibility(b, tuning) * light;
+export function exposure(b: BodyState, spec: BodySpec, tuning: Tuning, light = tuning.visibility.light.lit): number {
+  return stanceVisibility(b, spec, tuning) * movementVisibility(b, spec, tuning) * light;
 }
 
-/** The stance factor for how tall the body is: interpolated by eye height between the table's rows. */
-export function stanceVisibility(b: BodyState, tuning: Tuning): number {
-  const E = tuning.player.eyeHeight;
+/** The stance factor for how tall the body is: interpolated by its eye height between the table's rows. */
+export function stanceVisibility(b: BodyState, spec: BodySpec, tuning: Tuning): number {
+  const E = spec.eyeHeight;
   const S = tuning.visibility.stance;
   const e = b.eyeHeight;
   if (e >= E.stand) return S.stand;
@@ -26,10 +26,10 @@ export function stanceVisibility(b: BodyState, tuning: Tuning): number {
   return S.prone;
 }
 
-/** The movement factor for how fast the body is actually moving. */
-export function movementVisibility(b: BodyState, tuning: Tuning): number {
+/** The movement factor for how fast the body is actually moving: faster than its walk is sprinting. */
+export function movementVisibility(b: BodyState, spec: BodySpec, tuning: Tuning): number {
   const V = tuning.visibility;
   if (b.speed < 0.2) return V.movement.still;
-  if (b.speed > tuning.player.speed.walk + 0.25) return V.movement.sprinting;
+  if (b.speed > spec.speed.walk + 0.25) return V.movement.sprinting;
   return V.movement.moving;
 }

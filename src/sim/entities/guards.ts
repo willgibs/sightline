@@ -1,7 +1,7 @@
 import type { Tuning } from '../../config/tuning';
 import type { World } from '../gen/world';
 import { routinePose, type RoutinePose } from '../gen/routine';
-import { createBody, type BodySpec, type BodyState } from '../motor/body';
+import { createBody, type BodyState } from '../motor/body';
 import type { MoveIntent } from '../motor/motor';
 
 /**
@@ -18,33 +18,10 @@ export interface GuardState {
   headYaw: number;
 }
 
-const specs = new WeakMap<Tuning, BodySpec>();
-
-/** A guard's body: the player's, with a guard's size, eye, walking speed, stride and acceleration (M6 moves bodies into tuning). */
-export function guardSpec(tuning: Tuning): BodySpec {
-  let spec = specs.get(tuning);
-  if (!spec) {
-    const P = tuning.player;
-    const G = tuning.guards;
-    spec = {
-      ...P,
-      radius: G.radius,
-      height: { ...P.height, stand: G.height },
-      eyeHeight: { ...P.eyeHeight, stand: G.eyeHeight },
-      speed: { ...P.speed, walk: G.walkSpeed },
-      stride: { ...P.stride, walk: G.stride },
-      accel: G.accel,
-      decel: G.accel,
-    };
-    specs.set(tuning, spec);
-  }
-  return spec;
-}
-
 /** A guard's starting state, from the camp's spawn at `index`: on his post, or on the deck of his tower. */
 export function createGuard(world: World, index: number, tuning: Tuning): { body: BodyState; guard: GuardState } {
   const s = world.camp.guards[index]!;
-  const body = createBody(world, guardSpec(tuning), s.x, s.z, s.faceX, s.faceZ, s.y);
+  const body = createBody(world, tuning.bodies.guard, s.x, s.z, s.faceX, s.faceZ, s.y);
   return { body, guard: { spawn: index, headYaw: 0 } };
 }
 
@@ -62,7 +39,7 @@ export function guardIntent(body: BodyState, guard: GuardState, world: World, tu
   // Exactly the routine's velocity when on schedule; more, toward it, when behind.
   let wx = (pose.x - body.x) / dt;
   let wz = (pose.z - body.z) / dt;
-  const cap = tuning.guards.walkSpeed * tuning.guards.catchUp;
+  const cap = tuning.bodies.guard.speed.walk * tuning.guards.catchUp;
   const w = Math.sqrt(wx * wx + wz * wz);
   if (w > cap) {
     wx *= cap / w;

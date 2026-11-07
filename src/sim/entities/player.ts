@@ -16,7 +16,7 @@ import { requestStance, type MotorContext, type MoveIntent } from '../motor/moto
  * - Sprint needs standing, moving forward, and not being mid-way through a prone change.
  * - Walking backwards is slower, by up to backwardFactor.
  *
- * Numbers come from tuning.player (design doc · Player · Movement).
+ * Numbers come from the player's body, tuning.bodies.player (design doc · Player · Movement).
  */
 
 /** What the controls remember between ticks. */
@@ -30,7 +30,7 @@ export interface PlayerControl {
 export function createPlayer(world: World, tuning: Tuning): { body: BodyState; control: PlayerControl } {
   const { spawn } = world;
   return {
-    body: createBody(world, tuning.player, spawn.x, spawn.z, spawn.faceX, spawn.faceZ),
+    body: createBody(world, tuning.bodies.player, spawn.x, spawn.z, spawn.faceX, spawn.faceZ),
     control: { queuedStance: null, sprintSuppressed: false },
   };
 }

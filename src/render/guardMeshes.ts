@@ -3,7 +3,6 @@ import type { GuardRole } from '../sim/gen/camp';
 import { GUARD_FIELDS, type Snapshot } from '../sim/sim';
 import { lerp } from '../sim/core/math';
 import type { Tuning } from '../config/tuning';
-import { guardSpec } from '../sim/entities/guards';
 import type { BodyState } from '../sim/motor/body';
 import { bodyShape, emptyShape } from '../sim/motor/shape';
 import { createFlatMaterial, type LookUniforms } from './materials';
@@ -47,9 +46,9 @@ export class GuardMeshes {
   ) {
     this.group.name = 'guards';
     // A standing guard's shape at the origin.
-    const spec = guardSpec(tuning);
+    const spec = tuning.bodies.guard;
     const standing = { x: 0, y: 0, z: 0, yaw: 0, stance: 'stand', eyeHeight: spec.eyeHeight.stand } as BodyState;
-    const s = bodyShape(standing, spec, tuning.bodies, emptyShape());
+    const s = bodyShape(standing, spec, emptyShape());
     const capsule = (c: typeof s.torso, segments: number): THREE.BufferGeometry => {
       const g = new THREE.CapsuleGeometry(c.r, c.by - c.ay, 3, segments);
       g.translate(0, (c.ay + c.by) / 2, 0);

@@ -12,8 +12,9 @@ import { Surface } from '../world/surfaces';
  * player and, from M5, the guards obey one set of rules for slopes, steps, collision
  * and footsteps.
  *
- * A body is plain data in the state tree. What it may do comes from its spec: sizes,
- * speeds, accelerations and limits (tuning.player for the player).
+ * A body is plain data in the state tree. What it may do comes from its spec, one of the
+ * kinds in tuning.bodies: sizes, speeds, accelerations, limits and the parts it is made
+ * of. Everything a body kind can do is in its spec, so a new kind is data, not code.
  */
 
 export type Stance = StanceName;
@@ -28,8 +29,8 @@ export type Gait = 'idle' | 'sprint' | 'walk' | 'crouch' | 'crawl';
  */
 export type MotorModeName = 'ground' | 'air';
 
-/** A body's sizes and limits. Today the player's (tuning.player); M6 moves them to tuning.bodies. */
-export type BodySpec = Tuning['player'];
+/** A kind of body: its sizes, limits and parts (tuning.bodies). Every kind has the same fields; a test keeps them so. */
+export type BodySpec = Tuning['bodies']['player'];
 
 /** Where a body was at the end of a tick: enough to place its eye and shape between ticks. */
 export interface PoseSample {

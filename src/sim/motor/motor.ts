@@ -145,7 +145,7 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
   // down (groundSnap); on ground too steep to stand on, only as far as gravity could
   // carry the body this tick. Steeper than that, and the body leaves the ground.
   const follow =
-    destSlope > tanMax ? Math.max(0, -b.vy) * dt + 0.5 * spec.gravity * dt * dt + 0.005 : tanMax * movedDist + spec.groundSnap;
+    destSlope > tanMax ? Math.max(0, -b.vy) * dt + 0.5 * tuning.sim.gravity * dt * dt + 0.005 : tanMax * movedDist + spec.groundSnap;
   let landed = false;
   if (b.motor === 'ground' && b.vy <= 0 && drop <= follow) {
     b.y = ground.height;
@@ -154,7 +154,7 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
     b.motor = 'ground';
     landed = b.sliding && destSlope <= tanMax;
   } else if (feet > ground.height) {
-    b.vy -= spec.gravity * dt;
+    b.vy -= tuning.sim.gravity * dt;
     b.y = feet + b.vy * dt;
     if (b.y <= ground.height) {
       b.y = ground.height;
@@ -281,7 +281,7 @@ function driveGround(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorCont
   if (b.sliding) {
     // Gravity along the slope, projected onto the ground plane: g·sinθ·cosθ downhill.
     const s = sample.slopeTan;
-    const a = (spec.gravity * s) / (1 + s * s);
+    const a = (ctx.tuning.sim.gravity * s) / (1 + s * s);
     b.vx -= (sample.gx / s) * a * dt;
     b.vz -= (sample.gz / s) * a * dt;
   } else {

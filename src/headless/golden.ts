@@ -22,7 +22,7 @@ const recorder = new Recorder(sim, 'golden');
 const bot = new WanderBot(world.seed);
 const raw = neutralInput();
 const brisk = structuredClone(defaultTuning);
-brisk.player.speed.walk = 3.3;
+brisk.bodies.player.speed.walk = 3.3;
 for (let i = 0; i < 60 * defaultTuning.sim.tickHz; i++) {
   const input = bot.next(sim, raw);
   input.commands = i === 900 ? [{ kind: 'fire', lag: 0.4, yaw: input.yaw, pitch: -0.05 }] : [];

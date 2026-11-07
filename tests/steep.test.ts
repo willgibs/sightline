@@ -14,7 +14,7 @@ import { makeTerrainSample } from '../src/sim/world/heightfield';
  * gained on 33 faces of three valleys, while validation counted those faces as barriers.
  */
 
-const tanMax = dtanDeg(T.player.maxSlopeDeg);
+const tanMax = dtanDeg(T.bodies.player.maxSlopeDeg);
 
 interface Face {
   x: number;

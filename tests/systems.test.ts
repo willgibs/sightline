@@ -151,14 +151,14 @@ describe('the shared motor', () => {
   }
 
   it('stops each body at a wall by its own radius', () => {
-    const player = defaultTuning.player;
+    const player = defaultTuning.bodies.player;
     const wide = { ...player, radius: 0.6 };
     expect(walk(player, 0, 3, 5).x).toBeCloseTo(10 - 0.5 - 0.3, 2);
     expect(walk(wide, 0, 3, 5).x).toBeCloseTo(10 - 0.5 - 0.6, 2);
   });
 
   it('lets any body fall and land, making the sound itself', () => {
-    const r = walk(defaultTuning.player, -10, 3, 3);
+    const r = walk(defaultTuning.bodies.player, -10, 3, 3);
     expect(r.y).toBeCloseTo(0, 6);
     const land = r.events.find((e) => e.type === 'land');
     expect(land && land.type === 'land' && land.source).toBe(42);

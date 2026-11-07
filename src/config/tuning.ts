@@ -16,6 +16,7 @@ export const defaultTuning = {
   sim: {
     tickHz: 30, // fixed simulation rate (design doc · Platform and architecture)
     recordHz: 10, // state samples per second in recordings
+    gravity: 9.81, // m/s², for everything that falls: bodies now, bullets and throws later
   },
 
   // Everything generation reads, and nothing else: changing any of it rebuilds the valley.
@@ -73,35 +74,66 @@ export const defaultTuning = {
     },
   },
 
-  player: {
-    radius: 0.3,
-    height: { stand: 1.8, crouch: 1.2, prone: 0.5 },
-    eyeHeight: { stand: 1.65, crouch: 1.05, prone: 0.32 },
-    speed: { sprint: 5.5, walk: 3.0, crouch: 1.8, crawl: 0.7 }, // design doc · Player · Movement
-    backwardFactor: 0.7, // speed multiplier walking backwards
-    accel: 16, // m/s² toward the wished speed
-    decel: 20, // m/s² when slowing down
-    stanceTime: { crouch: 0.22, prone: 0.75 }, // seconds to change stance
-    maxSlopeDeg: 42, // steeper ground cannot be climbed
-    uphillSlowdown: 0.55, // speed multiplier climbing at the maximum slope
-    stepHeight: 0.45, // ledges up to this height are stepped onto
-    pitchLimit: 1.45, // radians the view can tilt up or down
-    shoveMax: 0.08, // most a guard shoves the body per resolve pass; small enough that walls always win
-    gravity: 9.81,
-    groundSnap: 0.6, // stay glued to the ground walking downhill
-    stride: { sprint: 1.7, walk: 1.25, crouch: 0.85, crawl: 0.6 }, // metres between footsteps
-  },
-
+  // Kinds of body: what the shared motor moves (motor/body.ts) and what sight lines and
+  // hits see (motor/shape.ts). Each kind is complete, so a new one (a dog, a pilot in a
+  // harness) is data, not code; recordings carry them with the rest of the tuning.
   bodies: {
-    // A human body as three parts for sight lines, hits and the guards' meshes: a head
-    // sphere at the eye, a torso capsule from the hips to the shoulders, a legs capsule
-    // from the feet to the hips (motor/shape.ts). Heights come from each body's stance.
-    headRadius: 0.115,
-    torsoRadius: 0.22,
-    legRadius: 0.15,
-    neck: 0.24, // the top of the torso sits this far below the eye
-    hip: 0.5, // hips at this share of the stance's height
-    proneLength: 1.75, // head to heels, lying down
+    player: {
+      radius: 0.3,
+      height: { stand: 1.8, crouch: 1.2, prone: 0.5 },
+      eyeHeight: { stand: 1.65, crouch: 1.05, prone: 0.32 },
+      speed: { sprint: 5.5, walk: 3.0, crouch: 1.8, crawl: 0.7 }, // design doc · Player · Movement
+      backwardFactor: 0.7, // speed multiplier walking backwards
+      accel: 16, // m/s² toward the wished speed
+      decel: 20, // m/s² when slowing down
+      stanceTime: { crouch: 0.22, prone: 0.75 }, // seconds to change stance
+      maxSlopeDeg: 42, // steeper ground cannot be climbed
+      uphillSlowdown: 0.55, // speed multiplier climbing at the maximum slope
+      stepHeight: 0.45, // ledges up to this height are stepped onto
+      pitchLimit: 1.45, // radians the head can tilt up or down
+      shoveMax: 0.08, // most another body shoves this one per resolve pass; small enough that walls always win
+      groundSnap: 0.6, // stay glued to the ground walking downhill
+      stride: { sprint: 1.7, walk: 1.25, crouch: 0.85, crawl: 0.6 }, // metres between footsteps
+      // Three parts for sight lines and hits: a head sphere at the eye, a torso capsule
+      // from the hips to the shoulders, a legs capsule from the feet to the hips.
+      // Heights come from the stance.
+      parts: {
+        headRadius: 0.115,
+        torsoRadius: 0.22,
+        legRadius: 0.15,
+        neck: 0.24, // the top of the torso sits this far below the eye
+        hip: 0.5, // hips at this share of the stance's height
+        proneLength: 1.75, // head to heels, lying down
+      },
+    },
+    guard: {
+      // A little taller than the player, and brisker to speed up and slow down, so he
+      // keeps to his routine within a few centimetres. His normal walk is slow: his
+      // footsteps are as loud as a walk at this speed.
+      radius: 0.3,
+      height: { stand: 1.85, crouch: 1.2, prone: 0.5 },
+      eyeHeight: { stand: 1.71, crouch: 1.05, prone: 0.32 },
+      speed: { sprint: 5.5, walk: 1.35, crouch: 1.8, crawl: 0.7 },
+      backwardFactor: 0.7,
+      accel: 30,
+      decel: 30,
+      stanceTime: { crouch: 0.22, prone: 0.75 },
+      maxSlopeDeg: 42,
+      uphillSlowdown: 0.55,
+      stepHeight: 0.45,
+      pitchLimit: 1.45,
+      shoveMax: 0.08,
+      groundSnap: 0.6,
+      stride: { sprint: 1.7, walk: 0.75, crouch: 0.85, crawl: 0.6 },
+      parts: {
+        headRadius: 0.115,
+        torsoRadius: 0.22,
+        legRadius: 0.15,
+        neck: 0.24,
+        hip: 0.5,
+        proneLength: 1.75,
+      },
+    },
   },
 
   noise: {
@@ -128,13 +160,7 @@ export const defaultTuning = {
   },
 
   guards: {
-    // Their bodies; everything else comes from the player's (entities/guards.ts, guardSpec).
-    radius: 0.3, // collision body (the drawn capsule is set in render/guardMeshes.ts until bodies are unified)
-    height: 1.85,
-    eyeHeight: 1.71,
-    walkSpeed: 1.35, // their normal walk; footsteps are as loud as a walk at this speed
-    stride: 0.75,
-    accel: 30, // m/s², speeding up and slowing down: brisker than the player, so a guard keeps to his routine within a few centimetres
+    // Their bodies are bodies.guard; this is how they keep to their routines (entities/guards.ts).
     catchUp: 1.5, // how much faster than walking a guard may hurry back to his routine
   },
 
