@@ -3,7 +3,7 @@ import { defaultTuning as T } from '../src/config/tuning';
 import { ChaosBot } from '../src/sim/bots/chaos';
 import { WanderBot } from '../src/sim/bots/wander';
 import { dtanDeg } from '../src/sim/core/detmath';
-import { bodyHeight } from '../src/sim/entities/player';
+import { bodyHeight } from '../src/sim/motor/body';
 import { generateWorld } from '../src/sim/gen/world';
 import { neutralInput, type InputFrame } from '../src/sim/input';
 import { missionSpec } from '../src/sim/mission';
@@ -44,15 +44,15 @@ function run(seed: string, bot: { next(sim: Simulation, out: InputFrame): InputF
     const before = sim.player;
     const y0 = before.y;
     world.terrain.sample(before.x, before.z, sample);
-    const onSteep = before.grounded && before.standingOn < 0 && sample.slopeTan > tanMax;
+    const onSteep = before.motor === 'ground' && before.standingOn < 0 && sample.slopeTan > tanMax;
     sim.step(bot.next(sim, raw));
     out.ticks++;
     const p = sim.player;
     if ([p.x, p.y, p.z, p.vx, p.vy, p.vz, p.yaw, p.pitch, p.eyeHeight].some((v) => v !== v)) out.nan++;
     if (p.y < world.terrain.heightAt(p.x, p.z) - 1e-6) out.below++;
-    if (p.grounded) out.worstRise = Math.max(out.worstRise, p.y - y0);
+    out.worstRise = Math.max(out.worstRise, p.y - y0); // in every motor mode
     if (onSteep && p.standingOn < 0) out.steepGain = Math.max(out.steepGain, p.y - y0);
-    const height = bodyHeight(p, T);
+    const height = bodyHeight(p, T.player);
     world.colliders.query(p.x - 1, p.z - 1, p.x + 1, p.z + 1, ids);
     for (const id of ids) {
       const c = world.colliders.list[id]!;

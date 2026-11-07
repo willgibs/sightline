@@ -3,6 +3,7 @@
  * record everything, then re-simulate the recording and check it matches bit for bit.
  *
  *   npm run sim -- --seed TAL-4471 --minutes 10 --out run.slrec
+ *   npm run sim -- --profile                                 (time spent in each system)
  *   npm run sim -- --replay sightline-TAL-4471-5400.slrec   (a recording saved in the browser)
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -14,6 +15,7 @@ import { Recorder, Recording } from '../sim/record/recording';
 import { resimulate } from '../sim/record/resim';
 import { Simulation } from '../sim/sim';
 import { WanderBot } from '../sim/bots/wander';
+import { SystemProfile } from '../sim/profile';
 import { fmt, parseArgs } from './args';
 import { missionSpec } from '../sim/mission';
 
@@ -60,6 +62,8 @@ console.log(
 );
 
 const sim = new Simulation(world, tuning);
+const profile = args.has('profile') ? new SystemProfile(now) : null;
+sim.profiler = profile;
 const recorder = new Recorder(sim, spawn);
 const bot = new WanderBot(seed);
 const raw = neutralInput();
@@ -90,6 +94,16 @@ console.log(
     `${fmt.int(ticks / (runMs / 1000))} ticks/s (${fmt.int(simSeconds / (runMs / 1000))}× real time) · ` +
     `${((runMs / ticks) * 1000).toFixed(1)} µs/tick`,
 );
+if (profile) {
+  const rows = profile.report(ticks);
+  const total = rows.reduce((sum, r) => sum + r.usPerTick, 0);
+  for (const r of rows) {
+    console.log(
+      `        ${r.phase.padEnd(11)} ${r.name.padEnd(14)} ${r.usPerTick.toFixed(2).padStart(7)} µs/tick · ${((r.usPerTick / total) * 100).toFixed(0).padStart(3)}%` +
+        (r.runs !== ticks ? ` · ran ${fmt.int(r.runs)} times` : ''),
+    );
+  }
+}
 console.log(
   `player  walked ${fmt.int(walked)} m · ${fmt.int(footsteps)} footsteps · ${stances} stance changes · ` +
     `targets reached ${bot.reached}, abandoned ${bot.abandoned}`,

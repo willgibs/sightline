@@ -6,6 +6,21 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### A tick runs declared systems, and every body shares one motor
+
+**Decision:** `step()` runs the systems listed in `src/sim/systems.ts`, phase by phase: schedule, commands, intent, motor, projectiles, world, perception, awareness, camp, decide, mission. Most phases are empty until the labs fill them, but their order is fixed now. Perception sees the world after everything has moved; brains decide after perceiving; what they decide moves bodies from the next tick, one tick (33 ms) after the stimulus.
+
+- **Rates.** A system can run slower than the tick (`hz: 10` runs every third tick), on a rhythm set by the tick number alone.
+- **The schedule** (`src/sim/schedule.ts`) holds delayed effects in the state tree, due by tick, first-scheduled first within a tick, and runs them before anything moves. Radio calls, reinforcements and search timers will use it.
+- **Profiling.** `npm run sim -- --profile` and the debug view report each system's time per tick. The caller supplies the clock.
+- **The shared motor** (`src/sim/motor/`). The player's controls (`entities/player.ts`) turn input into a `MoveIntent` (a wished velocity, a gait, a facing). The motor decides what the body gets: slopes, steps, collision, falls, landings, footsteps. Any body can use it with its own spec; a test drives a wider body into a wall and another off a ledge. Guards join it in M5.
+- **Modes.** A body is in one motor mode, `ground` or `air`. Each mode drives velocity its own way; moving and settling are shared, and settling picks the next mode. Lab C's mantle, vault and ladder become modes with their own invariants.
+- **Two fingerprints in the self-test.** `behaviour` hashes what can be observed every tick: every body's pose and every event, each entity's in order. `state` hashes the whole tree at the end. A refactor keeps `behaviour`; a change to how state is stored moves only `state` (`STATE_SCHEMA`); a change to what the game does moves `behaviour` (`SIM_VERSION`). The fuzzing bot joins the self-test, so the controls' edge cases are pinned too.
+
+**Why:** Every lab adds systems in parallel. Without a declared order, each would call its code from `step()` wherever it fit, and the reaction time between hearing a shot and acting on it would depend on whose code landed first. Moving one system later shifts every tuned reaction window by 33 ms and changes every recording, so the order has to be settled before the labs start. The motor is split now so that lab C's lean, mantle and carry and lab E's guards build on one controller, not two.
+
+**Proof it changed nothing:** the Phase 0 field-by-field hash matched on every tick of six 90-second runs (three valleys, both bots), and every tick's events matched entity by entity. The `behaviour` values held; only `state` moved, because the player is now a body plus its controls and the tree has a schedule (`STATE_SCHEMA` 2, `RECORDING_VERSION` 3). With `behaviour` in place, `legacyHash()` is gone.
+
 ### All simulation state lives in one plain-data tree
 
 **Decision:** Everything dynamic is in `sim.state` (`src/sim/state.ts`): entities with stable ids, a kind and a faction, each carrying its component (the player's body, a guard), plus the words of the simulation's random streams. Only numbers, booleans, strings, null, arrays and plain objects; entities refer to each other by id. Derived caches, such as the list of guards, live outside the tree and are rebuilt from it.

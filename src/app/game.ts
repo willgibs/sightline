@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Tuning } from '../config/tuning';
 import { FixedStepClock } from '../sim/core/clock';
 import { headingDegrees, lerp, moveTowards } from '../sim/core/math';
-import { exposure } from '../sim/entities/player';
+import { exposure } from '../sim/perception/visibility';
 import { generateWorld, simTuningKey, worldTuningKey, type SpawnKind, type World } from '../sim/gen/world';
 import { neutralInput } from '../sim/input';
 import { Recorder } from '../sim/record/recording';
@@ -15,6 +15,7 @@ import { InputController } from './input';
 import { Overlay } from './overlay';
 import { FrameStats, percentile } from './perf';
 import { missionSpec } from '../sim/mission';
+import { SystemProfile } from '../sim/profile';
 import { tuningProblems } from '../config/validate';
 
 /**
@@ -88,6 +89,9 @@ export class Game {
   private tickTimeSum = 0;
   private tickCount = 0;
   private tickWindow = 0;
+  /** Time per system, measured in the debug view only. */
+  private readonly profile = new SystemProfile(() => performance.now());
+  private systemCosts: ReturnType<SystemProfile['report']> = [];
   private bench: Bench | null = null;
   private benchRequested: boolean;
 
@@ -309,6 +313,7 @@ export class Game {
     if (!this.paused) {
       const ticks = this.clock.advance(dt * (this.debug ? TIME_SCALES[this.timeScaleIndex]! : 1));
       if (ticks > 0) {
+        this.sim.profiler = this.debug ? this.profile : null;
         const t0 = performance.now();
         for (let i = 0; i < ticks; i++) this.tick();
         this.tickTimeSum += performance.now() - t0;
@@ -329,6 +334,8 @@ export class Game {
     this.tickWindow += dt;
     if (this.tickWindow >= 1 && this.tickCount > 0) {
       this.tickMs = this.tickTimeSum / this.tickCount;
+      this.systemCosts = this.profile.report(this.tickCount);
+      this.profile.reset();
       this.tickTimeSum = 0;
       this.tickCount = 0;
       this.tickWindow = 0;
@@ -364,9 +371,9 @@ export class Game {
     const b = this.curr;
     const t = this.clock.alpha;
     const speed = lerp(a.speed, b.speed, t);
-    const stride = b.mode === 'idle' ? 1 : this.tuning.player.stride[b.mode];
+    const stride = b.gait === 'idle' ? 1 : this.tuning.player.stride[b.gait];
     this.bobPhase += (speed / stride) * Math.PI * dt;
-    const bob = -(BOB[b.mode] ?? 0) * this.tuning.view.headBob * Math.abs(Math.sin(this.bobPhase));
+    const bob = -(BOB[b.gait] ?? 0) * this.tuning.view.headBob * Math.abs(Math.sin(this.bobPhase));
     return {
       x: lerp(a.px, b.px, t),
       y: lerp(a.py, b.py, t) + lerp(a.eye, b.eye, t) + bob,
@@ -437,7 +444,7 @@ export class Game {
     const slopeDeg = (Math.atan(p.slopeTan) * 180) / Math.PI;
     const exp = exposure(p, T);
     const V = T.visibility;
-    const moveFactor = p.mode === 'idle' ? V.movement.still : p.mode === 'sprint' ? V.movement.sprinting : V.movement.moving;
+    const moveFactor = p.gait === 'idle' ? V.movement.still : p.gait === 'sprint' ? V.movement.sprinting : V.movement.moving;
     const sizes = this.recorder.sizes;
     const kb = (n: number) => (n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`);
     const mode = this.detached ? 'fly camera' : `${TIME_SCALES[this.timeScaleIndex]}× speed`;
@@ -446,12 +453,13 @@ export class Game {
       `seed ${w.seed} · tick ${this.sim.tick.toLocaleString('en-US')} · ${clock(played)} played · ${mode}`,
       `${s.fps.toFixed(0)} fps · frame ${s.frameMs.toFixed(1)} ms (p95 ${s.p95Ms.toFixed(1)}) · cpu ${s.cpuMs.toFixed(1)} ms · sim ${(this.tickMs * 1000).toFixed(0)} µs/tick`,
       `${r.calls} draws · ${(r.triangles / 1000).toFixed(0)}k tris · ${(r.lines / 1000).toFixed(0)}k lines`,
+      `systems ${this.systemCosts.map((c) => `${c.name} ${c.usPerTick.toFixed(0)}`).join(' · ') || '—'} µs`,
       ``,
       `PLAYER`,
       `pos ${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)} · heading ${headingDegrees(p.yaw).toFixed(0)}° · pitch ${((p.pitch * 180) / Math.PI).toFixed(0)}°`,
-      `${p.stance}${p.proneTransition ? ' (changing)' : ''} · ${p.mode} ${p.speed.toFixed(2)} m/s · ${surfaceName(p.surface)}${p.standingOn >= 0 ? ' (object)' : `, slope ${slopeDeg.toFixed(0)}°`}`,
+      `${p.stance}${p.proneTransition ? ' (changing)' : ''} · ${p.gait} ${p.speed.toFixed(2)} m/s · ${surfaceName(p.surface)}${p.standingOn >= 0 ? ' (object)' : `, slope ${slopeDeg.toFixed(0)}°`}`,
       `noise ${p.loudness.toFixed(2)} → heard within ${(p.loudness * T.noise.radiusPerUnit).toFixed(1)} m`,
-      `seen ×${exp.toFixed(2)} = ${p.stance} ${V.stance[p.stance]} × ${p.mode === 'idle' ? 'still' : 'moving'} ${moveFactor} × daylight ${V.light.lit}`,
+      `seen ×${exp.toFixed(2)} = ${p.stance} ${V.stance[p.stance]} × ${p.gait === 'idle' ? 'still' : 'moving'} ${moveFactor} × daylight ${V.light.lit}`,
       `aim ${this.aimText ?? '—'}`,
       ``,
       `WORLD`,

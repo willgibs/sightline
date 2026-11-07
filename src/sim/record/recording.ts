@@ -1,6 +1,6 @@
 import type { Tuning } from '../../config/tuning';
 import { hashValue } from '../core/hash';
-import type { MoveMode, Stance } from '../entities/player';
+import type { Gait, Stance } from '../motor/body';
 import type { SimEvent } from '../events';
 import type { SpawnKind } from '../gen/world';
 import { InputFlag, type InputFrame } from '../input';
@@ -21,8 +21,11 @@ import { assertTuning } from '../../config/validate';
  * inputs, states, events. All numbers little-endian.
  */
 
-/** 2: checkpoints hash the whole state tree (sim/state.ts). */
-export const RECORDING_VERSION = 2;
+/**
+ * 2: checkpoints hash the whole state tree (sim/state.ts).
+ * 3: the tree's layout changed (STATE_SCHEMA 2), so older checkpoints can't be compared.
+ */
+export const RECORDING_VERSION = 3;
 const MAGIC = [0x53, 0x4c, 0x52, 0x43]; // SLRC
 
 export interface RecordingHeader {
@@ -48,7 +51,7 @@ export interface RecordingHeader {
 }
 
 const STANCES: Stance[] = ['stand', 'crouch', 'prone'];
-const MODES: MoveMode[] = ['idle', 'sprint', 'walk', 'crouch', 'crawl'];
+const GAITS: Gait[] = ['idle', 'sprint', 'walk', 'crouch', 'crawl'];
 const STATE_BASE = 36;
 const STATE_PER_GUARD = 20;
 const EVENT_SIZE = 28;
@@ -64,7 +67,7 @@ export interface RecordedState {
   eye: number;
   speed: number;
   stance: Stance;
-  mode: MoveMode;
+  gait: Gait;
   /** x, y, z, yaw, headYaw per guard. */
   guards: Float32Array;
 }
@@ -120,7 +123,7 @@ export class Recorder {
       s.f32(p.eyeHeight);
       s.f32(p.speed);
       s.u8(STANCES.indexOf(p.stance));
-      s.u8(MODES.indexOf(p.mode));
+      s.u8(GAITS.indexOf(p.gait));
       s.u16(0);
       for (const g of sim.guards) {
         s.f32(g.x);
@@ -264,7 +267,7 @@ export class Recording {
       eye: 0,
       speed: 0,
       stance: 'stand',
-      mode: 'idle',
+      gait: 'idle',
       guards: new Float32Array(n * 5),
     };
     s.tick = v.getUint32(0, true);
@@ -276,7 +279,7 @@ export class Recording {
     s.eye = v.getFloat32(24, true);
     s.speed = v.getFloat32(28, true);
     s.stance = STANCES[v.getUint8(32)] ?? 'stand';
-    s.mode = MODES[v.getUint8(33)] ?? 'idle';
+    s.gait = GAITS[v.getUint8(33)] ?? 'idle';
     for (let i = 0; i < n * 5; i++) s.guards[i] = v.getFloat32(STATE_BASE + i * 4, true);
     return s;
   }

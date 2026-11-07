@@ -1,13 +1,14 @@
 import type { Tuning } from '../config/tuning';
 import { assertTuning } from '../config/validate';
-import { Hasher } from './core/hash';
 import { Rng } from './core/rng';
-import { createGuard, stepGuards, type GuardState } from './entities/guards';
-import { createPlayer, stepPlayer, type MoveMode, type PlayerContext, type PlayerState, type Stance } from './entities/player';
+import { createGuard, type GuardState } from './entities/guards';
+import { createPlayer, type PlayerControl } from './entities/player';
 import type { SimEvent } from './events';
 import { generateWorld, type SpawnKind, type World } from './gen/world';
 import { neutralInput, quantizeInput, type InputFrame } from './input';
 import { missionSpec } from './mission';
+import type { BodyState, Gait, Stance } from './motor/body';
+import type { MoveIntent } from './motor/motor';
 import {
   Faction,
   PLAYER_ID,
@@ -21,6 +22,7 @@ import {
   type PlayerEntity,
   type SimState,
 } from './state';
+import { SYSTEMS, planSystems, scheduleIn, type EntityIndex, type System, type TickContext } from './systems';
 
 /**
  * The simulation: pure TypeScript, no rendering, no DOM, fixed timestep.
@@ -31,7 +33,14 @@ import {
  *
  * All dynamic state lives in `state`, one tree of plain data (see state.ts). Save it
  * with `saveState()`, put it back with `restore()`, and the run continues bit for bit.
+ * A tick runs the systems in systems.ts, phase by phase.
  */
+
+/** Receives each system's start and end, to time them. The caller owns the clock. */
+export interface Profiler {
+  begin(system: System): void;
+  end(system: System): void;
+}
 
 /** Per-guard values in Snapshot.guards. */
 export const GUARD_FIELDS = 6; // x, y, z, yaw, headYaw, moving
@@ -47,7 +56,7 @@ export interface Snapshot {
   pitch: number;
   speed: number;
   stance: Stance;
-  mode: MoveMode;
+  gait: Gait;
   /** Guard entity ids, ascending; guards appear and disappear by id. */
   guardIds: number[];
   /** Each guard's camp spawn (world.camp.guards index), parallel to guardIds. */
@@ -62,37 +71,53 @@ export class Simulation {
   tuning: Tuning;
   /** All dynamic state. Systems write into it; nothing else holds simulation state. */
   state: SimState;
-  private readonly rng: Rng;
-  private readonly events: SimEvent[] = [];
-  private readonly ctx: PlayerContext;
-  private playerEntity!: PlayerEntity;
-  private guardEntities: GuardEntity[] = [];
-  private guardStates: GuardState[] = [];
   /** The exact (quantized) input the last tick ran on. Recorders store this. */
   readonly lastInput: InputFrame = neutralInput();
+  /** Set to time each system (`npm run sim -- --profile`). */
+  profiler: Profiler | null = null;
+  readonly systems: readonly System[];
+  /** Ticks between runs, per system. */
+  private readonly every: number[];
+  private readonly rng: Rng;
+  private readonly events: SimEvent[] = [];
+  private readonly intents = new Map<EntityId, MoveIntent>();
+  private index!: EntityIndex;
+  private readonly guardStates: GuardState[] = [];
+  private readonly ctx: { -readonly [K in keyof TickContext]: TickContext[K] };
 
-  constructor(world: World, tuning: Tuning) {
+  /** `systems` replaces the game's own list, for tests and scenes; recordings replay with the default. */
+  constructor(world: World, tuning: Tuning, systems: readonly System[] = SYSTEMS) {
     assertTuning(tuning);
     this.world = world;
     this.tuning = tuning;
     this.dt = 1 / tuning.sim.tickHz;
+    this.systems = systems;
+    this.every = planSystems(systems, tuning.sim.tickHz);
     this.rng = new Rng(world.seed, 'sim');
     const s = emptyState();
-    spawn(s, (id): PlayerEntity => ({ id, kind: 'player', faction: Faction.Player, player: createPlayer(world, tuning) }));
+    spawn(s, (id): PlayerEntity => ({ id, kind: 'player', faction: Faction.Player, ...createPlayer(world, tuning) }));
     for (let i = 0; i < world.camp.guards.length; i++) {
       spawn(s, (id): GuardEntity => ({ id, kind: 'guard', faction: Faction.Camp, guard: createGuard(world, i) }));
     }
     s.rng.sim = this.rng.stateWords();
     this.state = s;
-    this.ctx = {
+    this.reindex();
+    const ctx = {
       world,
       tuning,
       dt: this.dt,
       tick: 0,
-      guards: this.guardStates,
-      emit: (e) => this.events.push(e),
+      state: s,
+      index: this.index,
+      input: this.lastInput,
+      rng: this.rng,
+      intents: this.intents,
+      emit: (e: SimEvent) => {
+        this.events.push(e);
+      },
+      schedule: (seconds: number, kind: string, a = 0, b = 0) => scheduleIn(ctx.state, ctx.tick, ctx.dt, seconds, kind, a, b),
     };
-    this.reindex();
+    this.ctx = ctx;
   }
 
   static create(seed: string, tuning: Tuning, spawnKind: SpawnKind = 'overlook'): Simulation {
@@ -104,12 +129,17 @@ export class Simulation {
   }
 
   /** The player's body: a live reference into the state tree. */
-  get player(): PlayerState {
-    return this.playerEntity.player;
+  get player(): BodyState {
+    return this.index.player.body;
+  }
+
+  /** What the player's controls remember between ticks: a live reference into the state tree. */
+  get playerControl(): PlayerControl {
+    return this.index.player.control;
   }
 
   get playerId(): EntityId {
-    return this.playerEntity.id;
+    return this.index.player.id;
   }
 
   /** Guard bodies in entity order: live references into the state tree. */
@@ -121,10 +151,11 @@ export class Simulation {
   private reindex(): void {
     const player = this.state.entities.find((e): e is PlayerEntity => e.kind === 'player');
     if (!player || player.id !== PLAYER_ID) throw new Error('Simulation state has no player');
-    this.playerEntity = player;
-    this.guardEntities = this.state.entities.filter((e): e is GuardEntity => e.kind === 'guard');
+    const guards = this.state.entities.filter((e): e is GuardEntity => e.kind === 'guard');
+    this.index = { player, guards };
     this.guardStates.length = 0;
-    for (const g of this.guardEntities) this.guardStates.push(g.guard);
+    for (const g of guards) this.guardStates.push(g.guard);
+    this.intents.clear();
   }
 
   /**
@@ -137,11 +168,21 @@ export class Simulation {
     this.events.length = 0;
     const s = this.state;
     const tick = s.tick + 1;
-    this.ctx.tick = tick;
-    this.ctx.tuning = this.tuning;
+    const ctx = this.ctx;
+    ctx.tick = tick;
+    ctx.tuning = this.tuning;
+    ctx.state = s;
+    ctx.index = this.index;
     this.rng.setStateWords(s.rng.sim!);
-    stepGuards(this.guardEntities, this.world, this.tuning, this.dt, tick, this.rng, this.ctx.emit);
-    stepPlayer(this.player, this.lastInput, this.ctx);
+    const prof = this.profiler;
+    for (let k = 0; k < this.systems.length; k++) {
+      const every = this.every[k]!;
+      if (tick % every !== 0) continue;
+      const system = this.systems[k]!;
+      prof?.begin(system);
+      system.run(ctx, this.dt * every);
+      prof?.end(system);
+    }
     s.rng.sim = this.rng.stateWords();
     // Only a tick that completed counts, so a failure mid-tick never desynchronizes recorders.
     s.tick = tick;
@@ -167,7 +208,8 @@ export class Simulation {
   }
 
   snapshot(out?: Snapshot): Snapshot {
-    const n = this.guardEntities.length;
+    const guards = this.index.guards;
+    const n = guards.length;
     const s: Snapshot =
       out && out.guards.length === n * GUARD_FIELDS
         ? out
@@ -181,7 +223,7 @@ export class Simulation {
             pitch: 0,
             speed: 0,
             stance: 'stand',
-            mode: 'idle',
+            gait: 'idle',
             guardIds: [],
             guardSpawns: [],
             guards: new Float32Array(n * GUARD_FIELDS),
@@ -196,11 +238,11 @@ export class Simulation {
     s.pitch = p.pitch;
     s.speed = p.speed;
     s.stance = p.stance;
-    s.mode = p.mode;
+    s.gait = p.gait;
     s.guardIds.length = n;
     s.guardSpawns.length = n;
     for (let i = 0; i < n; i++) {
-      const e = this.guardEntities[i]!;
+      const e = guards[i]!;
       const g = e.guard;
       const o = i * GUARD_FIELDS;
       s.guardIds[i] = e.id;
@@ -218,24 +260,5 @@ export class Simulation {
   /** A hash of the complete dynamic state, for determinism checks: the whole state tree. */
   hash(): string {
     return hashState(this.state);
-  }
-
-  /**
-   * The hash Phase 0 used, field by field. Kept so restructuring can be proven to change
-   * nothing: a refactor must reproduce it bit for bit on the same runs.
-   */
-  legacyHash(): string {
-    const h = new Hasher();
-    const p = this.player;
-    h.u32(this.tick);
-    h.f64(p.x).f64(p.y).f64(p.z).f64(p.vx).f64(p.vy).f64(p.vz).f64(p.yaw).f64(p.pitch);
-    h.str(p.stance).f64(p.stanceTimer).f64(p.stanceDuration).f64(p.eyeFrom).f64(p.eyeHeight).f64(p.stride);
-    h.u32(p.grounded ? 1 : 0).u32(p.standingOn + 1).u32(p.proneTransition ? 1 : 0).str(p.queuedStance ?? '');
-    h.u32(p.sprintSuppressed ? 1 : 0).u32(p.sliding ? 1 : 0);
-    for (const g of this.guardStates) {
-      h.f64(g.x).f64(g.y).f64(g.z).f64(g.yaw).f64(g.headYaw).u32(g.waypoint).f64(g.wait).f64(g.stride).f64(g.scanTime);
-    }
-    for (const w of this.state.rng.sim!) h.u32(w);
-    return h.digest();
   }
 }

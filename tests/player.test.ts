@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { neutralInput, quantizeInput, type InputFrame } from '../src/sim/input';
-import { gait } from '../src/sim/entities/player';
+import { footfall } from '../src/sim/motor/footfall';
 import { Simulation } from '../src/sim/sim';
 import type { SimEvent } from '../src/sim/events';
 import { Blocks } from '../src/sim/world/colliders';
@@ -31,7 +31,7 @@ describe('player movement', () => {
       const sim = new Simulation(testWorld(), tuningCopy());
       hold(sim, 3, held, first);
       expect(sim.player.speed, name).toBeCloseTo(expected, 1);
-      expect(sim.player.mode).toBe(name);
+      expect(sim.player.gait).toBe(name);
     }
   });
 
@@ -48,7 +48,7 @@ describe('player movement', () => {
     const sim = new Simulation(testWorld(), t);
     hold(sim, 0.3, { moveZ: 1 }, { prone: true });
     expect(sim.player.stance).toBe('prone');
-    expect(sim.player.mode).toBe('crawl');
+    expect(sim.player.gait).toBe('crawl');
     expect(sim.player.eyeHeight).toBeGreaterThan(t.player.eyeHeight.prone);
     expect(sim.player.eyeHeight).toBeLessThan(t.player.eyeHeight.stand);
     hold(sim, 0.6, {});
@@ -95,7 +95,7 @@ describe('player movement', () => {
     expect(high.player.y).toBeCloseTo(3, 6);
     hold(high, 2, { moveZ: 1 });
     expect(high.player.y).toBeCloseTo(0, 6);
-    expect(high.player.grounded).toBe(true);
+    expect(high.player.motor).toBe('ground');
   });
 
   it('cannot stand up under something low', () => {
@@ -124,7 +124,7 @@ describe('controller edge cases (from code review)', () => {
     hold(sim, 1, {}, { prone: true });
     const events = hold(sim, 0.5, { moveZ: 1, sprint: true }, { prone: true });
     expect(sim.player.proneTransition).toBe(true);
-    expect(sim.player.mode).toBe('crawl');
+    expect(sim.player.gait).toBe('crawl');
     expect(sim.player.speed).toBeLessThanOrEqual(t.player.speed.crawl + 1e-9);
     expect(events.filter((e) => e.type === 'stance')).toHaveLength(1);
   });
@@ -240,10 +240,10 @@ describe('footstep noise', () => {
         if (e.type !== 'footstep') continue;
         steps++;
         fastest = Math.max(fastest, sim.player.speed);
-        expect(e.loudness).toBeCloseTo(gait(sim.player.speed, t).loudness * t.noise.surface.grass, 9);
+        expect(e.loudness).toBeCloseTo(footfall(sim.player.speed, t.player, t.noise).loudness * t.noise.surface.grass, 9);
       }
     }
-    expect(sim.player.mode).toBe('crawl');
+    expect(sim.player.gait).toBe('crawl');
     expect(steps).toBeGreaterThan(0);
     expect(steps).toBeLessThanOrEqual(2);
     expect(fastest).toBeGreaterThan(t.player.speed.crawl);
@@ -337,7 +337,7 @@ describe('controller edge cases (from the second audit)', () => {
     const lands: number[] = [];
     while (sim.player.y > 0.01 && ticks < 300) {
       for (const e of sim.step({ ...neutralInput(EAST), moveZ: 1 })) if (e.type === 'land') lands.push(e.speed);
-      if (!sim.player.grounded) airborne++;
+      if (sim.player.motor === 'air') airborne++;
       ticks++;
     }
     for (let i = 0; i < 10; i++) for (const e of sim.step(neutralInput(EAST))) if (e.type === 'land') lands.push(e.speed);
@@ -435,7 +435,7 @@ describe('controller edge cases (from the second audit)', () => {
     hold(sim, 0.2, {}, { crouch: true });
     hold(sim, 1, { moveZ: 1, sprint: true });
     expect(sim.player.stance).toBe('stand');
-    expect(sim.player.mode).toBe('sprint');
+    expect(sim.player.gait).toBe('sprint');
   });
 
   it('can stand up under a slab exactly at standing height', () => {

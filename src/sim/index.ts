@@ -7,7 +7,9 @@ export { generateWorld, type World, type Spawn, type SpawnKind } from './gen/wor
 export { neutralInput, quantizeInput, type InputFrame } from './input';
 export type { SimEvent, FootstepEvent, StanceEvent } from './events';
 export { PLAYER_SOURCE } from './events';
-export { exposure, type PlayerState, type Stance, type MoveMode } from './entities/player';
+export { exposure } from './perception/visibility';
+export type { BodyState, Gait, Stance } from './motor/body';
+export type { PlayerControl } from './entities/player';
 export type { GuardState } from './entities/guards';
 export { Recorder, Recording, type RecordingHeader } from './record/recording';
 export { resimulate, type ResimResult } from './record/resim';

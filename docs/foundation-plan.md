@@ -38,13 +38,14 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [x] Renderer, guard meshes and debug layer work from entity ids, so things can appear and disappear mid-run. (The recorder's event and state tracks follow in M4.)
 - [x] Proven bit-identical to Phase 0 through a `legacyHash()`, then switched to the generic hash.
 
-### M3 · Systems and the shared motor
-- [ ] `step()` runs a declared list of phases; each system has a rate and reports its time (`npm run sim -- --profile`); a deterministic scheduler queue for delayed effects.
-- [ ] Movement split into intent (input or AI to a `MoveIntent`) and one shared motor with modes (ground and air now), used by every body.
+### M3 · Systems and the shared motor ✓
+- [x] `step()` runs a declared list of phases; each system has a rate and reports its time (`npm run sim -- --profile`, and the debug view); a deterministic schedule for delayed effects, in the state tree.
+- [x] Movement split into intent (input or AI to a `MoveIntent`) and one shared motor with modes (ground and air now), usable by any body with its own spec. The guards join it in M5.
+- [x] The self-test pins `behaviour` (observable, every tick) separately from `state` (the whole tree), with the fuzzing bot added, so refactors prove themselves.
 
 ### M4 · Timed commands, the event log, recording v2
 - [ ] Tick input gains held states (optic, breath, lean) and a list of commands; precise commands carry the lag and view angles of the frame the player saw. Pose history of two ticks for hits between ticks.
-- [ ] One event registry: typed, with ids, times in seconds and causes; `explain(id)` walks the chain. Footstep and landing events carry the gait, so sound picks its voice from what the legs did rather than from loudness (today an uphill walk plays the crouch voice).
+- [ ] One event registry: typed, with ids, times in seconds and causes; `explain(id)` walks the chain. Every event carries its source as an entity id: today the player's events say −1 and stance events say nothing. Footstep and landing events carry the gait, so sound picks its voice from what the legs did rather than from loudness (today an uphill walk plays the crouch voice).
 - [ ] Recording v2: tagged tracks (header, inputs, states, events, annotations), build and version stamps, markers; snapshots cached in memory for exact seeking.
 - [ ] A strict loader: a bounds-checked reader, a `RecordingFormatError`, whole-record sizes, a size cap, no trailing bytes. The header adds the simulation tuning key, the world fingerprint and the tick-0 hash.
 - [ ] Tuning is frozen when a simulation or recorder takes it, and a tuning change mid-run becomes a track in the recording instead of a flag. A recorder records only the simulation it was made for.
@@ -60,7 +61,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 ### M6 · World, bodies, environment
 - [ ] `world/query.ts`: raycasts with hit point, normal, id, body part and surface; segment sweeps against moving bodies; sight lines. Colliders that can be inserted, moved and removed at runtime. `Blocks.Sound`. The rangefinder uses `raycast` instead of its own guard test.
 - [ ] A `TerrainQuery` interface (`heightAt`, `sample`, `surfaceAt`, `raycast`, `bounds`) for simulation systems; only generation and rendering read the heightfield's arrays.
-- [ ] `entities/body.ts`: head, torso and legs from each pose, from `tuning.bodies`; meshes and hitboxes built from the same numbers.
+- [ ] Body shapes (`bodyShape()` in `src/sim/motor/`): head, torso and legs from each pose, from `tuning.bodies`; meshes and hitboxes built from the same numbers. The motor's `BodySpec` moves to `tuning.bodies` too, with gravity going to the environment.
 - [ ] `EnvState` in the simulation: clock, wind, air (density, speed of sound); the sun's direction from deterministic math; the renderer reads the sun from the simulation.
 - [ ] One spatial grid: a 2.5 m map layer and a 0.5 m site layer recording walkable, blocks sound, cover height, indoors, surface and ambient masking.
 
@@ -86,7 +87,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [ ] Every dev session saves its recording and a telemetry report into `playtests/`; a marker key flags moments.
 - [ ] `npm run playtest -- <file>` re-simulates and summarizes a session.
 - [ ] A replay viewer with scrubbing.
-- [ ] Determinism checked in Chromium, Firefox and WebKit, and under Bun (JavaScriptCore), in CI. A long fuzzing-bot invariant run joins the weekly platform runs.
+- [ ] Determinism checked in Chromium, Firefox and WebKit, and under Bun (JavaScriptCore), in CI. A long fuzzing-bot invariant run joins the weekly platform runs. First, find out why the first browser-test run after a source change sometimes hangs (likely Vite's dependency optimizer); a rerun passes.
 
 ### M10 · Close out
 - [ ] `CLAUDE.md` gains the audit's rules as their milestones land: AI reads only `GuardMind`; systems join the phase list, never `step()` directly; anything drawn between ticks that changes an outcome, such as sway, is a pure function in `src/sim` that both sides evaluate; generation works in site frames; body sizes come from `tuning.bodies`; content definitions (rifle, ammunition, optics, throwables) live in tuning, so recordings embed them; rates are per second times `dt`; repair loops and searches get iteration budgets, never time budgets.
@@ -100,6 +101,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - M1: explicit generation inputs, tuning by owner and validated, the clock kept out of the simulation, the determinism audit's fixes.
 - The controller hardened from its audit: steep ground is a barrier from every angle, falls land audibly, the body is as tall as it is (`SIM_VERSION` 2).
 - M2: one plain-data state tree, save-states, entity ids through the renderer.
+- M3: declared system phases with rates, profiling and a schedule; the shared motor with ground and air modes; behaviour and state fingerprints.
 
 ## Deliberately later
 

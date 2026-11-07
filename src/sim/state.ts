@@ -1,6 +1,8 @@
 import { Hasher } from './core/hash';
 import type { GuardState } from './entities/guards';
-import type { PlayerState } from './entities/player';
+import type { PlayerControl } from './entities/player';
+import type { BodyState } from './motor/body';
+import { emptySchedule, type ScheduleState } from './schedule';
 
 /**
  * All of the simulation's dynamic state, in one tree of plain data: numbers, booleans,
@@ -16,8 +18,11 @@ import type { PlayerState } from './entities/player';
  * whole tree by construction, and a test checks that changing any leaf changes it.
  */
 
-/** Bumped when the tree's layout changes, so an old save-state is refused rather than misread. */
-export const STATE_SCHEMA = 1;
+/**
+ * Bumped when the tree's layout changes, so an old save-state is refused rather than
+ * misread. 2: the player is a body and its controls; the schedule.
+ */
+export const STATE_SCHEMA = 2;
 
 export type EntityId = number;
 
@@ -34,7 +39,10 @@ export interface PlayerEntity {
   id: EntityId;
   kind: 'player';
   faction: number;
-  player: PlayerState;
+  /** The physical body, moved by the shared motor. */
+  body: BodyState;
+  /** What the controls remember between ticks. */
+  control: PlayerControl;
 }
 
 export interface GuardEntity {
@@ -56,10 +64,12 @@ export interface SimState {
   entities: Entity[];
   /** Named random streams owned by the simulation. */
   rng: Record<string, RngWords>;
+  /** Delayed effects, in the order they fall due (schedule.ts). */
+  schedule: ScheduleState;
 }
 
 export function emptyState(): SimState {
-  return { schema: STATE_SCHEMA, tick: 0, nextId: 1, entities: [], rng: {} };
+  return { schema: STATE_SCHEMA, tick: 0, nextId: 1, entities: [], rng: {}, schedule: emptySchedule() };
 }
 
 /** Adds an entity with the next id. Entities stay in ascending id order. */

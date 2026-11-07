@@ -12,7 +12,7 @@ const engine = typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined' ? 'B
 console.log(`\nSIGHTLINE self-test · ${engine} · ${process.platform}/${process.arch}\n`);
 const results = runSelfTest(now);
 for (const r of results) {
-  console.log(`${r.ok ? '✓' : '✗'} ${r.name.padEnd(26)} ${r.got}${r.ok ? '' : `  (expected ${r.expected})`}  ${r.ms.toFixed(0)} ms`);
+  console.log(`${r.ok ? '✓' : '✗'} ${r.name.padEnd(30)} ${r.got}${r.ok ? '' : `  (expected ${r.expected})`}  ${r.ms.toFixed(0)} ms`);
 }
 const failed = results.filter((r) => !r.ok).length;
 console.log(failed ? `\n${failed} check(s) differ from the golden values.\n` : '\nAll checks match the golden values.\n');
