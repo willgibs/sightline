@@ -1,6 +1,8 @@
 node_modules
 dist/
 *.slrec
+# ...except the golden recording the tests re-simulate.
+!tests/golden/*.slrec
 .DS_Store
 *.log
 .vite/
