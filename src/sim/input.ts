@@ -1,11 +1,13 @@
-import { clamp, wrapAngle } from './core/math';
-
-const PI = 3.141592653589793;
-const TWO_PI = 6.283185307179586;
+import { MAX_COMMANDS, quantizeCommand, type Command } from './commands';
+import { quantAxis, quantPitch, quantYaw } from './quantize';
 
 /**
- * One tick of player intent. The browser builds these from keyboard and mouse; bots and
+ * One tick of player input. The browser builds these from keyboard and mouse; bots and
  * tests build them directly; recordings store them so a mission can be re-simulated.
+ *
+ * Three kinds of thing: continuous controls (movement axes, view angles), held states
+ * (sprint, an optic up, breath held, a lean), and discrete events: stance toggles and
+ * commands (commands.ts), which say exactly when within the frames on screen they happened.
  */
 export interface InputFrame {
   /** Strafe, -1 (left) to 1 (right). */
@@ -19,52 +21,73 @@ export interface InputFrame {
   /** View angles in radians (see math.ts for the yaw convention). */
   yaw: number;
   pitch: number;
+  /** The optic held up (Optic). Default none. */
+  optic?: number;
+  /** Breath held to steady the aim. */
+  breath?: boolean;
+  /** Leaning left (−1) or right (1). */
+  lean?: number;
+  /** Discrete actions this tick, usually none. */
+  commands?: readonly Command[];
 }
+
+/** An InputFrame as the simulation runs it: quantized, with every field present. */
+export interface TickInput extends InputFrame {
+  optic: Optic;
+  breath: boolean;
+  lean: -1 | 0 | 1;
+  commands: Command[];
+}
+
+export const Optic = { None: 0, Scope: 1, Binoculars: 2 } as const;
+export type Optic = (typeof Optic)[keyof typeof Optic];
 
 export const InputFlag = { Sprint: 1, Crouch: 2, Prone: 4 } as const;
 
-export function neutralInput(yaw = 0, pitch = 0): InputFrame {
-  return { moveX: 0, moveZ: 0, sprint: false, crouch: false, prone: false, yaw, pitch };
+export function neutralInput(yaw = 0, pitch = 0): TickInput {
+  return { moveX: 0, moveZ: 0, sprint: false, crouch: false, prone: false, yaw, pitch, optic: Optic.None, breath: false, lean: 0, commands: [] };
 }
 
 /**
  * Snaps an input to exactly what a recording stores (8-bit movement axes, 32-bit
- * angles). The live game feeds the simulation quantized input too, so playing a mission
- * and re-simulating its recording see identical numbers and stay in lockstep.
+ * angles, quantized commands). The live game feeds the simulation quantized input too,
+ * so playing a mission and re-simulating its recording see identical numbers and stay
+ * in lockstep.
  *
  * Quantizing is idempotent, bit for bit: quantizing a quantized frame changes nothing.
- * That is what makes a recorded value replay as itself. Non-finite values never get in:
- * an axis becomes 0 and an angle keeps its previous value (`out` holds the last frame),
- * because NaN would replay differently and its bits differ between engines.
+ * Non-finite values never get in: an axis becomes 0 and an angle keeps its previous
+ * value (`out` holds the last frame), because NaN would replay differently and its bits
+ * differ between engines.
  */
-export function quantizeInput(f: InputFrame, out: InputFrame = neutralInput()): InputFrame {
+export function quantizeInput(f: InputFrame, out: TickInput = neutralInput()): TickInput {
   out.moveX = quantAxis(f.moveX);
   out.moveZ = quantAxis(f.moveZ);
   out.sprint = f.sprint === true;
   out.crouch = f.crouch === true;
   out.prone = f.prone === true;
   out.yaw = quantYaw(Number.isFinite(f.yaw) ? f.yaw : out.yaw);
-  out.pitch = Math.fround(clamp(Number.isFinite(f.pitch) ? f.pitch : out.pitch, -1.5, 1.5));
+  out.pitch = quantPitch(Number.isFinite(f.pitch) ? f.pitch : out.pitch);
+  out.optic = f.optic === Optic.Scope || f.optic === Optic.Binoculars ? f.optic : Optic.None;
+  out.breath = f.breath === true;
+  out.lean = f.lean === -1 || f.lean === 1 ? f.lean : 0;
+  out.commands.length = 0;
+  const commands = f.commands ?? [];
+  for (let k = 0; k < commands.length && k < MAX_COMMANDS; k++) out.commands.push(quantizeCommand(commands[k]!));
   return out;
-}
-
-/** An axis to the nearest 1/127. Adding 0 turns −0 into +0, which a byte can't store. */
-function quantAxis(v: number): number {
-  return Math.round(clamp(Number.isFinite(v) ? v : 0, -1, 1) * 127) / 127 + 0;
-}
-
-/**
- * A yaw to 32 bits within (−π, π]. Rounding to 32 bits can land just outside the range
- * (fround(π) is above π), and re-wrapping that on replay would give different bits, so
- * an out-of-range result is folded back and rounded again.
- */
-export function quantYaw(a: number): number {
-  let v = Math.fround(wrapAngle(Number.isFinite(a) ? a : 0));
-  if (v > PI) v = Math.fround(v - TWO_PI);
-  else if (v <= -PI) v = Math.fround(v + TWO_PI);
-  return v;
 }
 
 export function inputFlags(f: InputFrame): number {
   return (f.sprint ? InputFlag.Sprint : 0) | (f.crouch ? InputFlag.Crouch : 0) | (f.prone ? InputFlag.Prone : 0);
+}
+
+/** The held states in one byte: optic in bits 0–1, breath in bit 2, lean in bits 3–4 (1 left, 2 right). */
+export function heldByte(f: TickInput): number {
+  return f.optic | (f.breath ? 4 : 0) | (f.lean === -1 ? 8 : f.lean === 1 ? 16 : 0);
+}
+
+export function fromHeldByte(b: number, out: TickInput): void {
+  const optic = b & 3;
+  out.optic = optic === Optic.Scope || optic === Optic.Binoculars ? optic : Optic.None;
+  out.breath = (b & 4) !== 0;
+  out.lean = b & 8 ? -1 : b & 16 ? 1 : 0;
 }

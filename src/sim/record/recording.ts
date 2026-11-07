@@ -3,16 +3,17 @@ import { hashValue } from '../core/hash';
 import type { Gait, Stance } from '../motor/body';
 import type { SimEvent } from '../events';
 import type { SpawnKind } from '../gen/world';
-import { InputFlag, type InputFrame } from '../input';
+import { neutralInput, type TickInput } from '../input';
 import type { Simulation } from '../sim';
-import { ByteReader, ByteWriter } from './bytes';
+import { ByteReader, ByteWriter, RecordingFormatError } from './bytes';
 import { readEvent, writeEvent } from './eventCodec';
+import { readInput, writeInput } from './inputCodec';
 import { assertTuning } from '../../config/validate';
 
 /**
  * Mission recordings.
  *
- * A recording holds two things. The input track (every tick, 12 bytes) can re-simulate
+ * A recording holds two things. The input track (every tick, 13 bytes and any commands) can re-simulate
  * the mission exactly, which turns any playtest into a reproducible bug report or a
  * regression test. The state track (10 Hz) and the event track drive the debrief replay
  * in Phase 2 and playtest telemetry, without re-simulating anything.
@@ -25,8 +26,9 @@ import { assertTuning } from '../../config/validate';
  * 2: checkpoints hash the whole state tree (sim/state.ts).
  * 3: the tree's layout changed (STATE_SCHEMA 2), so older checkpoints can't be compared.
  * 4: events from the registry (ids, times, sources, causes); STATE_SCHEMA 3.
+ * 5: held states and commands in the input track; STATE_SCHEMA 4 (pose history).
  */
-export const RECORDING_VERSION = 4;
+export const RECORDING_VERSION = 5;
 const MAGIC = [0x53, 0x4c, 0x52, 0x43]; // SLRC
 
 export interface RecordingHeader {
@@ -55,7 +57,6 @@ const STANCES: Stance[] = ['stand', 'crouch', 'prone'];
 const GAITS: Gait[] = ['idle', 'sprint', 'walk', 'crouch', 'crawl'];
 const STATE_BASE = 36;
 const STATE_PER_GUARD = 20;
-const INPUT_SIZE = 12;
 
 export interface RecordedState {
   tick: number;
@@ -102,14 +103,7 @@ export class Recorder {
    */
   record(sim: Simulation, events: readonly SimEvent[]): void {
     if (sim.tick !== this.ticks + 1) throw new Error(`Recorder missed a tick: at ${sim.tick}, recorded ${this.ticks}`);
-    const input = sim.lastInput;
-    const w = this.inputs;
-    w.i8(Math.round(input.moveX * 127));
-    w.i8(Math.round(input.moveZ * 127));
-    w.u8((input.sprint ? InputFlag.Sprint : 0) | (input.crouch ? InputFlag.Crouch : 0) | (input.prone ? InputFlag.Prone : 0));
-    w.u8(0);
-    w.f32(input.yaw);
-    w.f32(input.pitch);
+    writeInput(this.inputs, sim.lastInput);
 
     if (sim.tick % this.stateEvery === 0) {
       const p = sim.player;
@@ -184,7 +178,8 @@ function checkHeader(h: RecordingHeader, inputBytes: number): void {
   if (!h || typeof h !== 'object') fail('no header');
   if (typeof h.seed !== 'string' || (h.spawn !== 'overlook' && h.spawn !== 'edge')) fail('seed or spawn');
   const whole = (v: unknown, min: number) => typeof v === 'number' && Number.isInteger(v) && v >= min;
-  if (!whole(h.ticks, 0) || h.ticks * INPUT_SIZE !== inputBytes) fail(`${String(h.ticks)} ticks but ${inputBytes / INPUT_SIZE} inputs`);
+  // Every tick's input takes at least 13 bytes; checked before anything is sized by `ticks`.
+  if (!whole(h.ticks, 0) || h.ticks * 13 > inputBytes) fail(`${String(h.ticks)} ticks in ${inputBytes} bytes of input`);
   if (!whole(h.checkpointEvery, 1) || !whole(h.stateEvery, 1) || !whole(h.guardCount, 0) || h.guardCount > 4096) fail('counts');
   if (!Array.isArray(h.checkpoints) || h.checkpoints.length !== Math.floor(h.ticks / h.checkpointEvery)) fail('checkpoints');
   try {
@@ -223,18 +218,35 @@ export class Recording {
     return this.decoded;
   }
 
-  readInput(i: number, out: InputFrame): InputFrame {
-    const v = new DataView(this.inputs.buffer, this.inputs.byteOffset + i * INPUT_SIZE, INPUT_SIZE);
-    out.moveX = v.getInt8(0) / 127;
-    out.moveZ = v.getInt8(1) / 127;
-    const flags = v.getUint8(2);
-    out.sprint = (flags & InputFlag.Sprint) !== 0;
-    out.crouch = (flags & InputFlag.Crouch) !== 0;
-    out.prone = (flags & InputFlag.Prone) !== 0;
-    out.yaw = v.getFloat32(4, true);
-    out.pitch = v.getFloat32(8, true);
-    return out;
+  private inputIndex: Uint32Array | null = null;
+
+  /** Indexes the input track, checking it holds exactly `ticks` inputs. */
+  indexInputs(): void {
+    this.offsets();
   }
+
+  /** Where each tick's input starts in the input track. */
+  private offsets(): Uint32Array {
+    if (!this.inputIndex) {
+      const index = new Uint32Array(this.header.ticks);
+      const r = new ByteReader(this.inputs);
+      const scratch = neutralInput();
+      for (let i = 0; i < this.header.ticks; i++) {
+        index[i] = r.offset;
+        readInput(r, scratch);
+      }
+      if (r.remaining !== 0) throw new RecordingFormatError(`Corrupt recording: input past tick ${this.header.ticks}`);
+      this.inputIndex = index;
+    }
+    return this.inputIndex;
+  }
+
+  readInput(i: number, out: TickInput): TickInput {
+    const r = new ByteReader(this.inputs);
+    r.offset = this.offsets()[i]!;
+    return readInput(r, out);
+  }
+
 
   readState(k: number, out?: RecordedState): RecordedState {
     const n = this.header.guardCount;
@@ -294,6 +306,8 @@ export class Recording {
     const states = r.take(r.u32());
     const events = r.take(r.u32());
     checkHeader(header, inputs.length);
-    return new Recording(header, inputs, states, events);
+    const rec = new Recording(header, inputs, states, events);
+    rec.indexInputs(); // refuses an input track of the wrong length
+    return rec;
   }
 }

@@ -31,6 +31,16 @@ export type MotorModeName = 'ground' | 'air';
 /** A body's sizes and limits. Today the player's (tuning.player); M6 moves them to tuning.bodies. */
 export type BodySpec = Tuning['player'];
 
+/** Where a body was at the end of a tick: enough to place its eye and shape between ticks. */
+export interface PoseSample {
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  pitch: number;
+  eyeHeight: number;
+}
+
 export interface BodyState {
   /** Feet position. */
   x: number;
@@ -66,6 +76,12 @@ export interface BodyState {
   loudness: number;
   /** Collider stood on, or -1 for terrain. */
   standingOn: number;
+  /**
+   * The pose at the end of the last two ticks, newest first. Something that happened
+   * between ticks, such as a shot fired from a frame drawn between them, is resolved
+   * against these (poseAt).
+   */
+  history: [PoseSample, PoseSample];
 }
 
 const ids: number[] = [];
@@ -81,6 +97,8 @@ export function createBody(world: World, spec: BodySpec, x: number, z: number, f
   if (solidAround(world, x, z, y + spec.stepHeight, y + spec.height.stand, spec.radius)) {
     y = groundBelow(world, x, z, Infinity, spec.radius).height;
   }
+  const yaw = yawFromDirection(faceX, faceZ);
+  const pose = (): PoseSample => ({ x, y, z, yaw, pitch: 0, eyeHeight: spec.eyeHeight.stand });
   return {
     x,
     y,
@@ -88,7 +106,7 @@ export function createBody(world: World, spec: BodySpec, x: number, z: number, f
     vx: 0,
     vy: 0,
     vz: 0,
-    yaw: yawFromDirection(faceX, faceZ),
+    yaw,
     pitch: 0,
     stance: 'stand',
     stanceTimer: 0,
@@ -105,7 +123,46 @@ export function createBody(world: World, spec: BodySpec, x: number, z: number, f
     slopeTan: 0,
     loudness: 0,
     standingOn: -1,
+    history: [pose(), pose()],
   };
+}
+
+/** Moves the history on: the pose the body ends this tick with becomes the newest sample. Call before a tick moves the body. */
+export function pushHistory(b: BodyState): void {
+  const [h0, h1] = b.history;
+  h1.x = h0.x;
+  h1.y = h0.y;
+  h1.z = h0.z;
+  h1.yaw = h0.yaw;
+  h1.pitch = h0.pitch;
+  h1.eyeHeight = h0.eyeHeight;
+  h0.x = b.x;
+  h0.y = b.y;
+  h0.z = b.z;
+  h0.yaw = b.yaw;
+  h0.pitch = b.pitch;
+  h0.eyeHeight = b.eyeHeight;
+}
+
+/**
+ * Where the body was `lag` ticks before now (0 to 2), between its samples: now is the
+ * body's current state, 1 the end of the last tick, 2 the one before. Before the motor
+ * runs in a tick, "now" is the end of the previous tick, so a command with lag 1 − α
+ * finds the pose drawn at fraction α between the last two ticks.
+ */
+export function poseAt(b: BodyState, lag: number, out: PoseSample): PoseSample {
+  const [h0, h1] = b.history;
+  const l = lag < 0 ? 0 : lag > 2 ? 2 : lag;
+  const newer: PoseSample = l <= 1 ? b : h0;
+  const older = l <= 1 ? h0 : h1;
+  const t = l <= 1 ? l : l - 1; // 0 at the newer sample, 1 at the older
+  out.x = newer.x + (older.x - newer.x) * t;
+  out.y = newer.y + (older.y - newer.y) * t;
+  out.z = newer.z + (older.z - newer.z) * t;
+  out.yaw = newer.yaw; // angles come from the command, not from history
+  out.pitch = newer.pitch;
+  out.eyeHeight = newer.eyeHeight + (older.eyeHeight - newer.eyeHeight) * t;
+  return out;
 }
 
 /**

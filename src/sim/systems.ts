@@ -1,10 +1,12 @@
 import type { Tuning } from '../config/tuning';
+import { dcos, dsin } from './core/detmath';
 import type { Rng } from './core/rng';
 import { stepGuards } from './entities/guards';
 import { playerIntent } from './entities/player';
 import type { EventDraft } from './events';
 import type { World } from './gen/world';
-import type { InputFrame } from './input';
+import type { TickInput } from './input';
+import { poseAt, type PoseSample } from './motor/body';
 import { idleIntent, stepMotor, type Cylinder, type MoveIntent } from './motor/motor';
 import { popDue, scheduleAt, ticksAfter, type Scheduled } from './schedule';
 import type { EntityId, GuardEntity, PlayerEntity, SimState } from './state';
@@ -54,7 +56,7 @@ export interface TickContext {
   readonly state: SimState;
   readonly index: EntityIndex;
   /** This tick's input, already quantized. */
-  readonly input: InputFrame;
+  readonly input: TickInput;
   /** The shared random stream, until M5 gives each entity its own. */
   readonly rng: Rng;
   /** What each body wants this tick, by entity id: written in 'intent', read in 'motor'. */
@@ -86,6 +88,8 @@ const intentFor = (ctx: TickContext, id: EntityId): MoveIntent => {
   return i;
 };
 
+const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
+
 /** Scratch: the other bodies the moving one collides with, rewritten for each body. */
 const others: Cylinder[] = [];
 const cylinders: Cylinder[] = [];
@@ -108,6 +112,32 @@ export function scheduleSystem(handlers: Readonly<Record<string, ScheduleHandler
 
 export const SYSTEMS: readonly System[] = [
   scheduleSystem(SCHEDULE_HANDLERS),
+  {
+    // The player's commands, resolved against what was on screen when they were given.
+    name: 'player-commands',
+    phase: 'commands',
+    run(ctx) {
+      const p = ctx.index.player;
+      for (const c of ctx.input.commands) {
+        if (c.kind === 'fire') {
+          // The moment the player saw: `lag` ticks before this tick's start state.
+          poseAt(p.body, c.lag, pose);
+          const cp = dcos(c.pitch);
+          ctx.emit({
+            type: 'shot',
+            source: p.id,
+            t: (ctx.tick - 1 - c.lag) / ctx.tuning.sim.tickHz,
+            x: pose.x,
+            y: pose.y + pose.eyeHeight,
+            z: pose.z,
+            dx: -dsin(c.yaw) * cp,
+            dy: dsin(c.pitch),
+            dz: -dcos(c.yaw) * cp,
+          });
+        }
+      }
+    },
+  },
   {
     name: 'player-intent',
     phase: 'intent',
@@ -148,6 +178,15 @@ export const SYSTEMS: readonly System[] = [
     },
   },
 ];
+
+/** A copy of `systems` with `extra` added at the end of its phase (for tests and scenes). */
+export function withSystem(systems: readonly System[], extra: System): System[] {
+  const at = PHASES.indexOf(extra.phase);
+  const k = systems.findIndex((s) => PHASES.indexOf(s.phase) > at);
+  const out = [...systems];
+  out.splice(k < 0 ? out.length : k, 0, extra);
+  return out;
+}
 
 /**
  * Checks a list of systems and works out how often each runs: in phase order, unique

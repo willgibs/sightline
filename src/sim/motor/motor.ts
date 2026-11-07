@@ -6,7 +6,7 @@ import type { World } from '../gen/world';
 import { Blocks, circleOverlaps, pushOutCircle } from '../world/colliders';
 import { makeTerrainSample } from '../world/heightfield';
 import { surfaceLoudness } from '../world/surfaces';
-import { bodyHeight, groundBelow, type BodySpec, type BodyState, type Gait, type MotorModeName, type Stance } from './body';
+import { bodyHeight, groundBelow, pushHistory, type BodySpec, type BodyState, type Gait, type MotorModeName, type Stance } from './body';
 import { footfall } from './footfall';
 
 /**
@@ -120,6 +120,7 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
   const { world, tuning, dt } = ctx;
   const tanMax = dtanDeg(spec.maxSlopeDeg);
 
+  pushHistory(b);
   b.yaw = i.yaw;
   b.pitch = clamp(i.pitch, -spec.pitchLimit, spec.pitchLimit);
   easeStance(b, spec, dt);

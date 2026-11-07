@@ -21,8 +21,9 @@ import { emptySchedule, type ScheduleState } from './schedule';
 /**
  * Bumped when the tree's layout changes, so an old save-state is refused rather than
  * misread. 2: the player is a body and its controls; the schedule. 3: event ids.
+ * 4: bodies keep their last two poses.
  */
-export const STATE_SCHEMA = 3;
+export const STATE_SCHEMA = 4;
 
 export type EntityId = number;
 

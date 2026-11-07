@@ -1,9 +1,12 @@
-import type { InputFrame } from '../sim/input';
+import { Optic, type InputFrame } from '../sim/input';
+import type { Command } from '../sim/commands';
+import { CommandLatch } from './commandLatch';
 
 /**
  * Keyboard and mouse. Mouse look updates the view angles every frame for responsiveness;
  * movement keys and stance toggles are sampled once per simulation tick. Stance keys are
- * latched between ticks so a quick tap is never lost.
+ * latched between ticks so a quick tap is never lost, and clicks are latched against the
+ * frame on screen (commandLatch.ts), so a shot goes where the crosshair was.
  */
 
 const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'Space', 'KeyQ', 'KeyE']);
@@ -20,6 +23,9 @@ export class InputController {
   pitchLimit = 1.45;
   onAction: ((code: string) => void) | null = null;
   onLockChange: ((locked: boolean) => void) | null = null;
+  /** Clicks waiting for the next tick, each remembering its frame. The game reports frames to it. */
+  readonly latch = new CommandLatch();
+  private readonly commands: Command[] = [];
   private readonly keys = new Set<string>();
   private crouchLatched = false;
   private proneLatched = false;
@@ -48,7 +54,9 @@ export class InputController {
       this.pitch = Math.max(-this.pitchLimit, Math.min(this.pitchLimit, this.pitch - e.movementY * k));
     });
     on(document, 'mousedown', (e) => {
-      if (this.locked && e.button === 2) this.zoomHeld = true;
+      if (!this.locked) return;
+      if (e.button === 2) this.zoomHeld = true;
+      else if (e.button === 0) this.latch.latch('fire');
     });
     on(document, 'mouseup', (e) => {
       if (e.button === 2) this.zoomHeld = false;
@@ -118,8 +126,16 @@ export class InputController {
     else if (!MOVE_KEYS.has(e.code)) this.onAction?.(e.code);
   }
 
-  /** Fills one tick of player input. `frozen` sends a neutral frame (detached camera). */
-  sampleTick(out: InputFrame, frozen: boolean): InputFrame {
+  /** Automation: click, as if the left button were pressed now. */
+  click(): void {
+    this.latch.latch('fire');
+  }
+
+  /**
+   * Fills one tick of player input. `frozen` sends a neutral frame (detached camera).
+   * `startTick` is the simulation's tick before this one runs, which dates the clicks.
+   */
+  sampleTick(out: InputFrame, frozen: boolean, startTick: number): InputFrame {
     const k = this.keys;
     out.moveX = frozen ? 0 : (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0);
     out.moveZ = frozen ? 0 : (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
@@ -130,6 +146,14 @@ export class InputController {
     this.proneLatched = false;
     out.yaw = this.yaw;
     out.pitch = this.pitch;
+    out.optic = !frozen && this.zoomHeld ? Optic.Binoculars : Optic.None;
+    if (frozen) {
+      this.latch.clear();
+      this.commands.length = 0;
+    } else {
+      this.latch.drain(startTick, this.commands);
+    }
+    out.commands = this.commands;
     return out;
   }
 

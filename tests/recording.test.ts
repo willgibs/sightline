@@ -68,8 +68,9 @@ describe('recordings', () => {
   it('pinpoint where a tampered recording diverges', () => {
     const { rec } = play(60);
     const bytes = rec.inputs.slice();
-    // Flip the forward axis at tick 900 (30 s in).
-    const at = 900 * 12 + 1;
+    // Flip the forward axis at tick 900 (30 s in). The bot gives no commands, so every
+    // tick's input is 13 bytes.
+    const at = 900 * 13 + 1;
     bytes[at] = bytes[at] === 127 ? 0 : 127;
     const tampered = new Recording(rec.header, bytes, rec.states, rec.events);
     const result = resimulate(tampered, world);

@@ -5,7 +5,7 @@ import { createGuard, type GuardState } from './entities/guards';
 import { createPlayer, type PlayerControl } from './entities/player';
 import type { EventDraft, SimEvent } from './events';
 import { generateWorld, type SpawnKind, type World } from './gen/world';
-import { neutralInput, quantizeInput, type InputFrame } from './input';
+import { neutralInput, quantizeInput, type InputFrame, type TickInput } from './input';
 import { missionSpec } from './mission';
 import type { BodyState, Gait, Stance } from './motor/body';
 import type { MoveIntent } from './motor/motor';
@@ -72,7 +72,7 @@ export class Simulation {
   /** All dynamic state. Systems write into it; nothing else holds simulation state. */
   state: SimState;
   /** The exact (quantized) input the last tick ran on. Recorders store this. */
-  readonly lastInput: InputFrame = neutralInput();
+  readonly lastInput: TickInput = neutralInput();
   /** Set to time each system (`npm run sim -- --profile`). */
   profiler: Profiler | null = null;
   readonly systems: readonly System[];

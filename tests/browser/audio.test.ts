@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SoundEngine, type MuffleFn } from '../../src/audio/engine';
 import { footstep, makeNoiseBuffers, makeRand } from '../../src/audio/voices';
+import { PLAYER_ID } from '../../src/sim/state';
 import { defaultTuning } from '../../src/config/tuning';
 import type { FootstepEvent } from '../../src/sim/events';
 import { SURFACE_NAMES, type Surface } from '../../src/sim/world/surfaces';
@@ -86,8 +87,8 @@ function weightK(L: Float32Array, R: Float32Array): Float32Array {
   return out;
 }
 
-function step(x: number, z: number, radius: number, surface: Surface = 2, loudness = 1.15, source = 0, y = 1.65): FootstepEvent {
-  return { type: 'footstep', id: 1, tick: 1, t: 1 / 30, source, cause: 0, x, y, z, surface, loudness, radius, gait: 'walk' };
+function step(x: number, z: number, radius: number, surface: Surface = 2, loudness = 1.15, source = 0, y = 1.65, gait: FootstepEvent['gait'] = 'walk'): FootstepEvent {
+  return { type: 'footstep', id: 1, tick: 1, t: 1 / 30, source, cause: 0, x, y, z, surface, loudness, radius, gait };
 }
 
 describe.runIf(canSuspend)('the sound engine', () => {
@@ -131,8 +132,8 @@ describe.runIf(canSuspend)('the sound engine', () => {
     const loud = N.movement.sprint * N.surface.gravel;
     const soft = N.movement.crouch * N.surface.grass;
     const ear = 1.65;
-    const sprint = await render((e) => e.play([step(0, 0, loud * N.radiusPerUnit, 2, loud, -1, 0)], ear));
-    const crouch = await render((e) => e.play([step(0, 0, soft * N.radiusPerUnit, 0, soft, -1, 0)], ear));
+    const sprint = await render((e) => e.play([step(0, 0, loud * N.radiusPerUnit, 2, loud, PLAYER_ID, 0, 'sprint')], ear));
+    const crouch = await render((e) => e.play([step(0, 0, soft * N.radiusPerUnit, 0, soft, PLAYER_ID, 0, 'crouch')], ear));
     expect(sprint.loudness - crouch.loudness).toBeCloseTo(20 * Math.log10(loud / soft), -0.5);
   });
 });

@@ -34,9 +34,9 @@ export const GOLDEN = {
   world: '2ea333d491d7568c',
   /** 60 s of play: the person-like bot in two valleys, the fuzzing bot in one. */
   play: {
-    'TAL-4471 wander': { behaviour: '140cae1b09e871be', state: '286715cdcae5b9be' },
-    'MUD-9031 wander': { behaviour: 'dee3211739445415', state: 'be19428592a082bc' },
-    'TAL-4471 chaos': { behaviour: '68fd0635afb0746d', state: '0ef96ed312adf847' },
+    'TAL-4471 wander': { behaviour: '140cae1b09e871be', state: '69fe3c17ff1dfcea' },
+    'MUD-9031 wander': { behaviour: 'dee3211739445415', state: 'd2c68d76c846c434' },
+    'TAL-4471 chaos': { behaviour: '68fd0635afb0746d', state: '4480a7cf9d64c71b' },
   },
 } as const;
 

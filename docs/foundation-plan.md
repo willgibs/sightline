@@ -44,7 +44,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [x] The self-test pins `behaviour` (observable, every tick) separately from `state` (the whole tree), with the fuzzing bot added, so refactors prove themselves.
 
 ### M4 · Timed commands, the event log, recording v2
-- [ ] Tick input gains held states (optic, breath, lean) and a list of commands; precise commands carry the lag and view angles of the frame the player saw. Pose history of two ticks for hits between ticks.
+- [x] Tick input gains held states (optic, breath, lean) and a list of commands; precise commands carry the lag and view angles of the frame the player saw. Pose history of two ticks for hits between ticks. A `fire` command emits a `shot` event from the eye the player saw; a test proves it at six frame rates.
 - [x] One event registry: typed, with ids, times in seconds and causes; `explain(id)` walks the chain. Every event carries its source as an entity id. Footsteps carry the gait, so sound picks its voice from what the legs did rather than from loudness.
 - [ ] Recording v2: tagged tracks (header, inputs, states, events, annotations), build and version stamps, markers; snapshots cached in memory for exact seeking.
 - [ ] A strict loader: a bounds-checked reader, a `RecordingFormatError`, whole-record sizes, a size cap, no trailing bytes. The header adds the simulation tuning key, the world fingerprint and the tick-0 hash.
@@ -82,6 +82,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [ ] Tree canopies drawn so an eye inside one sees it, not a hole (they are single-sided cones today).
 - [ ] The debug time scale applies after the frame clamp, so fast-forward through a hitch stays fast.
 - [ ] A controller debug overlay: ground slope against the limit, sliding, rim probes, and the pushes of each resolve step (rule 8).
+- [ ] Head bob is drawn but not simulated, so a shot leaves from the eye without it. Turn bob off with an optic up, or make it a pure function of simulation time that both sides evaluate (with lab B).
 
 ### M9 · The playtest loop
 - [ ] Every dev session saves its recording and a telemetry report into `playtests/`; a marker key flags moments.

@@ -328,6 +328,8 @@ export class Game {
 
     if (this.debug) this.updateAim(pose);
     this.renderer.render(this.prev, this.curr, this.clock.alpha, this.time, pose, this.debug ? this.aim : null);
+    // A click from now on is about this frame.
+    this.input.latch.frameShown(this.sim.tick, this.clock.alpha, pose.yaw, pose.pitch);
     this.hud.updateCompass(pose.yaw);
     this.hud.setRange(this.debug ? this.aimText : null);
 
@@ -352,7 +354,7 @@ export class Game {
 
   private tick(): void {
     const frozen = this.detached || this.bench !== null;
-    this.input.sampleTick(this.raw, frozen);
+    this.input.sampleTick(this.raw, frozen, this.sim.tick);
     if (frozen) {
       this.raw.yaw = this.detached ? this.heldYaw : this.sim.player.yaw;
       this.raw.pitch = this.detached ? this.heldPitch : this.sim.player.pitch;
@@ -524,6 +526,8 @@ export class Game {
       body: () => this.setDetached(false),
       hold: (codes: string[]) => this.input.holdKeys(codes),
       tap: (code: 'KeyC' | 'KeyZ') => this.input.tap(code),
+      /** Click as if the left button were pressed now: a shot from the frame on screen. */
+      click: () => this.input.click(),
       zoom: (on: boolean) => {
         this.input.zoomHeld = on;
       },

@@ -43,6 +43,7 @@ export const palette = {
     stepPlayer: '#0b8fa8',
     stepGuard: '#e8590c',
     aim: '#e03131',
+    shot: '#f03e3e',
     bounds: '#c92a2a',
     collider: '#7048e8',
     ridges: ['#3b5bdb', '#0ca678', '#ae3ec9', '#f08c00', '#1098ad', '#d6336c', '#5c940d', '#495057'],

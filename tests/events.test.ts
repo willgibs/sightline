@@ -26,6 +26,7 @@ function events(): { sim: Simulation; all: SimEvent[] } {
   const walk = { ...neutralInput(), moveZ: 1 };
   const landings: SimEvent[] = [];
   for (let i = 0; i < 60; i++) for (const e of drop.step(walk)) if (e.type === 'land') landings.push({ ...e });
+  for (const e of drop.step({ ...walk, commands: [{ kind: 'fire', lag: 0.5, yaw: 0.3, pitch: -0.1 }] })) if (e.type === 'shot') landings.push({ ...e });
   // Renumber after the bot's events, as if one run.
   landings.forEach((e, k) => all.push({ ...e, id: all.length + k + 1 }));
   return { sim, all };
@@ -37,7 +38,8 @@ describe('events', () => {
   it('are numbered in order, stamped with their tick and a time inside it', () => {
     expect(all.length).toBeGreaterThan(100);
     all.forEach((e) => {
-      expect(e.t).toBeGreaterThan((e.tick - 1) / 30);
+      // A shot happened when the player saw it, before its tick began.
+      expect(e.t).toBeGreaterThan((e.tick - (e.type === 'shot' ? 3 : 1)) / 30);
       expect(e.t).toBeLessThanOrEqual(e.tick / 30);
     });
     const fromBot = all.slice(0, sim.state.nextEventId - 1);
@@ -49,7 +51,7 @@ describe('events', () => {
     const ids = new Set(sim.state.entities.map((e) => e.id));
     for (const e of all) expect(ids.has(e.source)).toBe(true);
     const types = new Set(all.filter((e) => e.source === PLAYER_ID).map((e) => e.type));
-    expect([...types].sort()).toEqual(['footstep', 'land', 'stance']);
+    expect([...types].sort()).toEqual(['footstep', 'land', 'shot', 'stance']);
     expect(all.some((e) => e.source !== PLAYER_ID && e.type === 'footstep')).toBe(true);
   });
 
@@ -72,7 +74,8 @@ describe('events', () => {
       expect(Object.keys(back).sort()).toEqual(Object.keys(e).sort());
       for (const [k, v] of Object.entries(e)) {
         const got = (back as unknown as Record<string, unknown>)[k];
-        if (typeof v === 'number' && !Number.isInteger(v) && k !== 't') expect(got).toBe(Math.fround(v));
+        const exact = k === 't' || e.type === 'shot';
+        if (typeof v === 'number' && !Number.isInteger(v) && !exact) expect(got).toBe(Math.fround(v));
         else expect(got).toBe(v);
       }
     }

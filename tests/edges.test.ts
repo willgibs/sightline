@@ -4,7 +4,8 @@ import { FixedStepClock } from '../src/sim/core/clock';
 import { datan2, dtanDeg } from '../src/sim/core/detmath';
 import { Hasher } from '../src/sim/core/hash';
 import { Rng } from '../src/sim/core/rng';
-import { neutralInput, quantizeInput, quantYaw, type InputFrame } from '../src/sim/input';
+import { neutralInput, quantizeInput, type InputFrame } from '../src/sim/input';
+import { quantYaw } from '../src/sim/quantize';
 import { missionSpec } from '../src/sim/mission';
 import { ByteWriter } from '../src/sim/record/bytes';
 import { Recorder, Recording } from '../src/sim/record/recording';
@@ -171,6 +172,7 @@ describe('tuning validation', () => {
     expect(() => Recording.fromBytes(tamper((h) => ((h.tuning as typeof defaultTuning).gen.props.treeSpacing = 0)))).toThrow(/treeSpacing/);
     expect(() => Recording.fromBytes(tamper((h) => ((h.tuning as { player: Record<string, unknown> }).player.walk = 99)))).toThrow(/Corrupt recording/);
     expect(() => Recording.fromBytes(tamper((h) => ((h.tuning as typeof defaultTuning).player.speed.walk = 3.5)))).toThrow(/does not match its hash/);
-    expect(() => Recording.fromBytes(tamper((h) => (h.ticks = 1e9)))).toThrow(/ticks/);
+    expect(() => Recording.fromBytes(tamper((h) => (h.ticks = 1e9)))).toThrow(/ticks in/);
+    expect(() => Recording.fromBytes(tamper((h) => (h.ticks = 59)))).toThrow(/Corrupt recording/);
   });
 });

@@ -8,7 +8,7 @@ import { stepMotor, type MotorContext, type MoveIntent } from '../src/sim/motor/
 import { emptySchedule, popDue, scheduleAt, ticksAfter, type Scheduled } from '../src/sim/schedule';
 import { Simulation } from '../src/sim/sim';
 import { assertPlain } from '../src/sim/state';
-import { SYSTEMS, planSystems, scheduleSystem, type ScheduleHandler, type System } from '../src/sim/systems';
+import { SYSTEMS, planSystems, scheduleSystem, withSystem, type ScheduleHandler, type System } from '../src/sim/systems';
 import { Blocks } from '../src/sim/world/colliders';
 import { Surface } from '../src/sim/world/surfaces';
 import { testWorld, tuningCopy } from './fixtures';
@@ -30,7 +30,7 @@ describe('the system list', () => {
   it('runs a slower system on a fixed rhythm, with the time since its last run', () => {
     const runs: Array<{ tick: number; dt: number }> = [];
     const slow: System = { name: 'slow', phase: 'awareness', hz: 10, run: (ctx, dt) => runs.push({ tick: ctx.tick, dt }) };
-    const sim = new Simulation(testWorld(), tuningCopy(), [...SYSTEMS, slow]);
+    const sim = new Simulation(testWorld(), tuningCopy(), withSystem(SYSTEMS, slow));
     for (let i = 0; i < 9; i++) sim.step(neutralInput());
     expect(runs.map((r) => r.tick)).toEqual([3, 6, 9]);
     for (const r of runs) expect(r.dt).toBeCloseTo(0.1, 12);
@@ -89,7 +89,7 @@ describe('the schedule', () => {
         if (ctx.tick === 1) ctx.schedule(0.2, 'ping', 4);
       },
     };
-    const systems = [scheduleSystem({ ping }), kick, ...SYSTEMS.slice(1)];
+    const systems = withSystem([scheduleSystem({ ping }), ...SYSTEMS.slice(1)], kick);
     return { sim: new Simulation(testWorld(), tuningCopy(), systems), pings };
   }
 
@@ -117,7 +117,7 @@ describe('the schedule', () => {
 
   it('refuses an entry nothing handles', () => {
     const kick: System = { name: 'kick', phase: 'intent', run: (ctx) => ctx.tick === 1 && ctx.schedule(0.1, 'nobody') };
-    const sim = new Simulation(testWorld(), tuningCopy(), [SYSTEMS[0]!, kick, ...SYSTEMS.slice(1)]);
+    const sim = new Simulation(testWorld(), tuningCopy(), withSystem(SYSTEMS, kick));
     expect(() => {
       for (let i = 0; i < 10; i++) sim.step(neutralInput());
     }).toThrow(/No handler/);

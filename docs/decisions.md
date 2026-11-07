@@ -6,6 +6,18 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### A click is about the frame the player saw
+
+**Decision:** The tick input carries held states (an optic up, breath held, a lean) and a list of commands. A precise command such as `fire` carries what was on screen: its `lag` (how many ticks before the consuming tick's start state the frame was, from 0 to 2, stored to 1/120 of a tick) and that frame's view angles. The browser latches each click against the frame on screen (`app/commandLatch.ts`): 1 − α, plus a tick for each tick that ran since. Bodies keep their pose at the end of the last two ticks, and the simulation resolves a precise command against that history (`poseAt`), so a shot leaves from the eye the player saw, along the crosshair they saw. Each `fire` emits a `shot` event, timed when it happened; the debug view draws it to where it stops.
+
+**Why:** The screen draws between the last two simulation states, so it runs about a tick behind the newest one, and mouse look runs at frame rate. A shot taken at the next tick with that tick's aim would miss by up to 9 cm at 300 m against an 11.5 cm head: exactly lab B's exit test. Lab B builds the ballistics; the timing has to be right underneath it first, because tuning lead and holdover around tick-quantized shots and fixing it later would change every shot.
+
+**Guarded by:** `tests/timing.test.ts` drives the simulation the way the game does (fixed-step clock, input per tick, interpolated frames, latched clicks) with the player sprinting and the view sweeping. At 30, 60, 144, 240 and 47 fps, and at an uneven frame rate, every shot leaves within 1 mm of the camera of the frame clicked on and along its crosshair. With the history ignored, all six fail.
+
+**Not yet:** head bob is drawn but not simulated, so a shot leaves from the eye without it (up to about 3 cm lower or higher). Lab B decides between turning bob off with an optic up and simulating it.
+
+Commands are recorded with the input (`RECORDING_VERSION` 5); the pose history is state (`STATE_SCHEMA` 4). No bot fires, so the `behaviour` fingerprints held.
+
 ### Events come from one registry, with ids, times, sources and causes
 
 **Decision:** Every event has one type from the registry in `src/sim/events.ts`, an id (from 1, in order, kept in the state tree), its tick, the moment it happened in seconds, the entity that made it, and the event that caused it (or 0). Sounds are one family: a position, a surface, a loudness and a radius. The registry says how each field is stored, so the recorder encodes events generically (`record/eventCodec.ts`) and the compiler rejects a type without a complete entry. `EventLog.explain(id)` walks causes back to the first.

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Tuning } from '../config/tuning';
 import { lerp } from '../sim/core/math';
-import type { SimEvent } from '../sim/events';
+import { isSound, type SimEvent } from '../sim/events';
 import { PLAYER_ID } from '../sim/state';
 import type { World } from '../sim/gen/world';
 import { GUARD_FIELDS, type Snapshot } from '../sim/sim';
@@ -21,6 +21,9 @@ const CONE_RINGS = 6;
 const RING_POINTS = 48;
 const RING_POOL = 64;
 const RING_LIFE = 0.9;
+const SHOT_POOL = 8;
+const SHOT_LIFE = 8;
+const SHOT_RANGE = 1500;
 
 interface SoundRing {
   line: THREE.LineLoop;
@@ -44,6 +47,9 @@ export class DebugLayer {
   private readonly facing: THREE.LineSegments;
   private readonly rings: SoundRing[] = [];
   private nextRing = 0;
+  private readonly shots: Array<{ line: THREE.LineSegments; material: THREE.LineBasicMaterial; start: number; active: boolean }> = [];
+  private nextShot = 0;
+  private readonly hit = { dist: Infinity, id: -1 };
   private readonly aim: THREE.LineSegments;
   private colliders: THREE.LineSegments | null = null;
   private perches: THREE.Group | null = null;
@@ -84,6 +90,19 @@ export class DebugLayer {
       line.visible = false;
       this.group.add(line);
       this.rings.push({ line, material, x: 0, y: 0, z: 0, radius: 1, start: 0, active: false });
+    }
+
+    // Shots: straight from the muzzle to whatever stops them, with a cross where they
+    // stop (lab B adds the drop and what was hit).
+    for (let i = 0; i < SHOT_POOL; i++) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(8 * 3), 3));
+      const material = new THREE.LineBasicMaterial({ color: palette.debug.shot, transparent: true, depthWrite: false });
+      const line = new THREE.LineSegments(geo, material);
+      line.frustumCulled = false;
+      line.visible = false;
+      this.group.add(line);
+      this.shots.push({ line, material, start: 0, active: false });
     }
 
     // Aim marker: a small 3D cross.
@@ -141,7 +160,11 @@ export class DebugLayer {
 
   addEvents(events: readonly SimEvent[], time: number): void {
     for (const e of events) {
-      if (e.type !== 'footstep') continue;
+      if (e.type === 'shot') {
+        this.addShot(e.x, e.y, e.z, e.dx, e.dy, e.dz, time);
+        continue;
+      }
+      if (!isSound(e)) continue;
       const ring = this.rings[this.nextRing]!;
       this.nextRing = (this.nextRing + 1) % RING_POOL;
       ring.x = e.x;
@@ -152,6 +175,32 @@ export class DebugLayer {
       ring.active = true;
       ring.material.color.set(e.source === PLAYER_ID ? palette.debug.stepPlayer : palette.debug.stepGuard);
     }
+  }
+
+  private addShot(x: number, y: number, z: number, dx: number, dy: number, dz: number, time: number): void {
+    const shot = this.shots[this.nextShot]!;
+    this.nextShot = (this.nextShot + 1) % SHOT_POOL;
+    const w = this.world;
+    const terrain = w.terrain.raycast(x, y, z, dx, dy, dz, SHOT_RANGE);
+    const object = w.colliders.raycast(x, y, z, dx, dy, dz, SHOT_RANGE, Blocks.Bullet, this.hit).dist;
+    const d = Math.min(terrain, object, SHOT_RANGE);
+    const pos = shot.line.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const hx = x + dx * d;
+    const hy = y + dy * d;
+    const hz = z + dz * d;
+    const c = Math.max(0.4, d * 0.004); // the cross stays visible from the muzzle
+    pos.setXYZ(0, x, y, z);
+    pos.setXYZ(1, hx, hy, hz);
+    pos.setXYZ(2, hx - c, hy, hz);
+    pos.setXYZ(3, hx + c, hy, hz);
+    pos.setXYZ(4, hx, hy - c, hz);
+    pos.setXYZ(5, hx, hy + c, hz);
+    pos.setXYZ(6, hx, hy, hz - c);
+    pos.setXYZ(7, hx, hy, hz + c);
+    pos.needsUpdate = true;
+    shot.start = time;
+    shot.active = true;
+    shot.line.visible = true;
   }
 
   update(prev: Snapshot, curr: Snapshot, alpha: number, time: number, aim: THREE.Vector3 | null, cameraPos: THREE.Vector3): void {
@@ -204,6 +253,17 @@ export class DebugLayer {
         }
         this.cones.delete(id);
       }
+    }
+
+    for (const shot of this.shots) {
+      if (!shot.active) continue;
+      const t = (time - shot.start) / SHOT_LIFE;
+      if (t >= 1) {
+        shot.active = false;
+        shot.line.visible = false;
+        continue;
+      }
+      shot.material.opacity = t < 0.5 ? 1 : 2 * (1 - t);
     }
 
     // Sound rings expand to their hearing radius and fade.

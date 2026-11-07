@@ -24,7 +24,11 @@ export interface EventBase {
   id: number;
   /** The tick that produced it. */
   tick: number;
-  /** When it happened, in seconds from the start: (tick − 1)·dt < t ≤ tick·dt. */
+  /**
+   * When it happened, in seconds from the start. Usually within its tick:
+   * (tick − 1)·dt < t ≤ tick·dt. A command resolved against what the player saw happened
+   * earlier, up to two ticks before its tick began.
+   */
   t: number;
   /** The entity that made it happen. */
   source: EntityId;
@@ -57,6 +61,21 @@ export interface LandEvent extends EventBase, SoundFields {
   speed: number;
 }
 
+/**
+ * A shot leaves the muzzle: from the eye at the moment the player fired, along their aim.
+ * Lab B adds the bullet's flight, its sounds and what it hits.
+ */
+export interface ShotEvent extends EventBase {
+  type: 'shot';
+  x: number;
+  y: number;
+  z: number;
+  /** Unit direction of the aim. */
+  dx: number;
+  dy: number;
+  dz: number;
+}
+
 export interface StanceEvent extends EventBase {
   type: 'stance';
   from: StanceName;
@@ -65,7 +84,7 @@ export interface StanceEvent extends EventBase {
 
 export type StanceName = 'stand' | 'crouch' | 'prone';
 
-export type SimEvent = FootstepEvent | LandEvent | StanceEvent;
+export type SimEvent = FootstepEvent | LandEvent | StanceEvent | ShotEvent;
 export type EventType = SimEvent['type'];
 export type EventOf<K extends EventType> = Extract<SimEvent, { type: K }>;
 
@@ -98,6 +117,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   footstep: { code: 1, sound: true, fields: { ...SOUND, gait: { enum: GAITS } } },
   stance: { code: 2, sound: false, fields: { from: { enum: STANCES }, to: { enum: STANCES } } },
   land: { code: 3, sound: true, fields: { ...SOUND, speed: 'f32' } },
+  shot: { code: 4, sound: false, fields: { x: 'f64', y: 'f64', z: 'f64', dx: 'f64', dy: 'f64', dz: 'f64' } },
 };
 
 export function isSound(e: SimEvent): e is Extract<SimEvent, SoundFields> {
