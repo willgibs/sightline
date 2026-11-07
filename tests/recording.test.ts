@@ -58,7 +58,7 @@ describe('recordings', () => {
 
   it('re-simulate bit for bit', () => {
     const { rec } = play(120);
-    const result = resimulate(Recording.fromBytes(rec.toBytes()), world);
+    const result = resimulate(Recording.fromBytes(rec.toBytes()), { world });
     expect(result.firstDivergence).toBeNull();
     expect(result.ok).toBe(true);
     expect(result.finalHash).toBe(rec.header.finalHash);
@@ -72,7 +72,7 @@ describe('recordings', () => {
     const at = 900 * 13 + 1;
     bytes[at] = bytes[at] === 127 ? 0 : 127;
     const tampered = new Recording(rec.header, { ...rec.tracks, INPT: bytes });
-    const result = resimulate(tampered, world);
+    const result = resimulate(tampered, { world });
     expect(result.ok).toBe(false);
     expect(result.firstDivergence).toBe(1200); // the first checkpoint after the change
   });
@@ -93,7 +93,7 @@ describe('recordings', () => {
       recorder.record(sim, events);
     }
     const rec = recorder.finish(sim);
-    expect(resimulate(Recording.fromBytes(rec.toBytes()), world).ok).toBe(true);
+    expect(resimulate(Recording.fromBytes(rec.toBytes()), { world }).ok).toBe(true);
   });
 
   it('refuse to skip a tick', () => {

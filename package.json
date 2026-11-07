@@ -19,7 +19,8 @@
     "seeds": "tsx src/headless/seeds.ts",
     "selftest": "tsx src/headless/selftest.ts",
     "check": "npm run typecheck && npm run test",
-    "golden": "tsx src/headless/golden.ts"
+    "golden": "tsx src/headless/golden.ts",
+    "scene": "tsx src/headless/scene.ts"
   },
   "dependencies": {
     "three": "0.186.1"

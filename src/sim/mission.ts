@@ -17,8 +17,11 @@ export interface MissionSpec {
   seed: string;
   /** Generator version the spec was made with; another version may build another world. */
   genVersion: number;
-  /** Where the terrain comes from. Only the procedural valley exists so far. */
-  terrain: { kind: 'procedural'; generator: 'valley' };
+  /**
+   * Where the terrain comes from: the procedural valley, or a world built by hand for a
+   * scene (gen/handmade.ts), which only its scene can build.
+   */
+  terrain: { kind: 'procedural'; generator: 'valley' } | { kind: 'handmade'; name: string };
   /** Where the player starts. */
   insertion: SpawnKind;
   /** The time of day, the wind and the air (env.ts). Generation doesn't read it. */

@@ -1,3 +1,4 @@
+import { handmadeMission } from '../src/sim/gen/handmade';
 import { describe, expect, it } from 'vitest';
 import { defaultTuning } from '../src/config/tuning';
 import { FixedStepClock } from '../src/sim/core/clock';
@@ -6,7 +7,6 @@ import { Hasher } from '../src/sim/core/hash';
 import { Rng } from '../src/sim/core/rng';
 import { neutralInput, quantizeInput, type InputFrame } from '../src/sim/input';
 import { quantYaw } from '../src/sim/quantize';
-import { missionSpec } from '../src/sim/mission';
 import { ByteWriter } from '../src/sim/record/bytes';
 import { Recorder, Recording } from '../src/sim/record/recording';
 import { resimulate } from '../src/sim/record/resim';
@@ -58,7 +58,7 @@ describe('input quantization', () => {
       rec.record(sim, sim.step(f));
     }
     const back = Recording.fromBytes(rec.finish(sim).toBytes());
-    expect(resimulate(back, world).ok).toBe(true);
+    expect(resimulate(back, { world }).ok).toBe(true);
   });
 
   it('keeps non-finite numbers out of the simulation', () => {
@@ -130,7 +130,7 @@ describe('small guards', () => {
 
 describe('the fixture spawn', () => {
   it('builds the world from a spec like generation does', () => {
-    expect(testWorld().spec).toEqual(missionSpec('TEST-0000', 'edge'));
+    expect(testWorld().spec).toEqual(handmadeMission('TEST-0000'));
   });
 });
 

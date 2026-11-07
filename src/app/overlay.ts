@@ -23,6 +23,8 @@ export class Overlay {
   private readonly go: HTMLButtonElement;
   private readonly report: HTMLElement;
   private mode: OverlayMode = 'loading';
+  /** The start screen's title: the phase, or the scene being played. */
+  private startTitle = 'Phase 0 · Foundations';
 
   constructor(
     private readonly root: HTMLElement,
@@ -79,8 +81,7 @@ export class Overlay {
     this.root.classList.remove('is-hidden');
     this.root.inert = false;
     this.root.dataset.mode = mode;
-    this.title.textContent =
-      mode === 'paused' ? 'Paused' : mode === 'loading' ? 'Generating the valley…' : mode === 'report' ? 'Benchmark' : 'Phase 0 · Foundations';
+    this.title.textContent = mode === 'paused' ? 'Paused' : mode === 'loading' ? 'Generating the valley…' : mode === 'report' ? 'Benchmark' : this.startTitle;
     this.go.textContent = mode === 'paused' ? 'Click to resume' : mode === 'report' ? 'Click to play this valley' : 'Click to begin';
   }
 
@@ -112,6 +113,12 @@ export class Overlay {
 
   setSeed(seed: string): void {
     this.seedInput.value = seed;
+  }
+
+  /** The start screen's title (a scene's name, or the phase). */
+  setStartTitle(text: string): void {
+    this.startTitle = text;
+    if (this.mode === 'start') this.title.textContent = text;
   }
 
   setStatus(text: string): void {

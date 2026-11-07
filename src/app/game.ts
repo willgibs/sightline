@@ -20,6 +20,7 @@ import { InputController } from './input';
 import { Overlay } from './overlay';
 import { FrameStats, percentile } from './perf';
 import { missionSpec } from '../sim/mission';
+import { startScene, type Scene } from '../sim/scene';
 import { SystemProfile } from '../sim/profile';
 import { BUILD } from './build';
 import { tuningProblems } from '../config/validate';
@@ -42,6 +43,9 @@ export interface GameOptions {
   pixelRatio: number;
   /** The ratio follows the screen the window is on (no ?dpr given). */
   pixelRatioFollowsScreen: boolean;
+  /** A scene to play (?scene=), instead of a valley from the seed; undefined if the name matched none. */
+  scene: Scene | null | undefined;
+  sceneName: string | null;
 }
 
 const TIME_SCALES = [0.25, 0.5, 1, 2, 4, 8];
@@ -120,6 +124,8 @@ export class Game {
   private savedTick = 0;
   /** The seed being generated or last generated. */
   private seed = '';
+  /** The scene being played, if any (sim/scene.ts): its world, systems and setup. */
+  private scene: Scene | null;
   /** What the last drawn frame showed, so a paused screen isn't drawn again unchanged. */
   private readonly drawnPose: CameraPose = { x: NaN, y: 0, z: 0, yaw: 0, pitch: 0, fov: 0 };
   private drawnKey = '';
@@ -130,13 +136,18 @@ export class Game {
     this.debug = opts.debug;
     this.spawnKind = opts.spawn;
     this.benchRequested = opts.bench;
+    this.scene = opts.scene ?? null;
     this.clock = new FixedStepClock(this.tuning.sim.tickHz);
     this.renderer = new GameRenderer(opts.canvas, this.tuning, opts.pixelRatio);
     this.input = new InputController(opts.canvas);
     this.hud = new Hud(opts.hud);
     this.overlay = new Overlay(opts.overlay, {
       onResume: () => this.resume(),
-      onGenerate: (seed) => this.generate(seed),
+      onGenerate: (seed) => {
+        // Generating a valley leaves the scene.
+        this.scene = null;
+        this.generate(seed);
+      },
       onSaveRecording: () => this.saveRecording(),
       onRetry: () => {
         const retry = this.retry;
@@ -267,7 +278,10 @@ export class Game {
     window.setTimeout(() => {
       let world: World;
       try {
-        world = generateWorld(missionSpec(seed, this.spawnKind), this.tuning, () => performance.now());
+        if (this.opts.sceneName && this.opts.scene === undefined) throw new Error(`There is no scene called '${this.opts.sceneName}'`);
+        const t0 = performance.now();
+        world = this.scene ? this.scene.world(this.tuning) : generateWorld(missionSpec(seed, this.spawnKind), this.tuning, () => performance.now());
+        if (this.scene) world.genMs = performance.now() - t0;
       } catch (e) {
         this.fail('generate', e);
         return;
@@ -276,10 +290,19 @@ export class Game {
       this.renderer.setWorld(world, this.tuning);
       this.restartRun();
       const url = new URL(window.location.href);
-      url.searchParams.set('seed', seed);
+      if (this.scene) {
+        url.searchParams.delete('seed');
+        url.searchParams.set('scene', this.scene.name);
+      } else {
+        url.searchParams.delete('scene');
+        url.searchParams.set('seed', seed);
+      }
       window.history.replaceState(null, '', url);
+      this.overlay.setStartTitle(this.scene ? `Scene · ${this.scene.title}` : 'Phase 0 · Foundations');
       this.overlay.setStatus(
-        `${seed} · generated in ${Math.round(world.genMs)} ms${world.attempt ? ` after ${world.attempt} re-roll${world.attempt > 1 ? 's' : ''}` : ''}`,
+        this.scene
+          ? this.scene.description
+          : `${seed} · generated in ${Math.round(world.genMs)} ms${world.attempt ? ` after ${world.attempt} re-roll${world.attempt > 1 ? 's' : ''}` : ''}`,
       );
       if (this.benchRequested) {
         this.benchRequested = false;
@@ -291,7 +314,7 @@ export class Game {
   }
 
   private restartRun(): void {
-    this.sim = new Simulation(this.world, this.tuning);
+    this.sim = this.scene ? startScene(this.scene, this.tuning, this.world) : new Simulation(this.world, this.tuning);
     this.recorder = new Recorder(this.sim, BUILD);
     this.savedTick = 0;
     this.failure = null;
@@ -660,7 +683,7 @@ export class Game {
     const short = Math.abs(this.deliveredScale - scale) > 0.05 * scale ? ` (${this.deliveredScale.toFixed(1)}× delivered)` : '';
     const mode = this.detached ? 'fly camera' : `${scale}× speed${short}`;
     const lines = [
-      `SIGHTLINE · PHASE 0 · DEBUG VIEW · build ${BUILD}`,
+      `SIGHTLINE · PHASE 0 · DEBUG VIEW · build ${BUILD}${this.scene ? ` · scene ${this.scene.name} v${this.scene.version}` : ''}`,
       `seed ${w.seed} · tick ${this.sim.tick.toLocaleString('en-US')} · ${clock(played)} played · ${mode}`,
       `${s.fps.toFixed(0)} fps · frame ${s.frameMs.toFixed(1)} ms (p95 ${s.p95Ms.toFixed(1)}) · cpu ${s.cpuMs.toFixed(1)} ms · sim ${(this.tickMs * 1000).toFixed(0)} µs/tick`,
       `${r.calls} draws · ${(r.triangles / 1000).toFixed(0)}k tris · ${(r.lines / 1000).toFixed(0)}k lines`,
@@ -779,6 +802,7 @@ export class Game {
       },
       state: () => ({
         seed: this.world?.seed,
+        scene: this.scene?.name ?? null,
         tick: this.sim?.tick,
         player: this.sim ? { ...this.sim.player } : null,
         perf: this.stats.summary(),

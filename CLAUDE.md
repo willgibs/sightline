@@ -41,6 +41,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 - `npm run test:browser`: tests that need a real browser (Web Audio, WebGL, each browser's JavaScript engine), run in Chromium through Playwright. On a new machine, install the browser once with `npx playwright install chromium`.
 - `npm run sim -- --minutes 10`: bot run, recording and bit-exact re-simulation, with timing. Add `--profile` for the time each system takes.
 - `npm run seeds -- --count 100`: generation health across many seeds.
+- `npm run scene` (or `-- <name>`, `-- --list`): every scene in `src/sim/scenes` headless, by its own driver, checking its expectations and re-simulating its recording. `?scene=<name>` plays one in the browser. A regression test that needs more than one tick belongs in a scene.
 - `npm run sim -- --replay <file>`: re-simulate a recording saved in the browser; it says where a run diverged, or why it can't re-simulate in this build.
 - In the browser, `window.sightline` exposes automation hooks for scripted screenshots and playtests: `play`, `debug(on)`, `grid(on)`, `fly(x, y, z, headingDeg, pitchDeg)`, `body()`, `hold([codes])`, `tap('KeyC' | 'KeyZ')`, `click()`, `zoom(on)`, `state()`, `dump()`, `recording()`.
 - Look at the result. Render the honest and debug views and judge them, rather than trusting that code which compiles also reads well.

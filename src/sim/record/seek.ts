@@ -1,8 +1,8 @@
-import { generateWorld, type World } from '../gen/world';
 import { neutralInput } from '../input';
-import { Simulation } from '../sim';
+import type { Simulation } from '../sim';
 import type { SimState } from '../state';
 import type { Recording, TuningChange } from './recording';
+import { replaySimulation, type ReplayOptions } from './resim';
 
 /**
  * Exact seeking in a recording, for the replay and the debrief: re-simulates it once,
@@ -21,19 +21,24 @@ export class ReplaySeeker {
   /** How many of the recording's tuning changes are in force. */
   private change = 0;
 
+  private readonly every: number;
+
+  /** Throws if this build can't re-simulate the recording (replaySimulation says why). `every`: ticks between save-states. */
   constructor(
     private readonly rec: Recording,
-    world?: World,
-    private readonly every = 150,
+    opts: ReplayOptions & { every?: number } = {},
   ) {
     const h = rec.header;
+    this.every = opts.every ?? 150;
     this.ticks = h.fault ? h.ticks - 1 : h.ticks;
     this.changes = rec.tuningChanges();
-    this.sim = new Simulation(world ?? generateWorld(h.mission, h.tuning), h.tuning);
+    const sim = replaySimulation(rec, opts);
+    if (typeof sim === 'string') throw new Error(`Can't replay this recording: ${sim}`);
+    this.sim = sim;
     this.saves.push({ state: this.sim.saveState(), change: 0 });
     while (this.sim.tick < this.ticks) {
       this.stepOne();
-      if (this.sim.tick % every === 0) this.saves.push({ state: this.sim.saveState(), change: this.change });
+      if (this.sim.tick % this.every === 0) this.saves.push({ state: this.sim.saveState(), change: this.change });
     }
   }
 

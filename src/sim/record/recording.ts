@@ -39,8 +39,9 @@ import { readInput, writeInput } from './inputCodec';
 /**
  * 6: tagged tracks; checkpoints part by part; tuning changes and annotations recorded.
  * 7: the mission spec carries its environment. 8: a run that ended in a fault says so.
+ * 9: the scene a run was played in, and worlds built by hand.
  */
-export const RECORDING_VERSION = 8;
+export const RECORDING_VERSION = 9;
 const MAGIC = [0x53, 0x4c, 0x52, 0x43]; // SLRC
 /** Larger than a day of play. Anything bigger is not a recording. */
 export const MAX_RECORDING_BYTES = 512 * 1024 * 1024;
@@ -55,6 +56,8 @@ export interface RecordingHeader {
   genVersion: number;
   stateSchema: number;
   mission: MissionSpec;
+  /** The scene the run was played in (sim/scene.ts), which re-simulating it needs; null for a plain mission. */
+  scene: { name: string; version: number } | null;
   /** The exact tuning at the start, so re-simulation never depends on today's defaults. */
   tuning: Tuning;
   tuningHash: string;
@@ -133,6 +136,7 @@ export class Recorder {
   private readonly tunings: TuningChange[] = [];
   private readonly annotations: Annotation[] = [];
   private fault: SimFault | null = null;
+  private readonly scene: { name: string; version: number } | null;
   ticks = 0;
 
   constructor(
@@ -143,6 +147,7 @@ export class Recorder {
     if (sim.tick !== 0) throw new Error('Recorder must start on a fresh simulation (tick 0)');
     this.sim = sim;
     this.mission = structuredClone(sim.world.spec);
+    this.scene = sim.scene ? { ...sim.scene } : null;
     this.tuning = structuredClone(sim.tuning);
     this.stateEvery = Math.max(1, Math.round(sim.tuning.sim.tickHz / sim.tuning.sim.recordHz));
     this.checkpointEvery = Math.max(1, Math.round(sim.tuning.sim.tickHz * checkpointSeconds));
@@ -211,6 +216,7 @@ export class Recorder {
       genVersion: GEN_VERSION,
       stateSchema: STATE_SCHEMA,
       mission: structuredClone(this.mission),
+      scene: this.scene ? { ...this.scene } : null,
       tuning: structuredClone(this.tuning),
       tuningHash: hashValue(this.tuning),
       worldFingerprint: this.fingerprint,
@@ -564,6 +570,7 @@ function checkHeader(v: unknown): RecordingHeader {
     'genVersion',
     'stateSchema',
     'mission',
+    'scene',
     'tuning',
     'tuningHash',
     'worldFingerprint',
@@ -593,9 +600,13 @@ function checkHeader(v: unknown): RecordingHeader {
     !text(m.seed, 64) ||
     !whole(m.genVersion, 1, 1e6) ||
     (m.insertion !== 'overlook' && m.insertion !== 'edge') ||
-    JSON.stringify(m.terrain) !== '{"kind":"procedural","generator":"valley"}'
+    !terrainOk(m.terrain)
   ) {
     fail('mission');
+  }
+  const sc = h.scene as Record<string, unknown> | null;
+  if (sc !== null && (!sc || typeof sc !== 'object' || Object.keys(sc).sort().join() !== 'name,version' || !text(sc.name, 64) || !whole(sc.version, 1, 1e6))) {
+    fail('scene');
   }
   // Tuning that is shaped differently comes from a build with other tuning values, not
   // from damage: say so, and which build, so the right build can replay it.
@@ -623,6 +634,13 @@ function checkHeader(v: unknown): RecordingHeader {
     }
   }
   return h as unknown as RecordingHeader;
+}
+
+/** Where a mission's terrain comes from: the procedural valley, or a world built by hand for a scene. */
+function terrainOk(t: unknown): boolean {
+  if (JSON.stringify(t) === '{"kind":"procedural","generator":"valley"}') return true;
+  const r = t as Record<string, unknown> | null;
+  return !!r && typeof r === 'object' && Object.keys(r).sort().join() === 'kind,name' && r.kind === 'handmade' && typeof r.name === 'string' && r.name.length > 0 && r.name.length <= 64;
 }
 
 /** An environment from a file: every field present, finite and within reason. */

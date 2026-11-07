@@ -20,6 +20,7 @@ import { fmt, parseArgs } from './args';
 import { missionSpec } from '../sim/mission';
 import { PLAYER_ID } from '../sim/state';
 import { buildStamp } from './build';
+import { sceneOf } from '../sim/scenes';
 
 const args = parseArgs(process.argv.slice(2));
 const now = (): number => performance.now();
@@ -35,7 +36,7 @@ if (replay) {
   const changes = rec.tuningChanges().length;
   const notes = rec.annotations().length;
   if (changes || notes) console.log(`        ${changes} tuning change${changes === 1 ? '' : 's'} · ${notes} annotation${notes === 1 ? '' : 's'}`);
-  const re = resimulate(rec, undefined, now);
+  const re = resimulate(rec, { clock: now, scene: sceneOf(rec.header) });
   if (re.problem) {
     console.log(`resim   ✗ can't re-simulate here: ${re.problem}\n`);
     process.exit(1);
@@ -145,7 +146,7 @@ if (out) {
 
 const loaded = Recording.fromBytes(bytes);
 // Regenerate the world from the recording's own header, so the check covers generation too.
-const re = resimulate(loaded, undefined, now);
+const re = resimulate(loaded, { clock: now });
 console.log(`hash    ${rec.header.finalHash}`);
 console.log(
   `resim   ${re.finalHash} ${re.ok ? '✓ identical' : '✗ DIVERGED'} · ${rec.checkpoints().length} checkpoints · ${fmt.ms(re.ms)}` +

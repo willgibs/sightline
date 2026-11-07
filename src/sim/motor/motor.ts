@@ -152,6 +152,8 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
   const follow =
     destSlope > tanMax ? Math.max(0, -b.vy) * dt + 0.5 * tuning.sim.gravity * dt * dt + 0.005 : tanMax * movedDist + spec.groundSnap;
   let landed = false;
+  /** Speed at the moment of touching down from a fall, m/s. */
+  let contact = 0;
   if (b.motor === 'ground' && b.vy <= 0 && drop <= follow) {
     b.y = ground.height;
     // Sliding keeps its descent rate, so gravity keeps building it; walkable ground stops it.
@@ -159,9 +161,15 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
     b.motor = 'ground';
     landed = b.sliding && destSlope <= tanMax;
   } else if (feet > ground.height) {
-    b.vy -= tuning.sim.gravity * dt;
-    b.y = feet + b.vy * dt;
+    // Exact under constant gravity, so a fall from h takes √(2h/g) and lands at √(2gh)
+    // at any tick rate; the speed at touchdown is the speed when the ground is reached
+    // within the tick, not at its start.
+    const g = tuning.sim.gravity;
+    const v0 = b.vy;
+    b.vy = v0 - g * dt;
+    b.y = feet + v0 * dt - 0.5 * g * dt * dt;
     if (b.y <= ground.height) {
+      contact = Math.sqrt(Math.max(0, v0 * v0 + 2 * g * (feet - ground.height)));
       b.y = ground.height;
       landed = true;
       b.vy = destSlope > tanMax ? b.vy : 0;
@@ -175,7 +183,7 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
     b.vy = 0;
     b.motor = 'ground';
   }
-  const impact = landed ? Math.max(fallSpeed, -b.vy) : 0;
+  const impact = landed ? Math.max(fallSpeed, -b.vy, contact) : 0;
   if (landed && destSlope <= tanMax) b.vy = 0;
 
   // --- Footsteps. --------------------------------------------------------------------

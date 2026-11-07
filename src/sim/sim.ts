@@ -103,6 +103,8 @@ export class Simulation {
   profiler: Profiler | null = null;
   /** Set when a tick failed; the simulation runs no further ticks (restore() clears it). */
   fault: SimFault | null = null;
+  /** The scene this simulation runs (scene.ts), if any: recordings name it so they can be re-simulated. */
+  scene: { name: string; version: number } | null = null;
   readonly systems: readonly System[];
   /** Ticks between runs, per system. */
   private readonly every: number[];

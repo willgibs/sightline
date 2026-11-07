@@ -10,6 +10,8 @@ import { EVENTS, type FieldCodec, type SimEvent } from './events';
 import { neutralInput } from './input';
 import { Simulation } from './sim';
 import { missionSpec } from './mission';
+import { startScene, type Scene } from './scene';
+import { SCENES } from './scenes';
 
 /**
  * A determinism self-test that runs anywhere the simulation runs: Node, Bun, and inside
@@ -39,6 +41,10 @@ export const GOLDEN = {
     'TAL-4471 wander': { behaviour: '0f49c7a0561251a9', state: 'e869f4a79a68f34b' },
     'MUD-9031 wander': { behaviour: '8af56c8be1ff3f42', state: 'e8a332c9746cce3c' },
     'TAL-4471 chaos': { behaviour: '100a20f7d94cbf02', state: '29887fc4e9583be7' },
+  },
+  /** Scenes run by their own drivers: the movement course covers stairs, drops, ramps, ceilings, crawling and surfaces. */
+  scenes: {
+    'movement-course': { behaviour: '07e02ecbd76f16bd', state: '9cf502b40c31b615' },
   },
 } as const;
 
@@ -76,6 +82,17 @@ export function playFingerprint(world: World, bot: BotKind, seconds: number): { 
   return { behaviour: h.digest(), state: sim.hash() };
 }
 
+/** Both fingerprints of a scene run by its own driver, for its own length. */
+export function sceneFingerprint(scene: Scene): { behaviour: string; state: string } {
+  const sim = startScene(scene, defaultTuning);
+  const driver = scene.driver?.();
+  const raw = neutralInput(sim.player.yaw);
+  const h = new Hasher();
+  const ticks = Math.round((scene.seconds ?? 10) * defaultTuning.sim.tickHz);
+  for (let i = 0; i < ticks; i++) behaviourInto(h, sim, sim.step(driver ? driver.next(sim, raw) : raw));
+  return { behaviour: h.digest(), state: sim.hash() };
+}
+
 const order: number[] = [];
 
 /** One tick of observable behaviour: every body's pose, then every entity's events in order. */
@@ -86,6 +103,15 @@ function behaviourInto(h: Hasher, sim: Simulation, events: readonly SimEvent[]):
   for (const g of sim.guards) {
     const b = g.body;
     h.u32(g.id).f64(b.x).f64(b.y).f64(b.z).f64(b.yaw).f64(g.guard.headYaw).f64(b.speed).str(b.stance).str(b.gait);
+  }
+  // Solid things where they are (only when there are any, so runs without them keep their values).
+  if (sim.solids.count > 0) {
+    h.u32(sim.solids.count);
+    for (const c of sim.solids.shapes) {
+      h.u32(c.id).f64(c.x).f64(c.z).f64(c.y0).f64(c.y1).u32(c.flags);
+      if (c.kind === 'box') h.f64(c.ux).f64(c.uz).f64(c.hx).f64(c.hz);
+      else h.f64(c.r);
+    }
   }
   // Events grouped by source, keeping each source's own order: which entity acted first
   // within a tick is a detail of how systems are scheduled, not behaviour. Every field
@@ -123,6 +149,13 @@ export function runSelfTest(now: () => number = () => 0): SelfTestResult[] {
     const t0 = now();
     const world = seed === 'TAL-4471' && tal ? tal : generateWorld(missionSpec(seed), defaultTuning);
     const got = playFingerprint(world, bot, 60);
+    const ms = now() - t0;
+    results.push({ name: `${name} · behaviour`, got: got.behaviour, expected: golden.behaviour, ok: got.behaviour === golden.behaviour, ms });
+    results.push({ name: `${name} · state`, got: got.state, expected: golden.state, ok: got.state === golden.state, ms: 0 });
+  }
+  for (const [name, golden] of Object.entries(GOLDEN.scenes)) {
+    const t0 = now();
+    const got = sceneFingerprint(SCENES[name]!());
     const ms = now() - t0;
     results.push({ name: `${name} · behaviour`, got: got.behaviour, expected: golden.behaviour, ok: got.behaviour === golden.behaviour, ms });
     results.push({ name: `${name} · state`, got: got.state, expected: golden.state, ok: got.state === golden.state, ms: 0 });

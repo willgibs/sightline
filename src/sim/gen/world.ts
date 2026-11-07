@@ -91,6 +91,7 @@ export function worldFingerprint(w: World): string {
 }
 
 export function generateWorld(spec: MissionSpec, tuning: Tuning, clock?: () => number): World {
+  if (spec.terrain.kind !== 'procedural') throw new Error(`The world '${spec.terrain.name}' is built by hand; its scene builds it (sim/scene.ts)`);
   // Bounds on sizes, spacings and attempts, so bad tuning fails here instead of hanging.
   assertTuning(tuning);
   const started = clock ? clock() : 0;

@@ -1,5 +1,6 @@
 import { generateWorld, worldFingerprint, type World } from '../gen/world';
 import { neutralInput } from '../input';
+import { startScene, type Scene } from '../scene';
 import { Simulation } from '../sim';
 import { SYSTEMS, type System } from '../systems';
 import { STATE_SCHEMA, stateParts } from '../state';
@@ -25,15 +26,53 @@ export interface ResimResult {
   ms: number;
 }
 
+export interface ReplayOptions {
+  /** The world, already built: skips building it again. */
+  world?: World;
+  /** The scene the recording names, from the build's scenes (scenes/index.ts): its world, systems and setup. */
+  scene?: Scene;
+  /** For a run that wasn't a scene: the systems it ran with, if not the game's own (tests). */
+  systems?: readonly System[];
+  /** Milliseconds, to time the run. */
+  clock?: () => number;
+}
+
+/**
+ * The simulation a recording starts from, or why this build can't make it: the
+ * versions, the scene, the valley's fingerprint and the first state must all agree.
+ */
+export function replaySimulation(rec: Recording, opts: ReplayOptions = {}): Simulation | string {
+  const h = rec.header;
+  if (h.simVersion !== SIM_VERSION || h.stateSchema !== STATE_SCHEMA || h.genVersion !== GEN_VERSION) {
+    return (
+      `made by a build with simulation ${h.simVersion}, state ${h.stateSchema}, generation ${h.genVersion}; ` +
+      `this build has ${SIM_VERSION}, ${STATE_SCHEMA}, ${GEN_VERSION}${h.build ? ` (it was ${h.build})` : ''}`
+    );
+  }
+  const scene = opts.scene;
+  if (h.scene && (!scene || scene.name !== h.scene.name)) return `made in the scene '${h.scene.name}', which this build doesn't have`;
+  if (h.scene && scene && scene.version !== h.scene.version) return `made in version ${h.scene.version} of the scene '${h.scene.name}'; this build has version ${scene.version}`;
+  if (!h.scene && !opts.world && h.mission.terrain.kind !== 'procedural') return `its world '${h.mission.terrain.name}' was built by hand outside any scene; pass the world`;
+  let world: World;
+  try {
+    world = opts.world ?? (h.scene && scene ? scene.world(h.tuning) : generateWorld(h.mission, h.tuning));
+  } catch (e) {
+    return `its world can't be built: ${e instanceof Error ? e.message : String(e)}`;
+  }
+  if (worldFingerprint(world) !== h.worldFingerprint) return 'this build generates a different valley from the same mission';
+  const sim = h.scene && scene ? startScene(scene, h.tuning, world) : new Simulation(world, h.tuning, opts.systems ?? SYSTEMS);
+  if (sim.hash() !== h.startHash) return 'this build starts the mission in a different state';
+  return sim;
+}
+
 /**
  * Replays a recording's inputs through a fresh simulation, applying its tuning changes
  * on their ticks, and checks every checkpoint. A build that behaves differently is
- * caught before running (the versions, the valley's fingerprint, the first state), and a
- * divergence is reported with the parts of the state that differed. Pass a prebuilt
- * world to skip generation, a clock (milliseconds) to time it, and the systems a scene
- * or test ran with if they weren't the game's own.
+ * caught before running (the versions, the scene, the valley's fingerprint, the first
+ * state), and a divergence is reported with the parts of the state that differed.
  */
-export function resimulate(rec: Recording, world?: World, clock?: () => number, systems: readonly System[] = SYSTEMS): ResimResult {
+export function resimulate(rec: Recording, opts: ReplayOptions = {}): ResimResult {
+  const clock = opts.clock;
   const started = clock ? clock() : 0;
   const h = rec.header;
   const result = (fields: Partial<ResimResult>): ResimResult => ({
@@ -49,17 +88,8 @@ export function resimulate(rec: Recording, world?: World, clock?: () => number, 
     ...fields,
   });
 
-  if (h.simVersion !== SIM_VERSION || h.stateSchema !== STATE_SCHEMA || h.genVersion !== GEN_VERSION) {
-    return result({
-      problem:
-        `made by a build with simulation ${h.simVersion}, state ${h.stateSchema}, generation ${h.genVersion}; ` +
-        `this build has ${SIM_VERSION}, ${STATE_SCHEMA}, ${GEN_VERSION}${h.build ? ` (it was ${h.build})` : ''}`,
-    });
-  }
-  const w = world ?? generateWorld(h.mission, h.tuning);
-  if (worldFingerprint(w) !== h.worldFingerprint) return result({ problem: 'this build generates a different valley from the same mission' });
-  const sim = new Simulation(w, h.tuning, systems);
-  if (sim.hash() !== h.startHash) return result({ problem: 'this build starts the mission in a different state' });
+  const sim = replaySimulation(rec, opts);
+  if (typeof sim === 'string') return result({ problem: sim });
 
   const changes = rec.tuningChanges();
   const checkpoints = rec.checkpoints();

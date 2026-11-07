@@ -47,6 +47,9 @@ float gridLine(vec2 coord, float widthPx) {
 
 float levelLine(float coord, float widthPx) {
   float w = fwidth(coord);
+  // A contour exists only where the ground rises: perfectly flat ground at a contour's
+  // height is not one huge line (a built scene's floor at 0 m, a lake).
+  if (w < 1e-9) return 0.0;
   float g = abs(fract(coord - 0.5) - 0.5) / max(w, 1e-6);
   return 1.0 - smoothstep(widthPx - 0.6, widthPx + 0.6, g);
 }

@@ -6,6 +6,20 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### Scenes: one definition, run headless, played in the browser, replayed
+
+**Decision:** A scene (`src/sim/scene.ts`) is a world (generated from a mission spec, or built by hand with `gen/handmade.ts`), the systems it adds, a setup before the first tick, a driver for headless runs (a bot or a list of waypoints), and expectations checked during and after the run. The same definition runs headless (`npm run scene`, and every scene in the tests), is played in the browser (`?scene=<name>`), and re-simulates from a recording, which names the scene and its version (recording format 9). Scenes live in `src/sim/scenes`, under the simulation's rules, and the self-test pins each one's fingerprints in every engine. A hand-built world's mission spec says so (`terrain: { kind: 'handmade' }`), and only its scene can build it.
+
+The first scene is the movement course: stairs, a 1 m and a 2 m drop, ramps of 30° and 40°, a ceiling to crouch under, a crawl space, six surfaces.
+
+**Why:** each Phase 1 lab is a scene built to its exit test, and needs to be playable, scriptable and replayable without building its own harness. A regression test that needs more than one tick is a scene too.
+
+### Falls follow gravity exactly
+
+**Decision:** A body in the air moves by the exact constant-gravity step (y += v·dt − ½g·dt², v −= g·dt), and lands at the speed it has when it reaches the ground within the tick, not at the start of that tick. A fall from h now lands at exactly √(2gh), whatever the tick rate (`SIM_VERSION` 5).
+
+**Why:** the movement course's first check found the old step falling a little faster in position but landing about 4% slower than gravity says (4.25 m/s from 1 m instead of 4.43), so landing noise didn't match its tuning's own note. No bot run in the self-test had fallen far enough to show it; the course now pins both drops in every engine.
+
 ### Solid things can appear, move and vanish
 
 **Decision:** An entity can have a solid shape: a collider in the world frame, kept in the state tree (`SolidEntity`, kind `solid`, for now the only kind with one). `Solids` (`src/sim/world/solids.ts`) shows the world's colliders and every entity's shape as one set: the motor, the world query, the light and the renderer all ask it, so a gate stops a body, a shot and a sight line exactly as a wall does. An entity's collider id is a fixed offset plus its entity id, the same for the whole run and across restores. Whatever moves a shape never moves it into a body (it checks with `overlapsBody`, then waits or stops): that keeps the motor's invariant that no body ends a tick inside anything solid, and a test runs a gate that waits for the player. Until a kind of entity has its own mesh, the renderer draws its shape (in both views, so nothing solid is invisible).

@@ -261,6 +261,7 @@ export function buildCamp(world: World, look: LookUniforms): THREE.Group {
     post: palette.vehicle,
     pole: palette.vehicle,
     mast: palette.vehicle,
+    block: palette.structure,
   };
   for (const st of world.camp.structures) {
     for (const id of st.colliders) {

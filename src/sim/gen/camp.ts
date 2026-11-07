@@ -26,7 +26,9 @@ export type StructureKind =
   | 'generator'
   | 'pole'
   | 'mast'
-  | 'vehicle';
+  | 'vehicle'
+  /** A piece of hand-built geometry (gen/handmade.ts): stairs, a ceiling, a wall in a scene. */
+  | 'block';
 
 export interface Structure {
   kind: StructureKind;

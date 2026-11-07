@@ -59,7 +59,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [x] Guards move with the shared motor, so they collide with the world like the player.
 - [ ] Later, if perception's budget needs it: a fast path for bodies standing still (eight bodies cost about 80 µs a tick headless).
 
-### M6 · World, bodies, environment
+### M6 · World, bodies, environment ✓
 - [x] `world/query.ts`: raycasts with hit point, normal, id, body part and surface; sight lines. `Blocks.Sound`. The rangefinder uses `raycast` instead of its own guard test.
 - [ ] Segment sweeps against moving bodies (the bullet's path against each part between two ticks' poses), with lab B.
 - [x] Colliders that can be inserted, moved and removed at runtime: entities with a solid shape (`solid`, a collider in the state tree), seen with the world's colliders through `Solids`, by the motor, every query, the light and the renderer (both views). Ids stay the same for the run; whatever moves one never moves it into a body. Doors and vehicles become kinds with a `solid` when a lab needs them; bodies riding what they stand on, and the grid learning about doors, come with them.
@@ -72,9 +72,9 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 
 ### M7 · Sites, camps, scenes and the perception boundary
 - [ ] `Site` and `CampSpec`: camps live at a site with its own origin and axis; nothing assumes the camp is at (0, 0). The Phase 0 camp converted.
-- [ ] Scene harness: worlds from a seed or built by hand, setup, scripts of inputs, commands or bots, expectations. Runs headless (`npm run scene`, vitest) and in the browser (`?scene=…`). Golden recordings re-simulated by the tests.
+- [x] Scene harness (`src/sim/scene.ts`): worlds from a seed or built by hand (`gen/handmade.ts`), systems, setup, a driver (a bot or waypoints) and expectations. Runs headless (`npm run scene`, and every scene in vitest) and in the browser (`?scene=…`); recordings name their scene and version and re-simulate through it; the self-test pins each scene's fingerprints in every engine.
 - [ ] Rulesets: a scene's or mission's rules (objectives, outcome, scoring) plug in; lab scenes are the first rulesets, Phase 2's mission the next.
-- [ ] A movement course scene: steps, ramps, ceilings, gaps, crawl spaces, drops, surfaces. A regression test now, lab C's arena later.
+- [x] A movement course scene: stairs, a 1 m and a 2 m drop, 30° and 40° ramps, a ceiling to crouch under, a crawl space, six surfaces. A scripted walker gets through, crouched and prone where it must, landing at √(2gh). A regression test now, lab C's arena later.
 - [ ] The perception boundary (audit item 4): only `src/sim/perception` reads other entities' true state. AI code receives a `GuardMind` (its own state, percepts, beliefs, the static world, its own random stream), and an architecture test enforces the imports. A no-omniscience test runs a scene twice with the player in two places no guard can perceive, and every guard decision must match bit for bit until the first percept differs.
 
 ### M8 · Presentation seams and feel
@@ -126,6 +126,8 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - M3: declared system phases with rates, profiling and a schedule; the shared motor with ground and air modes; behaviour and state fingerprints.
 - M4: the event registry with ids, times, sources and causes; clicks dated against the frame on screen, with pose history; recordings as checked, tagged tracks with seeking, tuning changes and markers.
 - M5: routines as pure functions of time, generated with the camp; guards as bodies moved by the shared motor; a random stream per entity (`GEN_VERSION` 2, `SIM_VERSION` 4).
+- M6: one world query and one body shape for sight, shots and the rangefinder; the environment (sun, wind, air, light) owned by the simulation; one spatial grid; every body a kind in tuning; entities with solid shapes, seen with the world's colliders by everything (`GEN_VERSION` 3).
+- The runtime audit: the browser game's focus, error, leak, hot-reload, input and layout findings fixed; a failed tick stops the run and its recording reproduces the failure (recording format 8).
 
 ## Deliberately later
 

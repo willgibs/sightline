@@ -2,11 +2,13 @@ import { defaultTuning } from '../config/tuning';
 import { normalizeSeed } from '../sim/core/seed';
 import type { SpawnKind } from '../sim/gen/world';
 import { Game } from './game';
+import { SCENES } from '../sim/scenes';
 import './styles.css';
 
 /**
  * Entry point. URL parameters:
  *   ?seed=TAL-4471   which valley to generate
+ *   ?scene=movement-course   play a scene instead (sim/scenes/index.ts)
  *   ?view=debug      start in the debug view
  *   ?spawn=edge      start where the road leaves the map instead of on an overlook
  *   ?bench           run the 20-second performance flythrough and report
@@ -16,6 +18,7 @@ const params = new URLSearchParams(window.location.search);
 const canvas = document.querySelector<HTMLCanvasElement>('#view')!;
 const overlay = document.querySelector<HTMLElement>('#overlay')!;
 const dprParam = Number(params.get('dpr'));
+const sceneName = params.get('scene');
 
 let game: Game;
 try {
@@ -30,6 +33,8 @@ try {
     bench: params.has('bench'),
     pixelRatio: dprParam > 0 ? Math.min(3, Math.max(0.5, dprParam)) : Math.min(window.devicePixelRatio || 1, 1.5),
     pixelRatioFollowsScreen: !(dprParam > 0),
+    sceneName,
+    scene: sceneName ? SCENES[sceneName]?.() : null,
   });
 } catch (e) {
   // Without WebGL 2 there is nothing to draw with: say so, rather than leave a blank page.
