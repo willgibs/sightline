@@ -21,7 +21,8 @@ import { assertTuning } from '../../config/validate';
  * inputs, states, events. All numbers little-endian.
  */
 
-export const RECORDING_VERSION = 1;
+/** 2: checkpoints hash the whole state tree (sim/state.ts). */
+export const RECORDING_VERSION = 2;
 const MAGIC = [0x53, 0x4c, 0x52, 0x43]; // SLRC
 
 export interface RecordingHeader {

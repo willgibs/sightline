@@ -74,9 +74,18 @@ export class Rng {
     return t >>> 0;
   }
 
-  /** The generator's internal state, for hashing. Does not advance the stream. */
+  /** The generator's internal state, for hashing and save-states. Does not advance the stream. */
   stateWords(): [number, number, number, number] {
     return [this.a >>> 0, this.b >>> 0, this.c >>> 0, this.d >>> 0];
+  }
+
+  /** Continues from saved words, as if the stream had never stopped. */
+  setStateWords(w: readonly number[]): this {
+    this.a = w[0]! | 0;
+    this.b = w[1]! | 0;
+    this.c = w[2]! | 0;
+    this.d = w[3]! | 0;
+    return this;
   }
 
   /** Uniform in [0, 1). */

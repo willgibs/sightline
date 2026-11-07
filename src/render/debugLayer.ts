@@ -35,7 +35,11 @@ interface SoundRing {
 export class DebugLayer {
   readonly group = new THREE.Group();
   private readonly world: World;
-  private readonly cones: Array<{ core: THREE.Mesh; wide: THREE.Mesh }> = [];
+  /** Sight cones by guard entity id, made when a guard first appears. */
+  private readonly cones = new Map<number, { core: THREE.Mesh; wide: THREE.Mesh }>();
+  private readonly coneIndex: number[];
+  private readonly prevIndex = new Map<number, number>();
+  private facingCapacity: number;
   private readonly facing: THREE.LineSegments;
   private readonly rings: SoundRing[] = [];
   private nextRing = 0;
@@ -51,18 +55,10 @@ export class DebugLayer {
     this.coreHalf = (tuning.visibility.coneCoreDeg * Math.PI) / 360;
     this.wideHalf = (tuning.visibility.conePeripheralDeg * Math.PI) / 360;
 
-    const coneIndex = fanIndex();
-    for (let i = 0; i < world.camp.guards.length; i++) {
-      const core = coneMesh(coneIndex, palette.debug.coneCore, 0.22);
-      const wide = coneMesh(coneIndex, palette.debug.cone, 0.09);
-      core.renderOrder = 2;
-      wide.renderOrder = 1;
-      this.cones.push({ core, wide });
-      this.group.add(wide, core);
-    }
-
+    this.coneIndex = fanIndex();
+    this.facingCapacity = Math.max(8, world.camp.guards.length);
     const facingGeo = new THREE.BufferGeometry();
-    facingGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(world.camp.guards.length * 6), 3));
+    facingGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.facingCapacity * 6), 3));
     this.facing = new THREE.LineSegments(facingGeo, new THREE.LineBasicMaterial({ color: palette.debug.facing }));
     this.facing.frustumCulled = false;
     this.group.add(this.facing);
@@ -160,15 +156,34 @@ export class DebugLayer {
   update(prev: Snapshot, curr: Snapshot, alpha: number, time: number, aim: THREE.Vector3 | null, cameraPos: THREE.Vector3): void {
     const hf = this.world.terrain;
 
-    // Cones and facing lines follow each guard's head.
+    // Cones and facing lines follow each guard's head, matched by entity id.
+    const n = curr.guardIds.length;
+    if (n > this.facingCapacity) {
+      this.facingCapacity = n * 2;
+      this.facing.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.facingCapacity * 6), 3));
+    }
+    this.facing.geometry.setDrawRange(0, n * 2);
     const facing = this.facing.geometry.getAttribute('position') as THREE.BufferAttribute;
-    for (let i = 0; i < this.cones.length; i++) {
+    this.prevIndex.clear();
+    prev.guardIds.forEach((id, i) => this.prevIndex.set(id, i));
+    for (let i = 0; i < n; i++) {
+      const id = curr.guardIds[i]!;
       const o = i * GUARD_FIELDS;
-      const x = lerp(prev.guards[o]!, curr.guards[o]!, alpha);
-      const y = lerp(prev.guards[o + 1]!, curr.guards[o + 1]!, alpha);
-      const z = lerp(prev.guards[o + 2]!, curr.guards[o + 2]!, alpha);
+      const j = this.prevIndex.get(id);
+      const a = j === undefined ? curr.guards : prev.guards;
+      const oa = (j ?? i) * GUARD_FIELDS;
+      const x = lerp(a[oa]!, curr.guards[o]!, alpha);
+      const y = lerp(a[oa + 1]!, curr.guards[o + 1]!, alpha);
+      const z = lerp(a[oa + 2]!, curr.guards[o + 2]!, alpha);
       const look = curr.guards[o + 3]! + curr.guards[o + 4]!;
-      const cone = this.cones[i]!;
+      let cone = this.cones.get(id);
+      if (!cone) {
+        cone = { core: coneMesh(this.coneIndex, palette.debug.coneCore, 0.22), wide: coneMesh(this.coneIndex, palette.debug.cone, 0.09) };
+        cone.core.renderOrder = 2;
+        cone.wide.renderOrder = 1;
+        this.cones.set(id, cone);
+        this.group.add(cone.wide, cone.core);
+      }
       layCone(cone.core, hf, x, z, look, this.coreHalf);
       layCone(cone.wide, hf, x, z, look, this.wideHalf);
       const fx = -Math.sin(look);
@@ -178,6 +193,17 @@ export class DebugLayer {
     }
     facing.needsUpdate = true;
     this.facing.geometry.computeBoundingSphere();
+    if (this.cones.size > n) {
+      for (const [id, cone] of this.cones) {
+        if (curr.guardIds.includes(id)) continue;
+        for (const m of [cone.core, cone.wide]) {
+          this.group.remove(m);
+          m.geometry.dispose();
+          (m.material as THREE.Material).dispose();
+        }
+        this.cones.delete(id);
+      }
+    }
 
     // Sound rings expand to their hearing radius and fade.
     for (const ring of this.rings) {

@@ -13,7 +13,8 @@ import { surfaceLoudness } from '../world/surfaces';
  * cones and the recorder.
  */
 export interface GuardState {
-  id: number;
+  /** Which of the camp's guard spawns (world.camp.guards) this guard came from. */
+  spawn: number;
   x: number;
   y: number;
   z: number;
@@ -28,9 +29,11 @@ export interface GuardState {
   scanTime: number;
 }
 
-export function createGuards(world: World): GuardState[] {
-  return world.camp.guards.map((s) => ({
-    id: s.id,
+/** A guard's starting state, from the camp's spawn at `index`. */
+export function createGuard(world: World, index: number): GuardState {
+  const s = world.camp.guards[index]!;
+  return {
+    spawn: index,
     x: s.x,
     y: s.y,
     z: s.z,
@@ -41,11 +44,11 @@ export function createGuards(world: World): GuardState[] {
     moving: false,
     stride: 0,
     scanTime: 0,
-  }));
+  };
 }
 
 export function stepGuards(
-  guards: GuardState[],
+  guards: ReadonlyArray<{ id: number; guard: GuardState }>,
   world: World,
   tuning: Tuning,
   dt: number,
@@ -54,8 +57,9 @@ export function stepGuards(
   emit: (e: SimEvent) => void,
 ): void {
   const G = tuning.guards;
-  for (const g of guards) {
-    const spawn = world.camp.guards[g.id]!;
+  for (const e of guards) {
+    const g = e.guard;
+    const spawn = world.camp.guards[g.spawn]!;
     g.scanTime += dt;
     g.moving = false;
     const route = spawn.route;
@@ -88,7 +92,7 @@ export function stepGuards(
               emit({
                 type: 'footstep',
                 tick,
-                source: g.id,
+                source: e.id,
                 x: g.x,
                 y: g.y,
                 z: g.z,

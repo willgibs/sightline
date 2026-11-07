@@ -63,10 +63,7 @@ export class GameRenderer {
   setWorld(world: World, tuning: Tuning): void {
     this.clearWorld();
     this.worldGroup.add(buildTerrain(world, this.look), buildBackdrop(world, this.look), buildProps(world, this.look), buildCamp(world, this.look));
-    this.guards = new GuardMeshes(
-      world.camp.guards.map((g) => g.role),
-      this.look,
-    );
+    this.guards = new GuardMeshes((spawn) => world.camp.guards[spawn]?.role ?? 'patrol', this.look);
     this.worldGroup.add(this.guards.group);
     this.debug = new DebugLayer(world, tuning);
     this.debug.group.visible = this.debugOn;
