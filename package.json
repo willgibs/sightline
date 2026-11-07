@@ -17,6 +17,7 @@
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "sim": "tsx src/headless/cli.ts",
     "seeds": "tsx src/headless/seeds.ts",
+    "selftest": "tsx src/headless/selftest.ts",
     "check": "npm run typecheck && npm run test"
   },
   "dependencies": {
