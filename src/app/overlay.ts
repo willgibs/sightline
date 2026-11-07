@@ -1,4 +1,5 @@
 import { normalizeSeed, randomSeed } from '../sim/core/seed';
+import { labelKeys } from './keys';
 
 /**
  * The start and pause screen: the seed, how to play, and the way back in. Kept to one
@@ -9,9 +10,11 @@ export interface OverlayHandlers {
   onResume: () => void;
   onGenerate: (seed: string) => void;
   onSaveRecording: () => void;
+  /** After an error: what "try again" means depends on what failed (game.ts). */
+  onRetry: () => void;
 }
 
-export type OverlayMode = 'loading' | 'start' | 'paused' | 'report';
+export type OverlayMode = 'loading' | 'start' | 'paused' | 'report' | 'error';
 
 export class Overlay {
   private readonly seedInput: HTMLInputElement;
@@ -37,11 +40,11 @@ export class Overlay {
           <button class="small" type="button" data-act="generate">Generate</button>
         </div>
         <div class="keys">
-          <span><kbd>W A S D</kbd> move</span>
+          <span><kbd data-code="KeyW KeyA KeyS KeyD">W A S D</kbd> move</span>
           <span><kbd>Shift</kbd> sprint</span>
-          <span><kbd>C</kbd> crouch</span>
-          <span><kbd>Z</kbd> prone</span>
-          <span><kbd>Right mouse</kbd> or <kbd>F</kbd> zoom</span>
+          <span><kbd data-code="KeyC">C</kbd> crouch</span>
+          <span><kbd data-code="KeyZ">Z</kbd> prone</span>
+          <span><kbd>Right mouse</kbd> or <kbd data-code="KeyF">F</kbd> zoom</span>
           <span><kbd>F3</kbd> or <kbd>\`</kbd> debug view</span>
           <span><kbd>Esc</kbd> pause</span>
         </div>
@@ -51,12 +54,13 @@ export class Overlay {
           <button class="link" type="button" data-act="save">Save recording</button>
         </div>
       </div>`;
+    labelKeys(root);
     this.seedInput = root.querySelector('#seed')!;
     this.status = root.querySelector('.status')!;
     this.title = root.querySelector('.overlay-title')!;
     this.go = root.querySelector('.go')!;
     this.report = root.querySelector('.report')!;
-    this.go.addEventListener('click', () => handlers.onResume());
+    this.go.addEventListener('click', () => (this.mode === 'error' ? handlers.onRetry() : handlers.onResume()));
     root.querySelector('[data-act="reroll"]')!.addEventListener('click', () => {
       this.seedInput.value = randomSeed();
       handlers.onGenerate(this.seedInput.value);
@@ -65,21 +69,37 @@ export class Overlay {
     root.querySelector('[data-act="save"]')!.addEventListener('click', () => handlers.onSaveRecording());
     this.seedInput.addEventListener('keydown', (e) => {
       e.stopPropagation();
-      if (e.key === 'Enter') handlers.onGenerate(normalizeSeed(this.seedInput.value));
+      // A held Enter repeats; one valley per press.
+      if (e.key === 'Enter' && !e.repeat && this.visible) handlers.onGenerate(normalizeSeed(this.seedInput.value));
     });
   }
 
   show(mode: OverlayMode): void {
     this.mode = mode;
     this.root.classList.remove('is-hidden');
+    this.root.inert = false;
     this.root.dataset.mode = mode;
     this.title.textContent =
       mode === 'paused' ? 'Paused' : mode === 'loading' ? 'Generating the valley…' : mode === 'report' ? 'Benchmark' : 'Phase 0 · Foundations';
     this.go.textContent = mode === 'paused' ? 'Click to resume' : mode === 'report' ? 'Click to play this valley' : 'Click to begin';
   }
 
+  /**
+   * Hidden means out of reach, not just transparent: nothing in it keeps the focus or can
+   * be tabbed to, so keys during play never land in the seed field.
+   */
   hide(): void {
     this.root.classList.add('is-hidden');
+    if (this.root.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+    this.root.inert = true;
+  }
+
+  /** Something failed: what, the details, and what trying again will do. */
+  showError(title: string, detail: string, retry: string): void {
+    this.show('error');
+    this.title.textContent = title;
+    this.report.textContent = detail;
+    this.go.textContent = retry;
   }
 
   get visible(): boolean {

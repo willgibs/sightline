@@ -56,3 +56,8 @@ export function headingDegrees(yaw: number): number {
   const deg = (-yaw * 180) / PI;
   return ((deg % 360) + 360) % 360;
 }
+
+/** True if every component of a ray is a finite number: a ray that isn't hits nothing. */
+export function finiteRay(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean {
+  return Number.isFinite(ox) && Number.isFinite(oy) && Number.isFinite(oz) && Number.isFinite(dx) && Number.isFinite(dy) && Number.isFinite(dz);
+}

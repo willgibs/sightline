@@ -1,9 +1,10 @@
 import { generateWorld, worldFingerprint, type World } from '../gen/world';
 import { neutralInput } from '../input';
 import { Simulation } from '../sim';
+import { SYSTEMS, type System } from '../systems';
 import { STATE_SCHEMA, stateParts } from '../state';
 import { GEN_VERSION, SIM_VERSION } from '../version';
-import type { Recording } from './recording';
+import { hashOrZeros, type Recording } from './recording';
 
 export interface ResimResult {
   ok: boolean;
@@ -16,6 +17,11 @@ export interface ResimResult {
   firstDivergence: number | null;
   /** The parts of the state that disagreed there: 'guard:4', 'rng', 'player:1'. */
   divergedParts: string[];
+  /**
+   * For a recording that ended in a fault: what re-simulating its last tick did. ok
+   * requires the same system to fail with the same message, leaving the same state.
+   */
+  fault: { expected: string; got: string | null } | null;
   ms: number;
 }
 
@@ -24,9 +30,10 @@ export interface ResimResult {
  * on their ticks, and checks every checkpoint. A build that behaves differently is
  * caught before running (the versions, the valley's fingerprint, the first state), and a
  * divergence is reported with the parts of the state that differed. Pass a prebuilt
- * world to skip generation, and a clock (milliseconds) to time it.
+ * world to skip generation, a clock (milliseconds) to time it, and the systems a scene
+ * or test ran with if they weren't the game's own.
  */
-export function resimulate(rec: Recording, world?: World, clock?: () => number): ResimResult {
+export function resimulate(rec: Recording, world?: World, clock?: () => number, systems: readonly System[] = SYSTEMS): ResimResult {
   const started = clock ? clock() : 0;
   const h = rec.header;
   const result = (fields: Partial<ResimResult>): ResimResult => ({
@@ -37,6 +44,7 @@ export function resimulate(rec: Recording, world?: World, clock?: () => number):
     problem: null,
     firstDivergence: null,
     divergedParts: [],
+    fault: null,
     ms: clock ? clock() - started : 0,
     ...fields,
   });
@@ -50,7 +58,7 @@ export function resimulate(rec: Recording, world?: World, clock?: () => number):
   }
   const w = world ?? generateWorld(h.mission, h.tuning);
   if (worldFingerprint(w) !== h.worldFingerprint) return result({ problem: 'this build generates a different valley from the same mission' });
-  const sim = new Simulation(w, h.tuning);
+  const sim = new Simulation(w, h.tuning, systems);
   if (sim.hash() !== h.startHash) return result({ problem: 'this build starts the mission in a different state' });
 
   const changes = rec.tuningChanges();
@@ -60,10 +68,20 @@ export function resimulate(rec: Recording, world?: World, clock?: () => number):
   let checkpoint = 0;
   let firstDivergence: number | null = null;
   let divergedParts: string[] = [];
+  const describe = (f: { system: string; message: string }): string => `${f.system}: ${f.message}`;
+  const expected = h.fault ? describe(h.fault) : null;
   for (let i = 0; i < h.ticks; i++) {
     while (change < changes.length && changes[change]!.tick === sim.tick + 1) sim.setTuning(changes[change++]!.tuning);
     rec.readInput(i, input);
-    sim.step(input);
+    try {
+      sim.step(input);
+    } catch {
+      // A fault: the recorded one if this is its tick, otherwise a new one.
+      const got = sim.fault ? describe(sim.fault) : 'an error outside the systems';
+      const finalHash = hashOrZeros(sim);
+      const same = expected !== null && sim.fault?.tick === h.fault!.tick && got === expected && finalHash === h.finalHash;
+      return result({ ok: same && firstDivergence === null, ticks: i + 1, finalHash, firstDivergence, divergedParts, fault: { expected: expected ?? '(none)', got } });
+    }
     const cp = checkpoints[checkpoint];
     if (cp && cp.tick === sim.tick) {
       if (firstDivergence === null && sim.hash() !== cp.hash) {
@@ -78,5 +96,6 @@ export function resimulate(rec: Recording, world?: World, clock?: () => number):
     }
   }
   const finalHash = sim.hash();
+  if (expected !== null) return result({ finalHash, firstDivergence, divergedParts, fault: { expected, got: null } });
   return result({ ok: firstDivergence === null && finalHash === h.finalHash, finalHash, firstDivergence, divergedParts });
 }

@@ -6,7 +6,7 @@ import { worldFingerprint } from '../gen/world';
 import { neutralInput, type TickInput } from '../input';
 import type { MissionSpec } from '../mission';
 import type { Gait, Stance } from '../motor/body';
-import type { Simulation } from '../sim';
+import type { SimFault, Simulation } from '../sim';
 import { STATE_SCHEMA, stateParts } from '../state';
 import { GEN_VERSION, SIM_VERSION } from '../version';
 import { ByteReader, ByteWriter, RecordingFormatError, concat } from './bytes';
@@ -38,9 +38,9 @@ import { readInput, writeInput } from './inputCodec';
 
 /**
  * 6: tagged tracks; checkpoints part by part; tuning changes and annotations recorded.
- * 7: the mission spec carries its environment.
+ * 7: the mission spec carries its environment. 8: a run that ended in a fault says so.
  */
-export const RECORDING_VERSION = 7;
+export const RECORDING_VERSION = 8;
 const MAGIC = [0x53, 0x4c, 0x52, 0x43]; // SLRC
 /** Larger than a day of play. Anything bigger is not a recording. */
 export const MAX_RECORDING_BYTES = 512 * 1024 * 1024;
@@ -68,7 +68,14 @@ export interface RecordingHeader {
   /** Ticks between checkpoints. */
   checkpointEvery: number;
   ticks: number;
+  /**
+   * The state's hash after the last tick. For a run that ended in a fault, after the
+   * failing tick threw: a deterministic fault leaves the same partial state every time.
+   * Zeros if that state could not be hashed.
+   */
   finalHash: string;
+  /** The tick that failed and why, when the run ended in a fault; its input is the last one recorded. */
+  fault: SimFault | null;
   createdAt: string;
 }
 
@@ -125,6 +132,7 @@ export class Recorder {
   private readonly checkpoints = new ByteWriter();
   private readonly tunings: TuningChange[] = [];
   private readonly annotations: Annotation[] = [];
+  private fault: SimFault | null = null;
   ticks = 0;
 
   constructor(
@@ -148,12 +156,30 @@ export class Recorder {
    */
   record(sim: Simulation, events: readonly SimEvent[]): void {
     if (sim !== this.sim) throw new Error('Recorder records only the simulation it was made for');
+    if (this.fault) throw new Error(`The run ended in a fault at tick ${this.fault.tick}`);
     if (sim.tick !== this.ticks + 1) throw new Error(`Recorder missed a tick: at ${sim.tick}, recorded ${this.ticks}`);
     writeInput(this.inputs, sim.lastInput);
     if (sim.tick % this.stateEvery === 0) writeState(this.states, sim);
     for (const e of events) writeEvent(this.events, e);
     if (sim.tick % this.checkpointEvery === 0) writeCheckpoint(this.checkpoints, sim);
     this.ticks++;
+  }
+
+  /**
+   * Call when `sim.step()` threw: keeps the failing tick's input and the fault, so the
+   * recording reproduces the failure. The recording ends there.
+   */
+  recordFault(sim: Simulation): void {
+    if (sim !== this.sim) throw new Error('Recorder records only the simulation it was made for');
+    if (!sim.fault || this.fault || sim.fault.tick !== this.ticks + 1) return;
+    writeInput(this.inputs, sim.lastInput);
+    this.fault = { ...sim.fault };
+    this.ticks++;
+  }
+
+  /** The run ended in a fault (recordFault). */
+  get faulted(): boolean {
+    return this.fault !== null;
   }
 
   /** The simulation's tuning changed (hot reload): it applies from the next tick. */
@@ -193,7 +219,8 @@ export class Recorder {
       stateEvery: this.stateEvery,
       checkpointEvery: this.checkpointEvery,
       ticks: this.ticks,
-      finalHash: sim.hash(),
+      finalHash: hashOrZeros(sim),
+      fault: this.fault ? { ...this.fault } : null,
       createdAt,
     };
     return new Recording(header, {
@@ -204,6 +231,17 @@ export class Recorder {
       EVNT: concat(this.events.parts()),
       ANNO: encodeJson(this.annotations),
     });
+  }
+}
+
+const NO_HASH = '0000000000000000';
+
+/** The state's hash; a state a failing tick left unhashable (not plain data) gets zeros. */
+export function hashOrZeros(sim: Simulation): string {
+  try {
+    return sim.hash();
+  } catch {
+    return NO_HASH;
   }
 }
 
@@ -535,6 +573,7 @@ function checkHeader(v: unknown): RecordingHeader {
     'checkpointEvery',
     'ticks',
     'finalHash',
+    'fault',
     'createdAt',
   ];
   for (const k of Object.keys(h)) if (!KEYS.includes(k)) fail(`unknown header field ${k}`);
@@ -577,6 +616,12 @@ function checkHeader(v: unknown): RecordingHeader {
   const tuning = h.tuning as Tuning;
   if (h.tickHz !== tuning.sim.tickHz) fail('tick rate');
   if (!whole(h.stateEvery, 1, 1e6) || !whole(h.checkpointEvery, 1, 1e8) || !whole(h.ticks, 0, 2147483647)) fail('counts');
+  if (h.fault !== null) {
+    const f = h.fault as Record<string, unknown>;
+    if (!f || typeof f !== 'object' || Object.keys(f).sort().join() !== 'message,system,tick' || f.tick !== h.ticks || !text(f.system, 200) || !text(f.message, 4000)) {
+      fail('fault');
+    }
+  }
   return h as unknown as RecordingHeader;
 }
 

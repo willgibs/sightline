@@ -8,6 +8,7 @@ import { GUARD_FIELDS, type Snapshot } from '../sim/sim';
 import { routinePose, type RoutinePose } from '../sim/gen/routine';
 import { Cell } from '../sim/world/grid';
 import { Blocks } from '../sim/world/colliders';
+import { disposeTree } from './dispose';
 import { palette } from './palette';
 
 /**
@@ -336,13 +337,13 @@ export class DebugLayer {
     }
   }
 
+  /** Frees everything, including overlays built and then turned off (no longer in the group). */
   dispose(): void {
-    this.group.traverse((o) => {
-      if (o instanceof THREE.Mesh || o instanceof THREE.Line) {
-        o.geometry.dispose();
-        (o.material as THREE.Material).dispose();
-      }
-    });
+    disposeTree(this.group);
+    for (const o of [this.colliders, this.perches, this.grid]) if (o && !o.parent) disposeTree(o);
+    this.colliders = null;
+    this.perches = null;
+    this.grid = null;
   }
 }
 
@@ -379,6 +380,7 @@ function coneMesh(index: number[], color: string, opacity: number): THREE.Mesh {
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
+      forceSinglePass: true, // flat on the ground: one pass draws both sides
       polygonOffset: true,
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -2,

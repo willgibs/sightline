@@ -83,6 +83,13 @@ body {
   border-radius: 6px;
   white-space: pre;
   backdrop-filter: blur(6px);
+  overflow: hidden;
+}
+
+/* Below the compass, so neither covers the other at any width. */
+#hud.is-debug .debug-panel {
+  top: 58px;
+  max-height: calc(100vh - 110px);
 }
 
 .legend {
@@ -150,7 +157,14 @@ body {
   transition:
     opacity 0.2s,
     transform 0.2s;
-  white-space: nowrap;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+}
+
+/* Above the key legend, which wraps onto two lines on narrow screens. */
+#hud.is-debug .toast {
+  bottom: 64px;
 }
 
 .toast.is-on {
@@ -164,7 +178,10 @@ body {
   position: fixed;
   inset: 0;
   display: grid;
-  place-items: center;
+  justify-items: center;
+  /* Centred, but scrollable from the top when the window is shorter than the panel. */
+  align-items: safe center;
+  overflow: auto;
   padding: 16px;
   background: rgba(228, 231, 234, 0.55);
   backdrop-filter: blur(3px);
@@ -289,8 +306,19 @@ body {
   display: block;
 }
 
-#overlay[data-mode='report'] .keys {
+#overlay[data-mode='report'] .keys,
+#overlay[data-mode='error'] .keys {
   display: none;
+}
+
+#overlay[data-mode='error'] .report {
+  display: block;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+#overlay[data-mode='error'] .overlay-title {
+  color: var(--panel-ink);
 }
 
 .overlay-foot {

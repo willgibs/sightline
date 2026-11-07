@@ -82,12 +82,28 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [ ] An action-map layer: device bindings to named actions by context (on foot, optic, menu, debug), defaults in a data table.
 - [ ] Settings with persistence: sensitivity, field of view, invert, volume. Raw mouse input where the browser supports it.
 - [ ] Sound wired into the game: events, ambient sources, muffling, pause ducking.
-- [ ] Runtime robustness from the audit: input release on blur, context loss, disposal on regenerate, visible errors. (The runtime audit's full list is added here when it lands.)
 - [ ] The camera never renders from inside a guard: a guard's mesh hides while the eye is inside its capsule. (Guards that step around a cornered player come with lab E.)
 - [ ] Tree canopies drawn so an eye inside one sees it, not a hole (they are single-sided cones today).
-- [ ] The debug time scale applies after the frame clamp, so fast-forward through a hitch stays fast.
 - [ ] A controller debug overlay: ground slope against the limit, sliding, rim probes, and the pushes of each resolve step (rule 8).
 - [ ] Head bob is drawn but not simulated, so a shot leaves from the eye without it. Turn bob off with an optic up, or make it a pure function of simulation time that both sides evaluate (with lab B).
+
+**The runtime audit** (the browser app and renderer, Nov 7; findings H1–H5, M1–M8, L1–L9):
+- [x] H1 · Tab during play moved the focus into the hidden seed field, and Enter regenerated the valley: the hidden overlay is inert, the focus drops when the lock starts, and Tab and browser shortcuts are the game's while playing (Ctrl+Shift stays the browser's).
+- [x] H2 · A non-finite view angle hung the debug view's ray loop: raycasts refuse non-finite rays, the automation hooks check their arguments, and the view numbers are bounded.
+- [x] H3 · Debug overlays turned on and off leaked about 12 MB per regeneration, and instance buffers waited for garbage collection: everything is freed when the valley is rebuilt.
+- [x] H4 · Errors were silent, and a failed tick corrupted the recording: a failed tick stops the simulation and the recording keeps the failing tick, so re-simulating it fails the same way; a drawing or page error pauses with the run intact; a failed generation says so and offers to try again.
+- [x] H5 · Saving tuning.ts reloaded the page: the validator takes the update too, and an architecture test keeps other importers out.
+- [x] M1 · Without WebGL 2 the page was blank; a lost context went unnoticed: both say so, and the run waits for the context to come back.
+- [x] M2 · A refused pointer lock did nothing visible: the status line says why.
+- [x] M3 · Shortcuts and closing the tab: browser shortcuts are the game's while playing; leaving with a minute or more of unsaved play asks first (the deployed build only). Autosaving the recording comes with M9.
+- [x] M4 · A save changing the world and the tick rate together ran at half speed, and tuning messages were invisible while paused: the clock follows the tuning on every restart, and messages show in the overlay.
+- [x] M5 · Per-frame garbage: flat transparent materials draw in one pass, and the motor's rim loops don't allocate.
+- [x] M6 · One mouse spike turned the view 189°: the first move after a lock change and single jumps over 400 px are dropped. Raw input (`unadjustedMovement`) comes with the settings.
+- [x] M7 · The pixel ratio followed the first screen only, and wide or tall windows got extreme views: the ratio follows the screen, and the horizontal view stays within 60–110°.
+- [x] M8 · Layout: the debug panel sits below the compass, toasts wrap, the overlay scrolls in a short window, and the compass is drawn at its real width.
+- [x] L1–L9 · Static loading text, one valley per Enter, fast-forward scaled after the frame limit (the panel shows what it delivers), a movement key held while the lock starts counts, the key and button zooms are separate, the save message names the folder, paused means still (no bob, no animation, no redrawing an unchanged screen), the automation hooks refuse misuse clearly, `?dpr` is clamped to 0.5–3, and key labels follow the keyboard layout where the browser says.
+- [ ] Later, if loading time needs it: shaders compiled before "Click to begin", and generation in a worker.
+- [ ] With Phase 2's menus: a teardown path (the renderer's and input's disposal are never called, and the resize listener stays).
 
 ### M9 · The playtest loop
 - [ ] Every dev session saves its recording and a telemetry report into `playtests/` (the marker key, M, already records moments).

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { disposeTree } from './dispose';
 import { sunDirection } from '../sim/env';
 import type { Tuning } from '../config/tuning';
 import type { SimEvent } from '../sim/events';
@@ -87,14 +88,7 @@ export class GameRenderer {
   private clearWorld(): void {
     this.guards?.dispose();
     this.debug?.dispose();
-    this.worldGroup.traverse((o) => {
-      if (o instanceof THREE.Mesh || o instanceof THREE.Line || o instanceof THREE.LineSegments) {
-        o.geometry.dispose();
-        const m = o.material as THREE.Material | THREE.Material[];
-        if (Array.isArray(m)) m.forEach((x) => x.dispose());
-        else m.dispose();
-      }
-    });
+    disposeTree(this.worldGroup);
     this.scene.remove(this.worldGroup);
     this.worldGroup = new THREE.Group();
     this.scene.add(this.worldGroup);
@@ -130,6 +124,11 @@ export class GameRenderer {
 
   addEvents(events: readonly SimEvent[], time: number): void {
     if (this.debugOn) this.debug?.addEvents(events, time);
+  }
+
+  /** Render resolution as a multiple of CSS pixels: follows the screen the window is on. */
+  setPixelRatio(ratio: number): void {
+    this.gl.setPixelRatio(ratio);
   }
 
   resize(width: number, height: number): void {

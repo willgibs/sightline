@@ -6,6 +6,20 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### A failed tick stops the run, and its recording reproduces the failure
+
+**Decision:** If a system throws during a tick, the simulation records which tick, which system and why (`sim.fault`) and refuses further ticks: its state is partway through that tick, and going on would quietly part ways with any recording of the run. The recorder keeps the failing tick's input (`recordFault`), and the recording says the run ended in a fault (recording format 8). Re-simulating it runs up to that tick and must fail the same way, in the same system, leaving the same partial state: then the fault "reproduces exactly". A replay can show everything up to the tick before.
+
+In the browser, a failed tick stops the run with the error on screen and offers to save the recording; a failure while drawing, or anywhere else in the page, pauses with the run intact; a failed generation says so and offers to try again; a lost WebGL context pauses until the browser gives it back.
+
+**Why:** the runtime audit found that one exception inside a tick left the game running on half-updated state while the recorder kept going, so a saved recording looked valid and re-simulated as diverged, with no word to the player. A recording that reproduces a crash is the most useful bug report there is, and it costs nothing until something fails.
+
+### Hot reload survives the validator
+
+**Decision:** `config/validate.ts` accepts updates to `tuning.ts` itself (it reads the defaults to check a tuning's shape), and keeps checking against the shape it loaded with. A saved value applies in place, as before; a change of shape is refused with a message to reload, since the code that reads it changed too. An architecture test allows only `main.ts` and the validator to import the tuning values in the browser.
+
+**Why:** the validator's import of the defaults made Vite reload the whole page on every save, losing the run (the runtime audit's H5), which broke rule 4 since the validator landed.
+
 ### Every body is a kind in tuning
 
 **Decision:** The player's and the guard's bodies are complete kinds in `tuning.bodies`: sizes, speeds, accelerations, limits, strides and the sizes of their parts. The motor, the body shapes, the visibility factors and the guards' meshes read a body's own kind, never the player's, and the guard is no longer the player's spec with overrides written in code. Gravity left the body for `tuning.sim.gravity`, since everything that falls shares it (bodies now, bullets and throws with lab B). It stays out of the mission's environment: Earth's gravity varies by half a percent between the equator and the poles, too little to matter, and a mission shouldn't be able to change it.

@@ -8,10 +8,13 @@ import type { Recording, TuningChange } from './recording';
  * Exact seeking in a recording, for the replay and the debrief: re-simulates it once,
  * keeping a save-state every few seconds, then reaches any tick by restoring the nearest
  * one before it and stepping forward with the recorded input. The saved states are a
- * cache (about a kilobyte each); the recording itself stays inputs only.
+ * cache (about a kilobyte each); the recording itself stays inputs only. A run that
+ * ended in a fault can be watched up to the tick before it.
  */
 export class ReplaySeeker {
   readonly sim: Simulation;
+  /** The last tick that can be shown: the recording's end, or the tick before its fault. */
+  readonly ticks: number;
   private readonly saves: Array<{ state: SimState; change: number }> = [];
   private readonly input = neutralInput();
   private readonly changes: TuningChange[];
@@ -24,10 +27,11 @@ export class ReplaySeeker {
     private readonly every = 150,
   ) {
     const h = rec.header;
+    this.ticks = h.fault ? h.ticks - 1 : h.ticks;
     this.changes = rec.tuningChanges();
     this.sim = new Simulation(world ?? generateWorld(h.mission, h.tuning), h.tuning);
     this.saves.push({ state: this.sim.saveState(), change: 0 });
-    while (this.sim.tick < h.ticks) {
+    while (this.sim.tick < this.ticks) {
       this.stepOne();
       if (this.sim.tick % every === 0) this.saves.push({ state: this.sim.saveState(), change: this.change });
     }
@@ -35,7 +39,7 @@ export class ReplaySeeker {
 
   /** Puts the simulation at `tick` (clamped to the recording) and returns it. */
   seek(tick: number): Simulation {
-    const target = Math.max(0, Math.min(this.rec.header.ticks, Math.floor(tick)));
+    const target = Math.max(0, Math.min(this.ticks, Math.floor(tick)));
     const save = this.saves[Math.floor(target / this.every)]!;
     this.sim.restore(save.state);
     this.change = save.change;

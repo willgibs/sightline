@@ -285,6 +285,8 @@ export function buildCamp(world: World, look: LookUniforms): THREE.Group {
       alphaTest: 0.02,
       depthWrite: false,
       side: THREE.DoubleSide,
+      // Flat, so one pass draws both sides; two would rebuild the program lookup every frame.
+      forceSinglePass: true,
       fog: true,
     }),
   );

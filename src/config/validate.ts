@@ -1,5 +1,11 @@
 import { defaultTuning, type Tuning } from './tuning';
 
+// Hot reload (CLAUDE.md rule 4): main.ts applies a saved tuning.ts to the running game.
+// This module reads the defaults too, so it must take the update as well, or Vite reloads
+// the whole page and the run is lost. It keeps checking against the shape it loaded with:
+// a change of shape comes with code that reads it, and is refused until the page reloads.
+import.meta.hot?.accept('./tuning', () => undefined);
+
 /**
  * Checks a tuning object before anything trusts it.
  *
@@ -9,7 +15,7 @@ import { defaultTuning, type Tuning } from './tuning';
  *   recording stores, so a run using them could never replay.
  * - Bounds on the numbers that size loops and allocations (world size, cell size, prop
  *   spacing, generation attempts, tick rate), so a hostile or corrupt recording can't
- *   hang generation or exhaust memory.
+ *   hang generation or exhaust memory; and on the view numbers nothing could draw with.
  *
  * Recordings embed their tuning and hot reload swaps it live, so both go through here.
  */
@@ -21,8 +27,15 @@ export class TuningError extends Error {
   }
 }
 
-/** Inclusive bounds on values that size loops or allocations. */
+/** Inclusive bounds on values that size loops or allocations, or that nothing could draw or divide by. */
 const BOUNDS: ReadonlyArray<readonly [path: string, min: number, max: number, integer?: boolean]> = [
+  // The view: a field of view of 0 or 180 has no projection, and the look scale divides by it.
+  ['view.fov', 10, 150],
+  ['view.zoomFov', 1, 150],
+  ['view.zoomTime', 0, 5],
+  ['view.lookSensitivity', 0, 1],
+  ['view.headBob', 0, 5],
+  ['view.fogDensity', 0, 0.1],
   ['sim.tickHz', 10, 240, true],
   ['sim.recordHz', 1, 240, true],
   ['gen.world.size', 64, 4096],

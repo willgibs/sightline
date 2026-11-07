@@ -45,6 +45,20 @@ export interface Profiler {
   end(system: System): void;
 }
 
+/**
+ * Why a simulation stopped: a system threw partway through a tick. The state is left
+ * partway through that tick too, so the simulation refuses to go on; continuing would
+ * quietly part ways with any recording of the run. A recording made up to the fault
+ * keeps the failing tick, and re-simulating it fails the same way (record/resim.ts).
+ */
+export interface SimFault {
+  /** The tick that failed. */
+  tick: number;
+  /** The system that threw. */
+  system: string;
+  message: string;
+}
+
 /** Per-guard values in Snapshot.guards. */
 export const GUARD_FIELDS = 6; // x, y, z, yaw, headYaw, moving
 
@@ -78,6 +92,8 @@ export class Simulation {
   readonly lastInput: TickInput = neutralInput();
   /** Set to time each system (`npm run sim -- --profile`). */
   profiler: Profiler | null = null;
+  /** Set when a tick failed; the simulation runs no further ticks (restore() clears it). */
+  fault: SimFault | null = null;
   readonly systems: readonly System[];
   /** Ticks between runs, per system. */
   private readonly every: number[];
@@ -183,6 +199,7 @@ export class Simulation {
    * Returns this tick's events; the array is reused, so copy any event you keep.
    */
   step(input: InputFrame): readonly SimEvent[] {
+    if (this.fault) throw new Error(`The simulation stopped at tick ${this.fault.tick}, in ${this.fault.system}: ${this.fault.message}`);
     quantizeInput(input, this.lastInput);
     this.events.length = 0;
     const s = this.state;
@@ -193,13 +210,19 @@ export class Simulation {
     ctx.state = s;
     ctx.index = this.index;
     const prof = this.profiler;
-    for (let k = 0; k < this.systems.length; k++) {
-      const every = this.every[k]!;
-      if (tick % every !== 0) continue;
-      const system = this.systems[k]!;
-      prof?.begin(system);
-      system.run(ctx, this.dt * every);
-      prof?.end(system);
+    let k = 0;
+    try {
+      for (; k < this.systems.length; k++) {
+        const every = this.every[k]!;
+        if (tick % every !== 0) continue;
+        const system = this.systems[k]!;
+        prof?.begin(system);
+        system.run(ctx, this.dt * every);
+        prof?.end(system);
+      }
+    } catch (e) {
+      this.fault = { tick, system: this.systems[k]?.name ?? '?', message: e instanceof Error ? e.message : String(e) };
+      throw e;
     }
     // Only a tick that completed counts, so a failure mid-tick never desynchronizes recorders.
     s.tick = tick;
@@ -229,6 +252,7 @@ export class Simulation {
   restore(saved: SimState): void {
     if (saved.schema !== STATE_SCHEMA) throw new Error(`Save-state schema ${saved.schema} is not ${STATE_SCHEMA}`);
     this.state = cloneState(saved);
+    this.fault = null;
     this.reindex();
   }
 

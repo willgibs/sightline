@@ -9,6 +9,7 @@ import { Recorder, Recording, RECORDING_VERSION } from '../src/sim/record/record
 import { resimulate } from '../src/sim/record/resim';
 import { ReplaySeeker } from '../src/sim/record/seek';
 import { Simulation } from '../src/sim/sim';
+import { SYSTEMS, withSystem, type System } from '../src/sim/systems';
 import { tuningCopy } from './fixtures';
 
 let world: World;
@@ -136,6 +137,67 @@ describe('re-simulating a recording', () => {
     expect(resimulate(older, world).problem).toMatch(/simulation .* abc123/);
     const elsewhere = generateWorld(missionSpec('KOR-1188'), defaultTuning);
     expect(resimulate(rec, elsewhere).problem).toMatch(/different valley/);
+  });
+});
+
+describe('a run that ends in a fault', () => {
+  // A system that moves the player, then throws on tick 40: the state is left partway through the tick.
+  const faulty: System = {
+    name: 'faulty',
+    phase: 'world',
+    run(ctx) {
+      ctx.index.player.body.x += 0.25;
+      if (ctx.tick === 40) throw new Error('the door has no hinge');
+    },
+  };
+  const systems = withSystem(SYSTEMS, faulty);
+
+  function faulted(): { sim: Simulation; rec: Recording } {
+    const sim = new Simulation(world, defaultTuning, systems);
+    const recorder = new Recorder(sim, 'test-build');
+    const bot = new WanderBot(world.seed);
+    const raw = neutralInput();
+    for (let i = 0; i < 60; i++) {
+      try {
+        recorder.record(sim, sim.step(bot.next(sim, raw)));
+      } catch {
+        recorder.recordFault(sim);
+        break;
+      }
+    }
+    return { sim, rec: Recording.fromBytes(recorder.finish(sim).toBytes()) };
+  }
+
+  it('stops the simulation: it names the tick and system, and runs no further ticks', () => {
+    const { sim } = faulted();
+    expect(sim.fault).toEqual({ tick: 40, system: 'faulty', message: 'the door has no hinge' });
+    expect(sim.tick).toBe(39);
+    expect(() => sim.step(neutralInput())).toThrow(/stopped at tick 40, in faulty: the door has no hinge/);
+  });
+
+  it('keeps the failing tick, and re-simulating fails the same way, leaving the same state', () => {
+    const { rec } = faulted();
+    expect(rec.header.ticks).toBe(40);
+    expect(rec.header.fault).toEqual({ tick: 40, system: 'faulty', message: 'the door has no hinge' });
+    const re = resimulate(rec, world, undefined, systems);
+    expect(re.ok, JSON.stringify(re)).toBe(true);
+    expect(re.fault).toEqual({ expected: 'faulty: the door has no hinge', got: 'faulty: the door has no hinge' });
+    // Without the system that failed, the fault doesn't reproduce.
+    const plain = resimulate(rec, world);
+    expect(plain.ok).toBe(false);
+    expect(plain.fault?.got).toBe(null);
+    // The replay shows everything up to the tick before.
+    expect(new ReplaySeeker(rec, world).ticks).toBe(39);
+  });
+
+  it('is cleared by restoring a save-state', () => {
+    const sim = new Simulation(world, defaultTuning, systems);
+    const saved = sim.saveState();
+    for (let i = 0; i < 39; i++) sim.step(neutralInput());
+    expect(() => sim.step(neutralInput())).toThrow(/no hinge/);
+    sim.restore(saved);
+    expect(sim.fault).toBe(null);
+    expect(() => sim.step(neutralInput())).not.toThrow();
   });
 });
 

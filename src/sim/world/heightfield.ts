@@ -1,3 +1,4 @@
+import { finiteRay } from '../core/math';
 import { Surface } from './surfaces';
 
 /**
@@ -145,6 +146,8 @@ export class Heightfield {
    * triangles of each cell the ray could touch.
    */
   raycast(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxDist: number): number {
+    // A ray that isn't a number hits nothing; walking the grid with it would never end.
+    if (!finiteRay(ox, oy, oz, dx, dy, dz) || !(maxDist >= 0)) return Infinity;
     const lo = this.min;
     const hi = this.min + this.size;
     let t0 = 0;

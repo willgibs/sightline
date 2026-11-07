@@ -17,13 +17,19 @@ export class FixedStepClock {
     this.dt = 1 / hz;
   }
 
-  /** Feed elapsed real seconds (already scaled by any time scale). Returns ticks to run. */
-  advance(elapsed: number): number {
+  /**
+   * Feed elapsed real seconds and the time scale (the debug view's fast-forward). Returns
+   * ticks to run. The limits apply to real time, so a frame that took long still moves
+   * the game on by the scale, up to the frame limit.
+   */
+  advance(elapsed: number, scale = 1): number {
     // NaN fails both comparisons, so it counts as no time rather than poisoning the clock.
-    this.acc += elapsed > 0 ? Math.min(elapsed, this.maxFrame) : 0;
+    const s = scale > 0 ? scale : 1;
+    this.acc += (elapsed > 0 ? Math.min(elapsed, this.maxFrame) : 0) * s;
+    const cap = Math.ceil(this.maxTicksPerFrame * Math.max(1, s));
     let ticks = Math.floor(this.acc / this.dt);
-    if (ticks > this.maxTicksPerFrame) {
-      ticks = this.maxTicksPerFrame;
+    if (ticks > cap) {
+      ticks = cap;
       this.acc = 0;
       return ticks;
     }

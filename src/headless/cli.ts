@@ -40,8 +40,20 @@ if (replay) {
     console.log(`resim   ✗ can't re-simulate here: ${re.problem}\n`);
     process.exit(1);
   }
+  if (h.fault) console.log(`        the run ended in a fault at tick ${h.fault.tick}, in ${h.fault.system}: ${h.fault.message}`);
+  const verdict = h.fault
+    ? re.ok
+      ? '✓ the fault reproduces exactly'
+      : re.fault?.got
+        ? `✗ a different fault: ${re.fault.got}`
+        : '✗ the fault did not reproduce'
+    : re.ok
+      ? '✓ identical'
+      : re.fault?.got
+        ? `✗ re-simulating fails at tick ${re.ticks}, in ${re.fault.got}`
+        : '✗ DIVERGED';
   console.log(
-    `resim   ${re.finalHash} vs recorded ${h.finalHash} · ${re.ok ? '✓ identical' : '✗ DIVERGED'}` +
+    `resim   ${re.finalHash} vs recorded ${h.finalHash} · ${verdict}` +
       (re.firstDivergence !== null ? ` · first divergence at tick ${re.firstDivergence}, in ${re.divergedParts.join(', ')}` : '') +
       ` · ${fmt.ms(re.ms)}\n`,
   );

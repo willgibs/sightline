@@ -90,6 +90,29 @@ describe('architecture', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('lets saving tuning.ts hot-reload in the browser instead of reloading the page', () => {
+    // Vite reloads the whole page unless every module that imports the tuning's values
+    // accepts the update: main.ts applies it, validate.ts keeps its reference. Any other
+    // importer in the browser's module graph would lose the run on every save.
+    const graph = new Set<string>();
+    const visit = (f: string): void => {
+      if (graph.has(f)) return;
+      graph.add(f);
+      const src = readFileSync(f, 'utf8');
+      for (const m of src.matchAll(/^import\s+(?!type\b)[^;]*?from\s+'(\.[^']+)'/gm)) {
+        const next = join(f, '..', m[1]!) + '.ts';
+        if (statSync(next, { throwIfNoEntry: false })) visit(next);
+      }
+    };
+    visit(join(root, 'src/app/main.ts'));
+    const importers = [...graph]
+      .filter((f) => /^import\s+(?!type\b)[^;]*?from\s+'(\.\.?\/)+(config\/)?tuning'/m.test(readFileSync(f, 'utf8')))
+      .map((f) => relative(root, f))
+      .sort();
+    expect(importers).toEqual(['src/app/main.ts', 'src/config/validate.ts']);
+    expect(readFileSync(join(root, 'src/config/validate.ts'), 'utf8')).toMatch(/import\.meta\.hot\?\.accept\('\.\/tuning'/);
+  });
+
   it('never calls Math.random inside the simulation', () => {
     const offenders = files(join(root, 'src/sim'))
       .filter((f) => !f.endsWith('seed.ts')) // randomSeed() is UI-only and documented as such

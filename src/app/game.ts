@@ -8,6 +8,8 @@ import { generateWorld, simTuningKey, worldTuningKey, type SpawnKind, type World
 import { neutralInput } from '../sim/input';
 import { Recorder } from '../sim/record/recording';
 import { Simulation, type Snapshot } from '../sim/sim';
+import type { SimEvent } from '../sim/events';
+import { normalizeSeed } from '../sim/core/seed';
 import { Blocks, type Collider } from '../sim/world/colliders';
 import { emptyHit, raycast, type QueryBody } from '../sim/world/query';
 import { Surface, surfaceName } from '../sim/world/surfaces';
@@ -37,9 +39,19 @@ export interface GameOptions {
   spawn: SpawnKind;
   bench: boolean;
   pixelRatio: number;
+  /** The ratio follows the screen the window is on (no ?dpr given). */
+  pixelRatioFollowsScreen: boolean;
 }
 
 const TIME_SCALES = [0.25, 0.5, 1, 2, 4, 8];
+/** Seconds of unsaved play after which closing the tab asks first (in the deployed game). */
+const UNSAVED_WARNING_SECONDS = 60;
+
+/** What went wrong, once something has: the run stops there until the player tries again. */
+interface Failure {
+  where: 'generate' | 'tick' | 'frame' | 'page' | 'context';
+  message: string;
+}
 const BOB: Record<string, number> = { sprint: 0.05, walk: 0.026, crouch: 0.016, crawl: 0.01, idle: 0 };
 const BENCH_SECONDS = 20;
 
@@ -94,11 +106,24 @@ export class Game {
   private tickTimeSum = 0;
   private tickCount = 0;
   private tickWindow = 0;
+  /** Game seconds per real second over the last window: what the time scale actually delivered. */
+  private deliveredScale = 1;
   /** Time per system, measured in the debug view only. */
   private readonly profile = new SystemProfile(() => performance.now());
   private systemCosts: ReturnType<SystemProfile['report']> = [];
   private bench: Bench | null = null;
   private benchRequested: boolean;
+  private failure: Failure | null = null;
+  /** What "try again" does after the failure on screen. */
+  private retry: () => void = () => undefined;
+  /** The tick of the last saved recording, so leaving with unsaved play can ask first. */
+  private savedTick = 0;
+  /** The seed being generated or last generated. */
+  private seed = '';
+  /** What the last drawn frame showed, so a paused screen isn't drawn again unchanged. */
+  private readonly drawnPose: CameraPose = { x: NaN, y: 0, z: 0, yaw: 0, pitch: 0, fov: 0 };
+  private drawnKey = '';
+  private redraws = 0;
 
   constructor(private readonly opts: GameOptions) {
     this.tuning = opts.tuning;
@@ -113,9 +138,23 @@ export class Game {
       onResume: () => this.resume(),
       onGenerate: (seed) => this.generate(seed),
       onSaveRecording: () => this.saveRecording(),
+      onRetry: () => {
+        const retry = this.retry;
+        this.failure = null;
+        this.retry = () => undefined;
+        retry();
+      },
     });
     this.input.onAction = (code) => this.action(code);
     this.input.onLockChange = (locked) => (locked ? this.onLocked() : this.onUnlocked());
+    this.input.onLockRefused = () => {
+      if (!this.overlay.visible || this.failure) return;
+      this.overlay.setStatus(
+        window.top !== window
+          ? 'The browser refused to capture the mouse in this frame · open the game in its own tab'
+          : 'The browser refused to capture the mouse · wait a moment after Esc, then click again',
+      );
+    };
     this.renderer.setDebug(this.debug);
     this.hud.setDebug(this.debug);
     this.hud.setVisible(false);
@@ -124,14 +163,99 @@ export class Game {
   start(): void {
     this.input.attach();
     window.addEventListener('resize', () => this.resize());
+    this.watchPixelRatio();
     this.resize();
+    // Errors anywhere in the game stop the run and say so, instead of failing silently.
+    window.addEventListener('error', (e) => {
+      if (e.filename && !e.filename.startsWith(window.location.origin)) return; // an extension's, not ours
+      this.fail('page', e.error ?? e.message);
+    });
+    window.addEventListener('unhandledrejection', (e) => this.fail('page', e.reason));
+    // The GPU can take the context away (a driver reset, too many tabs): pause, and come back when it returns.
+    this.opts.canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.fail('context', 'The browser took the graphics context away');
+    });
+    this.opts.canvas.addEventListener('webglcontextrestored', () => {
+      if (this.failure?.where !== 'context') return;
+      this.failure = null;
+      this.redraws++;
+      this.overlay.show('paused');
+    });
+    // Closing the tab with a minute or more of unsaved play asks first, in the deployed game
+    // (in development, Vite reloads the page after code changes and must not be stopped).
+    window.addEventListener('beforeunload', (e) => {
+      if (!import.meta.env.PROD || !this.sim || this.bench) return;
+      if ((this.sim.tick - this.savedTick) / this.tuning.sim.tickHz < UNSAVED_WARNING_SECONDS) return;
+      e.preventDefault();
+    });
     this.generate(this.opts.seed);
     requestAnimationFrame(this.frame);
+  }
+
+  /**
+   * Something failed: stop where it happened, say what and why, and keep what can still
+   * be saved. Only the first failure is shown; trying again clears it.
+   */
+  private fail(where: Failure['where'], error: unknown): void {
+    if (this.failure) return;
+    const message = error instanceof Error ? error.message : String(error);
+    this.failure = { where, message };
+    if (where !== 'context') console.error(`Sightline: ${where} failed`, error);
+    this.paused = true;
+    this.input.releaseLock();
+    this.hud.setVisible(false);
+    const stack = error instanceof Error && error.stack ? `\n\n${error.stack.split('\n').slice(1, 7).join('\n')}` : '';
+    if (where === 'generate') {
+      const seed = this.seed;
+      this.retry = () => this.generate(seed);
+      this.overlay.showError(`The valley ${seed} could not be generated`, `${message}${stack}`, 'Try again');
+    } else if (where === 'tick') {
+      const f = this.sim.fault;
+      this.retry = () => this.restartRunFromStart();
+      this.overlay.showError(
+        `The simulation failed at tick ${f?.tick ?? this.sim.tick + 1}`,
+        `${f ? `${f.system}: ` : ''}${message}${stack}\n\nThe run stopped there. Save the recording to reproduce it with npm run sim -- --replay.`,
+        'Restart the run',
+      );
+    } else if (where === 'context') {
+      this.retry = () => window.location.reload();
+      this.overlay.showError(
+        'The screen was lost',
+        'The browser took the graphics context away (a driver reset, or too many tabs using the GPU). The run is kept; it carries on when the browser gives the context back. Save the recording first if you reload.',
+        'Reload the page',
+      );
+    } else {
+      // Drawing or the page failed, not the simulation: the run itself is intact and can go on.
+      this.retry = () => {
+        this.redraws++;
+        this.overlay.show('paused');
+      };
+      this.overlay.showError('Something went wrong', `${message}${stack}\n\nThe run is paused and intact.`, 'Carry on');
+    }
+  }
+
+  /** A fresh run in the same valley, from the start screen. */
+  private restartRunFromStart(): void {
+    if (!this.world) {
+      this.generate(this.seed);
+      return;
+    }
+    this.restartRun();
+    this.overlay.show('start');
+  }
+
+  /** Tells the player something: in the HUD while playing, in the overlay's status line while it is up. */
+  private notify(text: string): void {
+    if (this.overlay.visible) this.overlay.setStatus(text);
+    else this.hud.toast(text);
   }
 
   // --- World and runs. ---------------------------------------------------------------
 
   private generate(seed: string): void {
+    this.seed = seed;
+    this.failure = null;
     // Hand the mouse back while the valley is rebuilt; the overlay invites the player back in.
     this.input.releaseLock();
     this.paused = true;
@@ -141,7 +265,13 @@ export class Game {
     this.overlay.setStatus('');
     // Let the loading state paint before the main thread is busy generating.
     window.setTimeout(() => {
-      const world = generateWorld(missionSpec(seed, this.spawnKind), this.tuning, () => performance.now());
+      let world: World;
+      try {
+        world = generateWorld(missionSpec(seed, this.spawnKind), this.tuning, () => performance.now());
+      } catch (e) {
+        this.fail('generate', e);
+        return;
+      }
       this.world = world;
       this.renderer.setWorld(world, this.tuning);
       this.restartRun();
@@ -163,6 +293,11 @@ export class Game {
   private restartRun(): void {
     this.sim = new Simulation(this.world, this.tuning);
     this.recorder = new Recorder(this.sim, BUILD);
+    this.savedTick = 0;
+    this.failure = null;
+    this.redraws++;
+    // From the tuning in force: a save can change the tick rate and the world together.
+    this.clock = new FixedStepClock(this.tuning.sim.tickHz);
     this.prev = this.sim.snapshot();
     this.curr = this.sim.snapshot();
     this.input.yaw = this.sim.player.yaw;
@@ -171,7 +306,6 @@ export class Game {
     const dist = Math.hypot(p.x, p.z);
     const drop = this.tuning.gen.world.padHeight + 1 - (p.y + p.eyeHeight);
     this.input.pitch = dist > 1 ? Math.max(-0.35, Math.min(0.1, Math.atan2(drop, dist))) : 0;
-    this.clock.reset();
     this.bobPhase = 0;
     if (this.detached) this.setDetached(false);
   }
@@ -181,7 +315,8 @@ export class Game {
     const problems = tuningProblems(next);
     if (problems.length > 0) {
       // Keep playing on the last good numbers rather than handing bad ones to the simulation.
-      this.hud.toast(`Tuning not applied: ${problems[0]}${problems.length > 1 ? ` (+${problems.length - 1} more)` : ''}`);
+      const shape = problems.some((p) => / is (missing|not a tuning value)$/.test(p) || / should be /.test(p));
+      this.notify(`Tuning not applied: ${problems[0]}${problems.length > 1 ? ` (+${problems.length - 1} more)` : ''}${shape ? ' · its shape changed: reload the page' : ''}`);
       console.warn('Tuning not applied:', problems);
       return;
     }
@@ -191,25 +326,26 @@ export class Game {
     this.tuning = next;
     this.renderer.setTuning(next);
     if (worldChanged) {
-      this.hud.toast('World tuning changed · regenerating the valley');
+      this.notify('World tuning changed · regenerating the valley');
       this.generate(this.world.seed);
     } else if (tickChanged) {
-      this.clock = new FixedStepClock(next.sim.tickHz);
       this.restartRun();
-      this.hud.toast(`Tick rate ${next.sim.tickHz} Hz · run restarted`);
+      this.notify(`Tick rate ${next.sim.tickHz} Hz · run restarted`);
     } else if (simChanged) {
-      this.sim.setTuning(next);
-      this.recorder.tuningChanged(this.sim);
-      this.hud.toast('Tuning reloaded');
+      if (!this.sim.fault) {
+        this.sim.setTuning(next);
+        this.recorder.tuningChanged(this.sim);
+      }
+      this.notify('Tuning reloaded');
     } else {
-      this.hud.toast('View tuning reloaded');
+      this.notify('View tuning reloaded');
     }
   }
 
   // --- Pausing and input. --------------------------------------------------------------
 
   private resume(): void {
-    if (this.overlay.currentMode === 'loading') return;
+    if (this.overlay.currentMode === 'loading' || this.failure) return;
     this.input.requestLock();
   }
 
@@ -221,7 +357,7 @@ export class Game {
   }
 
   private onUnlocked(): void {
-    if (this.bench) return;
+    if (this.bench || this.failure) return;
     this.paused = true;
     this.hud.setVisible(false);
     if (this.overlay.currentMode !== 'loading' || !this.overlay.visible) this.overlay.show('paused');
@@ -307,32 +443,68 @@ export class Game {
   private resize(): void {
     this.renderer.resize(window.innerWidth, window.innerHeight);
     this.hud.resizeCompass();
+    this.redraws++;
+  }
+
+  /** Everything besides the pose that changes the picture. */
+  private viewKey(): string {
+    return `${this.redraws}|${this.debug}|${this.colliders}|${this.perches}|${this.gridShown}|${this.sim.tick}|${this.world.seed}|${this.tuning.view.fogDensity}`;
+  }
+
+  /**
+   * Moving the window to a screen with another pixel density changes the ratio without a
+   * resize event; a media query on the current ratio fires when it changes.
+   */
+  private watchPixelRatio(): void {
+    const ratio = window.devicePixelRatio || 1;
+    window.matchMedia(`(resolution: ${ratio}dppx)`).addEventListener(
+      'change',
+      () => {
+        if (this.opts.pixelRatioFollowsScreen) this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+        this.resize();
+        this.watchPixelRatio();
+      },
+      { once: true },
+    );
   }
 
   // --- The frame. ----------------------------------------------------------------------
 
   private readonly frame = (now: number): void => {
     requestAnimationFrame(this.frame);
-    if (!this.sim) return;
+    // After a failure nothing more runs or draws: the last frame stays under the message.
+    if (!this.sim || this.failure) return;
+    try {
+      this.drawFrame(now);
+    } catch (e) {
+      this.fail('frame', e);
+    }
+  };
+
+  private drawFrame(now: number): void {
     const dt = this.lastNow ? Math.min((now - this.lastNow) / 1000, 0.25) : 0;
     this.lastNow = now;
     const cpuStart = performance.now();
-    this.time += dt;
+    // Paused means still: animation time and the head bob stop with the simulation.
+    if (!this.paused) this.time += dt;
 
     const V = this.tuning.view;
     this.zoom = moveTowards(this.zoom, this.input.zoomHeld && !this.paused ? 1 : 0, dt / Math.max(V.zoomTime, 1e-3));
     const eased = this.zoom * this.zoom * (3 - 2 * this.zoom);
-    const fov = zoomFov(V.fov, V.zoomFov, eased);
+    // The window's shape sets the view, within limits; zooming keeps its magnification.
+    const base = fitFov(V.fov, window.innerWidth / Math.max(1, window.innerHeight));
+    const fov = zoomFov(base, scaleFov(V.zoomFov, Math.tan((base * Math.PI) / 360) / Math.tan((V.fov * Math.PI) / 360)), eased);
     this.input.sensitivity = V.lookSensitivity;
-    this.input.sensitivityScale = Math.tan((fov * Math.PI) / 360) / Math.tan((V.fov * Math.PI) / 360);
+    this.input.sensitivityScale = Math.tan((fov * Math.PI) / 360) / Math.tan((base * Math.PI) / 360);
     this.input.pitchLimit = this.tuning.bodies.player.pitchLimit;
 
     if (!this.paused) {
-      const ticks = this.clock.advance(dt * (this.debug ? TIME_SCALES[this.timeScaleIndex]! : 1));
+      const ticks = this.clock.advance(dt, this.debug ? TIME_SCALES[this.timeScaleIndex]! : 1);
       if (ticks > 0) {
         this.sim.profiler = this.debug ? this.profile : null;
         const t0 = performance.now();
-        for (let i = 0; i < ticks; i++) this.tick();
+        for (let i = 0; i < ticks && !this.failure; i++) this.tick();
+        if (this.failure) return;
         this.tickTimeSum += performance.now() - t0;
         this.tickCount += ticks;
       }
@@ -344,15 +516,22 @@ export class Game {
     else pose = this.bodyPose(dt, fov);
 
     if (this.debug) this.updateAim(pose);
-    this.renderer.render(this.prev, this.curr, this.clock.alpha, this.time, pose, this.debug ? this.aim : null);
+    // While paused, draw only when the picture would change: a view toggled, a new valley, the window resized.
+    const still = this.paused && !this.bench && samePose(pose, this.drawnPose) && this.drawnKey === this.viewKey();
+    if (!still) {
+      this.renderer.render(this.prev, this.curr, this.clock.alpha, this.time, pose, this.debug ? this.aim : null);
+      Object.assign(this.drawnPose, pose);
+      this.drawnKey = this.viewKey();
+    }
     // A click from now on is about this frame.
     this.input.latch.frameShown(this.sim.tick, this.clock.alpha, pose.yaw, pose.pitch);
     this.hud.updateCompass(pose.yaw);
     this.hud.setRange(this.debug ? this.aimText : null);
 
-    this.tickWindow += dt;
+    if (!this.paused) this.tickWindow += dt;
     if (this.tickWindow >= 1 && this.tickCount > 0) {
       this.tickMs = this.tickTimeSum / this.tickCount;
+      this.deliveredScale = this.tickCount / this.tuning.sim.tickHz / this.tickWindow;
       this.systemCosts = this.profile.report(this.tickCount);
       this.profile.reset();
       this.tickTimeSum = 0;
@@ -367,7 +546,7 @@ export class Game {
       this.panelTimer = 0.125;
       this.hud.setPanel(this.panelText());
     }
-  };
+  }
 
   private tick(): void {
     const frozen = this.detached || this.bench !== null;
@@ -376,10 +555,18 @@ export class Game {
       this.raw.yaw = this.detached ? this.heldYaw : this.sim.player.yaw;
       this.raw.pitch = this.detached ? this.heldPitch : this.sim.player.pitch;
     }
+    let events: readonly SimEvent[];
+    try {
+      events = this.sim.step(this.raw);
+    } catch (e) {
+      // The state is partway through the tick: keep the failing input, and stop.
+      this.recorder.recordFault(this.sim);
+      this.fail('tick', e);
+      return;
+    }
     const swap = this.prev;
     this.prev = this.curr;
     this.curr = swap;
-    const events = this.sim.step(this.raw);
     this.recorder.record(this.sim, events);
     this.sim.snapshot(this.curr);
     if (events.length > 0) this.renderer.addEvents(events, this.time);
@@ -391,7 +578,7 @@ export class Game {
     const t = this.clock.alpha;
     const speed = lerp(a.speed, b.speed, t);
     const stride = b.gait === 'idle' ? 1 : this.tuning.bodies.player.stride[b.gait];
-    this.bobPhase += (speed / stride) * Math.PI * dt;
+    if (!this.paused) this.bobPhase += (speed / stride) * Math.PI * dt;
     const bob = -(BOB[b.gait] ?? 0) * this.tuning.view.headBob * Math.abs(Math.sin(this.bobPhase));
     return {
       x: lerp(a.px, b.px, t),
@@ -423,6 +610,11 @@ export class Game {
 
   /** Rangefinder for the debug view: what's under the crosshair, and how far. */
   private updateAim(pose: CameraPose): void {
+    if (![pose.x, pose.y, pose.z, pose.yaw, pose.pitch].every(Number.isFinite)) {
+      this.aim = null;
+      this.aimText = null;
+      return;
+    }
     const cp = Math.cos(pose.pitch);
     const dx = -Math.sin(pose.yaw) * cp;
     const dy = Math.sin(pose.pitch);
@@ -457,7 +649,10 @@ export class Game {
     const moveFactor = p.gait === 'idle' ? V.movement.still : p.gait === 'sprint' ? V.movement.sprinting : V.movement.moving;
     const sizes = this.recorder.sizes;
     const kb = (n: number) => (n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`);
-    const mode = this.detached ? 'fly camera' : `${TIME_SCALES[this.timeScaleIndex]}× speed`;
+    const scale = TIME_SCALES[this.timeScaleIndex]!;
+    // A slow machine can't always run the ticks fast-forward asks for (8 a frame at most, times the scale).
+    const short = Math.abs(this.deliveredScale - scale) > 0.05 * scale ? ` (${this.deliveredScale.toFixed(1)}× delivered)` : '';
+    const mode = this.detached ? 'fly camera' : `${scale}× speed${short}`;
     const lines = [
       `SIGHTLINE · PHASE 0 · DEBUG VIEW · build ${BUILD}`,
       `seed ${w.seed} · tick ${this.sim.tick.toLocaleString('en-US')} · ${clock(played)} played · ${mode}`,
@@ -491,7 +686,8 @@ export class Game {
     a.download = `sightline-${this.world.seed}-${this.sim.tick}.slrec`;
     a.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    this.overlay.setStatus(`Saved ${a.download} · replay it with npm run sim -- --replay ${a.download}`);
+    this.savedTick = this.sim.tick;
+    this.overlay.setStatus(`Saved ${a.download} · to re-simulate it: npm run sim -- --replay <folder>/${a.download}`);
   }
 
   // --- Automation (window.sightline). ----------------------------------------------------
@@ -502,8 +698,15 @@ export class Game {
    */
   automation() {
     const rad = Math.PI / 180;
+    const ready = (what: string): void => {
+      if (!this.sim) throw new Error(`sightline.${what}() needs the valley first: wait until state().overlay is 'start'`);
+    };
+    const finite = (what: string, ...xs: unknown[]): void => {
+      if (!xs.every((x) => typeof x === 'number' && Number.isFinite(x))) throw new TypeError(`sightline.${what}() takes finite numbers, got ${xs.map(String).join(', ')}`);
+    };
     return {
       play: () => {
+        ready('play');
         this.paused = false;
         this.overlay.hide();
         this.hud.setVisible(true);
@@ -512,7 +715,7 @@ export class Game {
       pause: () => {
         this.paused = true;
       },
-      debug: (on: boolean) => this.setDebugView(on),
+      debug: (on: boolean) => this.setDebugView(on === true),
       colliders: (on: boolean) => {
         this.colliders = on;
         this.renderer.setColliders(on);
@@ -526,10 +729,13 @@ export class Game {
         this.renderer.setPerches(on);
       },
       look: (headingDeg: number, pitchDeg = 0) => {
+        finite('look', headingDeg, pitchDeg);
         this.input.yaw = -headingDeg * rad;
         this.input.pitch = pitchDeg * rad;
       },
-      fly: (x: number, y: number, z: number, headingDeg: number, pitchDeg: number) => {
+      fly: (x: number, y: number, z: number, headingDeg = 0, pitchDeg = 0) => {
+        ready('fly');
+        finite('fly', x, y, z, headingDeg, pitchDeg);
         this.setDetached(true);
         this.fly.set(x, y, z);
         this.input.yaw = -headingDeg * rad;
@@ -543,17 +749,28 @@ export class Game {
       zoom: (on: boolean) => {
         this.input.zoomHeld = on;
       },
-      generate: (seed: string) => this.generate(seed),
+      generate: (seed: string) => {
+        if (typeof seed !== 'string') throw new TypeError('sightline.generate() takes a seed, such as "TAL-4471"');
+        this.generate(normalizeSeed(seed));
+      },
       /** Full simulation state and its hash, for determinism checks. */
-      dump: () => ({ tick: this.sim.tick, hash: this.sim.hash(), player: { ...this.sim.player }, guards: this.sim.guards.map((g) => ({ ...g })) }),
+      dump: () => {
+        ready('dump');
+        return { tick: this.sim.tick, hash: this.sim.hash(), player: { ...this.sim.player }, guards: this.sim.guards.map((g) => ({ ...g })) };
+      },
       /** The current run's recording as base64, for re-simulating it outside the browser. */
       recording: () => {
+        ready('recording');
         const bytes = this.recorder.finish(this.sim, new Date().toISOString()).toBytes();
+        // In slices: one character at a time takes half a second an hour of play.
         let bin = '';
-        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!);
+        for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
         return btoa(bin);
       },
-      fog: (density: number) => this.renderer.setTuning({ ...this.tuning, view: { ...this.tuning.view, fogDensity: density } }),
+      fog: (density: number) => {
+        finite('fog', density);
+        this.renderer.setTuning({ ...this.tuning, view: { ...this.tuning.view, fogDensity: Math.max(0, density) } });
+      },
       state: () => ({
         seed: this.world?.seed,
         tick: this.sim?.tick,
@@ -651,11 +868,36 @@ export class Game {
   }
 }
 
+const HFOV_MAX = Math.tan((110 * Math.PI) / 360);
+const HFOV_MIN = Math.tan((60 * Math.PI) / 360);
+const VFOV_MAX = Math.tan((100 * Math.PI) / 360);
+
+/**
+ * The vertical field of view for a window of this shape: the tuned one, unless that
+ * would make the horizontal view wider than 110° (an ultra-wide window) or narrower
+ * than 60° (a phone held upright).
+ */
+function fitFov(vfov: number, aspect: number): number {
+  const t = Math.tan((vfov * Math.PI) / 360);
+  const h = t * aspect;
+  const fitted = h > HFOV_MAX ? HFOV_MAX / aspect : h < HFOV_MIN ? Math.min(HFOV_MIN / aspect, VFOV_MAX) : t;
+  return (Math.atan(fitted) * 360) / Math.PI;
+}
+
+/** A field of view with its half-angle's tangent scaled by k: the same magnification relative to a scaled base view. */
+function scaleFov(fov: number, k: number): number {
+  return k === 1 ? fov : (Math.atan(Math.tan((fov * Math.PI) / 360) * k) * 360) / Math.PI;
+}
+
 function zoomFov(base: number, zoomed: number, t: number): number {
   // Interpolate in tan space so the zoom feels linear in magnification.
   const a = Math.tan((base * Math.PI) / 360);
   const b = Math.tan((zoomed * Math.PI) / 360);
   return (Math.atan(lerp(a, b, t)) * 360) / Math.PI;
+}
+
+function samePose(a: CameraPose, b: CameraPose): boolean {
+  return a.x === b.x && a.y === b.y && a.z === b.z && a.yaw === b.yaw && a.pitch === b.pitch && a.fov === b.fov;
 }
 
 function clock(seconds: number): string {

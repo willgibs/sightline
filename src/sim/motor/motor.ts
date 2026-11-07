@@ -480,7 +480,9 @@ function terrainBlocks(world: World, b: BodyState, x: number, z: number, feet: n
 function rimPush(world: World, x: number, z: number, feet: number, r: number, stepHeight: number, out: { x: number; z: number }): boolean {
   let px = 0;
   let pz = 0;
-  for (const [ux, uz] of RIM) {
+  for (let k = 0; k < RIM.length; k++) {
+    const ux = RIM[k]![0];
+    const uz = RIM[k]![1];
     const excess = world.terrain.heightAt(x + ux * r, z + uz * r) - (feet + stepHeight);
     if (excess <= 0) continue;
     world.terrain.sample(x + ux * r, z + uz * r, sample);
@@ -502,8 +504,8 @@ function rimPush(world: World, x: number, z: number, feet: number, r: number, st
 /** How far the terrain inside the body's rim rises above a step, at most; 0 or less if clear. */
 function rimExcess(world: World, x: number, z: number, feet: number, r: number, stepHeight: number): number {
   let worst = -Infinity;
-  for (const [ux, uz] of RIM) {
-    const e = world.terrain.heightAt(x + ux * r, z + uz * r) - (feet + stepHeight);
+  for (let k = 0; k < RIM.length; k++) {
+    const e = world.terrain.heightAt(x + RIM[k]![0] * r, z + RIM[k]![1] * r) - (feet + stepHeight);
     if (e > worst) worst = e;
   }
   return worst;

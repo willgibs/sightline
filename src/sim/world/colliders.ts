@@ -1,3 +1,4 @@
+import { finiteRay } from '../core/math';
 import type { Surface } from './surfaces';
 
 /**
@@ -142,6 +143,7 @@ export class ColliderSet {
   ): RayHit {
     out.dist = Infinity;
     out.id = -1;
+    if (!finiteRay(ox, oy, oz, dx, dy, dz) || !(maxDist >= 0)) return out;
     const cellSize = this.gridCell;
     const s = this.nextStamp();
     let i = this.cellIndex(ox);
