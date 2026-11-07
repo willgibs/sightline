@@ -1,6 +1,6 @@
 # Foundation pass: the plan
 
-Phase 0 passed its gate on Nov 7, 2026. Before Phase 1's labs start, the owner asked for the foundation to be pushed close to its full potential, with room for the game to grow later. This is the working plan for that pass. Status is kept current as work lands.
+Phase 0 passed its gate on Nov 7, 2026. Before Phase 1's labs start, the owner asked for the foundation to be pushed close to its full potential, with room for the game to grow later. This is the working plan for that pass. Status is kept current as work lands, and every audit finding not yet fixed is listed here, so nothing depends on anyone's memory.
 
 ## What this pass is for
 
@@ -8,7 +8,7 @@ Phase 0 built the right core: deterministic math, seeded generation, recordings 
 
 | Interface | Today | After this pass |
 | --- | --- | --- |
-| State | A hash that lists fields by hand; a guard list fixed for the run | One plain-data state tree with stable entity ids, spawning, a generic hash, snapshot and restore |
+| State | A hash that lists fields by hand; a guard list fixed for the run | One plain-data state tree with stable entity ids, spawning, a generic hash, snapshot and restore (done, M2) |
 | Input | A 12-byte record sampled once per tick | Held states plus timed commands, so a shot between ticks resolves against what the player saw |
 | Events | Two types at tick resolution, no ids, no causes | One typed registry with ids, sub-tick times and cause chains |
 | Geometry | Two raycasts that return a distance; no guard hitboxes | One world-query module and one body model shared by physics, sight and hits |
@@ -25,18 +25,18 @@ Phase 1 runs five labs in parallel, and all five extend these interfaces. Wideni
 
 Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), the sim-core, controller and runtime audits, and the owner's notes.
 
-### M1 · Ground rules and inputs
-- [ ] `MissionSpec` replaces (seed, spawn kind) as the input to generation and the recording header; `genVersion` and `simVersion` numbers.
-- [ ] Tuning split by owner: `gen` (generation), `view` (presentation), everything else (simulation). Keys derived, not hand-listed. Body sizes and content definitions as data.
-- [ ] Architecture tests: no wall-clock time, async code, timers, network or dynamic imports in `src/sim`; no module-level state that lasts across ticks.
-- [ ] Deterministic `dexp`, `dlog`, `dpow`.
-- [ ] Confirmed audit findings fixed, each with a regression test.
+### M1 · Ground rules and inputs ✓
+- [x] `MissionSpec` replaces (seed, spawn kind) as the input to generation and the recording header; `GEN_VERSION` and `SIM_VERSION`.
+- [x] Tuning split by owner: `gen` (generation), `view` (presentation), everything else (simulation). Keys derived, not hand-listed; a test proves generation reads nothing outside `gen`. The guards' body size is tuning (all body sizes move to `tuning.bodies` in M6).
+- [x] Architecture tests: no wall-clock time, async code, timers, network or dynamic imports in `src/sim`; no module-level state that lasts across ticks; no aliasing around the banned math.
+- [x] Deterministic `dexp`, `dlog`, `dpow`.
+- [x] The sim-core and controller audits' findings fixed, each with a regression test. What they deferred is listed under the milestones below.
 
-### M2 · State and entities
-- [ ] All dynamic state in one plain-data `SimState`: entities with stable ids, kinds, factions and component records; random stream words inside the state.
-- [ ] `spawn`, `despawn`, generic `hashState`, `cloneState`, `Simulation.restore`; a coverage test that changing any leaf changes the hash.
-- [ ] Renderer, recorder, guard meshes and debug layer work from entity ids, so things can appear and disappear mid-run.
-- [ ] Proven bit-identical to Phase 0 through a `legacyHash()`, then switched to the generic hash.
+### M2 · State and entities ✓
+- [x] All dynamic state in one plain-data `SimState`: entities with stable ids, kinds, factions and component records; random stream words inside the state.
+- [x] `spawn`, `despawn`, generic `hashState`, `cloneState`, `Simulation.restore`; a coverage test that changing any leaf changes the hash.
+- [x] Renderer, guard meshes and debug layer work from entity ids, so things can appear and disappear mid-run. (The recorder's event and state tracks follow in M4.)
+- [x] Proven bit-identical to Phase 0 through a `legacyHash()`, then switched to the generic hash.
 
 ### M3 · Systems and the shared motor
 - [ ] `step()` runs a declared list of phases; each system has a rate and reports its time (`npm run sim -- --profile`); a deterministic scheduler queue for delayed effects.
@@ -44,8 +44,13 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 
 ### M4 · Timed commands, the event log, recording v2
 - [ ] Tick input gains held states (optic, breath, lean) and a list of commands; precise commands carry the lag and view angles of the frame the player saw. Pose history of two ticks for hits between ticks.
-- [ ] One event registry: typed, with ids, times in seconds and causes; `explain(id)` walks the chain.
+- [ ] One event registry: typed, with ids, times in seconds and causes; `explain(id)` walks the chain. Footstep and landing events carry the gait, so sound picks its voice from what the legs did rather than from loudness (today an uphill walk plays the crouch voice).
 - [ ] Recording v2: tagged tracks (header, inputs, states, events, annotations), build and version stamps, markers; snapshots cached in memory for exact seeking.
+- [ ] A strict loader: a bounds-checked reader, a `RecordingFormatError`, whole-record sizes, a size cap, no trailing bytes. The header adds the simulation tuning key, the world fingerprint and the tick-0 hash.
+- [ ] Tuning is frozen when a simulation or recorder takes it, and a tuning change mid-run becomes a track in the recording instead of a flag. A recorder records only the simulation it was made for.
+- [ ] Checkpoints carry a digest per system, so a desync names the system that diverged.
+- [ ] Long sessions: saving a 24-hour recording peaked at 191 MB; the writer streams instead.
+- [ ] A golden recording in the tests, re-simulated bit for bit.
 
 ### M5 · Deliberate behaviour changes
 - [ ] A random stream per entity and purpose; the shared `sim` stream retired.
@@ -53,37 +58,54 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [ ] Guards move with the shared motor, so they collide with the world like the player.
 
 ### M6 · World, bodies, environment
-- [ ] `world/query.ts`: raycasts with hit point, normal, id, body part and surface; segment sweeps against moving bodies; sight lines. Colliders that can be inserted, moved and removed at runtime. `Blocks.Sound`.
+- [ ] `world/query.ts`: raycasts with hit point, normal, id, body part and surface; segment sweeps against moving bodies; sight lines. Colliders that can be inserted, moved and removed at runtime. `Blocks.Sound`. The rangefinder uses `raycast` instead of its own guard test.
+- [ ] A `TerrainQuery` interface (`heightAt`, `sample`, `surfaceAt`, `raycast`, `bounds`) for simulation systems; only generation and rendering read the heightfield's arrays.
 - [ ] `entities/body.ts`: head, torso and legs from each pose, from `tuning.bodies`; meshes and hitboxes built from the same numbers.
 - [ ] `EnvState` in the simulation: clock, wind, air (density, speed of sound); the sun's direction from deterministic math; the renderer reads the sun from the simulation.
 - [ ] One spatial grid: a 2.5 m map layer and a 0.5 m site layer recording walkable, blocks sound, cover height, indoors, surface and ambient masking.
 
-### M7 · Sites, camps and scenes
+### M7 · Sites, camps, scenes and the perception boundary
 - [ ] `Site` and `CampSpec`: camps live at a site with its own origin and axis; nothing assumes the camp is at (0, 0). The Phase 0 camp converted.
 - [ ] Scene harness: worlds from a seed or built by hand, setup, scripts of inputs, commands or bots, expectations. Runs headless (`npm run scene`, vitest) and in the browser (`?scene=…`). Golden recordings re-simulated by the tests.
+- [ ] Rulesets: a scene's or mission's rules (objectives, outcome, scoring) plug in; lab scenes are the first rulesets, Phase 2's mission the next.
 - [ ] A movement course scene: steps, ramps, ceilings, gaps, crawl spaces, drops, surfaces. A regression test now, lab C's arena later.
+- [ ] The perception boundary (audit item 4): only `src/sim/perception` reads other entities' true state. AI code receives a `GuardMind` (its own state, percepts, beliefs, the static world, its own random stream), and an architecture test enforces the imports. A no-omniscience test runs a scene twice with the player in two places no guard can perceive, and every guard decision must match bit for bit until the first percept differs.
 
 ### M8 · Presentation seams and feel
 - [ ] Cues (what the shipped game shows) and debug primitives as separate channels out of the simulation; the honest view reads cues only.
 - [ ] An action-map layer: device bindings to named actions by context (on foot, optic, menu, debug), defaults in a data table.
 - [ ] Settings with persistence: sensitivity, field of view, invert, volume. Raw mouse input where the browser supports it.
 - [ ] Sound wired into the game: events, ambient sources, muffling, pause ducking.
-- [ ] Runtime robustness from the audit: input release on blur, context loss, disposal on regenerate, visible errors.
+- [ ] Runtime robustness from the audit: input release on blur, context loss, disposal on regenerate, visible errors. (The runtime audit's full list is added here when it lands.)
+- [ ] The camera never renders from inside a guard: a guard's mesh hides while the eye is inside its capsule. (Guards that step around a cornered player come with lab E.)
+- [ ] Tree canopies drawn so an eye inside one sees it, not a hole (they are single-sided cones today).
+- [ ] The debug time scale applies after the frame clamp, so fast-forward through a hitch stays fast.
+- [ ] A controller debug overlay: ground slope against the limit, sliding, rim probes, and the pushes of each resolve step (rule 8).
 
 ### M9 · The playtest loop
 - [ ] Every dev session saves its recording and a telemetry report into `playtests/`; a marker key flags moments.
 - [ ] `npm run playtest -- <file>` re-simulates and summarizes a session.
 - [ ] A replay viewer with scrubbing.
-- [ ] Determinism checked in Chromium, Firefox and WebKit, and under Bun (JavaScriptCore), in CI.
+- [ ] Determinism checked in Chromium, Firefox and WebKit, and under Bun (JavaScriptCore), in CI. A long fuzzing-bot invariant run joins the weekly platform runs.
 
 ### M10 · Close out
-- [ ] `CLAUDE.md`, `decisions.md`, the Phase 0 report and the design doc updated; delivered; verified on the owner's Mac; an independent review of the result.
+- [ ] `CLAUDE.md` gains the audit's rules as their milestones land: AI reads only `GuardMind`; systems join the phase list, never `step()` directly; anything drawn between ticks that changes an outcome, such as sway, is a pure function in `src/sim` that both sides evaluate; generation works in site frames; body sizes come from `tuning.bodies`; content definitions (rifle, ammunition, optics, throwables) live in tuning, so recordings embed them; rates are per second times `dt`; repair loops and searches get iteration budgets, never time budgets.
+- [ ] `decisions.md`, the Phase 0 report and the design doc updated; delivered; verified on the owner's Mac; an independent review of the result.
 
 ## Done so far
 
 - GitHub repository, CI (Linux on every push; macOS and Windows weekly, hashes compared), Vercel deploys.
 - Sound engine, procedural voices and world sounds, with browser tests (not yet wired into the game).
 - Browser test harness (`npm run test:browser`) and the determinism self-test (`npm run selftest`).
+- M1: explicit generation inputs, tuning by owner and validated, the clock kept out of the simulation, the determinism audit's fixes.
+- The controller hardened from its audit: steep ground is a barrier from every angle, falls land audibly, the body is as tall as it is (`SIM_VERSION` 2).
+- M2: one plain-data state tree, save-states, entity ids through the renderer.
+
+## Deliberately later
+
+- **Range reduction for `dsin` and `dcos` beyond |x| < 10⁶.** Better reduction changes bits, so it waits for a deliberate `GEN_VERSION` bump, made together with lab D's fingerprint change and seed-and-cell scatter (X3).
+- **Lab C** decides the prone body's shape: today a 0.3 m circle stands in for a 1.5 m body.
+- **Lab E** makes guards step around a player instead of shoving through.
 
 ## Not in this pass
 
@@ -103,5 +125,5 @@ Possible futures the owner has named. None is planned. They shape interfaces onl
 | A bigger open world with several bases | Sites (M7), entities that spawn (M2), runtime colliders (M6). Streaming, chunking and level of detail: nothing now. |
 | A plane drop and parachute insertion | Movement modes in the shared motor (M3). The plane, free-fall and canopy: nothing now. |
 | Survival with shelters, gear and supplies | Entities and save-states (M2), runtime colliders (M6), stable ids for generated objects (with the scatter change). Inventory, crafting, persistence: nothing now. |
-| A night zombie mode | Factions (M2), the environment clock (M6), the shared motor and perception. Zombie AI, hordes, waves: nothing now. |
-| A broader open-world shooter | The action map (M8), content definitions as data (M1). Vehicles, physics engine, networking: nothing now. |
+| A night zombie mode | Factions (M2), the environment clock (M6), the shared motor and the perception boundary (M7). Zombie AI, hordes, waves: nothing now. |
+| A broader open-world shooter | The action map (M8), content definitions as data (M10's rule). Vehicles, physics engine, networking: nothing now. |

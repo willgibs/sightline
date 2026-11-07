@@ -39,6 +39,31 @@ describe('world generation', () => {
     expect(fingerprint(other)).not.toBe(fingerprint(tal));
   });
 
+  it('depends on tuning.gen and nothing else', () => {
+    // Every non-integer number outside gen moves by 1%; integers there are rates and
+    // counts with their own rules, and generation has no business reading them either.
+    const nudged = structuredClone(defaultTuning) as unknown as Record<string, unknown>;
+    let moved = 0;
+    const nudge = (v: unknown): unknown => {
+      if (typeof v === 'number') {
+        if (Number.isInteger(v)) return v;
+        moved++;
+        return v * 1.01;
+      }
+      if (Array.isArray(v)) return v.map(nudge);
+      if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, nudge(x)]));
+      return v;
+    };
+    for (const key of Object.keys(nudged)) if (key !== 'gen') nudged[key] = nudge(nudged[key]);
+    expect(moved).toBeGreaterThan(40);
+    const world = generateWorld(missionSpec('TAL-4471'), nudged as unknown as typeof defaultTuning);
+    expect(fingerprint(world)).toBe(fingerprint(tal));
+    // And the check isn't vacuous: a gen value does change the valley.
+    const gen = structuredClone(defaultTuning);
+    gen.gen.world.hills *= 1.01;
+    expect(fingerprint(generateWorld(missionSpec('TAL-4471'), gen))).not.toBe(fingerprint(tal));
+  });
+
   it('keeps old seeds stable', () => {
     // Daily contracts and shared seeds depend on a seed always building the same valley.
     // If you change generation on purpose, update this value and note it in docs/decisions.md.
