@@ -10,7 +10,8 @@ import type { TickInput } from './input';
 import { bodyHeight, poseAt, type PoseSample } from './motor/body';
 import { idleIntent, stepMotor, type Cylinder, type MoveIntent } from './motor/motor';
 import { popDue, scheduleAt, ticksAfter, type Scheduled } from './schedule';
-import type { EntityId, GuardEntity, PlayerEntity, SimState } from './state';
+import { hasBody, type EntityId, type GuardEntity, type PlayerEntity, type SimState } from './state';
+import type { Solids } from './world/solids';
 
 /**
  * The order of a tick.
@@ -49,6 +50,8 @@ export interface EntityIndex {
 /** What every system sees while a tick runs. */
 export interface TickContext {
   readonly world: World;
+  /** Everything solid now: the world's colliders and entities' shapes (world/solids.ts). */
+  readonly solids: Solids;
   readonly tuning: Tuning;
   /** Seconds per tick. */
   readonly dt: number;
@@ -104,7 +107,7 @@ const bodies: Array<{ id: EntityId; body: BodyState; spec: BodySpec }> = [];
 /** Every body in entity order, with its kind's spec. */
 function bodiesOf(ctx: TickContext): typeof bodies {
   bodies.length = 0;
-  for (const e of ctx.state.entities) bodies.push({ id: e.id, body: e.body, spec: ctx.tuning.bodies[e.kind] });
+  for (const e of ctx.state.entities) if (hasBody(e)) bodies.push({ id: e.id, body: e.body, spec: ctx.tuning.bodies[e.kind] });
   return bodies;
 }
 
@@ -157,7 +160,7 @@ export const SYSTEMS: readonly System[] = [
     phase: 'intent',
     run(ctx) {
       const p = ctx.index.player;
-      const motor = { world: ctx.world, tick: ctx.tick, source: p.id, emit: ctx.emit };
+      const motor = { world: ctx.world, solids: ctx.solids, tick: ctx.tick, source: p.id, emit: ctx.emit };
       playerIntent(p.body, p.control, ctx.input, ctx.tuning.bodies.player, motor, intentFor(ctx, p.id));
     },
   },
@@ -191,7 +194,7 @@ export const SYSTEMS: readonly System[] = [
         }
         let intent = intentFor(ctx, id);
         if (intent.tick !== ctx.tick) intent = idleIntent(body, ctx.tick, intent);
-        stepMotor(body, intent, spec, { world: ctx.world, tuning: ctx.tuning, dt, tick: ctx.tick, source: id, others, emit: ctx.emit });
+        stepMotor(body, intent, spec, { world: ctx.world, solids: ctx.solids, tuning: ctx.tuning, dt, tick: ctx.tick, source: id, others, emit: ctx.emit });
       }
     },
   },

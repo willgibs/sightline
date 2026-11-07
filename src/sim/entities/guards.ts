@@ -3,6 +3,7 @@ import type { World } from '../gen/world';
 import { routinePose, type RoutinePose } from '../gen/routine';
 import { createBody, type BodyState } from '../motor/body';
 import type { MoveIntent } from '../motor/motor';
+import type { Solids } from '../world/solids';
 
 /**
  * Guards, before Phase 1 gives them senses and a brain: each keeps to his routine
@@ -19,9 +20,9 @@ export interface GuardState {
 }
 
 /** A guard's starting state, from the camp's spawn at `index`: on his post, or on the deck of his tower. */
-export function createGuard(world: World, index: number, tuning: Tuning): { body: BodyState; guard: GuardState } {
+export function createGuard(world: World, solids: Solids, index: number, tuning: Tuning): { body: BodyState; guard: GuardState } {
   const s = world.camp.guards[index]!;
-  const body = createBody(world, tuning.bodies.guard, s.x, s.z, s.faceX, s.faceZ, s.y);
+  const body = createBody(world, solids, tuning.bodies.guard, s.x, s.z, s.faceX, s.faceZ, s.y);
   return { body, guard: { spawn: index, headYaw: 0 } };
 }
 

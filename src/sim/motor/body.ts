@@ -4,6 +4,7 @@ import type { StanceName } from '../events';
 import type { World } from '../gen/world';
 import { Blocks, circleOverlaps } from '../world/colliders';
 import { makeTerrainSample } from '../world/heightfield';
+import type { Solids } from '../world/solids';
 import { Surface } from '../world/surfaces';
 
 /**
@@ -93,11 +94,11 @@ const ids: number[] = [];
  * inside something solid does it stand on top. `standY` raises where to look, for a
  * body that starts up on something: a sentry on his tower's deck.
  */
-export function createBody(world: World, spec: BodySpec, x: number, z: number, faceX: number, faceZ: number, standY?: number): BodyState {
+export function createBody(world: World, solids: Solids, spec: BodySpec, x: number, z: number, faceX: number, faceZ: number, standY?: number): BodyState {
   const from = standY ?? world.terrain.heightAt(x, z);
-  let ground = groundBelow(world, x, z, from + spec.stepHeight, spec.radius);
-  if (solidAround(world, x, z, ground.height + spec.stepHeight, ground.height + spec.height.stand, spec.radius)) {
-    ground = groundBelow(world, x, z, Infinity, spec.radius);
+  let ground = groundBelow(world, solids, x, z, from + spec.stepHeight, spec.radius);
+  if (solidAround(solids, x, z, ground.height + spec.stepHeight, ground.height + spec.height.stand, spec.radius)) {
+    ground = groundBelow(world, solids, x, z, Infinity, spec.radius);
   }
   const y = ground.height;
   const surface = ground.surface;
@@ -181,10 +182,10 @@ export function bodyHeight(b: BodyState, spec: BodySpec): number {
 }
 
 /** True if a solid collider overlaps the vertical band [y0, y1) of a body at (x, z). */
-export function solidAround(world: World, x: number, z: number, y0: number, y1: number, r: number): boolean {
-  world.colliders.query(x - r, z - r, x + r, z + r, ids);
+export function solidAround(solids: Solids, x: number, z: number, y0: number, y1: number, r: number): boolean {
+  solids.query(x - r, z - r, x + r, z + r, ids);
   for (let q = 0; q < ids.length; q++) {
-    const c = world.colliders.list[ids[q]!]!;
+    const c = solids.get(ids[q]!);
     if ((c.flags & Blocks.Move) !== 0 && c.y1 > y0 && c.y0 < y1 && circleOverlaps(c, x, z, r)) return true;
   }
   return false;
@@ -207,15 +208,14 @@ const groundOut: Ground = { height: 0, surface: Surface.Grass, collider: -1 };
  * small drop in the terrain would turn the ledge into a wall it is already inside.
  * The result is reused by the next call; copy what you keep.
  */
-export function groundBelow(world: World, x: number, z: number, maxTop: number, radius: number): Ground {
+export function groundBelow(world: World, solids: Solids, x: number, z: number, maxTop: number, radius: number): Ground {
   world.terrain.sample(x, z, sample);
   groundOut.height = sample.height;
   groundOut.surface = sample.surface;
   groundOut.collider = -1;
-  const { colliders } = world;
-  colliders.query(x - radius, z - radius, x + radius, z + radius, ids);
+  solids.query(x - radius, z - radius, x + radius, z + radius, ids);
   for (let q = 0; q < ids.length; q++) {
-    const c = colliders.list[ids[q]!]!;
+    const c = solids.get(ids[q]!);
     if ((c.flags & Blocks.Move) === 0) continue;
     if (c.y1 > maxTop || c.y1 <= groundOut.height) continue;
     if (!circleOverlaps(c, x, z, radius)) continue;

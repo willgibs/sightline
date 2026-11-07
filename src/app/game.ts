@@ -11,7 +11,8 @@ import { Simulation, type Snapshot } from '../sim/sim';
 import type { SimEvent } from '../sim/events';
 import { normalizeSeed } from '../sim/core/seed';
 import { Blocks, type Collider } from '../sim/world/colliders';
-import { emptyHit, raycast, type QueryBody } from '../sim/world/query';
+import { emptyHit, raycast } from '../sim/world/query';
+import { entityOfCollider } from '../sim/world/solids';
 import { Surface, surfaceName } from '../sim/world/surfaces';
 import { GameRenderer, type CameraPose } from '../render/renderer';
 import { Hud } from './hud';
@@ -79,7 +80,6 @@ export class Game {
   private readonly stats = new FrameStats();
   private readonly raw = neutralInput();
   private readonly hit = emptyHit();
-  private readonly queryBodies: QueryBody[] = [];
   private gridShown = false;
   private readonly spawnKind: SpawnKind;
   private debug: boolean;
@@ -620,11 +620,17 @@ export class Game {
     const dy = Math.sin(pose.pitch);
     const dz = -Math.cos(pose.yaw) * cp;
     // The same query sight and shots use, ignoring the player's own body.
-    const hit = raycast(this.world, this.sim.queryBodies(this.queryBodies), pose.x, pose.y, pose.z, dx, dy, dz, 2000, Blocks.Bullet, this.hit, this.sim.playerId);
+    const hit = raycast(this.sim.queryView(), pose.x, pose.y, pose.z, dx, dy, dz, 2000, Blocks.Bullet, this.hit, this.sim.playerId);
     if (hit.what !== 'none') {
       const t = hit.dist;
       const what =
-        hit.what === 'body' ? `guard ${hit.id} · ${hit.part}` : hit.what === 'collider' ? colliderLabel(this.world.colliders.list[hit.id]!) : 'terrain';
+        hit.what === 'body'
+          ? `guard ${hit.id} · ${hit.part}`
+          : hit.what === 'collider'
+            ? entityOfCollider(hit.id) >= 0
+              ? `solid ${entityOfCollider(hit.id)}`
+              : colliderLabel(this.sim.solids.get(hit.id))
+            : 'terrain';
       this.aim = (this.aim ?? new THREE.Vector3()).set(hit.x, hit.y, hit.z);
       this.aimText = `${t < 10 ? t.toFixed(1) : Math.round(t)} m · ${what}`;
     } else {
@@ -642,7 +648,7 @@ export class Game {
     const played = this.sim.tick / T.sim.tickHz;
     const slopeDeg = (Math.atan(p.slopeTan) * 180) / Math.PI;
     // The light where the player's chest is: in the sun, or shaded by terrain or something solid.
-    const light = lightAt(w, w.spec.env, this.sim.tick / T.sim.tickHz, p.x, p.y + p.eyeHeight * 0.75, p.z, T.visibility);
+    const light = lightAt(w, this.sim.solids, w.spec.env, this.sim.tick / T.sim.tickHz, p.x, p.y + p.eyeHeight * 0.75, p.z, T.visibility);
     const lightName = light === T.visibility.light.lit ? 'sun' : light === T.visibility.light.shade ? 'shade' : light === T.visibility.light.dusk ? 'dusk' : 'dark';
     const exp = exposure(p, T.bodies.player, T, light);
     const V = T.visibility;
@@ -670,7 +676,7 @@ export class Game {
       `WORLD`,
       `relief ${w.terrain.minHeight.toFixed(0)} to ${w.terrain.maxHeight.toFixed(0)} m · ${w.features.saddles.length} passes · generated in ${Math.round(w.genMs)} ms`,
       `overwatch ${w.report.overwatchSectors}/8 directions · ${w.report.perches.length} perches · reachable from ${w.report.accessSectors}/16`,
-      `${w.props.trees.length.toLocaleString('en-US')} trees · ${w.props.rocks.length.toLocaleString('en-US')} rocks · ${w.props.bushes.length.toLocaleString('en-US')} bushes · ${w.camp.guards.length} guards`,
+      `${w.props.trees.length.toLocaleString('en-US')} trees · ${w.props.rocks.length.toLocaleString('en-US')} rocks · ${w.props.bushes.length.toLocaleString('en-US')} bushes · ${w.camp.guards.length} guards${this.sim.solids.count ? ` · ${this.sim.solids.count} solid entities` : ''}`,
       `recording ${kb(sizes.inputs)} inputs · ${kb(sizes.states)} states · ${kb(sizes.events)} events`,
     ];
     return lines.join('\n');

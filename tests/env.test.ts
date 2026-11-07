@@ -1,3 +1,4 @@
+import { Solids } from '../src/sim/world/solids';
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { air, defaultEnv, lightAt, sunDirection, timeOfDay, windAt, type EnvSpec } from '../src/sim/env';
@@ -50,9 +51,9 @@ describe('the environment', () => {
     const wall = { kind: 'box' as const, x: -3, z: 3, y0: 0, y1: 6, hx: 0.5, hz: 6, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Wood };
     const w = testWorld({ colliders: [wall] });
     const L = T.visibility.light;
-    expect(lightAt(w, defaultEnv(), 0, 10, 1, -10, T.visibility)).toBe(L.lit);
+    expect(lightAt(w, new Solids(w.colliders), defaultEnv(), 0, 10, 1, -10, T.visibility)).toBe(L.lit);
     // The sun is in the south-west: a point just north-east of the wall is in its shade.
-    expect(lightAt(w, defaultEnv(), 0, -1.5, 1, 1.5, T.visibility)).toBe(L.shade);
-    expect(lightAt(w, at({ timeOfDayMin: 23 * 60 }), 0, 10, 1, -10, T.visibility)).toBe(L.dark);
+    expect(lightAt(w, new Solids(w.colliders), defaultEnv(), 0, -1.5, 1, 1.5, T.visibility)).toBe(L.shade);
+    expect(lightAt(w, new Solids(w.colliders), at({ timeOfDayMin: 23 * 60 }), 0, 10, 1, -10, T.visibility)).toBe(L.dark);
   });
 });

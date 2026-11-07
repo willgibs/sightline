@@ -5,6 +5,7 @@ import type { EventDraft } from '../events';
 import type { World } from '../gen/world';
 import { Blocks, circleOverlaps, pushOutCircle } from '../world/colliders';
 import { makeTerrainSample } from '../world/heightfield';
+import type { Solids } from '../world/solids';
 import { surfaceLoudness } from '../world/surfaces';
 import { bodyHeight, groundBelow, pushHistory, type BodySpec, type BodyState, type Gait, type MotorModeName, type Stance } from './body';
 import { footfall } from './footfall';
@@ -25,10 +26,12 @@ import { footfall } from './footfall';
  * following it or falling, landing, footsteps. Settling picks the next mode. A mode that
  * moves along a path of its own, such as lab C's mantle or ladder, replaces both.
  *
- * Invariants (tests/invariants.test.ts and tests/steep.test.ts):
+ * Invariants (tests/invariants.test.ts, tests/steep.test.ts, tests/solids.test.ts):
  * - in every mode, the body never ends a tick inside anything solid or under the terrain,
- *   and never rises more than stepHeight in one tick; static geometry always beats other
- *   bodies, which can shove it but never through a wall;
+ *   and never rises more than stepHeight in one tick; solid geometry (the world's
+ *   colliders and entities' shapes, world/solids.ts) always beats other bodies, which can
+ *   shove it but never through a wall. Entities' shapes hold this only because whatever
+ *   moves one never moves it into a body;
  * - on the ground, the body never gains height on ground steeper than maxSlopeDeg, from
  *   any angle of approach.
  * A new mode states its own invariants here and adds them to the invariant run.
@@ -73,6 +76,8 @@ export interface Cylinder {
 
 export interface MotorContext {
   world: World;
+  /** The world's colliders and entities' solid shapes (world/solids.ts). */
+  solids: Solids;
   tuning: Tuning;
   dt: number;
   tick: number;
@@ -136,7 +141,7 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
   const movedDist = Math.sqrt(mdx * mdx + mdz * mdz);
 
   // --- Settle: follow the ground, fall or land. ----------------------------------
-  const ground = groundBelow(world, nx, nz, feet + spec.stepHeight, spec.radius);
+  const ground = groundBelow(world, ctx.solids, nx, nz, feet + spec.stepHeight, spec.radius);
   const destSlope = ground.collider >= 0 ? 0 : world.terrain.sample(nx, nz, sample).slopeTan;
   const drop = feet - ground.height;
   const wasFalling = b.motor !== 'ground' || b.sliding;
@@ -308,9 +313,9 @@ function driveAir(b: BodyState): void {
  * into or out of prone takes stanceTime.prone and can't be interrupted (`proneTransition`).
  * Returns whether the stance changed.
  */
-export function requestStance(b: BodyState, to: Stance, spec: BodySpec, ctx: Pick<MotorContext, 'world' | 'source' | 'emit'>): boolean {
+export function requestStance(b: BodyState, to: Stance, spec: BodySpec, ctx: Pick<MotorContext, 'solids' | 'source' | 'emit'>): boolean {
   if (to === b.stance) return false;
-  if (spec.height[to] > spec.height[b.stance] && !hasHeadroom(b, spec.height[to], spec, ctx.world)) return false;
+  if (spec.height[to] > spec.height[b.stance] && !hasHeadroom(b, spec.height[to], spec, ctx.solids)) return false;
   const prone = to === 'prone' || b.stance === 'prone';
   ctx.emit({ type: 'stance', source: ctx.source, from: b.stance, to });
   b.eyeFrom = b.eyeHeight;
@@ -323,13 +328,12 @@ export function requestStance(b: BodyState, to: Stance, spec: BodySpec, ctx: Pic
 }
 
 /** True if nothing solid sits between the body's current top and `height` above its feet. */
-function hasHeadroom(b: BodyState, height: number, spec: BodySpec, world: World): boolean {
-  const { colliders } = world;
+function hasHeadroom(b: BodyState, height: number, spec: BodySpec, solids: Solids): boolean {
   const r = spec.radius;
   const current = bodyHeight(b, spec);
-  colliders.query(b.x - r, b.z - r, b.x + r, b.z + r, ids);
+  solids.query(b.x - r, b.z - r, b.x + r, b.z + r, ids);
   for (let q = 0; q < ids.length; q++) {
-    const c = colliders.list[ids[q]!]!;
+    const c = solids.get(ids[q]!);
     if ((c.flags & Blocks.Move) === 0) continue;
     // Same comparisons as moving: a slab exactly at head height is overhead, not in the way.
     if (c.y0 < b.y + current - 0.01 || c.y0 >= b.y + height) continue;
@@ -343,20 +347,19 @@ function hasHeadroom(b: BodyState, height: number, spec: BodySpec, world: World)
  *
  * Each pass resolves, in order: other bodies (soft, may shove), terrain (no gaining
  * height on ground too steep to stand on, and no rising faster than a walkable slope
- * allows), and static colliders (hard, always win). A ceiling the body is deep under but
+ * allows), and colliders, the world's and entities' (hard, always win). A ceiling the body is deep under but
  * no longer fits beneath (the ground rose) is never pushed out of sideways; a shallow
  * overlap at its edge is. If anything still overlaps after the passes, the body stays
  * where it was. That keeps every tick's end position clear, by induction from a clear
  * spawn.
  */
 export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec, ctx: MotorContext, out: { x: number; z: number }): void {
-  const { world } = ctx;
+  const { world, solids } = ctx;
   const r = spec.radius;
   const height = bodyHeight(b, spec);
   const feet = b.y;
   const stepTop = feet + spec.stepHeight;
   const tanMax = dtanDeg(spec.maxSlopeDeg);
-  const list = world.colliders.list;
   let nx = tx;
   let nz = tz;
 
@@ -410,10 +413,10 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
       moved = true;
     }
 
-    const head = Math.max(feet, groundBelow(world, nx, nz, stepTop, r).height) + height;
-    world.colliders.query(nx - r - 0.1, nz - r - 0.1, nx + r + 0.1, nz + r + 0.1, ids);
+    const head = Math.max(feet, groundBelow(world, solids, nx, nz, stepTop, r).height) + height;
+    solids.query(nx - r - 0.1, nz - r - 0.1, nx + r + 0.1, nz + r + 0.1, ids);
     for (let q = 0; q < ids.length; q++) {
-      const c = list[ids[q]!]!;
+      const c = solids.get(ids[q]!);
       if ((c.flags & Blocks.Move) === 0) continue;
       if (c.y1 <= stepTop) continue; // low enough to step onto
       if (c.y0 >= head) continue; // overhead
@@ -446,7 +449,7 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
     b.vz = 0;
   }
 
-  if (!isClear(b, nx, nz, spec, world, tanMax)) {
+  if (!isClear(b, nx, nz, spec, world, solids, tanMax)) {
     b.vx = 0;
     b.vz = 0;
     out.x = b.x;
@@ -512,7 +515,7 @@ function rimExcess(world: World, x: number, z: number, feet: number, r: number, 
 }
 
 /** True if the body can end the tick at (x, z): nothing solid inside it, no cliff under it. */
-function isClear(b: BodyState, x: number, z: number, spec: BodySpec, world: World, tanMax: number): boolean {
+function isClear(b: BodyState, x: number, z: number, spec: BodySpec, world: World, solids: Solids, tanMax: number): boolean {
   const r = spec.radius;
   const feet = b.y;
   const stepTop = feet + spec.stepHeight;
@@ -520,10 +523,10 @@ function isClear(b: BodyState, x: number, z: number, spec: BodySpec, world: Worl
   // Never press further into a face than the body already is. (A body falling or sliding
   // beside a face is already overlapping it with its rim; moving away or along is fine.)
   if (rimExcess(world, x, z, feet, r, spec.stepHeight) > Math.max(0, rimExcess(world, b.x, b.z, feet, r, spec.stepHeight)) + 1e-3) return false;
-  const head = Math.max(feet, groundBelow(world, x, z, stepTop, r).height) + bodyHeight(b, spec);
-  world.colliders.query(x - r, z - r, x + r, z + r, ids);
+  const head = Math.max(feet, groundBelow(world, solids, x, z, stepTop, r).height) + bodyHeight(b, spec);
+  solids.query(x - r, z - r, x + r, z + r, ids);
   for (let q = 0; q < ids.length; q++) {
-    const c = world.colliders.list[ids[q]!]!;
+    const c = solids.get(ids[q]!);
     if ((c.flags & Blocks.Move) === 0 || c.y1 <= stepTop || c.y0 >= head) continue;
     if (pushOutCircle(c, x, z, r, tmpPush) && tmpPush.x * tmpPush.x + tmpPush.z * tmpPush.z > 1e-8) return false;
   }

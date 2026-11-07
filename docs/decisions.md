@@ -6,6 +6,14 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### Solid things can appear, move and vanish
+
+**Decision:** An entity can have a solid shape: a collider in the world frame, kept in the state tree (`SolidEntity`, kind `solid`, for now the only kind with one). `Solids` (`src/sim/world/solids.ts`) shows the world's colliders and every entity's shape as one set: the motor, the world query, the light and the renderer all ask it, so a gate stops a body, a shot and a sight line exactly as a wall does. An entity's collider id is a fixed offset plus its entity id, the same for the whole run and across restores. Whatever moves a shape never moves it into a body (it checks with `overlapsBody`, then waits or stops): that keeps the motor's invariant that no body ends a tick inside anything solid, and a test runs a gate that waits for the player. Until a kind of entity has its own mesh, the renderer draws its shape (in both views, so nothing solid is invisible).
+
+**Why:** doors, the escape vehicle and the reinforcement truck (labs D and E, Phase 2) all need it, and retrofitting it would mean reworking every collision path of the motor later, under its invariants. With no entities' shapes in play, every answer is the same as before: the behaviour goldens and the golden recording are unchanged, and a tick costs the same.
+
+**Not yet:** bodies don't ride what they stand on, and the spatial grid doesn't know about doors; both come with the lab that needs them.
+
 ### A failed tick stops the run, and its recording reproduces the failure
 
 **Decision:** If a system throws during a tick, the simulation records which tick, which system and why (`sim.fault`) and refuses further ticks: its state is partway through that tick, and going on would quietly part ways with any recording of the run. The recorder keeps the failing tick's input (`recordFault`), and the recording says the run ended in a fault (recording format 8). Re-simulating it runs up to that tick and must fail the same way, in the same system, leaving the same partial state: then the fault "reproduces exactly". A replay can show everything up to the tick before.

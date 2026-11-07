@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { disposeTree } from './dispose';
+import { SolidMeshes } from './solidMeshes';
 import { sunDirection } from '../sim/env';
 import type { Tuning } from '../config/tuning';
 import type { SimEvent } from '../sim/events';
@@ -45,6 +46,7 @@ export class GameRenderer {
   private readonly sky: THREE.Mesh;
   private worldGroup = new THREE.Group();
   private guards: GuardMeshes | null = null;
+  private solids: SolidMeshes | null = null;
   private debug: DebugLayer | null = null;
   private debugOn = false;
   private collidersOn = false;
@@ -76,6 +78,8 @@ export class GameRenderer {
     this.worldGroup.add(buildTerrain(world, this.look), buildBackdrop(world, this.look), buildProps(world, this.look), buildCamp(world, this.look));
     this.guards = new GuardMeshes((spawn) => world.camp.guards[spawn]?.role ?? 'patrol', this.look, tuning);
     this.worldGroup.add(this.guards.group);
+    this.solids = new SolidMeshes(this.look);
+    this.worldGroup.add(this.solids.group);
     this.debug = new DebugLayer(world, tuning);
     this.debug.group.visible = this.debugOn;
     this.debug.setCollidersVisible(this.collidersOn);
@@ -93,6 +97,7 @@ export class GameRenderer {
     this.worldGroup = new THREE.Group();
     this.scene.add(this.worldGroup);
     this.guards = null;
+    this.solids = null;
     this.debug = null;
   }
 
@@ -147,6 +152,7 @@ export class GameRenderer {
     }
     this.sky.position.copy(cam.position);
     this.guards?.update(prev, curr, alpha, time);
+    this.solids?.update(prev, curr, alpha);
     if (this.debugOn) this.debug?.update(prev, curr, alpha, time, aim, cam.position);
     this.gl.render(this.scene, cam);
   }

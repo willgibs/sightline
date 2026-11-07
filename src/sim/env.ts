@@ -2,6 +2,7 @@ import type { Tuning } from '../config/tuning';
 import { DEG, datan2, dcos, dpow, dsin } from './core/detmath';
 import type { World } from './gen/world';
 import { Blocks } from './world/colliders';
+import type { Solids } from './world/solids';
 
 /**
  * The mission's environment, owned by the simulation: the time of day and the sun, the
@@ -75,14 +76,14 @@ const sun = { x: 0, y: 0, z: 0 };
  * The light at a point, as the sight table's factor: full sun, shade (the sun hidden by
  * terrain or anything that blocks sight), dusk or dark (by the sun's height).
  */
-export function lightAt(world: World, env: EnvSpec, t: number, x: number, y: number, z: number, V: Tuning['visibility']): number {
+export function lightAt(world: World, solids: Solids, env: EnvSpec, t: number, x: number, y: number, z: number, V: Tuning['visibility']): number {
   sunDirection(env, t, sun);
   const elevation = datan2(sun.y, Math.sqrt(sun.x * sun.x + sun.z * sun.z));
   if (elevation < -6 * DEG) return V.light.dark;
   if (elevation < 6 * DEG) return V.light.dusk;
   const reach = 3000;
   if (world.terrain.raycast(x, y, z, sun.x, sun.y, sun.z, reach) < reach) return V.light.shade;
-  if (world.colliders.raycast(x, y, z, sun.x, sun.y, sun.z, reach, Blocks.Sight, shadeHit).id >= 0) return V.light.shade;
+  if (solids.raycast(x, y, z, sun.x, sun.y, sun.z, reach, Blocks.Sight, shadeHit).id >= 0) return V.light.shade;
   return V.light.lit;
 }
 

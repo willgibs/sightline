@@ -1,3 +1,5 @@
+import type { QueryBody, QueryView } from '../src/sim/world/query';
+import { Solids } from '../src/sim/world/solids';
 import { defaultTuning, type Tuning } from '../src/config/tuning';
 import type { Camp, GuardSpawn } from '../src/sim/gen/camp';
 import { buildRoutine, type Routine } from '../src/sim/gen/routine';
@@ -87,3 +89,8 @@ export function testGuard(s: Omit<GuardSpawn, 'routine'>): GuardSpawn {
 
 export const NORTH = 0; // yaw facing -z
 export const EAST = -Math.PI / 2; // yaw facing +x
+
+/** What queries look through in a world with no entities' shapes: its own colliders, and these bodies. */
+export function viewOf(world: World, bodies: readonly QueryBody[] = []): QueryView {
+  return { world, solids: new Solids(world.colliders), bodies };
+}

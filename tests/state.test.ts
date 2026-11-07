@@ -6,7 +6,9 @@ import { generateWorld } from '../src/sim/gen/world';
 import { neutralInput, type InputFrame } from '../src/sim/input';
 import { missionSpec } from '../src/sim/mission';
 import { Simulation } from '../src/sim/sim';
-import { assertPlain, hashState, type SimState } from '../src/sim/state';
+import { Faction, assertPlain, hashState, type SimState } from '../src/sim/state';
+import { Blocks } from '../src/sim/world/colliders';
+import { Surface } from '../src/sim/world/surfaces';
 
 /**
  * The state tree: plain data, completely covered by the hash, and restorable so that a
@@ -56,6 +58,13 @@ describe('the state tree', () => {
 
   it('is changed by changing any leaf', () => {
     const sim = new Simulation(world, T);
+    // An entity of every kind: the player, the guards, and a solid shape.
+    sim.spawn((id) => ({
+      id,
+      kind: 'solid',
+      faction: Faction.None,
+      solid: { kind: 'box', id: 0, x: 400, z: 400, y0: 0, y1: 2, hx: 1, hz: 0.5, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Metal },
+    }));
     play(sim, new ChaosBot('VEX-0042'), 900);
     const base = hashState(sim.state);
     const leaves: Array<{ path: string; poke: (s: SimState) => void }> = [];

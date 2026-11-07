@@ -10,7 +10,7 @@ import { Simulation } from '../src/sim/sim';
 import { Blocks } from '../src/sim/world/colliders';
 import { emptyHit, raycast, sightLine, type QueryBody } from '../src/sim/world/query';
 import { Surface } from '../src/sim/world/surfaces';
-import { testWorld } from './fixtures';
+import { testWorld, viewOf } from './fixtures';
 
 const n = { x: 0, y: 0, z: 0 };
 
@@ -109,14 +109,14 @@ describe('the world query', () => {
     const bodies = sim.queryBodies();
     const g = sim.guards.find((e) => !world.camp.guards[e.guard.spawn]!.elevated)!;
     const hit = emptyHit();
-    const from = (y: number) => raycast(world, bodies, g.body.x + 20, g.body.y + y, g.body.z, -1, 0, 0, 50, Blocks.Bullet, hit);
+    const from = (y: number) => raycast({ world, solids: sim.solids, bodies }, g.body.x + 20, g.body.y + y, g.body.z, -1, 0, 0, 50, Blocks.Bullet, hit);
     const s = bodies.find((b) => b.id === g.id)!.shape;
     expect(from(s.head.y - g.body.y)).toMatchObject({ what: 'body', id: g.id, part: 'head' });
     expect(from((s.torso.ay + s.torso.by) / 2 - g.body.y)).toMatchObject({ what: 'body', id: g.id, part: 'torso' });
     expect(from(0.4)).toMatchObject({ what: 'body', id: g.id, part: 'legs' });
     // Sound goes through bodies; so does a ray that ignores this one.
-    expect(raycast(world, bodies, g.body.x + 20, g.body.y + 1, g.body.z, -1, 0, 0, 25, Blocks.Sound, hit).what).not.toBe('body');
-    expect(raycast(world, bodies, g.body.x + 20, g.body.y + 1, g.body.z, -1, 0, 0, 25, Blocks.Bullet, hit, g.id).id).not.toBe(g.id);
+    expect(raycast({ world, solids: sim.solids, bodies }, g.body.x + 20, g.body.y + 1, g.body.z, -1, 0, 0, 25, Blocks.Sound, hit).what).not.toBe('body');
+    expect(raycast({ world, solids: sim.solids, bodies }, g.body.x + 20, g.body.y + 1, g.body.z, -1, 0, 0, 25, Blocks.Bullet, hit, g.id).id).not.toBe(g.id);
   });
 
   it('gives the point, an outward normal and the surface of the terrain and of colliders', () => {
@@ -125,11 +125,11 @@ describe('the world query', () => {
       colliders: [{ kind: 'box', x: 10, z: 0, y0: -1, y1: 3, hx: 1, hz: 2, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Metal }],
     });
     const hit = emptyHit();
-    expect(raycast(w, [], 0, 1, 0, 1, 0, 0, 50, Blocks.Bullet, hit)).toMatchObject({ what: 'collider', surface: Surface.Metal, nx: -1, ny: 0, nz: 0 });
+    expect(raycast(viewOf(w), 0, 1, 0, 1, 0, 0, 50, Blocks.Bullet, hit)).toMatchObject({ what: 'collider', surface: Surface.Metal, nx: -1, ny: 0, nz: 0 });
     expect(hit.x).toBeCloseTo(9, 9);
-    expect(raycast(w, [], 0, 5, 0, 0.6, -0.8, 0, 50, Blocks.Bullet, hit)).toMatchObject({ what: 'terrain', surface: Surface.Dirt });
+    expect(raycast(viewOf(w), 0, 5, 0, 0.6, -0.8, 0, 50, Blocks.Bullet, hit)).toMatchObject({ what: 'terrain', surface: Surface.Dirt });
     expect(hit.ny).toBeCloseTo(1, 9);
-    expect(raycast(w, [], 10, 10, 0, 0, -1, 0, 50, Blocks.Bullet, hit)).toMatchObject({ what: 'collider', ny: 1 });
+    expect(raycast(viewOf(w), 10, 10, 0, 0, -1, 0, 50, Blocks.Bullet, hit)).toMatchObject({ what: 'collider', ny: 1 });
   });
 
   it('lets sound through a chain-link fence but not a wall', () => {
@@ -137,8 +137,8 @@ describe('the world query', () => {
     const wall = { ...fence, x: 15, flags: Blocks.All, surface: Surface.Wood };
     const w = testWorld({ colliders: [fence, wall] });
     const hit = emptyHit();
-    expect(raycast(w, [], 0, 1, 0, 1, 0, 0, 50, Blocks.Sound, hit).x).toBeCloseTo(14.95, 6);
-    expect(raycast(w, [], 0, 1, 0, 1, 0, 0, 50, Blocks.Move, hit).x).toBeCloseTo(4.95, 6);
+    expect(raycast(viewOf(w), 0, 1, 0, 1, 0, 0, 50, Blocks.Sound, hit).x).toBeCloseTo(14.95, 6);
+    expect(raycast(viewOf(w), 0, 1, 0, 1, 0, 0, 50, Blocks.Move, hit).x).toBeCloseTo(4.95, 6);
   });
 
   it('is symmetric: if A sees B, B sees A', () => {
@@ -156,8 +156,8 @@ describe('the world query', () => {
       };
       const [ax, ay, az] = p();
       const [bx, by, bz] = p();
-      const ab = sightLine(world, bodies, ax, ay, az, bx, by, bz, Blocks.Sight);
-      const ba = sightLine(world, bodies, bx, by, bz, ax, ay, az, Blocks.Sight);
+      const ab = sightLine(viewOf(world, bodies), ax, ay, az, bx, by, bz, Blocks.Sight);
+      const ba = sightLine(viewOf(world, bodies), bx, by, bz, ax, ay, az, Blocks.Sight);
       expect(ab, `pair ${k}`).toBe(ba);
       if (ab) clear++;
       else blocked++;

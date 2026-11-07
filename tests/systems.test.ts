@@ -1,3 +1,4 @@
+import { Solids } from '../src/sim/world/solids';
 import { describe, expect, it } from 'vitest';
 import { defaultTuning } from '../src/config/tuning';
 import { Rng } from '../src/sim/core/rng';
@@ -131,10 +132,12 @@ describe('the shared motor', () => {
 
   function walk(spec: BodySpec, x: number, wishX: number, seconds: number): { x: number; y: number; events: SimEvent[] } {
     const world = testWorld({ colliders: [wall, ledge] });
-    const b = createBody(world, spec, x, 0, 1, 0);
+    const solids = new Solids(world.colliders);
+    const b = createBody(world, solids, spec, x, 0, 1, 0);
     const events: SimEvent[] = [];
     const ctx: MotorContext = {
       world,
+      solids,
       tuning: defaultTuning,
       dt: 1 / 30,
       tick: 0,

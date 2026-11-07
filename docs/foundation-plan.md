@@ -62,7 +62,7 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 ### M6 · World, bodies, environment
 - [x] `world/query.ts`: raycasts with hit point, normal, id, body part and surface; sight lines. `Blocks.Sound`. The rangefinder uses `raycast` instead of its own guard test.
 - [ ] Segment sweeps against moving bodies (the bullet's path against each part between two ticks' poses), with lab B.
-- [ ] Colliders that can be inserted, moved and removed at runtime: doors, the escape vehicle, the reinforcement truck. They are simulation state, so entities with a solid shape, which the motor and queries see alongside the world's colliders.
+- [x] Colliders that can be inserted, moved and removed at runtime: entities with a solid shape (`solid`, a collider in the state tree), seen with the world's colliders through `Solids`, by the motor, every query, the light and the renderer (both views). Ids stay the same for the run; whatever moves one never moves it into a body. Doors and vehicles become kinds with a `solid` when a lab needs them; bodies riding what they stand on, and the grid learning about doors, come with them.
 - [x] Simulation code reads the terrain through its queries; an architecture test keeps the heightfield's arrays to generation, bots and rendering.
 - [x] Body shapes (`bodyShape()` in `src/sim/motor/shape.ts`): head, torso and legs from each pose, from `tuning.bodies`; the guards' meshes built from the same numbers.
 - [x] Every body is a complete kind in `tuning.bodies` (player and guard: sizes, limits, strides, parts); gravity is `tuning.sim.gravity`, shared by everything that falls.

@@ -2,6 +2,7 @@ import { Hasher } from './core/hash';
 import type { GuardState } from './entities/guards';
 import type { PlayerControl } from './entities/player';
 import type { BodyState } from './motor/body';
+import type { Collider } from './world/colliders';
 import { emptySchedule, type ScheduleState } from './schedule';
 
 /**
@@ -22,6 +23,7 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * Bumped when the tree's layout changes, so an old save-state is refused rather than
  * misread. 2: the player is a body and its controls; the schedule. 3: event ids.
  * 4: bodies keep their last two poses. 5: guards are bodies; random streams per entity.
+ * (Solid entities are a new kind, not a change of layout: existing states read the same.)
  */
 export const STATE_SCHEMA = 5;
 
@@ -30,8 +32,8 @@ export type EntityId = number;
 /** The player is always the first entity spawned. */
 export const PLAYER_ID: EntityId = 1;
 
-/** Which side an entity is on. Perception and AI target factions, never specific entities. */
-export const Faction = { Player: 0, Camp: 1 } as const;
+/** Which side an entity is on. Perception and AI target factions, never specific entities. None: an object, no one's. */
+export const Faction = { Player: 0, Camp: 1, None: 2 } as const;
 
 /** Four 32-bit words of a random stream's state. */
 export type RngWords = [number, number, number, number];
@@ -55,8 +57,31 @@ export interface GuardEntity {
   guard: GuardState;
 }
 
-export type Entity = PlayerEntity | GuardEntity;
+/**
+ * An entity that is only a solid shape: a gate, a crate, a scene's moving wall. The motor
+ * and every query see it as they see the world's colliders (world/solids.ts). Doors and
+ * vehicles will be kinds of their own with a `solid` as well.
+ */
+export interface SolidEntity {
+  id: EntityId;
+  kind: 'solid';
+  faction: number;
+  /** Its shape in the world frame. Its id is solidId(id), set on spawning. */
+  solid: Collider;
+}
+
+export type Entity = PlayerEntity | GuardEntity | SolidEntity;
 export type EntityKind = Entity['kind'];
+/** The entities with a body the motor moves. */
+export type BodyEntity = Extract<Entity, { body: BodyState }>;
+
+export function hasBody(e: Entity): e is BodyEntity {
+  return 'body' in e;
+}
+
+export function hasSolid(e: Entity): e is Extract<Entity, { solid: Collider }> {
+  return 'solid' in e;
+}
 
 export interface SimState {
   schema: number;

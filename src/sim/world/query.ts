@@ -3,13 +3,14 @@ import type { EntityId } from '../state';
 import { rayCapsule, raySphere, type BodyPart, type BodyShape } from '../motor/shape';
 import { Blocks, type Collider, type RayHit } from './colliders';
 import { makeTerrainSample } from './heightfield';
+import type { Solids } from './solids';
 import type { Surface } from './surfaces';
 
 /**
- * One answer to "what does this line hit": the terrain, the colliders and the bodies, with
- * the point, the surface normal, what it was and, for a body, which part. Sight, hearing,
- * shots and the rangefinder all ask here, with different masks, so if a guard can see
- * your head, you can hit his.
+ * One answer to "what does this line hit": the terrain, everything solid (the world's
+ * colliders and entities' shapes) and the bodies, with the point, the surface normal,
+ * what it was and, for a body, which part. Sight, hearing, shots and the rangefinder all
+ * ask here, with different masks, so if a guard can see your head, you can hit his.
  *
  * Masks are collider flags (colliders.ts): Blocks.Sight, Blocks.Bullet, Blocks.Sound,
  * Blocks.Move. The terrain blocks everything. Bodies block sight and bullets, not sound.
@@ -26,7 +27,7 @@ export interface Hit {
   ny: number;
   nz: number;
   what: 'none' | 'terrain' | 'collider' | 'body';
-  /** The collider's id, or the body's entity id; −1 otherwise. */
+  /** The collider's id (an entity's shape: entityOfCollider gives the entity), or the body's entity id; −1 otherwise. */
   id: number;
   part: BodyPart | null;
   /** The ground or the collider's surface; null for a body or nothing. */
@@ -43,6 +44,13 @@ export interface QueryBody {
   shape: BodyShape;
 }
 
+/** What a query looks through: the world, what is solid now, and the bodies as they stand now (Simulation.queryView). */
+export interface QueryView {
+  readonly world: World;
+  readonly solids: Solids;
+  readonly bodies: readonly QueryBody[];
+}
+
 /** The masks bodies stand in the way of. */
 const BODY_BLOCKS = Blocks.Sight | Blocks.Bullet;
 
@@ -56,8 +64,7 @@ const n = { x: 0, y: 0, z: 0 };
  * one asking). Writes to and returns `out`.
  */
 export function raycast(
-  world: World,
-  bodies: readonly QueryBody[],
+  view: QueryView,
   ox: number,
   oy: number,
   oz: number,
@@ -74,13 +81,14 @@ export function raycast(
   out.id = -1;
   out.part = null;
   out.surface = null;
+  const { world, solids, bodies } = view;
 
   const t = world.terrain.raycast(ox, oy, oz, dx, dy, dz, maxDist);
   if (t <= maxDist) {
     out.dist = t;
     out.what = 'terrain';
   }
-  world.colliders.raycast(ox, oy, oz, dx, dy, dz, Math.min(maxDist, out.dist), mask, colliderHit);
+  solids.raycast(ox, oy, oz, dx, dy, dz, Math.min(maxDist, out.dist), mask, colliderHit);
   if (colliderHit.id >= 0 && colliderHit.dist < out.dist) {
     out.dist = colliderHit.dist;
     out.what = 'collider';
@@ -111,7 +119,7 @@ export function raycast(
     out.nz = -sample.gz / l;
     out.surface = sample.surface;
   } else if (out.what === 'collider') {
-    const c = world.colliders.list[out.id]!;
+    const c = solids.get(out.id);
     colliderNormal(c, out.x, out.y, out.z, out);
     out.surface = c.surface;
   }
@@ -173,8 +181,7 @@ const sight = emptyHit();
  * out of `bodies` by the caller, or the line ends on it.
  */
 export function sightLine(
-  world: World,
-  bodies: readonly QueryBody[],
+  view: QueryView,
   ax: number,
   ay: number,
   az: number,
@@ -189,6 +196,6 @@ export function sightLine(
   const dz = bz - az;
   const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
   if (d < 1e-9) return true;
-  raycast(world, bodies, ax, ay, az, dx / d, dy / d, dz / d, d, mask, sight, ignore);
+  raycast(view, ax, ay, az, dx / d, dy / d, dz / d, d, mask, sight, ignore);
   return sight.dist >= d - 1e-6;
 }

@@ -2,7 +2,9 @@ import { finiteRay } from '../core/math';
 import type { Surface } from './surfaces';
 
 /**
- * Static collision shapes: oriented boxes and vertical cylinders.
+ * Collision shapes: oriented boxes and vertical cylinders. The world's are static and
+ * live here; entities' shapes (doors, vehicles) are the same kind of collider, kept in
+ * the state tree and seen alongside these through Solids (solids.ts).
  *
  * Each collider says what it blocks. A chain-link fence blocks movement but not sight,
  * bullets or sound; a bush blocks sight only; a wall blocks everything. Perception,
@@ -50,8 +52,8 @@ export interface RayHit {
   id: number;
 }
 
-/** Horizontal half-extent of a collider (radius of its footprint's bounding square). */
-function footprintExtent(c: Collider): { ex: number; ez: number } {
+/** Horizontal half-extents of a collider's footprint's bounding box. */
+export function footprintExtent(c: Collider): { ex: number; ez: number } {
   if (c.kind === 'cyl') return { ex: c.r, ez: c.r };
   const ex = Math.abs(c.ux) * c.hx + Math.abs(c.uz) * c.hz;
   const ez = Math.abs(c.uz) * c.hx + Math.abs(c.ux) * c.hz;
@@ -330,4 +332,12 @@ export function pushOutCircle(c: Collider, x: number, z: number, r: number, out:
   out.x = mx * c.ux - mz * c.uz;
   out.z = mx * c.uz + mz * c.ux;
   return true;
+}
+
+/**
+ * True if a collider overlaps an upright body: a circle of `radius` at (x, z), from its
+ * feet at y to y + height. What something that moves a solid checks before moving it.
+ */
+export function overlapsBody(c: Collider, x: number, y: number, z: number, radius: number, height: number): boolean {
+  return c.y1 > y && c.y0 < y + height && circleOverlaps(c, x, z, radius);
 }

@@ -9,7 +9,9 @@ import { missionSpec } from './mission';
 import type { BodyState, Gait, Stance } from './motor/body';
 import type { MoveIntent } from './motor/motor';
 import { bodyShape, emptyShape } from './motor/shape';
-import type { QueryBody } from './world/query';
+import type { QueryBody, QueryView } from './world/query';
+import type { Collider } from './world/colliders';
+import { Solids, solidId } from './world/solids';
 import { createGuard } from './entities/guards';
 import {
   Faction,
@@ -18,8 +20,11 @@ import {
   cloneState,
   despawn,
   emptyState,
+  hasBody,
+  hasSolid,
   hashState,
   spawn,
+  type Entity,
   type EntityId,
   type GuardEntity,
   type PlayerEntity,
@@ -80,10 +85,14 @@ export interface Snapshot {
   guardSpawns: number[];
   /** GUARD_FIELDS values per guard, parallel to guardIds. */
   guards: Float32Array;
+  /** Entities' solid shapes (copies), in entity order; their ids say whose (world/solids.ts). */
+  solids: Collider[];
 }
 
 export class Simulation {
   readonly world: World;
+  /** Everything solid now: the world's colliders and the entities' shapes, read live from the state. */
+  readonly solids: Solids;
   readonly dt: number;
   private current: Tuning;
   /** All dynamic state. Systems write into it; nothing else holds simulation state. */
@@ -102,25 +111,29 @@ export class Simulation {
   private readonly events: SimEvent[] = [];
   private readonly intents = new Map<EntityId, MoveIntent>();
   private index!: EntityIndex;
+  private readonly view: { world: World; solids: Solids; bodies: QueryBody[] };
   private readonly ctx: { -readonly [K in keyof TickContext]: TickContext[K] };
 
   /** `systems` replaces the game's own list, for tests and scenes; recordings replay with the default. */
   constructor(world: World, tuning: Tuning, systems: readonly System[] = SYSTEMS) {
     assertTuning(tuning);
     this.world = world;
+    this.solids = new Solids(world.colliders);
+    this.view = { world, solids: this.solids, bodies: [] };
     this.current = frozenTuning(tuning);
     this.dt = 1 / tuning.sim.tickHz;
     this.systems = systems;
     this.every = planSystems(systems, tuning.sim.tickHz);
     const s = emptyState();
-    spawn(s, (id): PlayerEntity => ({ id, kind: 'player', faction: Faction.Player, ...createPlayer(world, tuning) }));
+    spawn(s, (id): PlayerEntity => ({ id, kind: 'player', faction: Faction.Player, ...createPlayer(world, this.solids, tuning) }));
     for (let i = 0; i < world.camp.guards.length; i++) {
-      spawn(s, (id): GuardEntity => ({ id, kind: 'guard', faction: Faction.Camp, ...createGuard(world, i, this.current) }));
+      spawn(s, (id): GuardEntity => ({ id, kind: 'guard', faction: Faction.Camp, ...createGuard(world, this.solids, i, this.current) }));
     }
     this.state = s;
     this.reindex();
     const ctx = {
       world,
+      solids: this.solids,
       tuning,
       dt: this.dt,
       tick: 0,
@@ -190,6 +203,7 @@ export class Simulation {
     if (!player || player.id !== PLAYER_ID) throw new Error('Simulation state has no player');
     const guards = this.state.entities.filter((e): e is GuardEntity => e.kind === 'guard');
     this.index = { player, guards };
+    this.solids.track(this.state.entities.filter(hasSolid).map((e) => e.solid));
     this.intents.clear();
   }
 
@@ -235,6 +249,18 @@ export class Simulation {
     this.current = frozenTuning(tuning);
   }
 
+  /**
+   * Adds an entity between ticks (a scene's gate, a test's crate), with the next id. An
+   * entity with a solid shape gets its collider id from its entity id, and must not be
+   * placed inside a body (world/solids.ts).
+   */
+  spawn<E extends Entity>(make: (id: EntityId) => E): E {
+    const e = spawn(this.state, make);
+    if (hasSolid(e)) e.solid.id = solidId(e.id);
+    this.reindex();
+    return e;
+  }
+
   /** Removes an entity between ticks (a killed guard, a picked-up object). Returns false if there was none. */
   despawn(id: EntityId): boolean {
     if (id === PLAYER_ID) throw new Error('The player cannot be despawned');
@@ -276,6 +302,7 @@ export class Simulation {
             guardIds: [],
             guardSpawns: [],
             guards: new Float32Array(n * GUARD_FIELDS),
+            solids: [],
           };
     const p = this.player;
     s.tick = this.tick;
@@ -303,20 +330,29 @@ export class Simulation {
       s.guards[o + 4] = e.guard.headYaw;
       s.guards[o + 5] = b.speed > 0.1 ? 1 : 0;
     }
+    const shapes = this.solids.shapes;
+    s.solids.length = shapes.length;
+    for (let k = 0; k < shapes.length; k++) s.solids[k] = Object.assign(s.solids[k] ?? ({} as Collider), shapes[k]!);
     return s;
   }
 
   /** Every body's shape as it stands now, for queries (world/query.ts). Reuses `out` and its shapes. */
   queryBodies(out: QueryBody[] = []): QueryBody[] {
-    const entities = this.state.entities;
-    out.length = entities.length;
-    for (let k = 0; k < entities.length; k++) {
-      const e = entities[k]!;
-      const q = (out[k] ??= { id: 0, shape: emptyShape() });
+    let n = 0;
+    for (const e of this.state.entities) {
+      if (!hasBody(e)) continue;
+      const q = (out[n++] ??= { id: 0, shape: emptyShape() });
       q.id = e.id;
       bodyShape(e.body, this.current.bodies[e.kind], q.shape);
     }
+    out.length = n;
     return out;
+  }
+
+  /** What queries look through now: the world, everything solid, and every body's shape (world/query.ts). Reused. */
+  queryView(): QueryView {
+    this.queryBodies(this.view.bodies);
+    return this.view;
   }
 
   /** A hash of the complete dynamic state, for determinism checks: the whole state tree. */

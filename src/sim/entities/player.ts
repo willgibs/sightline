@@ -3,6 +3,7 @@ import { dcos, dsin } from '../core/detmath';
 import type { World } from '../gen/world';
 import type { InputFrame } from '../input';
 import { createBody, type BodySpec, type BodyState, type Gait } from '../motor/body';
+import type { Solids } from '../world/solids';
 import { requestStance, type MotorContext, type MoveIntent } from '../motor/motor';
 
 /**
@@ -27,10 +28,10 @@ export interface PlayerControl {
   sprintSuppressed: boolean;
 }
 
-export function createPlayer(world: World, tuning: Tuning): { body: BodyState; control: PlayerControl } {
+export function createPlayer(world: World, solids: Solids, tuning: Tuning): { body: BodyState; control: PlayerControl } {
   const { spawn } = world;
   return {
-    body: createBody(world, tuning.bodies.player, spawn.x, spawn.z, spawn.faceX, spawn.faceZ),
+    body: createBody(world, solids, tuning.bodies.player, spawn.x, spawn.z, spawn.faceX, spawn.faceZ),
     control: { queuedStance: null, sprintSuppressed: false },
   };
 }
@@ -41,7 +42,7 @@ export function playerIntent(
   c: PlayerControl,
   input: InputFrame,
   spec: BodySpec,
-  ctx: Pick<MotorContext, 'world' | 'tick' | 'source' | 'emit'>,
+  ctx: Pick<MotorContext, 'world' | 'solids' | 'tick' | 'source' | 'emit'>,
   out: MoveIntent,
 ): MoveIntent {
   updateStance(b, c, input, spec, ctx);
@@ -75,7 +76,7 @@ export function playerIntent(
   return out;
 }
 
-function updateStance(b: BodyState, c: PlayerControl, input: InputFrame, spec: BodySpec, ctx: Pick<MotorContext, 'world' | 'source' | 'emit'>): void {
+function updateStance(b: BodyState, c: PlayerControl, input: InputFrame, spec: BodySpec, ctx: Pick<MotorContext, 'solids' | 'source' | 'emit'>): void {
   if (!input.sprint) c.sprintSuppressed = false;
   let request: 'crouch' | 'prone' | null = input.prone ? 'prone' : input.crouch ? 'crouch' : null;
   if (b.proneTransition) {
