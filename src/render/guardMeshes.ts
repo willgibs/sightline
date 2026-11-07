@@ -20,7 +20,13 @@ interface GuardMesh {
  * sphere, a pale visor showing where the head points, and a rifle. Facing has to read at
  * 300 m through a scope, so the visor and rifle carry it. The capsules and the sphere are
  * the body's shape (sim/motor/shape.ts), built from the same numbers sight and hits use,
- * so what is drawn is what can be hit.
+ * and drawn exactly where the body is, so what is drawn is what can be hit. (They don't
+ * bob as they walk: the body's shape doesn't. Whether walking bodies bob in the
+ * simulation, with sim/motor/bob.ts, is lab B's call for its moving targets.)
+ *
+ * A guard whose body holds the camera isn't drawn: from inside, its faces would show as
+ * holes and slivers. That happens with the fly camera, or when a guard is shoved into
+ * you against a wall.
  */
 export class GuardMeshes {
   readonly group = new THREE.Group();
@@ -38,6 +44,9 @@ export class GuardMeshes {
   private readonly rifleGeo: THREE.BufferGeometry;
   private readonly prevIndex = new Map<number, number>();
   private debugTint = false;
+  /** How near the body's axis, and its height, within which the camera is inside it. */
+  private readonly reach: number;
+  private readonly height: number;
 
   constructor(
     private readonly roleOf: (spawn: number) => GuardRole,
@@ -69,6 +78,9 @@ export class GuardMeshes {
       worker: createFlatMaterial(look, { color: palette.debug.roles.worker }),
     };
     this.visorMaterial = createFlatMaterial(look, { color: palette.guardVisor });
+    // The body's radius covers its capsules; the camera's near plane (0.08 m) cuts into anything closer.
+    this.reach = spec.radius + 0.12;
+    this.height = spec.height.stand + 0.12;
   }
 
   private make(role: GuardRole): GuardMesh {
@@ -101,9 +113,9 @@ export class GuardMeshes {
 
   /**
    * Places every guard between its last two ticks. A guard new this tick appears where
-   * it is; a guard gone this tick is removed.
+   * it is; a guard gone this tick is removed. One with the camera inside it is hidden.
    */
-  update(prev: Snapshot, curr: Snapshot, alpha: number, time: number): void {
+  update(prev: Snapshot, curr: Snapshot, alpha: number, eye: THREE.Vector3): void {
     this.prevIndex.clear();
     prev.guardIds.forEach((id, i) => this.prevIndex.set(id, i));
     const b = curr.guards;
@@ -123,11 +135,12 @@ export class GuardMeshes {
       const z = lerp(a[oa + 2]!, b[o + 2]!, alpha);
       const yaw = lerpAngle(a[oa + 3]!, b[o + 3]!, alpha);
       const head = lerp(a[oa + 4]!, b[o + 4]!, alpha);
-      const moving = b[o + 5]! > 0.5;
-      const bob = moving ? Math.abs(Math.sin(time * 5.6 + id)) * 0.035 : 0;
-      g.root.position.set(x, y + bob, z);
+      g.root.position.set(x, y, z);
       g.root.rotation.y = yaw;
       g.head.rotation.y = head;
+      const dx = eye.x - x;
+      const dz = eye.z - z;
+      g.root.visible = !(dx * dx + dz * dz < this.reach * this.reach && eye.y > y - 0.12 && eye.y < y + this.height);
     }
     if (this.guards.size > curr.guardIds.length) {
       for (const [id, g] of this.guards) {
@@ -136,6 +149,13 @@ export class GuardMeshes {
         this.guards.delete(id);
       }
     }
+  }
+
+  /** How many guards are hidden because the camera is inside them (for tests). */
+  get hidden(): number {
+    let n = 0;
+    for (const g of this.guards.values()) if (!g.root.visible) n++;
+    return n;
   }
 
   dispose(): void {

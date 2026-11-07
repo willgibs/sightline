@@ -6,6 +6,17 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### What is drawn is what can be hit, from any camera
+
+**Decision:**
+
+- **Guards:** a guard whose body holds the camera isn't drawn (the fly camera, or a guard shoved into you against a wall). Walking guards no longer bob: the bob was the renderer's own, so the drawn head sat up to 3.5 cm from the hit sphere.
+- **Foliage:** the canopy or bush the camera is in shows its inner faces, translucent (`src/render/interiors.ts`), using the same shapes and placement as the outside.
+
+**Why:** a closed shape seen from inside is a hole, or slivers of faces cut by the near plane. A drawn shape that moves without its hit shape breaks the promise that guards' meshes make: lab B's 300 m shot at a walking guard depends on it. If walking bodies should bob, they bob in the simulation (lab B's call), and the drawing follows.
+
+**Found on the way:** canopies are drawn opaque but block no sight in the simulation, and a bush hides you while you see out of it freely. What foliage does to sight, in both directions, is lab A's to decide. It's listed in the plan under M8.
+
 ### Sound plays in the game, at the moment the picture shows
 
 **Decision:** The sound engine is wired into the game (`src/app/sound.ts`):

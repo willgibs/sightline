@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { World } from '../sim/gen/world';
+import type { Bush, Tree } from '../sim/gen/props';
 import type { BoxCollider, Collider } from '../sim/world/colliders';
 import { SURFACE_NAMES } from '../sim/world/surfaces';
 import { createFlatMaterial, createLineMaterial, type LookUniforms } from './materials';
@@ -122,9 +123,32 @@ export function buildBackdrop(world: World, look: LookUniforms): THREE.Mesh {
 
 const Y = new THREE.Vector3(0, 1, 0);
 
-function yRotation(ux: number, uz: number, q: THREE.Quaternion): THREE.Quaternion {
+export function yRotation(ux: number, uz: number, q: THREE.Quaternion): THREE.Quaternion {
   // Local +x maps to (ux, 0, uz).
   return q.setFromAxisAngle(Y, Math.atan2(-uz, ux));
+}
+
+/** A conifer's canopy: a seven-sided cone standing on its base (scaled per tree by canopyMatrix). */
+export function canopyGeometry(): THREE.BufferGeometry {
+  const g = new THREE.ConeGeometry(1, 1, 7, 1);
+  g.translate(0, 0.5, 0);
+  return g;
+}
+
+export function bushGeometry(): THREE.BufferGeometry {
+  return new THREE.IcosahedronGeometry(1, 0);
+}
+
+const placeQ = new THREE.Quaternion();
+const placeP = new THREE.Vector3();
+const placeS = new THREE.Vector3();
+
+export function canopyMatrix(t: Tree, out: THREE.Matrix4): THREE.Matrix4 {
+  return out.compose(placeP.set(t.x, t.y + t.trunkH, t.z), yRotation(t.ux, t.uz, placeQ), placeS.set(t.canopyR, t.canopyH, t.canopyR));
+}
+
+export function bushMatrix(b: Bush, out: THREE.Matrix4): THREE.Matrix4 {
+  return out.compose(placeP.set(b.x, b.y + b.h * 0.4, b.z), placeQ.identity(), placeS.set(b.r, b.h * 0.6, b.r));
 }
 
 /** Conifers, rocks and bushes as instanced meshes plus edge lines, one set per tile. */
@@ -143,13 +167,12 @@ export function buildProps(world: World, look: LookUniforms): THREE.Group {
     return out;
   };
 
-  const canopyGeo = new THREE.ConeGeometry(1, 1, 7, 1);
-  canopyGeo.translate(0, 0.5, 0);
+  const canopyGeo = canopyGeometry();
   const trunkGeo = new THREE.CylinderGeometry(1, 1, 1, 5, 1, true);
   trunkGeo.translate(0, 0.5, 0);
   const rockGeo = new THREE.IcosahedronGeometry(1, 0);
   const rockEdgeTemplate = new THREE.EdgesGeometry(rockGeo, 1).getAttribute('position') as THREE.BufferAttribute;
-  const bushGeo = new THREE.IcosahedronGeometry(1, 0);
+  const bushGeo = bushGeometry();
   const canopyMat = createFlatMaterial(look, { color: palette.canopy });
   const trunkMat = createFlatMaterial(look, { color: palette.trunk });
   const rockMat = createFlatMaterial(look, { color: palette.rock });
@@ -177,7 +200,7 @@ export function buildProps(world: World, look: LookUniforms): THREE.Group {
       for (let i = 0; i < trees.length; i++) {
         const t = trees[i]!;
         yRotation(t.ux, t.uz, q);
-        m.compose(p.set(t.x, t.y + t.trunkH, t.z), q, s.set(t.canopyR, t.canopyH, t.canopyR));
+        canopyMatrix(t, m);
         canopies.setMatrixAt(i, m);
         m.compose(p.set(t.x, t.y - 0.3, t.z), q, s.set(t.trunkR, t.trunkH + 0.6, t.trunkR));
         trunks.setMatrixAt(i, m);
@@ -232,7 +255,7 @@ export function buildProps(world: World, look: LookUniforms): THREE.Group {
       const mesh = new THREE.InstancedMesh(bushGeo, bushMat, bushes.length);
       for (let i = 0; i < bushes.length; i++) {
         const b = bushes[i]!;
-        m.compose(p.set(b.x, b.y + b.h * 0.4, b.z), q.identity(), s.set(b.r, b.h * 0.6, b.r));
+        bushMatrix(b, m);
         mesh.setMatrixAt(i, m);
       }
       mesh.instanceMatrix.needsUpdate = true;

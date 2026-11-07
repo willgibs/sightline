@@ -910,6 +910,8 @@ export class Game {
       },
       /** Whether sound runs and how many voices are sounding (a browser started without a gesture keeps it suspended). */
       sound: () => this.sound.status(),
+      /** Guards hidden with the camera inside them, and foliage drawn from inside, in the last frame. */
+      insides: () => this.renderer.insides(),
       state: () => ({
         seed: this.world?.seed,
         scene: this.scene?.name ?? null,

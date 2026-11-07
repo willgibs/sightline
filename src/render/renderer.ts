@@ -9,6 +9,7 @@ import type { World } from '../sim/gen/world';
 import type { Snapshot } from '../sim/sim';
 import { DebugLayer } from './debugLayer';
 import { GuardMeshes } from './guardMeshes';
+import { FoliageInteriors } from './interiors';
 import { createLook, type LookUniforms } from './materials';
 import { palette } from './palette';
 import { createSky } from './sky';
@@ -48,6 +49,7 @@ export class GameRenderer {
   private worldGroup = new THREE.Group();
   private guards: GuardMeshes | null = null;
   private solids: SolidMeshes | null = null;
+  private interiors: FoliageInteriors | null = null;
   private readonly projected = new THREE.Vector3();
   private debug: DebugLayer | null = null;
   private debugOn = false;
@@ -82,6 +84,8 @@ export class GameRenderer {
     this.worldGroup.add(this.guards.group);
     this.solids = new SolidMeshes(this.look);
     this.worldGroup.add(this.solids.group);
+    this.interiors = new FoliageInteriors(world, this.look);
+    this.worldGroup.add(this.interiors.group);
     this.debug = new DebugLayer(world, tuning);
     this.debug.group.visible = this.debugOn;
     this.debug.setCollidersVisible(this.collidersOn);
@@ -94,12 +98,14 @@ export class GameRenderer {
   private clearWorld(): void {
     this.guards?.dispose();
     this.debug?.dispose();
+    this.interiors?.dispose();
     disposeTree(this.worldGroup);
     this.scene.remove(this.worldGroup);
     this.worldGroup = new THREE.Group();
     this.scene.add(this.worldGroup);
     this.guards = null;
     this.solids = null;
+    this.interiors = null;
     this.debug = null;
   }
 
@@ -165,10 +171,16 @@ export class GameRenderer {
       cam.updateProjectionMatrix();
     }
     this.sky.position.copy(cam.position);
-    this.guards?.update(prev, curr, alpha, time);
+    this.guards?.update(prev, curr, alpha, cam.position);
     this.solids?.update(prev, curr, alpha);
+    this.interiors?.update(pose.x, pose.y, pose.z);
     if (this.debugOn) this.debug?.update(prev, curr, alpha, time, aim, cam.position);
     this.gl.render(this.scene, cam);
+  }
+
+  /** Guards hidden with the camera inside them, and foliage shown from inside (for tests). */
+  insides(): { guards: number; foliage: number } {
+    return { guards: this.guards?.hidden ?? 0, foliage: this.interiors?.showing ?? 0 };
   }
 
   stats(): RenderStats {
