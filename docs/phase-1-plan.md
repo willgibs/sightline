@@ -362,12 +362,33 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - a crack-bias scenario;
   - trial accuracy above the rules-only predictor.
 
+**Recorded before building (Nov 8), so the exit note can be read against it:**
+- **The seed, as the bench runs it.** The perception bench keeps the seed as a model of its own (`seedSight`): Blacklist's nested zones (core 60°, periphery 120°, each with a hard range), time linear in distance inside a zone, and the design doc's table applied as one product of rates, with no caps. Both models are swept over the same factor grid.
+- **Where the seed falls short, in the bench's terms:**
+  - **Fixed points.** It can't meet the design's ranges together. Rates alone make any exposure inside a zone complete given time, so a still, prone player in cover is still found at 140 m, against a target of never beyond 50 m.
+  - **Edges.** A zone's edge is a cliff: time to detection jumps from its slowest to never within a centimetre.
+  - **Telegraph.** Nothing bounds the time from the first cue to 100%: at a metre's range it is under half a second.
+  - **Foliage.** It has none: a canopy hides a guard from you but not you from him.
+  - **The crack.** It has no model: a crack is heard from the shooter.
+- **The target, in the bench's metrics:**
+  - **The design's ranges in daylight:**
+    - a standing, walking player in the open is spotted out to 150 m, ±10 m;
+    - a still, prone player in cover is never spotted beyond 50 m;
+    - crouched in shade at 30 m, spotted in 3–6 s;
+    - a marksman's narrow cone reaches 400 m, ±20 m.
+  - **Monotone:** no step up in exposure, anywhere on the grid, detects more slowly.
+  - **Telegraphed:** outside a 2.5 m contact zone, at least 1.5 s from the first cue (30%) to 100%, in every combination.
+  - **No cliffs:** every edge, of range and of cone, ramps over at least 2 m or 4°.
+  - **Symmetric, bit for bit:** foliage between a guard and the player, both ways; a sound's clarity in the player's speakers and for a guard at the player's cell.
+  - **The crack:** a listener 5–15 m from a supersonic path at 300 m hears it from 55–62° off the shooter's bearing. (Recorded as 5–20 m; at 20 m the shooter's own bearing sits 3.8° off the path, giving 54.6°. The research's figure is for listeners near the path.)
+  - **Readable:** the owner beats the rules-only predictor on borderline trials (A12).
+
 **Milestones:**
-- [ ] A1 · The lab scene.
+- [x] A1 · The lab scene.
   - It holds a sentry, a patrol, a marksman post, cover, shade, a skyline ridge, gravel and grass, and a generator.
   - It grows with each milestone.
   - Handmade worlds have no foliage yet (`generation/handmade.ts`), so the scene adds it or uses generated terrain.
-- [ ] A2 · Sight: the detection meter, restructured (owner, Nov 7).
+- [x] A2 · Sight: the detection meter, restructured (owner, Nov 7).
   - Stance and light are range caps, and peripheral vision is a short-range zone. Time grows linearly with distance inside each zone, and each edge ramps over a few metres instead of a cliff.
   - Rays go to head, chest and feet, with a minimum number clear per stance.
   - Light is taken at the ground beneath the body (owner).
@@ -375,7 +396,7 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - Exposure is computed for any observer, so the player can be one in Phase 2.
   - Rates per second (rule 17), in `tuning.perception`.
   - Its debug overlay: zones at their real ranges, rays to the three parts, and the factors.
-- [ ] A3 · The scenario runner (see The three tools).
+- [x] A3 · The scenario runner (see The three tools).
   - Scenes take no parameters today, and a recording's header names its scene by exactly `{name, version}` (`kernel/record/recording.ts`). Parameters therefore join the scene's identity.
   - Its first table sweeps the design doc's ranges over the factor grid, asserting monotonicity and the minimum interval from cue to detection.
 - [ ] A4 · Shade and foliage, drawn as simulated.
@@ -384,18 +405,18 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - A test holds the drawing to `lightAt` at sampled points; 99.5% is the starting bar.
   - Fog uses distance, not view depth, so a guard's contrast doesn't change as you turn.
   - Foliage is a transmittance multiplied along each body ray in both directions, drawn from the same volumes, and tested for symmetry.
-- [ ] A5 · Hearing, with one law of sound (owner, Nov 7).
+- [x] A5 · Hearing, with one law of sound (owner, Nov 7).
   - A bounded flood on the site grid (W0.5), once per sound, which every listener and the player's speakers read at their own cell.
   - A second, through-wall route that loses a set number of decibels per wall, as in Rainbow Six Siege. The louder route wins.
   - Masking by the steady sources in `generation/ambient.ts`, as a shift of the hearing threshold.
   - A heard sound gives a guess, not a fix. It arrives from the doorway it came through, blurred by how much longer its path was than a straight line, with the error drawn from the guard's own stream.
-  - The crack comes from the point the bullet's shock cone predicts, about 55–62° off the shooter's true bearing, scheduled at its exact arrival (B8).
+  - The crack comes from the point the bullet's shock cone predicts, about 55–62° off the shooter's true bearing, scheduled at its exact arrival (B8). Its geometry is built and benched (`perception/crack.ts`); it is scheduled at arrival when B8's shot sounds land.
   - No offscreen bias: anything unfair gets a cue.
-- [ ] A6 · Percepts and beliefs.
+- [x] A6 · Percepts and beliefs.
   - Percepts are records with a kind, strength, place, age, expiry and cause.
   - The mind holds the last known position, with its uncertainty.
   - The no-omniscience test extends to guards who perceive. Its two places must lie beyond every sense: marksmen see 400 m, and the overlook is about 330 m from the camp.
-- [ ] A7 · The awareness ladder.
+- [x] A7 · The awareness ladder.
   - Curious from 30%, then suspicious, searching and combat.
   - A rise is delayed by the current state's dwell. A fall steps down one state at a time, to a raised floor.
   - Grace periods, with the spread drawn from the guard's own stream.

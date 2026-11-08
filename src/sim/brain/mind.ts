@@ -2,7 +2,7 @@ import type { Tuning } from '../../config/tuning';
 import type { GuardSpawn } from '../generation';
 import type { World } from '../kernel/world/world';
 import type { BodyState } from '../body';
-import type { Percept } from '../perception';
+import type { AwarenessState, Belief, Percept } from '../perception';
 
 /**
  * The perception boundary. A guard's brain (anything in the brain lane) decides from a
@@ -34,7 +34,23 @@ export interface GuardMind {
   /** The tick being decided (the one after this), and its end in mission seconds. */
   readonly tick: number;
   readonly time: number;
-  /** What he sensed this tick (perception's output); none until guards have senses (lab A). */
+  /** His head turn now, relative to his body. */
+  readonly head: number;
+  /** What he has sensed and not yet forgotten (perception's output), oldest first. */
   readonly percepts: readonly Percept[];
+  /** His place on the awareness ladder (perception): since when, and where his attention is. */
+  readonly awareness: Readonly<MindAwareness>;
+  /** Where he believes the intruder is, and how sure: null until he has sensed one. */
+  readonly belief: Readonly<Belief> | null;
+}
+
+/** A mind's awareness: the state, the tick he entered it, and his focus, if any (perception/senses.ts). */
+export interface MindAwareness {
+  state: AwarenessState;
+  since: number;
+  focus: boolean;
+  fx: number;
+  fy: number;
+  fz: number;
 }
 

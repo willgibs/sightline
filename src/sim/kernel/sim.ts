@@ -117,6 +117,7 @@ export class Simulation {
       index: this.index,
       input: this.lastInput,
       work: this.counts,
+      events: this.events,
       emit: (draft: EventDraft): number => {
         const system = this.running;
         if (system && !system.emits.includes(draft.type)) throw new Error(`System '${system.name}' emitted '${draft.type}', which it doesn't declare`);
