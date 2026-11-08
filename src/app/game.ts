@@ -799,7 +799,8 @@ export class Game {
       Object.assign(this.drawnPose, view);
       this.drawnKey = this.viewKey();
     }
-    this.instruments.draw(this.instrumentState(view, scoped, optic === Optic.Binoculars ? eased : 0, rifle));
+    // The instruments come with the rifle: with none (the valley, until Phase 2) the zoom stays a bare zoom.
+    this.instruments.draw(this.instrumentState(view, scoped, optic === Optic.Binoculars && rifle ? eased : 0, rifle));
     // A click from now on is about this frame: the line of sight the player steered, before any sway.
     this.input.latch.frameShown(this.sim.tick, this.clock.alpha, pose.yaw, pose.pitch);
     this.hud.updateCompass(view.yaw);
