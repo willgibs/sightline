@@ -219,6 +219,8 @@ export class InputController {
       } else if (a === 'crouch' || a === 'prone') this.pressed.add(a);
       else if (a === 'scopeToggle') this.scopeToggled = !this.scopeToggled;
       else if (a === 'shotDrop') this.latch.latch('shotDrop');
+      else if (a === 'dropNoise') this.latch.latch('noise');
+      else if (a === 'dropBody') this.latch.latch('bodyDrop');
       else if (a === 'zeroUp' || a === 'zeroDown' || a === 'suppressor') {
         if (this.armed) this.simple.push({ kind: a });
       } else this.onAction?.(a);
@@ -231,6 +233,16 @@ export class InputController {
   /** Automation: click, as if the left button were pressed now (with the binoculars up, a range). */
   click(): void {
     this.latch.latch(this.opticHeld === Optic.Binoculars && this.armed ? 'range' : 'fire');
+  }
+
+  /** Automation: drop a noise where the view points, as the sandbox key does (A10). */
+  dropNoise(): void {
+    this.latch.latch('noise');
+  }
+
+  /** Automation: drop a body where the view points, as the sandbox key does (A9). */
+  dropBody(): void {
+    this.latch.latch('bodyDrop');
   }
 
   /**

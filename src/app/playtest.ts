@@ -23,7 +23,7 @@ export interface TelemetryReport {
   build: string;
   startedAt: string;
   savedAt: string;
-  /** Why this save happened: 'minute', 'pause', 'outcome', 'fault', 'hidden', 'new run'. */
+  /** Why this save happened: 'minute', 'pause', 'outcome', 'fault', 'hidden', 'new run', 'sitting'. */
   reason: string;
   world: { seed: string; scene: string | null };
   run: { ticks: number; tickHz: number; playedSeconds: number; pausedSeconds: number; pauses: number };
@@ -162,6 +162,14 @@ export class PlaytestCapture {
   private readonly pending = new Map<Run, string>();
   /** The last save's outcome, for the debug panel. */
   status = 'nothing saved yet';
+  /** The last run's name, and how many runs in a row have had it (begun in the same second). */
+  private lastName = '';
+  private sameName = 0;
+  /**
+   * Runs shorter than this aren't kept. Trial mode (A12) keeps every trial, however short:
+   * each holds an answer. A review of its misses after the results keeps none (Infinity).
+   */
+  minSeconds = MIN_SECONDS;
 
   constructor(
     readonly store: PlaytestStore | null,
@@ -172,8 +180,12 @@ export class PlaytestCapture {
   startRun(sim: Simulation, recorder: Recorder, label: string, scene: string | null): void {
     if (this.run) this.save('new run');
     const now = new Date();
+    const base = `${stamp(now)}-${(scene ? `scene-${scene}` : label).replace(/[^A-Za-z0-9-]+/g, '-')}`;
+    // Two runs begun in the same second keep their names apart (trial mode can start several).
+    this.sameName = base === this.lastName ? this.sameName + 1 : 1;
+    this.lastName = base;
     this.run = {
-      name: `${stamp(now)}-${(scene ? `scene-${scene}` : label).replace(/[^A-Za-z0-9-]+/g, '-')}`,
+      name: this.sameName === 1 ? base : `${base}-${this.sameName}`,
       label,
       scene,
       startedAt: now.toISOString(),
@@ -216,7 +228,7 @@ export class PlaytestCapture {
     if (!r || !this.store) return;
     // What the recorder holds, which after a failed tick includes that tick's input.
     const ticks = r.recorder.ticks;
-    if (ticks === r.savedTick || ticks / r.sim.tuning.sim.tickHz < MIN_SECONDS) return;
+    if (ticks === r.savedTick || ticks / r.sim.tuning.sim.tickHz < this.minSeconds) return;
     if (this.saving) {
       // One save at a time; the rest wait their turn, one per run.
       this.pending.set(r, reason);

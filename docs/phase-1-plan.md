@@ -188,6 +188,7 @@ The statistics behind these protocols are in `docs/research/foundations.md`. A p
   - At least 70% in each sitting.
   - At least 21 of the 30 borderline answers right. Guessing reaches that only 2% of the time.
   - Clearly better than a rules-only predictor scored on the same trials: distance and the sight table, with no cues. Beating it is the evidence that the cues are readable.
+    - (Nov 8, A12: on the borderline trials, by 3 of 30, as the research advises; the table proved strong, so the borderline cells are split evenly by whether it gets them right.)
 - **Item analysis:** accuracy is reported by the factor that flips each borderline outcome. A factor near chance needs a cue, or a simpler rule, before the second sitting.
 - **Blind** means the honest view only, no outcomes or parameters ahead of time, and fresh trials.
 - **Agents pre-screen** each trial set for cues the simulation shows to be missing, after passing a perception check against the simulation's own record. Today's vision-language agents are unreliable judges of timing and detail, so their findings never count toward the pass.
@@ -400,7 +401,7 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
 - [x] A3 · The scenario runner (see The three tools).
   - Scenes take no parameters today, and a recording's header names its scene by exactly `{name, version}` (`kernel/record/recording.ts`). Parameters therefore join the scene's identity.
   - Its first table sweeps the design doc's ranges over the factor grid, asserting monotonicity and the minimum interval from cue to detection.
-- [ ] A4 · Shade and foliage, drawn as simulated.
+- [x] A4 · Shade and foliage, drawn as simulated.
   - Each body's lit state comes from the simulation, in the snapshot.
   - World shade comes from one static shadow map over the play area, rendered once.
   - A test holds the drawing to `lightAt` at sampled points; 99.5% is the starting bar.
@@ -424,20 +425,24 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - About 1.5 s to react to something alarming, always telegraphed: Bungie found an untelegraphed delay read as a bug.
   - Stand-downs start near 20 s.
   - Minimal reactions show each state: look, walk to the believed spot, go back. E's brain replaces them.
-- [ ] A8 · Cues in the honest view.
+- [x] A8 · Cues in the honest view.
   - Head and body turn, and weapon raised.
   - The bark vocabulary, started now (Alien: Isolation's took most of its cycle). Barks run from specific to generic.
   - The detection indicator at the screen edge.
   - Then the fairness checks.
-- [ ] A9 · The other stimuli, each wired in when its source is on `main`:
-  - bodies and a comrade dropping (B4);
-  - impacts (B4);
-  - thrown objects (B9);
-  - lens glint (B6);
-  - open doors (D4).
-- [ ] A10 · Sandbox mode: noise drops, and the time-scale hook.
-- [ ] A11 · The budget: 16 guards perceiving within the frame budget, measured by work counts as well as `npm run sim -- --profile`, in Chromium, Firefox and WebKit. Fast paths come only if it needs them: a still body skips the motor, and a distant guard skips perception.
-- [ ] A12 · Trial mode, with the protocol in Exit tests, and the agents' pre-screen.
+- [ ] A9 · The other stimuli, each wired in when its source is on `main` (`docs/decisions.md`, A9):
+  - [x] bodies and a comrade dropping (B4);
+  - [x] impacts (B4), and the crack from the bullet's path;
+  - [x] thrown objects (B9);
+  - [x] lens glint (B6);
+  - [ ] open doors (D4, when lab D's code is on `main`).
+- [x] A10 · Sandbox mode: noise drops, and the time-scale hook.
+- [x] A11 · The budget: 16 guards perceiving within the frame budget, measured by work counts as well as `npm run sim -- --profile`, in Chromium, Firefox and WebKit. Fast paths come only if it needs them: a still body skips the motor, and a distant guard skips perception.
+- [x] A12 · Trial mode, with the protocol in Exit tests, and the agents' pre-screen.
+  - `?trials=<seed>` plays a sitting; `npm run playtest` scores it from its recordings or its saved file; `npm run trials -- <seed> --shots` prints it and draws its freeze frames for the pre-screen.
+  - Each borderline cell is split evenly between trials the sight table gets right and wrong, so the table alone scores 7 of 15 there, and the comparison with it is on the borderline trials (`docs/decisions.md`, A12).
+  - The trials are spread over the factors by a greedy pairwise covering; a one-tap probe asks what told you; R on the results plays back the misses (the research's list for before the first sitting).
+  - The freeze kind says nothing about the outcome: each kind holds the same share of seen and not seen, and they're scored apart. Answers survive a reload, and each carries its key, so later builds can still score the sitting.
 - [ ] A13 · Perception joins the valley (`SYSTEMS`), announced, with the version bump.
 - [ ] Exit test, the bench numbers, a note, a playable link.
 

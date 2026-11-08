@@ -15,7 +15,7 @@
  */
 export type { Belief, Percept, PerceptKind } from './percept';
 export { beliefRadius } from './percept';
-export { AWARENESS, createSenses, rung, type Awareness, type AwarenessState, type PendingSound, type Senses, type SightState } from './senses';
+export { AWARENESS, createSenses, rung, type Awareness, type AwarenessState, type PendingSound, type PendingSpot, type Senses, type SightState } from './senses';
 export { exposure as tableExposure, movementVisibility, stanceVisibility } from './visibility';
 export {
   ZONES,
@@ -34,12 +34,17 @@ export {
   type SightRay,
   type SightTarget,
   type Zone,
+  inGaze,
+  lineOpen,
 } from './sight';
 export { stepMeter, type MeterStep } from './meter';
-export { groundLight, lightName } from './light';
+export { drawnLit, groundLight, lightName, shadeMap, type ShadeArea, type ShadeMap } from './light';
 export { Foliage, coneChord, cylinderChord, foliageOf, type FoliageVolume } from './foliage';
 export { SIGHT_LAW, sweepSight, type RateLaw, type SweepReport } from './sweep';
 export { SEED_LAW } from './seed';
 export { Acoustics, acousticsOf, emptyHeard, type Heard, type SoundSource } from './hearing';
 export { believe, levelOf, prunePercepts, soundLevel, stateAt, stepLadder, stimulate, type Change, type Stimulus } from './awareness';
 export { crackHeard, type CrackHeard, type FlightPoint } from './crack';
+export { BARKS, chooseBark, type BarkLine } from './barks';
+export { describe, explainChain } from './explain';
+export { HEARD_AS } from './stimuli';

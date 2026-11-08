@@ -165,6 +165,19 @@ export interface ClatterEvent extends EventBase, SoundFields {
   speed: number;
 }
 
+/** What a guard can catch sight of that isn't a person: a body, or the flash from a lens. */
+export type SpotKind = 'body' | 'glint';
+
+/** A guard caught sight of something (perception, A9): where, and how far off. It's the cause of what he does about it. */
+export interface SpottedEvent extends EventBase {
+  type: 'spotted';
+  what: SpotKind;
+  x: number;
+  y: number;
+  z: number;
+  distance: number;
+}
+
 export interface StanceEvent extends EventBase {
   type: 'stance';
   from: StanceName;
@@ -187,7 +200,7 @@ export type SightZone = 'core' | 'peripheral' | 'far' | 'contact' | 'none';
 /** The awareness ladder's states (perception/senses.ts). */
 export type AwarenessName = 'unaware' | 'curious' | 'suspicious' | 'searching' | 'combat';
 /** Why a guard's awareness changed (perception/awareness.ts). */
-export type AlertReason = 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm';
+export type AlertReason = 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm' | 'body' | 'glint';
 /** What a heard sound sounded like (perception/hearing.ts). */
 export type HeardKind = 'sound' | 'shot' | 'voice';
 
@@ -278,6 +291,7 @@ export type SimEvent =
   | AlertEvent
   | BarkEvent
   | NoiseEvent
+  | SpottedEvent
   | ReportEvent
   | ImpactEvent
   | DeathEvent
@@ -314,7 +328,8 @@ export interface EventSpec<E> {
 const GAITS = ['crawl', 'crouch', 'walk', 'sprint'] as const;
 const ZONES = ['core', 'peripheral', 'far', 'contact', 'none'] as const satisfies readonly SightZone[];
 const AWARE = ['unaware', 'curious', 'suspicious', 'searching', 'combat'] as const satisfies readonly AwarenessName[];
-const REASONS = ['seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm'] as const satisfies readonly AlertReason[];
+const REASONS = ['seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'body', 'glint'] as const satisfies readonly AlertReason[];
+const SPOTS = ['body', 'glint'] as const satisfies readonly SpotKind[];
 const HEARD = ['sound', 'shot', 'voice'] as const satisfies readonly HeardKind[];
 const STANCES = ['stand', 'crouch', 'prone'] as const satisfies readonly StanceName[];
 const SOUND = { x: 'f32', y: 'f32', z: 'f32', surface: 'u8', loudness: 'f32', radius: 'f32' } as const;
@@ -358,6 +373,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   alert: { code: 13, range: 'perception', sound: false, fields: { from: { enum: AWARE }, to: { enum: AWARE }, reason: { enum: REASONS } } },
   bark: { code: 14, range: 'perception', sound: true, fields: { ...SOUND, line: 'u8' } },
   noise: { code: 15, range: 'perception', sound: true, fields: { ...SOUND } },
+  spotted: { code: 16, range: 'perception', sound: false, fields: { what: { enum: SPOTS }, x: 'f32', y: 'f32', z: 'f32', distance: 'f32' } },
   report: { code: 30, range: 'ballistics', sound: true, fields: { ...SOUND, suppressed: 'u8' } },
   impact: {
     code: 31,

@@ -1,4 +1,4 @@
-import type { AlertReason } from '../kernel/events';
+import type { AlertReason, SpotKind } from '../kernel/events';
 import type { Belief, Percept } from './percept';
 
 /**
@@ -37,6 +37,19 @@ export interface SightState {
   detected: number;
 }
 
+/** Something he has just caught sight of (a body, a flash), for the ladder to take this tick. */
+export interface PendingSpot {
+  what: SpotKind;
+  /** The 'spotted' event. */
+  cause: number;
+  x: number;
+  y: number;
+  z: number;
+  radius: number;
+  /** How strong: 1 for a body; a flash, its glint (0–1). */
+  strength: number;
+}
+
 /** A sound on its way to a listener: heard when it arrives (sound travels about 11 m a tick). */
 export interface PendingSound {
   /** The tick it arrives. */
@@ -47,6 +60,8 @@ export interface PendingSound {
   kind: 'sound' | 'shot' | 'voice';
   /** How clearly: its level over the masked threshold (1 at the edge of hearing). */
   clarity: number;
+  /** A voice's own level for listeners (a bark's line: perception/barks.ts); 0 for other sounds. */
+  voice: number;
   /** Where it seemed to come from, blurred: the guess, not the fix. */
   x: number;
   y: number;
@@ -93,6 +108,12 @@ export interface Senses {
   heard: PendingSound[];
   /** What he has sensed and not yet forgotten, oldest first. */
   percepts: Percept[];
+  /** Bodies he has already seen (their entity ids): each one is news once. */
+  bodies: number[];
+  /** What he caught sight of this tick, taken by the ladder ('perception-awareness'). */
+  spotted: PendingSpot[];
+  /** Whether a lens was flashing at him last tick: a flash is news when it starts. */
+  flashed: boolean;
   awareness: Awareness;
   /** Where he believes the intruder is; null until he has sensed one. */
   belief: Belief | null;
@@ -107,6 +128,9 @@ export function createSenses(far = false): Senses {
     sight: { meter: 0, seenTick: -1, target: 0, x: 0, y: 0, z: 0, noticed: 0, detected: 0 },
     heard: [],
     percepts: [],
+    bodies: [],
+    spotted: [],
+    flashed: false,
     awareness: {
       state: 'unaware',
       since: 0,
