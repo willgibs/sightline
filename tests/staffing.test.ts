@@ -27,7 +27,7 @@ beforeAll(() => {
   ] as const) {
     worlds.push(generateWorld(campMission(seed, { archetype: 'compound', difficulty }), T));
   }
-});
+}, 120_000);
 
 const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
 
@@ -101,12 +101,20 @@ describe('a generated camp\'s guards', () => {
           expect((w.grid.site.flags[c]! & Cell.Walkable) !== 0, `${w.seed}: ${g.role} ${g.id} at ${t.toFixed(1)} s, (${pose.x.toFixed(1)}, ${pose.z.toFixed(1)})`).toBe(true);
         }
       }
-      // Two patrols on the perimeter loop are half its period apart.
-      const perimeter = w.camp.guards.filter((g) => g.role === 'patrol' && g.routine.offset !== undefined && g.routine.legs.length === w.camp.guards.find((h) => h.role === 'patrol')!.routine.legs.length);
-      if (perimeter.length >= 2) {
-        const [a, b] = perimeter;
-        const gap = Math.abs(a!.routine.offset! - b!.routine.offset!);
-        expect(Math.min(gap, a!.routine.period - gap)).toBeCloseTo(a!.routine.period / 2, 6);
+      // No two guards on the ground ever come within the clearance of each other: patrols
+      // sharing a loop walk it apart (at start times staffing chose, D7, so the sightline
+      // graph's clusters stay within their limits).
+      const ground = w.camp.guards.filter((g) => !g.elevated);
+      const other = { ...pose };
+      for (let t = 0; t < w.camp.cycle!; t += 0.5) {
+        for (let a = 0; a < ground.length; a++) {
+          routinePose(ground[a]!.routine, t, pose);
+          for (let b = a + 1; b < ground.length; b++) {
+            routinePose(ground[b]!.routine, t, other);
+            const d = Math.hypot(pose.x - other.x, pose.z - other.z);
+            expect(d, `${w.seed}: ${ground[a]!.role} ${ground[a]!.id} and ${ground[b]!.role} ${ground[b]!.id} at ${t} s`).toBeGreaterThanOrEqual(T.gen.staffing.clearance - 1e-6);
+          }
+        }
       }
     }
   });

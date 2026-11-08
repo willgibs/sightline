@@ -19,4 +19,7 @@ export type { Backdrop, TerrainFeatures } from './terrain';
 export { analyzeTerrain, type Perch, type TerrainReport } from './analysis';
 export { closestOnPolyline, makePolyline, pointAt, type PathHit, type Point2, type Polyline } from './paths';
 export { ambientSources, CREEK_SPACING, type AmbientKind, type AmbientSource } from './ambient';
-export { surveyWorld, type Survey, type SurveyGuard, type SurveyPerch, type SurveyStructure, type SurveyTerrain } from './survey';
+export { surveyWorld, type Survey, type SurveyAnalysis, type SurveyGuard, type SurveyPerch, type SurveyStructure, type SurveyTerrain } from './survey';
+export { analyzeCamp, type CampAnalysis, type PathReport, type PerchReport } from './campAnalysis';
+export { spaceTimeSearch } from './infiltrate';
+export type { Cluster } from './clusters';

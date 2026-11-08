@@ -107,6 +107,50 @@ Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Unt
 
 Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the generation lane.
 
+### The camp's analysis: who sees whom, what each perch sees, and the ways in (D7)
+
+**Decision:**
+- **One raster, aligned with the camp** (`generation/raster.ts`): 1 m cells in the camp's frame, over the fence and 30 m round it, each with its ground, its tallest top, an overhead slab (roofs, lintels), whether it's walkable and its moves. Sight colliders and vehicles are stamped by their extents in the camp's frame, and doorways carved under their lintels. Its lines of sight agree with exact raycasts on more than 85% of random pairs and err toward blocking (a test).
+- **One cycle, sampled every half second** (`field.ts`). Every routine divides the camp's cycle, so one cycle of every guard's eye and gaze is exact for the whole mission. The exposure field says, for each cell and sample, how many levels of the intruder's meter it adds, summed over guards: one meter for every guard fills at least as fast as any one guard's. It is stored cell by cell, so a search reads a cell's cycle in one run.
+- **D's sight law is A's, copied** (`sight.ts`, `tuning.gen.sight`). Generation reads only `tuning.gen`, so the law is D's own: lab A's for one body, a crouched intruder on the move, lit, in the open.
+  - A's zones, with ranges A's × 0.6 for the stance: the core ±30° to 90 m, the periphery ±60° to 15 m, a marksman's binoculars ±2.5° to 240 m. Then A's edge ramps, the fill linear in distance from 2 s to 8 s, the telegraph's cap (0.47 of the meter a second), contact (2.5 m in any direction, 0.8 s) and the still factor (0.4).
+  - What it leaves out only makes it quicker than A: light, foliage, the share of the body A's three rays see, and per-guard meters. The one exception is the sky behind a body; on the camp's pad, guards see an intruder against the ground.
+  - `tests/campSight.test.ts` runs A's sight scenario at 112 points across the zones and their edges. D is never later than A by more than a sample, and never more than twice as quick wherever the scenario's circle lies wholly inside one zone.
+  - The meter has 128 levels and falls at 0.0625 of full a second: half A's rate, with no hold, which covers A's 1.5 s hold for any pause of 3 s or more.
+  - The first calibration came from the design doc before A landed: 27 m of periphery, a 0.4 s fill up close, and no contact zone. A's numbers replaced it.
+- **Infiltration by safe intervals, exactly** (`infiltrate.ts`).
+  - SIPP over (cell, interval), with the meter. An interval is a safe run, where waiting lowers the meter, or one watched sample, whose rate the meter takes on arrival. It is a wall where even a still intruder couldn't take it.
+  - Each interval keeps the Pareto front of its labels (arrival, meter), counting the meter's fall while a label waits in a safe run. The labels live in a pool, so a 128-level meter costs no memory. A* orders them by arrival plus the walking distance.
+  - On 400 random small camps, it, the plain space-time search and brute force agree on whether a way exists and how soon, and every path replays. On the bench's first camp it expands 106k states to the plain search's 168k.
+  - The budget is 400k expansions (rule 18).
+  - **The three ways.**
+    - In: from anywhere on the rim to a close shot at the target, within 12 m with a clear line to his chest and outside his contact zone. Reaching him within 1.5 m means entering that zone, which A's law makes all but impossible.
+    - To the generator: within 2.2 m.
+    - Out: from the shot to the rim, with the target's own view gone.
+- **The sightline graph** (`clusters.ts`).
+  - Witness edges: a sees b drop when b stands in a's cone within D's witness ranges (80 m in the core, 30 m in the periphery: lab D's own until lab E's brain says how guards take it) with a clear line. Each carries its duty over the cycle.
+  - Edges holding for at least a tenth of the cycle join guards, and clusters are the strongly connected components (Tarjan, iterative, in guard order). No published method clusters guards by mutual visibility over time (`docs/research/labs.md`), so this is lab D's own.
+  - **Certified, watchers first.** A bounded search (20k expansions a cluster) looks for a kill order from the perches:
+    - shots 0.75 s apart from one perch while anyone is pending, and every witness dropped within the 1.5 s reaction;
+    - or waiting for a moment nobody alive is watching;
+    - relocating between perches at 2 m/s;
+    - one distraction: a witness looks away for 6 s, from one of 12 moments.
+
+    Clusters are taken apart in a topological order (a watcher's cluster before those he watches), each with the guards shot before it dead. Each is labelled isolated, window, chain, distraction, out of sight (no perch sees a member), or unsolved. The first version tried only each guard's next sighting, so it missed windows and left lone guards unsolved. With waiting and the kill order, none of 16 camps has an unsolved cluster.
+- **Perches** (`perches.ts`). A 720-ray sweep of the valley finds spots that overlook the camp, thinned to 32 at least 25 m apart, steepest first. Each gets a viewshed over the raster (the lowest height visible in each cell), held to exact raycasts. Each perch reports:
+  - each guard's share of the cycle in view, counted as the plan pinned before D8;
+  - the target's share;
+  - the alarm boxes and the antenna in view;
+  - the share of the escape route it sees.
+- **Heatmaps:** coverage (the share of the cycle some guard watches a cell) and idleness (its longest quiet stretch, wrapping round the cycle).
+- **Staffing sees through the analysis** (`staffing.ts`). Each guard is placed only where the sightline graph stays within limits: no component over 4, at most one over 3, and no guard watching the skeleton's corridor for more than a fifth of the cycle. Posts try four facings, walkers 12 start times, and the roles that must stay take their best fallback. The target walks once a cycle, mostly inside, and guards indoors face away from doors.
+- **Drawn.** The explorer's camp view draws the coverage heatmap, the sightline edges coloured by cluster (unsolved in red), the three ways (in green, to the generator orange, out blue) and the perches shaded by coverage, ringed where they see the target.
+- **Its cost.** A camp now generates in about 2.3 s in Node (mean of 16): terrain 0.35 s, the grid 0.2 s, staffing 0.6 s, the fields 0.35 s, and the searches 0.2–1.5 s. A search that runs out of budget costs about 0.75 s. Laying the field out cell by cell, folding the target's view in densely, and the label pool brought it down from about 4 s.
+
+**What moved:** nothing in Phase 0's valley. The `camp-systems` run moved with its staffing (`f38577ac4a34e3b6`, state `40446ee293103458`). The tuning gained `gen.sight` and `gen.analysis`, so the golden recording is rewritten. The generation bench gained D7's numbers: 5 of 6 camps with a way in and out, no unsolved cluster, one search at its budget, and the expansions of both searches.
+
+**Why:** the plan's D7. Validation (D8) needs to know who sees whom, what each perch sees, and whether a way in exists, exactly and within budgets. And D's model must be its own, yet held to A's.
+
 ### Staffing: points, chokepoints, a grammar, one cycle (D6)
 
 **Decision:**

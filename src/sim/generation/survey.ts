@@ -36,6 +36,23 @@ export interface Survey {
   doors?: Array<{ x: number; z: number; ux: number; uz: number; width: number }>;
   vehicles?: Array<{ corners: Point2[]; escape: boolean }>;
   skeleton?: { corridor: Point2[]; escape: Point2[]; exfil: Point2[][]; sabotage: Point2; target: Point2 };
+  /** Generated camps only (D7): the analysis, as the explorer draws it. */
+  analysis?: SurveyAnalysis;
+}
+
+export interface SurveyAnalysis {
+  /** Coverage over the camp's cycle, every `cell` metres in its frame from (a0, b0), na × nb. */
+  heat: { a0: number; b0: number; cell: number; na: number; nb: number; coverage: Float32Array; idleness: Float32Array };
+  /** The camp's frame, to place the heatmap. */
+  frame: { ox: number; oz: number; ux: number; uz: number; vx: number; vz: number };
+  perches: Array<{ x: number; z: number; coverage: number; target: number }>;
+  /** Sightline edges that hold long enough to join a cluster, between guards (by index), with their duty. */
+  edges: Array<{ a: number; b: number; duty: number }>;
+  clusters: Array<{ members: number[]; certified: string }>;
+  infiltration: Point2[] | null;
+  sabotage: Point2[] | null;
+  exfil: Point2[] | null;
+  cycle: number;
 }
 
 export interface SurveyTerrain {
@@ -113,7 +130,16 @@ export function surveyWorld(w: World, n = 160): Survey {
         'steep (%)': Math.round(v.steepShare * 1000) / 10,
       }
     : { 'overwatch sectors (of 8)': r.overwatchSectors, 'access sectors (of 16)': r.accessSectors, ridges: r.ridges, 'steep (%)': Math.round(r.steepShare * 1000) / 10 };
-  const extra: Pick<Survey, 'ridges' | 'fords' | 'doors' | 'vehicles' | 'skeleton'> = {};
+  if (r.camp) {
+    const c = r.camp;
+    stats['best perch (%)'] = Math.round(100 * Math.max(0, ...c.perches.map((p) => p.coverage)));
+    stats['target in view (%)'] = Math.round(100 * Math.max(0, ...c.perches.map((p) => p.target)));
+    stats['clusters'] = c.clusters.filter((x) => x.members.length > 1).length;
+    stats['unsolved'] = c.clusters.filter((x) => x.certified === 'unsolved').length;
+    stats['way in (s)'] = c.infiltration.found ? Math.round(c.infiltration.arrive) : -1;
+    stats['cycle (s)'] = c.cycle;
+  }
+  const extra: Pick<Survey, 'ridges' | 'fords' | 'doors' | 'vehicles' | 'skeleton' | 'analysis'> = {};
   if (w.features.ridges) {
     extra.ridges = w.features.ridges.map((rd) => ({
       crest: rd.crest.points.map((p) => ({ x: p.x, z: p.z })),
@@ -141,6 +167,52 @@ export function surveyWorld(w: World, n = 160): Survey {
   }
   const sk = w.camp.layout?.skeleton;
   if (sk) extra.skeleton = structuredClone(sk);
+  const a = r.camp;
+  if (a) {
+    // The heatmaps at twice the raster's cell, each the mean of its four.
+    const f = a.frame;
+    const na = Math.ceil(f.na / 2);
+    const nb = Math.ceil(f.nb / 2);
+    const coverage = new Float32Array(na * nb);
+    const idleness = new Float32Array(na * nb);
+    for (let j = 0; j < nb; j++) {
+      for (let i = 0; i < na; i++) {
+        let c = 0;
+        let q = 0;
+        let n = 0;
+        for (const [di, dj] of [
+          [0, 0],
+          [1, 0],
+          [0, 1],
+          [1, 1],
+        ] as const) {
+          const ii = 2 * i + di;
+          const jj = 2 * j + dj;
+          if (ii >= f.na || jj >= f.nb) continue;
+          c += a.coverage[jj * f.na + ii]!;
+          q += a.idleness[jj * f.na + ii]!;
+          n++;
+        }
+        coverage[j * na + i] = c / n;
+        idleness[j * na + i] = q / n;
+      }
+    }
+    const g = w.camp.guards.length;
+    const edges: SurveyAnalysis['edges'] = [];
+    for (let x = 0; x < g; x++) for (let y = 0; y < g; y++) if (x !== y && a.duty[x * g + y]! >= 0.1) edges.push({ a: x, b: y, duty: a.duty[x * g + y]! });
+    const path = (p: { found: boolean; path: Point2[] }) => (p.found ? p.path.filter((_, k) => k % 2 === 0 || k === p.path.length - 1) : null);
+    extra.analysis = {
+      heat: { a0: f.a0, b0: f.b0, cell: f.cell * 2, na, nb, coverage, idleness },
+      frame: { ox: f.ox, oz: f.oz, ux: f.ux, uz: f.uz, vx: f.vx, vz: f.vz },
+      perches: a.perches.map((p) => ({ x: p.x, z: p.z, coverage: p.coverage, target: p.target })),
+      edges,
+      clusters: a.clusters.map((c) => ({ members: [...c.members], certified: c.certified })),
+      infiltration: path(a.infiltration),
+      sabotage: path(a.sabotage),
+      exfil: path(a.exfil),
+      cycle: a.cycle,
+    };
+  }
   return {
     ...extra,
     seed: w.seed,

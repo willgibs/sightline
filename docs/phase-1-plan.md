@@ -672,11 +672,18 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
     - Patrols walk the perimeter lane, the yard and the alleys along grid paths pulled taut, with stops from a grammar: glance, quarter turn, half turn, sweep, full turn.
     - Every routine divides one camp cycle (160–300 s, longer only if a route needs it), so the camp repeats exactly. Patrols that share a lane run it the same way round.
     - Each walking guard tries up to 12 start times until no guard on routine comes within 1 m of another, all cycle long. The last of a role who can't is posted at a stop, so all seven roles stay. Guards then keep to their routines through the motor within 25 cm.
-- [ ] D7 · Analysis on the grid.
+- [x] D7 · Analysis on the grid.
   - Infiltration is certified with Safe Interval Path Planning against the routines' known trajectories. It allows exposure that stays below A's fill rates, and is checked against brute-force space-time search on small camps.
   - The sightline graph: directed witness edges, each carrying the intervals of the cycle when it holds. Its strongly connected components are the clusters. Each cluster is certified by a bounded search for a kill order inside the reaction window, or for a split by sabotage or distraction.
   - Coverage and idleness heatmaps, perch scores, exfil routes and the escape route.
   - Generation reads only `tuning.gen`, so its sight model is its own, and a scenario-runner check holds it to A's detection at sampled points. A retune of A then never changes a valley.
+  - **Built** (`generation/raster.ts`, `field.ts`, `sight.ts`, `infiltrate.ts`, `clusters.ts`, `perches.ts`, `campAnalysis.ts`). Every world with a camp carries its analysis (`report.camp`), and the explorer draws it.
+    - A 1 m raster in the camp's frame, and one cycle sampled every half second. The exposure field sums every guard's view, by D's copy of A's law for a crouched intruder on the move: A's zones, ramps, fill, cap and contact zone. A's scenario runner holds it to A at 112 points: never later than A by more than a sample, never twice as quick inside a zone.
+    - SIPP with a 128-level meter, its labels in Pareto fronts per interval. It agrees with brute force and the plain space-time search on 400 small camps. On the bench's first camp it expands 106k states to the plain search's 168k.
+    - The ways: in (to a close shot at the target: within 12 m, a clear line, outside his contact zone), to the generator, and out.
+    - Clusters are the strongly connected parts of the witness graph. They are certified watchers first by a bounded search: chains inside the 1.5 s reaction, waits for windows, relocation between perches, one distraction.
+    - Staffing places each guard so the graph stays within limits (no part over 4, one over 3 at most) and the corridor stays a way in.
+    - Over 16 camps: every one has a way in, to the generator and out, and no cluster is unsolved. The best perch sees 38–56% of guard time, but the target is in some perch's view for 10–37% of the cycle, which D8's rule (25%) will repair. A camp generates in about 2.3 s.
 - [ ] D8 · Validation and repair.
   - The design doc's rules, plus **no single perch wins**, checked exhaustively over the finite list of perches.
   - Both perch rules count coverage the same way: the share of each guard's time in view over the cycle, or a minimum time in view. Never "ever in view", which would count every passing patrol.

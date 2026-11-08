@@ -26,7 +26,7 @@ const SEEDS = ['TAL-4471', 'MUD-9031', 'KOR-1188', 'BNC-0303', 'POP-6981'];
 const worlds: World[] = [];
 beforeAll(() => {
   for (const seed of SEEDS) worlds.push(generateWorld(campMission(seed), T));
-});
+}, 120_000);
 
 /** A path on the site layer between two points, if one exists within budget. */
 function walk(layer: GridLayer, from: { x: number; z: number }, to: { x: number; z: number }): boolean {

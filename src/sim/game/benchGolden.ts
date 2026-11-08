@@ -27,7 +27,12 @@ export const BENCH_GOLDEN: PinnedBench = {
       "lab D valleys valid at the first attempt (of 6)": 6,
       "lab D least margin under the valley budget": 7,
       "lab D widest overwatched horizon (°)": 157,
-      "lab D narrowest open horizon (°)": 164
+      "lab D narrowest open horizon (°)": 164,
+      "lab D camps with a way in and out (of 6)": 5,
+      "lab D clusters left unsolved": 0,
+      "lab D busiest search (of 400000 expansions)": 400000,
+      "lab D way in, states expanded: safe intervals": 105852,
+      "lab D way in, states expanded: plain space-time search": 168493
     },
     "runs": {
       "camp-systems": {

@@ -179,7 +179,19 @@ function drawValley(ctx: CanvasRenderingContext2D, s: Survey): void {
   ctx.setLineDash([3, 3]);
   ctx.strokeRect(toPx(-s.playHalf), toPx(-s.playHalf), toPx(s.playHalf) - toPx(-s.playHalf), toPx(s.playHalf) - toPx(-s.playHalf));
   ctx.setLineDash([]);
-  for (const p of s.perches) {
+  for (const p of s.analysis?.perches ?? []) {
+    // Analysed perches: darker the more of the camp they see, ringed if they see the target.
+    ctx.fillStyle = `rgba(29, 34, 39, ${(0.2 + 0.8 * Math.min(1, p.coverage / 0.6)).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(toPx(p.x), toPx(p.z), 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    if (p.target > 0.1) {
+      ctx.strokeStyle = '#c92a2a';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+  for (const p of s.analysis ? [] : s.perches) {
     ctx.fillStyle = palette.debug.ridges[p.ridge % palette.debug.ridges.length]!;
     const x = toPx(p.x);
     const y = toPx(p.z);
@@ -205,8 +217,27 @@ function drawCamp(ctx: CanvasRenderingContext2D, s: Survey): void {
       for (const p of pts) half = Math.max(half, Math.abs(p.x - s.site.x) + 6, Math.abs(p.z - s.site.z) + 6);
     }
   }
+  const an = s.analysis;
+  for (const path of [an?.infiltration, an?.exfil]) for (const p of path ?? []) half = Math.max(half, Math.abs(p.x - s.site.x) + 3, Math.abs(p.z - s.site.z) + 3);
   const scale = VIEW / (2 * half);
   const toPx = (x: number, z: number): [number, number] => [(x - s.site.x + half) * scale, (z - s.site.z + half) * scale];
+  if (an) {
+    // Coverage: how much of the cycle some guard watches each patch of ground.
+    const h = an.heat;
+    const f = an.frame;
+    for (let j = 0; j < h.nb; j++) {
+      for (let i = 0; i < h.na; i++) {
+        const c = h.coverage[j * h.na + i]!;
+        if (c <= 0.02) continue;
+        const a = h.a0 + (i + 0.5) * h.cell;
+        const b = h.b0 + (j + 0.5) * h.cell;
+        const [x, y] = toPx(f.ox + f.ux * a + f.vx * b, f.oz + f.uz * a + f.vz * b);
+        ctx.fillStyle = `rgba(224, 49, 49, ${(0.08 + 0.5 * c).toFixed(3)})`;
+        const size = h.cell * scale + 0.6;
+        ctx.fillRect(x - size / 2, y - size / 2, size, size);
+      }
+    }
+  }
   const fill: Partial<Record<string, string>> = {
     building: '#cfd2d4',
     tower: '#b5b9bd',
@@ -293,6 +324,29 @@ function drawCamp(ctx: CanvasRenderingContext2D, s: Survey): void {
     ctx.strokeStyle = '#e8590c';
     ctx.lineWidth = 2;
     ctx.strokeRect(sx - 4, sy - 4, 8, 8);
+  }
+  if (an) {
+    // The sightline graph: who would see whom drop, coloured by cluster; unsolved in red.
+    const clusterOf = new Map<number, { members: number[]; certified: string }>();
+    for (const c of an.clusters) if (c.members.length > 1) for (const m of c.members) clusterOf.set(m, c);
+    for (const e of an.edges) {
+      const ca = clusterOf.get(e.a);
+      const same = ca !== undefined && ca === clusterOf.get(e.b);
+      const ga = s.guards[e.a]!;
+      const gb = s.guards[e.b]!;
+      const [x0, y0] = toPx(ga.x, ga.z);
+      const [x1, y1] = toPx(gb.x, gb.z);
+      ctx.strokeStyle = !same ? 'rgba(134,142,150,0.35)' : ca!.certified === 'unsolved' ? 'rgba(224,49,49,0.9)' : 'rgba(112,72,232,0.75)';
+      ctx.lineWidth = same ? 1.4 : 0.8;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+    }
+    // The ways the analysis found: in to the target, to the generator, and back out.
+    if (an.sabotage) path(an.sabotage, 'rgba(232,89,12,0.85)', 1.4);
+    if (an.exfil) path(an.exfil, 'rgba(24,100,171,0.85)', 1.4);
+    if (an.infiltration) path(an.infiltration, 'rgba(43,138,62,0.95)', 1.8);
   }
   for (const g of s.guards) {
     const color = palette.debug.roles[g.role];

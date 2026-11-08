@@ -7,6 +7,8 @@ import { buildGrid } from '../kernel/world/grid';
 import type { World } from '../kernel/world/world';
 import type { TerrainReport } from './analysis';
 import { campSpecProblems } from './campSpec';
+import { analyzeCamp } from './campAnalysis';
+import { buildRaster } from './raster';
 import { buildCompound } from './compound';
 import { generateLandform } from './landform';
 import { checkValley, type Overwatch } from './overwatch';
@@ -47,10 +49,14 @@ export function generateCampWorld(spec: MissionSpec, tuning: Tuning, clock?: () 
   const camp = buildCompound(new Rng(seed, 'camp'), terrain.heightfield, terrain.features, colliders, G, spec.camp!);
   const props = scatterProps(new Rng(seed, 'props'), terrain.heightfield, terrain.features, colliders, G);
   colliders.build();
-  const grid = buildGrid(terrain.heightfield, colliders, siteBounds(camp, colliders, G.grid.siteMargin), G);
-  // Staffing searches the grid: its chokepoints and its patrols' paths.
-  staffCamp(camp, terrain.heightfield, grid, G, spec.camp!, new Rng(seed, 'staff'), new Rng(seed, 'routines'));
+  // The fine grid covers the ground the analysis looks at: the camp and its margin.
+  const grid = buildGrid(terrain.heightfield, colliders, siteBounds(camp, colliders, Math.max(G.grid.siteMargin, G.analysis.margin + 2)), G);
+  // Staffing searches the grid (its chokepoints, its patrols' paths) and sees through the
+  // analysis raster (who would see whom drop), so it shapes the camp's clusters as it goes.
+  const raster = buildRaster(camp, terrain.heightfield, colliders, grid.site, G.analysis.cell, G.analysis.margin);
+  staffCamp(camp, terrain.heightfield, grid, raster, G, spec.camp!, new Rng(seed, 'staff'), new Rng(seed, 'routines'));
   const report = reportOf(valley);
+  report.camp = analyzeCamp(camp, terrain.heightfield, colliders, grid, G, raster).analysis;
   const playHalf = terrain.heightfield.size / 2 - G.world.playMargin;
   const spawn = chooseSpawn(spec.insertion, terrain.heightfield, terrain.features, colliders, report, playHalf, camp.site);
   return {

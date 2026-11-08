@@ -29,7 +29,7 @@ let world: World;
 beforeAll(() => {
   for (const seed of SEEDS) valleys.push(generateLandform(new Rng(seed, 'valley'), T.gen));
   world = generateWorld(campMission('TAL-4471'), T);
-});
+}, 120_000);
 
 const sample = makeTerrainSample();
 const hit: PathHit = { dist: 0, s: 0, x: 0, z: 0 };

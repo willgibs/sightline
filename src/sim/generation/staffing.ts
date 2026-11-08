@@ -10,6 +10,9 @@ import { minimumCut } from './chokepoints';
 import type { DoorSpec } from './compound';
 import type { Point2 } from './paths';
 import { naturalPeriod, nearestWalkable, patrolRoutine, pickScan, postRoutine, walkPath, type ScanKind, type Stop } from './patrols';
+import { dropDuty, trackOf, type GuardTrack } from './field';
+import { cellOf, centreOf, lineOfSight, type Raster } from './raster';
+import { contactRate, reachOf, sightRate } from './sight';
 import { routinePose, type Routine, type RoutinePose } from './routine';
 
 /**
@@ -33,7 +36,7 @@ import { routinePose, type Routine, type RoutinePose } from './routine';
  * Every routine is fitted to one cycle of the camp (patrols.ts), so the camp's rhythm
  * repeats exactly and its windows can be learned. Each guard draws from his own fork.
  */
-export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, gen: GenTuning, spec: CampSpec, rng: Rng, routines: Rng): void {
+export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster: Raster, gen: GenTuning, spec: CampSpec, rng: Rng, routines: Rng): void {
   const S = gen.staffing;
   const R = gen.routines;
   const L = camp.layout!;
@@ -83,6 +86,8 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, gen: G
     stops?: Stop[];
     legs?: Point2[][];
     loop?: string;
+    /** Walk it this many times a cycle, if not as often as it fits. */
+    perCycle?: number;
   }
   const plans: Plan[] = [];
   const srng = rng.fork('posts');
@@ -109,7 +114,14 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, gen: G
   const hq = L.buildings.find((b) => b.module === 'hq')!;
   const hqDoor = camp.doors![hq.doors[0]!]!;
   const errand = doorOf('mess') ?? doorOf('barracks');
-  const targetWalk = errand ? route([{ x: hq.x, z: hq.z }, step(errand, 2.5)], [lookAt({ x: hq.x, z: hq.z }, hqDoor), lookAt(step(errand, 2.5), { x: hq.x, z: hq.z })], ['glance', 'glance']) : null;
+  // Inside, he faces across the room, neither door in his eyes; outside he lingers only briefly.
+  const across = { x: hq.x - hqDoor.nz, z: hq.z + hqDoor.nx };
+  const targetWalk = errand ? route([{ x: hq.x, z: hq.z }, step(errand, 2.5)], [lookAt({ x: hq.x, z: hq.z }, across), lookAt(step(errand, 2.5), { x: hq.x, z: hq.z })], ['glance', 'glance']) : null;
+  if (targetWalk) {
+    targetWalk.stops[0]!.weight = 1;
+    targetWalk.stops[1]!.weight = 0;
+    targetWalk.stops[1]!.dwell = S.dwell[0]!;
+  }
   // The officer: between the target's door and the barracks, watching the yard.
   const barracksDoor = doorOf('barracks');
   const officerWalk = barracksDoor ? route([step(hqDoor, 3), step(barracksDoor, 3)], [lookAt(step(hqDoor, 3), at(0, 0)), lookAt(step(barracksDoor, 3), at(0, 0))], ['half', 'quarter']) : null;
@@ -161,7 +173,8 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, gen: G
   let workerIndex = 0;
   for (const role of roster) {
     if (role === 'target') {
-      if (targetWalk) plans.push({ role, stops: targetWalk.stops, legs: targetWalk.legs, loop: 'target' });
+      // His walk out happens once a cycle: his window.
+      if (targetWalk) plans.push({ role, stops: targetWalk.stops, legs: targetWalk.legs, loop: 'target', perCycle: 1 });
       else plans.push({ role, post: { at: { x: hq.x, z: hq.z }, look: lookAt({ x: hq.x, z: hq.z }, hqDoor), scan: 'glance' } });
     } else if (role === 'marksman') {
       const t = towers.shift();
@@ -169,8 +182,9 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, gen: G
     } else if (role === 'radio-operator') {
       const radio = L.buildings.find((b) => b.module === 'radio');
       if (radio) {
-        const door = camp.doors![radio.doors[0]!]!;
-        plans.push({ role, post: { at: { x: radio.x, z: radio.z }, look: lookAt({ x: radio.x, z: radio.z }, door), scan: 'glance' } });
+        // At his set, against the wall across from the door: his back to the yard.
+        const set = (camp.devices ?? []).find((d) => d.kind === 'radio') ?? camp.doors![radio.doors[0]!]!;
+        plans.push({ role, post: { at: { x: radio.x, z: radio.z }, look: lookAt({ x: radio.x, z: radio.z }, set), scan: 'glance' } });
       }
     } else if (role === 'officer') {
       if (officerWalk) plans.push({ role, stops: officerWalk.stops, legs: officerWalk.legs, loop: 'officer' });
@@ -219,7 +233,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, gen: G
     }
     const own = natural.get(p.loop!)!;
     // A period that divides the cycle: the longest that is at least the route's own.
-    const k = Math.max(1, Math.floor(cycle / own + 1e-9));
+    const k = p.perCycle ?? Math.max(1, Math.floor(cycle / own + 1e-9));
     const period = cycle / k;
     const nth = seen.get(p.loop!) ?? 0;
     seen.set(p.loop!, nth + 1);
@@ -229,9 +243,13 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, gen: G
     pending.push({ plan: p, routine: patrolRoutine(p.legs!, p.stops!, R, period, offset, scan) });
   }
 
-  // No two guards come within a body's reach of each other on routine: the posts are
-  // fixed, and each guard who walks tries offsets until he passes everyone clear, or is
-  // left out (rule 18: a fixed number of tries).
+  // Each guard is placed in turn, posts first: on a routine that keeps him at least
+  // `clearance` from every other all cycle, and, as far as one can, without growing the
+  // sightline graph's clusters past their limits (a few small clusters and one hard core:
+  // the design doc's sightline puzzle, shaped on purpose). A walker tries start times, a post
+  // tries facing another way; each takes the first that fits, within a fixed number of tries
+  // (rule 18). The last of a role who fits nowhere is kept anyway, his walk turned into a
+  // post if he can't walk clear, so all seven roles stay.
   const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
   const STEP = 0.25;
   const samples = Math.round(cycle / STEP);
@@ -253,38 +271,139 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, gen: G
     }
     return false;
   };
-  const placed: Array<{ plan: Plan; routine: Routine; xz: Float64Array | null; order: number }> = [];
-  const indexed = pending.map((p, order) => ({ ...p, order }));
-  const ground = indexed.filter((p) => p.plan.post?.elevated === undefined);
-  for (const p of indexed) if (p.plan.post?.elevated !== undefined) placed.push({ ...p, xz: null });
-  for (const p of ground.filter((q) => q.plan.post)) {
-    const xz = track(p.routine);
-    if (!placed.some((q) => q.xz && clashes(q.xz, xz))) placed.push({ ...p, xz });
+  const witnessSamples = Math.round(cycle / gen.analysis.dt);
+  interface Placed {
+    plan: Plan;
+    routine: Routine;
+    xz: Float64Array | null;
+    sight: GuardTrack;
+    order: number;
   }
-  for (const p of ground.filter((q) => !q.plan.post)) {
-    const r = p.routine;
-    const tries = S.offsetTries;
-    let ok: { routine: Routine; xz: Float64Array } | null = null;
-    for (let k = 0; k < tries && !ok; k++) {
-      const candidate = { ...r, offset: (r.offset! + (r.period * k) / tries) % r.period };
-      const xz = track(candidate);
-      if (!placed.some((q) => q.xz && clashes(q.xz, xz))) ok = { routine: candidate, xz };
+  const placed: Placed[] = [];
+  /** Witness edges among the placed guards, by placed index: a sees b drop for at least clusterDuty. */
+  const edges: boolean[][] = [];
+  const clusterLimit = (candidate: GuardTrack): { ok: boolean; largest: number; links: Array<[number, number]> } => {
+    const m = placed.length;
+    const links: Array<[number, number]> = [];
+    for (let i = 0; i < m; i++) {
+      if (dropDuty(raster, candidate, placed[i]!.sight, witnessSamples, gen) >= gen.analysis.clusterDuty) links.push([m, i]);
+      if (dropDuty(raster, placed[i]!.sight, candidate, witnessSamples, gen) >= gen.analysis.clusterDuty) links.push([i, m]);
     }
-    if (ok) placed.push({ plan: p.plan, routine: ok.routine, xz: ok.xz, order: p.order });
-    else if (!placed.some((q) => q.plan.role === p.plan.role)) {
-      // Every role is kept: the last of his role who can't walk clear holds one of his stops instead.
-      for (const st of p.plan.stops!) {
-        const post = postRoutine({ x: st.x, z: st.z }, st.look, 'quarter', R, cycle, { scanAmp: r.scanAmp, scanPeriod: r.scanPeriod, scanPhase: r.scanPhase });
-        const xz = track(post);
-        if (!placed.some((q) => q.xz && clashes(q.xz, xz))) {
-          placed.push({ plan: { role: p.plan.role, post: { at: { x: st.x, z: st.z }, look: st.look, scan: 'quarter' } }, routine: post, xz, order: p.order });
+    const sizes = componentSizes(m + 1, (a, b) => (a === m || b === m ? links.some(([x, y]) => x === a && y === b) : edges[a]![b]!));
+    const largest = Math.max(...sizes);
+    const cores = sizes.filter((x) => x > S.clusterMax).length;
+    // A guard who'd watch the way in for long fits worse than any cluster.
+    const watch = corridorWatch(candidate);
+    const ok = largest <= S.coreMax && cores <= 1 && watch <= S.corridorWatch;
+    return { ok, largest: largest + (watch > S.corridorWatch ? 100 * watch : 0), links };
+  };
+  const accept = (p: { plan: Plan; order: number }, routine: Routine, xz: Float64Array | null, sight: GuardTrack, links: Array<[number, number]>) => {
+    const m = placed.length;
+    placed.push({ plan: p.plan, routine, xz, sight, order: p.order });
+    for (const row of edges) row.push(false);
+    edges.push(new Array<boolean>(m + 1).fill(false));
+    for (const [a, b] of links) edges[a]![b] = true;
+  };
+  const sightOf = (r: Routine, deck: number | null, role: GuardRole): GuardTrack => trackOf(r, deck, raster, gen, witnessSamples, gen.analysis.dt, -1, role === 'marksman');
+  // The skeleton's way in, cell by cell: no guard may watch it for long, so it stays a way in.
+  const corridorCells: Array<{ x: number; z: number; y: number }> = [];
+  {
+    const seenCells = new Set<number>();
+    for (let k = 0; k + 1 < corridor.length; k++) {
+      const a = corridor[k]!;
+      const b = corridor[k + 1]!;
+      const len = Math.sqrt((b.x - a.x) * (b.x - a.x) + (b.z - a.z) * (b.z - a.z));
+      for (let d = 0; d <= len; d += raster.cell / 2) {
+        const c = cellOf(raster, a.x + ((b.x - a.x) * d) / len, a.z + ((b.z - a.z) * d) / len);
+        if (c < 0 || seenCells.has(c) || !raster.walk[c]) continue;
+        seenCells.add(c);
+        const m = centreOf(raster, c);
+        corridorCells.push({ x: m.x, z: m.z, y: m.y + gen.sight.crouchHead });
+      }
+    }
+  }
+  /** The share of the cycle a guard would see an intruder's head somewhere on the corridor, by lab D's sight law. */
+  const corridorWatch = (t: GuardTrack): number => {
+    let watched = 0;
+    const reach = reachOf(t.far ? gen.sight.intruder.far : gen.sight.intruder.core, gen.sight);
+    for (let k = 0; k < witnessSamples; k++) {
+      for (const p of corridorCells) {
+        const dx = p.x - t.x[k]!;
+        const dz = p.z - t.z[k]!;
+        const d = Math.sqrt(dx * dx + dz * dz);
+        if (d > reach || d < 1e-6) continue;
+        const cos = ((dx * raster.ux + dz * raster.uz) * t.ga[k]! + (dx * raster.vx + dz * raster.vz) * t.gb[k]!) / d;
+        const off = datan2(Math.sqrt(Math.max(0, 1 - cos * cos)), cos) / DEG;
+        if (sightRate(d, off, 1, t.far, gen.sight) <= 0 && contactRate(d, 1, gen.sight) <= 0) continue;
+        if (lineOfSight(raster, t.x[k]!, t.eye[k]!, t.z[k]!, p.x, p.y, p.z)) {
+          watched++;
           break;
         }
       }
     }
+    return watched / witnessSamples;
+  };
+  const indexed = pending.map((p, order) => ({ ...p, order }));
+  const mandatory = (role: GuardRole): boolean => !placed.some((q) => q.plan.role === role);
+  // Posts on the towers, then on the ground, then the guards who walk.
+  const onDecks = indexed.filter((p) => p.plan.post?.elevated !== undefined);
+  const posts = indexed.filter((p) => p.plan.post && p.plan.post.elevated === undefined);
+  const walkers = indexed.filter((p) => !p.plan.post);
+  for (const p of [...onDecks, ...posts]) {
+    const post = p.plan.post!;
+    const deck = post.elevated ?? null;
+    let fallback: { routine: Routine; xz: Float64Array | null; sight: GuardTrack; links: Array<[number, number]>; largest: number } | null = null;
+    let done = false;
+    for (const turn of [0, 90, -90, 180]) {
+      const routine = turn === 0 ? p.routine : postRoutine(postAt(p.routine), post.look + turn * DEG, post.scan, R, cycle, scanOf(p.routine));
+      const xz = deck === null ? track(routine) : null;
+      if (xz && placed.some((q) => q.xz && clashes(q.xz, xz))) continue;
+      const sight = sightOf(routine, deck, p.plan.role);
+      const fit = clusterLimit(sight);
+      if (fit.ok) {
+        accept(p, routine, xz, sight, fit.links);
+        done = true;
+        break;
+      }
+      if (!fallback || fit.largest < fallback.largest) fallback = { routine, xz, sight, links: fit.links, largest: fit.largest };
+    }
+    if (!done && fallback && mandatory(p.plan.role)) accept(p, fallback.routine, fallback.xz, fallback.sight, fallback.links);
+  }
+  for (const p of walkers) {
+    const r = p.routine;
+    let fallback: { routine: Routine; xz: Float64Array; sight: GuardTrack; links: Array<[number, number]>; largest: number } | null = null;
+    let done = false;
+    for (let k = 0; k < S.offsetTries && !done; k++) {
+      const routine = { ...r, offset: (r.offset! + (r.period * k) / S.offsetTries) % r.period };
+      const xz = track(routine);
+      if (placed.some((q) => q.xz && clashes(q.xz, xz))) continue;
+      const sight = sightOf(routine, null, p.plan.role);
+      const fit = clusterLimit(sight);
+      if (fit.ok) {
+        accept(p, routine, xz, sight, fit.links);
+        done = true;
+      } else if (!fallback || fit.largest < fallback.largest) fallback = { routine, xz, sight, links: fit.links, largest: fit.largest };
+    }
+    if (done || !mandatory(p.plan.role)) continue;
+    if (fallback) {
+      accept(p, fallback.routine, fallback.xz, fallback.sight, fallback.links);
+      continue;
+    }
+    // He can't walk clear at any start: he holds one of his stops instead.
+    for (const st of p.plan.stops!) {
+      const post = postRoutine({ x: st.x, z: st.z }, st.look, 'quarter', R, cycle, scanOf(r));
+      const xz = track(post);
+      if (placed.some((q) => q.xz && clashes(q.xz, xz))) continue;
+      const sight = sightOf(post, null, p.plan.role);
+      accept({ plan: { role: p.plan.role, post: { at: { x: st.x, z: st.z }, look: st.look, scan: 'quarter' } }, order: p.order }, post, xz, sight, clusterLimit(sight).links);
+      break;
+    }
   }
   // The target is never left out: without him there's no mission.
-  if (!placed.some((q) => q.plan.role === 'target')) placed.push({ ...indexed.find((q) => q.plan.role === 'target')!, xz: null });
+  if (!placed.some((q) => q.plan.role === 'target')) {
+    const t = indexed.find((q) => q.plan.role === 'target')!;
+    placed.push({ plan: t.plan, routine: t.routine, xz: null, sight: sightOf(t.routine, null, 'target'), order: t.order });
+  }
   placed.sort((a, b) => a.order - b.order); // unique: each guard's place in the roster
 
   for (const { plan, routine } of placed) {
@@ -330,6 +449,39 @@ export function setObjective(camp: Camp): void {
     building: L.buildings.findIndex((b) => b.module === 'hq'),
     vehicle: (camp.vehicles ?? []).findIndex((v) => v.escape),
   };
+}
+
+/** Where a post's routine holds. */
+function postAt(r: Routine): Point2 {
+  const leg = r.legs[0]!;
+  return leg.kind === 'hold' ? { x: leg.x, z: leg.z } : { x: leg.x0, z: leg.z0 };
+}
+
+function scanOf(r: Routine): { scanAmp: number; scanPeriod: number; scanPhase: number } {
+  return { scanAmp: r.scanAmp, scanPeriod: r.scanPeriod, scanPhase: r.scanPhase };
+}
+
+/**
+ * The sizes of the strongly connected components of a small directed graph, by mutual
+ * reachability (n is at most the guard cap, so the cube is cheap).
+ */
+function componentSizes(n: number, edge: (a: number, b: number) => boolean): number[] {
+  const reach: boolean[][] = Array.from({ length: n }, (_, a) => Array.from({ length: n }, (_, b) => a === b || edge(a, b)));
+  for (let k = 0; k < n; k++) for (let a = 0; a < n; a++) if (reach[a]![k]) for (let b = 0; b < n; b++) if (reach[k]![b]) reach[a]![b] = true;
+  const seen = new Array<boolean>(n).fill(false);
+  const sizes: number[] = [];
+  for (let a = 0; a < n; a++) {
+    if (seen[a]) continue;
+    let size = 0;
+    for (let b = 0; b < n; b++) {
+      if (!seen[b] && reach[a]![b] && reach[b]![a]) {
+        seen[b] = true;
+        size++;
+      }
+    }
+    sizes.push(size);
+  }
+  return sizes;
 }
 
 function segmentDistance(p: Point2, a: Point2, b: Point2): number {

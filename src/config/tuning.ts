@@ -142,6 +142,52 @@ export const defaultTuning = {
       chokeWidth: 10, // the widest passage a sentry is posted at, metres
       clearance: 1.0, // no two guards on routine come closer than this, metres
       offsetTries: 12, // start times tried for a walking guard before he's left out
+      clusterMax: 3, // guards who see each other drop, in any cluster but one
+      coreMax: 4, // and in the hard core
+      corridorWatch: 0.2, // the most of the cycle one guard may watch the skeleton's way in
+    },
+
+    // Lab D's own sight model (D7; sim/generation/sight.ts). Generation reads only gen, so its
+    // model is its own: lab A's law (tuning.perception.sight) for one body, a crouched intruder
+    // on the move, lit, in the open, with A's numbers copied here and the ranges A's × 0.6 for
+    // the stance. tests/campSight.test.ts holds it to A's detection through A's scenario runner,
+    // so a retune of perception never changes a valley; a deliberate one is copied here.
+    sight: {
+      cone: { core: 30, peripheral: 60, far: 2.5, edge: 4 }, // half-angles off the gaze, and the width of a cone's edge, degrees
+      intruder: { core: 90, peripheral: 15, far: 240 }, // metres: A's 150, 25 and 400 for a standing body, × 0.6 crouched
+      edge: { share: 0.08, min: 2, max: 12 }, // a range's edge ramps over this share of it, within these metres
+      fill: { near: 2, edge: 8 }, // seconds to fill the meter at no distance, and at the range: linear between
+      cap: 0.47, // the fastest fill outside contact, of a full meter per second (A's telegraph: the cue 1.5 s before 100%)
+      contact: { range: 2.5, ramp: 0.5, seconds: 0.8 }, // close enough to touch: any direction, and quickly
+      still: 0.4, // a still body fills a guard's meter at this share of a moving one's rate
+      // A guard seeing a comrade drop: a standing body, falling. Lab D's own, until lab E's
+      // brain says how guards take it.
+      witness: { core: 80, peripheral: 30 },
+      eye: 1.7, // a standing guard's eye
+      chest: 1.35, // where a standing body is seen, and shot
+      crouchHead: 1.05, // the crouched intruder's head and chest: what a guard sees of him
+      crouchChest: 0.75,
+      proneEye: 0.5, // a shooter lying on a perch
+    },
+
+    // How lab D analyses a camp (D7; sim/generation/analysis files).
+    analysis: {
+      cell: 1, // metres: the analysis raster, two of the site layer's cells a side
+      dt: 0.5, // seconds between samples of the camp's cycle
+      margin: 30, // metres of ground around the fence that the intruder crosses
+      meterLevels: 128, // the intruder's detection meter, in whole levels: full is detected
+      // How fast it falls while no guard sees him, of a full meter per second. A's falls at 0.12
+      // after holding 1.5 s; half that rate with no hold covers any pause of 3 s or more.
+      meterDecay: 0.0625,
+      maxExpansions: 400000, // the infiltration search's budget (rule 18)
+      reaction: 1.5, // seconds from seeing a comrade drop to raising the camp (design doc)
+      closeShot: 12, // metres: where infiltration ends, near enough to see the target indoors, with a clear line
+      shotInterval: 0.75, // seconds between two shots from one rifle
+      relocate: 2, // metres per second a shooter moves between perches
+      perches: 32, // the most perches analysed, after thinning
+      perchSpacing: 25, // metres between two perches kept
+      clusterDuty: 0.1, // share of the cycle a witness edge must hold to join two guards in a cluster
+      clusterExpansions: 20000, // the cluster search's budget (rule 18)
     },
 
     // The camp's rhythm: how its guards walk their routines (sim/generation/routine.ts). Part of the

@@ -1,6 +1,6 @@
 import { defaultTuning } from '../../config/tuning';
 import { InvariantWatch } from '../body';
-import { campMission, generateWorld } from '../generation';
+import { analyzeCamp, campMission, generateWorld, spaceTimeSearch } from '../generation';
 import type { LayerName } from '../lanes';
 import { LAYERS } from '../lanes';
 import { Hasher } from '../kernel/core/hash';
@@ -53,7 +53,7 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
   },
   generation: {
     about:
-      "Lab D: of a held-out series, Phase 0's valleys and lab D's valid at their first attempt, the least margin left under each budget, and how much of the horizon lab D's ridges overlook.",
+      "Lab D: of a held-out series, Phase 0's valleys and lab D's valid at their first attempt, the least margin left under each budget, how much of the horizon lab D's ridges overlook, and the analysis of lab D's camps: ways in and out, unsolved clusters, the busiest search, and safe intervals against the plain search.",
     metrics() {
       let first = 0;
       let margin = Infinity;
@@ -77,6 +77,25 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
         widest = Math.max(widest, Math.round(v.perchArcDeg));
         narrowestOpen = Math.min(narrowestOpen, Math.round(v.openGapDeg));
       }
+      // Lab D's analysis of its camps (D7): ways in found, clusters left unsolved, and the
+      // busiest search against its budget; and on the first, the gain of safe intervals over
+      // the plain space-time search, by states expanded on the way in.
+      let wayIn = 0;
+      let unsolved = 0;
+      let busiest = 0;
+      let sipp = 0;
+      let plain = 0;
+      for (const seed of GENERATION_SEEDS) {
+        const w = generateWorld(campMission(seed), defaultTuning);
+        const a = w.report.camp!;
+        if (a.infiltration.found && a.exfil.found) wayIn++;
+        unsolved += a.clusters.filter((c) => c.certified === 'unsolved').length;
+        busiest = Math.max(busiest, a.infiltration.expanded, a.sabotage.expanded, a.exfil.expanded);
+        if (seed === GENERATION_SEEDS[0]) {
+          sipp = a.infiltration.expanded;
+          plain = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, undefined, spaceTimeSearch).analysis.infiltration.expanded;
+        }
+      }
       return {
         [`valid at the first attempt (of ${GENERATION_SEEDS.length})`]: first,
         'least margin under the attempt budget': margin,
@@ -84,6 +103,11 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
         'lab D least margin under the valley budget': campMargin,
         'lab D widest overwatched horizon (°)': widest,
         'lab D narrowest open horizon (°)': narrowestOpen,
+        [`lab D camps with a way in and out (of ${GENERATION_SEEDS.length})`]: wayIn,
+        'lab D clusters left unsolved': unsolved,
+        [`lab D busiest search (of ${defaultTuning.gen.analysis.maxExpansions} expansions)`]: busiest,
+        'lab D way in, states expanded: safe intervals': sipp,
+        'lab D way in, states expanded: plain space-time search': plain,
       };
     },
   },

@@ -31,6 +31,8 @@ export interface Stop {
   look: number;
   /** Seconds held still at the stop, besides turning. */
   dwell: number;
+  /** This stop's share of any time the routine is stretched by to fit the camp's cycle (default 1). */
+  weight?: number;
 }
 
 export type ScanKind = 'glance' | 'quarter' | 'half' | 'full' | 'sweep';
@@ -127,12 +129,14 @@ export function naturalPeriod(legs: readonly Point2[][], stops: readonly Stop[],
 /**
  * A patrol's routine: walk each leg's path, and at each stop turn through its scan and
  * dwell. Its period is stretched to exactly `period` (at least its natural one) by
- * lengthening every stop's dwell alike, and it starts `offset` seconds into its cycle.
+ * lengthening its stops' dwells by their weights, and it starts `offset` seconds into its
+ * cycle.
  * `legs[k]` runs from stop k to stop k + 1 (the last back to the first).
  */
 export function patrolRoutine(legs: readonly Point2[][], stops: readonly Stop[], R: GenTuning['routines'], period: number, offset: number, scan: { scanAmp: number; scanPeriod: number; scanPhase: number }): Routine {
   const natural = buildLegs(legs, stops, R, 0).period;
-  const extra = Math.max(0, period - natural) / stops.length;
+  const weights = stops.reduce((sum, st) => sum + (st.weight ?? 1), 0);
+  const extra = weights > 0 ? Math.max(0, period - natural) / weights : 0;
   const built = buildLegs(legs, stops, R, extra);
   // The sum of the parts lands within a rounding of `period`: the last leg ends exactly on it.
   built.legs[built.legs.length - 1]!.t1 = period;
@@ -170,7 +174,7 @@ function buildLegs(paths: readonly Point2[][], stops: readonly Stop[], R: GenTun
     const s = stops[k]!;
     // The scan at the stop: each look in turn, the dwell shared among them.
     const yaws = scanYaws(s.scan, s.look);
-    const dwell = (s.dwell + extra) / yaws.length;
+    const dwell = (s.dwell + extra * (s.weight ?? 1)) / yaws.length;
     for (const y of yaws) {
       hold(s.x, s.z, yaw, y, dwell);
       yaw = y;

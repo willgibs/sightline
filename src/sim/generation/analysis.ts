@@ -3,6 +3,7 @@ import type { GenTuning } from '../../config/tuning';
 import { circleDirections, dtanDeg } from '../kernel/core/detmath';
 import { Blocks, type ColliderSet, type RayHit } from '../kernel/world/colliders';
 import type { Heightfield } from '../kernel/world/heightfield';
+import type { CampAnalysis } from './campAnalysis';
 import type { Overwatch } from './overwatch';
 
 /**
@@ -39,6 +40,8 @@ export interface TerrainReport {
   problems: string[];
   /** Terrain with teeth only (landform.ts), absent from Phase 0's valley: D3's checks in full. */
   valley?: Overwatch;
+  /** Generated camps only (D7): the camp's analysis over its cycle. */
+  camp?: CampAnalysis;
 }
 
 export const DIRECTIONS = 32;
