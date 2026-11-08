@@ -1,8 +1,9 @@
 import { intentFor, motorSystem, poseAt, type PoseSample } from '../body';
-import { carryOut } from '../brain';
+import { carryOut, type NavAllowance } from '../brain';
 import { dcos, dsin } from '../kernel/core/detmath';
-import { scheduleSystem, type ScheduleHandler, type System } from '../kernel/systems';
+import { scheduleSystem, type ScheduleHandler, type System, type TickContext } from '../kernel/systems';
 import { player } from './entities';
+import { drawBrain } from './brains';
 import { think } from './guards';
 import { playerIntent } from './player';
 
@@ -75,18 +76,32 @@ const guardOrders: System = {
 
 /**
  * Every guard's brain decides his order for the next tick, after the world has moved and
- * been perceived: today, keep to the routine (brain lane), until lab E's brain can pull
- * him off it. Each decides from his mind alone: the perception boundary (brain/mind.ts).
+ * been perceived: lab E's brain where the camp brain runs (a guard with `brain`), lab A's
+ * minimal reactions where only perception does, otherwise the routine (brain lane). Each
+ * decides from his mind alone: the perception boundary (brain/mind.ts). A change of what
+ * he's doing is an 'act', with its reason and its cause.
  */
 const guardBrains: System = {
   name: 'guard-brains',
   phase: 'decide',
-  reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.senses'],
-  writes: ['guard.guard.order'],
-  emits: [],
+  reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.senses', 'guard.brain'],
+  writes: ['guard.guard.order', 'guard.brain', 'rng.brain'],
+  emits: ['act'],
   run(ctx) {
-    for (const g of ctx.index.of('guard')) think(g, ctx.world, ctx.tuning, ctx.tick + 1);
+    const nav = navAllowance(ctx);
+    for (const g of ctx.index.of('guard')) {
+      const change = think(g, ctx.world, ctx.tuning, ctx.tick + 1, () => ctx.draw(g.id, 'brain', (rng) => rng.next()), nav);
+      if (change) {
+        g.brain!.event = ctx.emit({ type: 'act', source: g.id, cause: change.cause, from: change.from, to: change.to, why: change.why, x: change.x, z: change.z, weight: change.weight });
+      }
+      if (g.brain) ctx.debug((draw) => drawBrain(draw, ctx, g));
+    }
   },
 };
+
+/** What the tick's guards may spend on routes (rule 18): a fresh allowance every tick, shared in id order. */
+function navAllowance(ctx: TickContext): NavAllowance {
+  return ctx.channel('nav', () => ({ work: ctx.work, searches: { left: ctx.tuning.brain.nav.searchesPerTick } }));
+}
 
 export const SYSTEMS: readonly System[] = [scheduleSystem(SCHEDULE_HANDLERS), playerCommands, playerIntentSystem, guardOrders, motorSystem, guardBrains];

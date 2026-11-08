@@ -3,6 +3,9 @@ import type { GuardSpawn } from '../generation';
 import type { World } from '../kernel/world/world';
 import type { BodyState } from '../body';
 import type { AwarenessState, Belief, Percept } from '../perception';
+import type { AlertReason } from '../kernel/events';
+import type { SearchOptions } from '../kernel/world/search';
+import type { BrainState } from './brain';
 
 /**
  * The perception boundary. A guard's brain (anything in the brain lane) decides from a
@@ -42,9 +45,21 @@ export interface GuardMind {
   readonly awareness: Readonly<MindAwareness>;
   /** Where he believes the intruder is, and how sure: null until he has sensed one. */
   readonly belief: Readonly<Belief> | null;
+  /** His brain's memory: what he's doing and why (brain.ts). Null for a guard with no brain: he keeps to routine, or reacts as lab A's minimal reactions do. */
+  readonly brain: BrainState | null;
+  /** A number in [0, 1) from his own stream: the only way a brain rolls dice (rule 3). */
+  draw(): number;
+  /** Counts the navigator's work, and how many route searches are left this tick. */
+  readonly nav: NavAllowance;
 }
 
-/** A mind's awareness: the state, the tick he entered it, and his focus, if any (perception/senses.ts). */
+/** What a brain may spend on routes in a tick: its counters, shared across the tick's guards. */
+export interface NavAllowance {
+  work: SearchOptions['work'];
+  searches: { left: number };
+}
+
+/** A mind's awareness: the state, the tick he entered it, his focus, if any, and why (perception/senses.ts). */
 export interface MindAwareness {
   state: AwarenessState;
   since: number;
@@ -52,5 +67,8 @@ export interface MindAwareness {
   fx: number;
   fy: number;
   fz: number;
+  /** The last stimulus that raised him: the event behind it, and why. */
+  cause: number;
+  reason: AlertReason;
 }
 

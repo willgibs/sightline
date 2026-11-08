@@ -268,6 +268,34 @@ export const defaultTuning = {
       stallsMax: 4, // stalls a route may take before the brain is told
       sideSeconds: 0.7, // how long a sidestep around something in the way lasts
     },
+    // A guard's brain (E3, brain.ts): awareness states, utility scoring inside each.
+    think: 0.4, // seconds between reconsiderings, at most (sooner when something changes)
+    pickShare: 0.7, // options within this share of the best weight are in the draw (rank-then-weight)
+    switchRatio: 1.4, // a running act is dropped only for one better by this factor
+    routeEvery: 1.5, // seconds a guard waits before re-searching a route to a goal that moved
+    goalMoved: 2.5, // metres a goal must move before it's worth a new route
+    backAt: 3, // metres from where his routine says he should be: close enough to walk straight there
+    routeRetry: 1.5, // seconds before trying again after no route was found
+    paces: { investigate: 1.35, search: 2, hurry: 2.4, run: 5 },
+    linger: { investigate: 4.5, search: 2.5 },
+    cooldown: { investigate: 2.5, search: 2 },
+    search: { points: 3, radius: 7, growth: 0.35 },
+    roles: {
+      // What each role is willing to do (0 never, 1 fully): the role column of the design doc's table.
+      sentry: { investigate: 0.65, search: 0.75, flank: 0.6 },
+      patrol: { investigate: 1, search: 1, flank: 0.85 },
+      marksman: { investigate: 0, search: 0, flank: 0 },
+      'radio-operator': { investigate: 0.1, search: 0.1, flank: 0 },
+      officer: { investigate: 0.7, search: 0.8, flank: 0.3 },
+      worker: { investigate: 0.25, search: 0, flank: 0 },
+      target: { investigate: 0, search: 0, flank: 0 },
+    },
+    // Each option's weight multiplies these, each read through its response curve.
+    curves: {
+      near: { from: 4, to: 60, at0: 1, at1: 0.15 }, // how much a nearby spot pulls him
+      fresh: { from: 2, to: 25, at0: 1, at1: 0.05 }, // how fresh the belief is
+    },
+    lookWeight: 0.35, // the weight of standing to look, when it competes with going
   },
 
   view: {

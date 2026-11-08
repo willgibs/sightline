@@ -1,5 +1,6 @@
 import type { Scene as KernelScene } from '../../kernel/scene';
 import type { Simulation } from '../sim';
+import { campBrain } from './campBrain';
 import { movementCourse } from './movementCourse';
 import { perceptionLab } from './perceptionLab';
 import { SIGHT_TABLE, sightScenario } from './sightScenario';
@@ -14,6 +15,7 @@ export type Scene = KernelScene<Simulation>;
  * the same version (kernel/scene.ts).
  */
 export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
+  'camp-brain': campBrain,
   'movement-course': movementCourse,
   'perception-lab': perceptionLab,
   sight: sightScenario,

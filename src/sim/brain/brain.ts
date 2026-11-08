@@ -1,0 +1,484 @@
+import type { Tuning } from '../../config/tuning';
+import { DEG, dsin } from '../kernel/core/detmath';
+import { turnTowards, wrapAngle, yawFromDirection } from '../kernel/core/math';
+import type { AwarenessName } from '../kernel/events';
+import { routinePose, type RoutinePose } from '../generation';
+import type { Gait } from '../body';
+import type { GuardMind } from './mind';
+import { emptyRoute, emptySteering, followRoute, navigatorOf, type Route, type Steering } from './nav';
+import type { Order } from './orders';
+import { keepRoutine } from './routine';
+import { choose, response, type Option } from './utility';
+
+/**
+ * A guard's brain (E3): a prioritized machine of the awareness ladder's states (lab A),
+ * and inside each, what to do chosen by utility (utility.ts): the options the state
+ * offers, each scored by multiplied 0–1 considerations, rank then weight, cooldowns
+ * against dithering, the draw from his own stream through the mind (rule 13).
+ *
+ * The brain decides in the 'decide' phase from its mind alone (mind.ts), and steers its
+ * body only through orders (orders.ts). It walks by the navigator's routes (nav.ts), so
+ * a guard goes around buildings and through doorways by the motor, like anyone.
+ *
+ * Every change of act is reported with a reason code and the event that caused it, so
+ * any reaction can be explained, back to a percept (the `act` event, kernel/events.ts).
+ * No act reads anything but the mind: where the player really is reaches him only as a
+ * percept, an awareness, a belief.
+ */
+
+export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold'] as const;
+export type ActName = (typeof ACTS)[number];
+
+/** Why a guard changed what he's doing: A's reasons for a change of state, and the brain's own. */
+export const ACT_WHYS = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost'] as const;
+export type ActWhy = (typeof ACT_WHYS)[number];
+
+/** A change of what a guard is doing, for its system to emit as an 'act' event. */
+export interface ActChange {
+  from: ActName;
+  to: ActName;
+  why: ActWhy;
+  /** Where the new act points: on the ground. */
+  x: number;
+  z: number;
+  /** The event behind it: the percept, or the act that led to it. */
+  cause: number;
+  /** The utility the winning option scored: 0–1. */
+  weight: number;
+}
+
+/** A guard's brain: what he's doing and why, plain data in his state. */
+export interface BrainState {
+  act: ActName;
+  /** The tick this act began. */
+  since: number;
+  /** Where it points, if anywhere. */
+  x: number;
+  z: number;
+  /** The event behind it, or 0. */
+  cause: number;
+  /** The act's event, once its system has emitted one. */
+  event: number;
+  /** The act is over: the next think chooses another. */
+  done: boolean;
+  /** When to think again, at the latest. */
+  thinkAt: number;
+  /** What he last thought about: the awareness state and newest percept. */
+  state: AwarenessName;
+  percept: number;
+  /** The route he's walking, its goal, when it was last searched, and whether one was found. */
+  route: Route;
+  goalX: number;
+  goalZ: number;
+  routed: number;
+  routeOk: boolean;
+  /** He has arrived and is looking around until this tick. */
+  linger: number;
+  /** A search: how many points it has been to, and which way it goes next. */
+  points: number;
+  angle: number;
+  /** The tick each act last ended, for its cooldown. */
+  ended: Partial<Record<ActName, number>>;
+}
+
+export function createBrain(): BrainState {
+  return {
+    act: 'routine',
+    since: 0,
+    x: 0,
+    z: 0,
+    cause: 0,
+    event: 0,
+    done: false,
+    thinkAt: 0,
+    state: 'unaware',
+    percept: -1,
+    route: emptyRoute(),
+    goalX: 0,
+    goalZ: 0,
+    routed: -1,
+    routeOk: false,
+    linger: -1,
+    points: 0,
+    angle: 0,
+    ended: {},
+  };
+}
+
+const steer: Steering = emptySteering();
+const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
+const options: Array<Option<ActName>> = [];
+
+/**
+ * One tick of a guard's brain: reconsiders what he's doing if the world gives him reason,
+ * then carries out his act for the next tick into `out`. Returns the change of act, if
+ * any, for its system to emit.
+ */
+export function decide(m: GuardMind, out: Order): ActChange | null {
+  const b = m.brain!;
+  const T = m.tuning.brain;
+  const a = m.awareness;
+  let change: ActChange | null = null;
+  const newest = newestPercept(m);
+  if (b.done || m.tick >= b.thinkAt || a.state !== b.state || newest !== b.percept) {
+    b.state = a.state;
+    b.percept = newest;
+    b.thinkAt = m.tick + Math.max(1, Math.round(T.think * m.tuning.sim.tickHz));
+    const running = b.done ? null : b.act;
+    if (b.done) b.ended[b.act] = m.tick;
+    fillOptions(m, options);
+    const best = running && !outranked(options, running, T.switchRatio) ? running : (choose(options, T.pickShare, m.draw)?.act ?? 'routine');
+    if (best !== b.act || b.done) change = begin(m, best, b.done);
+    b.done = false;
+  }
+  perform(m, out);
+  return change;
+}
+
+/** The newest percept's tick, or −1. */
+function newestPercept(m: GuardMind): number {
+  let tick = -1;
+  for (const p of m.percepts) if (p.tick > tick) tick = p.tick;
+  return tick;
+}
+
+/** True if something better than the running act is on offer: a higher rank, or the running act's weight beaten by `ratio`. */
+function outranked(opts: readonly Option<ActName>[], running: ActName, ratio: number): boolean {
+  let rank = -Infinity;
+  let weight = 0;
+  for (const o of opts) {
+    if (o.act === running) {
+      rank = o.rank;
+      weight = o.weight;
+    }
+  }
+  if (weight <= 0) return true;
+  for (const o of opts) {
+    if (o.act === running || o.weight <= 0) continue;
+    if (o.rank > rank) return true;
+    if (o.rank === rank && o.weight > weight * ratio) return true;
+  }
+  return false;
+}
+
+/** Starts an act: where it points, why, and because of what. Writes the change for its system. */
+function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
+  const b = m.brain!;
+  const prev = b.act;
+  b.act = act;
+  b.since = m.tick;
+  b.linger = -1;
+  b.routed = -1;
+  b.points = 0;
+  b.route.points.length = 0;
+  b.route.next = 0;
+  const focus = focusOf(m);
+  if (act === 'routine' || act === 'return') {
+    routinePose(m.post.routine, m.time, pose);
+    b.x = pose.x;
+    b.z = pose.z;
+  } else {
+    b.x = focus.x;
+    b.z = focus.z;
+  }
+  // Why: what his senses gave him, while something drives him; calm or nothing when it doesn't.
+  const reacting = act !== 'routine' && act !== 'return';
+  const reason: ActWhy = reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
+  const cause = reacting ? perceptCause(m) : b.event;
+  b.cause = cause;
+  return { from: prev, to: act, why: reason, x: b.x, z: b.z, cause, weight: 1 };
+}
+
+/** The freshest percept's kind, as the reason for a reaction; the awareness's own reason if there is none. */
+function perceptWhy(m: GuardMind): ActWhy {
+  let tick = -1;
+  let why: ActWhy = m.awareness.reason as ActWhy;
+  for (const p of m.percepts) {
+    if (p.tick < tick) continue;
+    tick = p.tick;
+    why = p.kind === 'sight' ? 'seen' : p.kind === 'shot' ? 'shot' : p.kind === 'voice' ? 'voice' : 'heard';
+  }
+  return why;
+}
+
+/** The cause of the freshest percept, or of the awareness itself: what a reaction is a reaction to. */
+function perceptCause(m: GuardMind): number {
+  let tick = -1;
+  let cause = m.awareness.cause;
+  for (const p of m.percepts) {
+    if (p.tick >= tick) {
+      tick = p.tick;
+      cause = p.cause;
+    }
+  }
+  return cause;
+}
+
+/** Where his attention is: his focus, or where he believes the intruder is. */
+function focusOf(m: GuardMind): { x: number; z: number } {
+  const a = m.awareness;
+  if (a.state === 'combat' && m.belief) return m.belief;
+  if (a.focus) return { x: a.fx, z: a.fz };
+  if (m.belief) return m.belief;
+  return { x: m.self.x, z: m.self.z };
+}
+
+/**
+ * The options his state offers, in a fixed order, each with its rank and its weight: the
+ * multiplied considerations. A state with nothing to do falls back on rank 0, the routine.
+ */
+function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
+  out.length = 0;
+  const T = m.tuning.brain;
+  const b = m.brain!;
+  const hz = m.tuning.sim.tickHz;
+  const role = T.roles[m.post.role];
+  const state = m.awareness.state;
+  const elevated = m.post.elevated;
+  const focus = focusOf(m);
+  const dx = focus.x - m.self.x;
+  const dz = focus.z - m.self.z;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+  const near = response(T.curves.near, dist);
+  const age = m.belief ? (m.tick - m.belief.tick) / hz : 1e6;
+  const fresh = response(T.curves.fresh, age);
+  const cool = (act: 'investigate' | 'search'): number => {
+    const ended = b.ended[act];
+    if (ended === undefined) return 1;
+    const c = T.cooldown[act];
+    const t = (m.tick - ended) / hz;
+    return t < c ? 0 : 1;
+  };
+  out.push({ act: 'routine', rank: 0, weight: 1 });
+  const off = offRoutine(m);
+  switch (state) {
+    case 'unaware':
+      if (off && !elevated) out.push({ act: 'return', rank: 1, weight: 1 });
+      break;
+    case 'curious':
+      out.push({ act: 'look', rank: 2, weight: 1 });
+      break;
+    case 'suspicious':
+      out.push({ act: 'look', rank: 3, weight: T.lookWeight });
+      if (!elevated) out.push({ act: 'investigate', rank: 3, weight: role.investigate * near * fresh * cool('investigate') });
+      break;
+    case 'searching':
+      out.push({ act: 'hold', rank: 4, weight: 0.2 });
+      if (!elevated) {
+        out.push({ act: 'investigate', rank: 4, weight: role.investigate * near * fresh * cool('investigate') });
+        out.push({ act: 'search', rank: 4, weight: role.search * (0.25 + 0.75 * fresh) * cool('search') });
+      }
+      break;
+    case 'combat':
+      out.push({ act: 'hold', rank: 5, weight: 1 });
+      break;
+  }
+}
+
+/** True if he's far from where his routine says he should be. */
+function offRoutine(m: GuardMind): boolean {
+  routinePose(m.post.routine, m.time, pose);
+  const dx = pose.x - m.self.x;
+  const dz = pose.z - m.self.z;
+  return dx * dx + dz * dz > m.tuning.brain.backAt * m.tuning.brain.backAt;
+}
+
+/** Carries out the current act for the next tick. */
+function perform(m: GuardMind, out: Order): void {
+  const b = m.brain!;
+  switch (b.act) {
+    case 'routine':
+      keepRoutine(m, out);
+      break;
+    case 'return':
+      performReturn(m, out);
+      break;
+    case 'look':
+      stand(m, out, true);
+      break;
+    case 'hold':
+      stand(m, out, false);
+      break;
+    case 'investigate':
+      performInvestigate(m, out);
+      break;
+    case 'search':
+      performSearch(m, out);
+      break;
+  }
+}
+
+/** Stands where he is and faces his focus: the head first, then the body, looking around if `scan`. */
+function stand(m: GuardMind, out: Order, scan: boolean): void {
+  const A = m.tuning.perception.awareness;
+  const dt = 1 / m.tuning.sim.tickHz;
+  const focus = focusOf(m);
+  const self = m.self;
+  const dx = focus.x - self.x;
+  const dz = focus.z - self.z;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+  const toward = dist > 1e-6 ? yawFromDirection(dx, dz) : self.yaw;
+  const limit = A.headLimitDeg * DEG;
+  const combat = m.awareness.state === 'combat';
+  let yaw = self.yaw;
+  if (Math.abs(wrapAngle(toward - self.yaw)) > limit || combat) yaw = turnTowards(self.yaw, toward, A.turnRate * dt);
+  let head = combat ? 0 : clamp(wrapAngle(toward - yaw), limit);
+  if (scan) {
+    const t = (m.tick - m.brain!.since) / m.tuning.sim.tickHz;
+    head = clamp(head + A.scanDeg * DEG * dsin((2 * Math.PI * t) / A.scanPeriod), limit);
+  }
+  writeOrder(m, out, 0, 0, 'idle', yaw, head);
+}
+
+/** Stands where he is and looks around, while he lingers at a spot. */
+function lookAround(m: GuardMind, out: Order): void {
+  stand(m, out, true);
+}
+
+/** Walks toward a goal by the navigator, then says whether he's there. */
+function walk(m: GuardMind, out: Order, x: number, z: number, pace: number, gait: Gait, lookX: number, lookZ: number): 'walking' | 'arrived' | 'stuck' {
+  const b = m.brain!;
+  const T = m.tuning.brain;
+  const hz = m.tuning.sim.tickHz;
+  const moved = (x - b.goalX) * (x - b.goalX) + (z - b.goalZ) * (z - b.goalZ) > T.goalMoved * T.goalMoved;
+  const retry = b.routed >= 0 && (m.tick - b.routed) / hz >= (b.routeOk ? T.routeEvery : T.routeRetry);
+  if (b.routed < 0 || (moved && retry) || (!b.routeOk && retry)) {
+    if (m.nav.searches.left <= 0) {
+      stand(m, out, false);
+      return 'walking';
+    }
+    m.nav.searches.left--;
+    const r = navigatorOf(m.world, m.tuning).find(m.self.x, m.self.z, x, z, { work: m.nav.work }, b.route);
+    b.routed = m.tick;
+    b.routeOk = r === 'found';
+    b.goalX = x;
+    b.goalZ = z;
+    if (!b.routeOk) return 'stuck';
+  }
+  if (!b.routeOk) return 'stuck';
+  const w = followRoute(b.route, m.self.x, m.self.z, pace, m.id, m.tick, m.tuning, steer);
+  if (w === 'arrived') return 'arrived';
+  if (w === 'stalled') {
+    // Something the grid doesn't know is in the way, and sidestepping hasn't cleared it.
+    b.routed = -1;
+    return 'stuck';
+  }
+  const A = m.tuning.perception.awareness;
+  const dt = 1 / hz;
+  const toward = yawFromDirection(steer.dirX, steer.dirZ);
+  const yaw = turnTowards(m.self.yaw, toward, A.turnRate * dt);
+  const lx = lookX - m.self.x;
+  const lz = lookZ - m.self.z;
+  const see = lx * lx + lz * lz > 1e-6 ? yawFromDirection(lx, lz) : yaw;
+  const head = clamp(wrapAngle(see - yaw), A.headLimitDeg * DEG);
+  writeOrder(m, out, steer.wishX, steer.wishZ, gait, yaw, head);
+  return 'walking';
+}
+
+function performReturn(m: GuardMind, out: Order): void {
+  const b = m.brain!;
+  const T = m.tuning.brain;
+  // Rejoin the routine where it will be, about when he gets there.
+  routinePose(m.post.routine, m.time, pose);
+  const dx = pose.x - m.self.x;
+  const dz = pose.z - m.self.z;
+  const d = Math.sqrt(dx * dx + dz * dz);
+  if (d < T.backAt) {
+    b.done = true;
+    keepRoutine(m, out);
+    return;
+  }
+  routinePose(m.post.routine, m.time + d / T.paces.hurry, pose);
+  const look = focusOf(m);
+  const w = walk(m, out, pose.x, pose.z, T.paces.hurry, 'walk', look.x, look.z);
+  if (w === 'arrived') b.done = true;
+  else if (w === 'stuck') keepRoutine(m, out); // no way back by the grid: his routine knows the way
+}
+
+function performInvestigate(m: GuardMind, out: Order): void {
+  const b = m.brain!;
+  const T = m.tuning.brain;
+  const hz = m.tuning.sim.tickHz;
+  if (b.linger >= 0) {
+    lookAround(m, out);
+    if (m.tick >= b.linger) b.done = true;
+    return;
+  }
+  // He goes to where he believes it was; a fresher belief moves the goal.
+  const focus = focusOf(m);
+  if (!sameGoal(b.x, b.z, focus.x, focus.z, T.goalMoved)) {
+    b.x = focus.x;
+    b.z = focus.z;
+  }
+  const w = walk(m, out, b.x, b.z, T.paces.investigate, 'walk', b.x, b.z);
+  if (w === 'arrived') {
+    b.linger = m.tick + Math.round(T.linger.investigate * hz);
+    lookAround(m, out);
+  } else if (w === 'stuck') {
+    b.done = true;
+    stand(m, out, false);
+  }
+}
+
+function performSearch(m: GuardMind, out: Order): void {
+  const b = m.brain!;
+  const T = m.tuning.brain;
+  const hz = m.tuning.sim.tickHz;
+  if (b.linger >= 0) {
+    lookAround(m, out);
+    if (m.tick >= b.linger) {
+      b.linger = -1;
+      b.points++;
+      b.routed = -1;
+      if (b.points >= T.search.points) b.done = true;
+      else nextSearchPoint(m);
+    }
+    return;
+  }
+  if (b.points === 0 && b.routed < 0) nextSearchPoint(m);
+  const w = walk(m, out, b.x, b.z, T.paces.search, 'walk', b.x, b.z);
+  if (w === 'arrived') {
+    b.linger = m.tick + Math.round(T.linger.search * hz);
+    lookAround(m, out);
+  } else if (w === 'stuck') {
+    b.points++;
+    b.routed = -1;
+    if (b.points >= T.search.points) b.done = true;
+    else nextSearchPoint(m);
+    stand(m, out, false);
+  }
+}
+
+/** The next point of a search: around where he believes the intruder is, on a ring that grows as the belief ages. */
+function nextSearchPoint(m: GuardMind): void {
+  const b = m.brain!;
+  const T = m.tuning.brain;
+  const hz = m.tuning.sim.tickHz;
+  const focus = focusOf(m);
+  const age = m.belief ? (m.tick - m.belief.tick) / hz : 0;
+  const r = T.search.radius + T.search.growth * age;
+  b.angle = m.draw() * 2 * Math.PI;
+  b.x = focus.x + r * dsin(b.angle + Math.PI / 2);
+  b.z = focus.z + r * dsin(b.angle);
+}
+
+function sameGoal(ax: number, az: number, bx: number, bz: number, within: number): boolean {
+  return (ax - bx) * (ax - bx) + (az - bz) * (az - bz) <= within * within;
+}
+
+function writeOrder(m: GuardMind, out: Order, wishX: number, wishZ: number, gait: Gait, yaw: number, head: number): void {
+  const A: Tuning['perception']['awareness'] = m.tuning.perception.awareness;
+  const dt = 1 / m.tuning.sim.tickHz;
+  out.kind = 'move';
+  out.tick = m.tick;
+  out.wishX = wishX;
+  out.wishZ = wishZ;
+  out.gait = gait;
+  out.yaw = yaw;
+  out.pitch = 0;
+  out.headYaw = turnTowards(m.head, head, A.headRate * dt);
+}
+
+function clamp(v: number, limit: number): number {
+  return v > limit ? limit : v < -limit ? -limit : v;
+}

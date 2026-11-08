@@ -101,6 +101,9 @@ export type AwarenessName = 'unaware' | 'curious' | 'suspicious' | 'searching' |
 export type AlertReason = 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm';
 /** What a heard sound sounded like (perception/hearing.ts). */
 export type HeardKind = 'sound' | 'shot' | 'voice';
+/** What a guard can be doing, and why he changed (brain/brain.ts, ACTS and ACT_WHYS). Stored by index: only add at the end. */
+export type ActCode = 'routine' | 'return' | 'look' | 'investigate' | 'search' | 'hold';
+export type ActReason = 'start' | 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm' | 'arrived' | 'nothing' | 'stalled' | 'no-route' | 'lost';
 
 /**
  * A guard's detection meter rose through the cue (30%): the first sign shows, at the
@@ -177,6 +180,19 @@ export interface NoiseEvent extends EventBase, SoundFields {
   type: 'noise';
 }
 
+/** A guard's brain changed what he is doing (brain/brain.ts): source the guard, cause the percept or act behind it. */
+export interface ActEvent extends EventBase {
+  type: 'act';
+  from: ActCode;
+  to: ActCode;
+  why: ActReason;
+  /** Where the new act points. */
+  x: number;
+  z: number;
+  /** The utility the winning option scored, 0–1. */
+  weight: number;
+}
+
 export type SimEvent =
   | FootstepEvent
   | LandEvent
@@ -188,7 +204,8 @@ export type SimEvent =
   | HeardEvent
   | AlertEvent
   | BarkEvent
-  | NoiseEvent;
+  | NoiseEvent
+  | ActEvent;
 export type EventType = SimEvent['type'];
 export type EventOf<K extends EventType> = Extract<SimEvent, { type: K }>;
 
@@ -222,6 +239,8 @@ const REASONS = ['seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact
 const HEARD = ['sound', 'shot', 'voice'] as const satisfies readonly HeardKind[];
 const STANCES = ['stand', 'crouch', 'prone'] as const satisfies readonly StanceName[];
 const SOUND = { x: 'f32', y: 'f32', z: 'f32', surface: 'u8', loudness: 'f32', radius: 'f32' } as const;
+const ACT_NAMES = ['routine', 'return', 'look', 'investigate', 'search', 'hold'] as const satisfies readonly ActCode[];
+const ACT_WHY_NAMES = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost'] as const satisfies readonly ActReason[];
 
 export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   footstep: { code: 1, range: 'foundation', sound: true, fields: { ...SOUND, gait: { enum: GAITS } } },
@@ -255,6 +274,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   alert: { code: 13, range: 'perception', sound: false, fields: { from: { enum: AWARE }, to: { enum: AWARE }, reason: { enum: REASONS } } },
   bark: { code: 14, range: 'perception', sound: true, fields: { ...SOUND, line: 'u8' } },
   noise: { code: 15, range: 'perception', sound: true, fields: { ...SOUND } },
+  act: { code: 90, range: 'brain', sound: false, fields: { from: { enum: ACT_NAMES }, to: { enum: ACT_NAMES }, why: { enum: ACT_WHY_NAMES }, x: 'f32', z: 'f32', weight: 'f32' } },
 };
 
 export function isSound(e: SimEvent): e is Extract<SimEvent, SoundFields> {

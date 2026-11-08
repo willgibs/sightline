@@ -7,7 +7,10 @@
  * with (orders.ts), and the brains themselves: the routine (routine.ts), and lab A's minimal
  * reactions to each state of the awareness ladder (react.ts), which lab E's brain replaces.
  */
-export type { GuardMind, MindAwareness } from './mind';
+export type { GuardMind, MindAwareness, NavAllowance } from './mind';
 export { carryOut, standStill, type MoveOrder, type Order } from './orders';
 export { keepRoutine } from './routine';
 export { react } from './react';
+export { emptyRoute, emptySteering, followRoute, navigatorOf, routeLength, type Route, type RouteResult, type Steering, type Walk } from './nav';
+export { ACTS, ACT_WHYS, createBrain, decide, type ActChange, type ActName, type ActWhy, type BrainState } from './brain';
+export { choose, response, type Curve, type Option } from './utility';

@@ -1,4 +1,5 @@
 import type { BodyState } from '../body';
+import type { BrainState } from '../brain';
 import type { Senses } from '../perception';
 import type { EntityBase, EntityId, EntityIndex } from '../kernel/state';
 import type { GuardState } from './guards';
@@ -32,6 +33,8 @@ export interface GuardEntity extends EntityBase {
    * neither sees nor hears, and keeps to his routine.
    */
   senses?: Senses;
+  /** His brain's memory (lab E), where the camp brain runs; without it he keeps to routine, or lab A's minimal reactions. */
+  brain?: BrainState;
 }
 
 declare module '../kernel/state' {

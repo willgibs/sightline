@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import { keepRoutine, react, standStill, type GuardMind, type MindAwareness, type Order } from '../brain';
+import { decide, keepRoutine, react, standStill, type ActChange, type GuardMind, type MindAwareness, type NavAllowance, type Order } from '../brain';
 import type { Percept } from '../perception';
 import type { World } from '../kernel/world/world';
 import { createBody, type BodyState } from '../body';
@@ -36,7 +36,7 @@ type Writable<T> = { -readonly [K in keyof T]: T[K] };
 
 const NO_PERCEPTS: readonly Percept[] = [];
 /** The awareness of a guard without senses: unaware, attending to nothing. */
-const UNAWARE: Readonly<MindAwareness> = Object.freeze({ state: 'unaware', since: 0, focus: false, fx: 0, fy: 0, fz: 0 });
+const UNAWARE: Readonly<MindAwareness> = Object.freeze({ state: 'unaware', since: 0, focus: false, fx: 0, fy: 0, fz: 0, cause: 0, reason: 'heard' });
 
 /**
  * What a guard's brain gets to decide from (brain/mind.ts): his own body and head, his
@@ -45,7 +45,7 @@ const UNAWARE: Readonly<MindAwareness> = Object.freeze({ state: 'unaware', since
  * boundary, from his own state; the brain never sees the rest. Writes into `out`, which is
  * reused.
  */
-export function guardMind(g: GuardEntity, world: World, tuning: Tuning, tick: number, out: Writable<GuardMind>): GuardMind {
+export function guardMind(g: GuardEntity, world: World, tuning: Tuning, tick: number, out: Writable<GuardMind>, draw: () => number = noDraw, nav: NavAllowance = noNav): GuardMind {
   out.id = g.id;
   out.self = g.body;
   out.head = g.guard.headYaw;
@@ -58,24 +58,36 @@ export function guardMind(g: GuardEntity, world: World, tuning: Tuning, tick: nu
   out.percepts = s ? s.percepts : NO_PERCEPTS;
   out.awareness = s ? s.awareness : UNAWARE;
   out.belief = s ? s.belief : null;
+  out.brain = g.brain ?? null;
+  out.draw = draw;
+  out.nav = nav;
   return out;
 }
 
 /** A mind for guardMind to fill: every field is written on each use. */
 export function emptyMind(): Writable<GuardMind> {
   const unset = null as never;
-  return { id: 0, self: unset, head: 0, post: unset, world: unset, tuning: unset, tick: 0, time: 0, percepts: NO_PERCEPTS, awareness: UNAWARE, belief: null };
+  return { id: 0, self: unset, head: 0, post: unset, world: unset, tuning: unset, tick: 0, time: 0, percepts: NO_PERCEPTS, awareness: UNAWARE, belief: null, brain: null, draw: noDraw, nav: noNav };
 }
+
+const noDraw = (): number => {
+  throw new Error('This mind has no stream to draw from');
+};
+const noNav: NavAllowance = { work: undefined, searches: { left: 0 } };
 
 /** Scratch: the mind a guard's brain decides from, rewritten for each decision. */
 const mind = emptyMind();
 
 /**
  * A guard's brain decides his order for `tick` (the one after now) from his mind alone:
- * with senses, lab A's minimal reactions to his awareness (which keep to the routine while
- * he's unaware); without, the routine. Writes the order into his state.
+ * with a brain, lab E's (brain/brain.ts); with senses, lab A's minimal reactions to his
+ * awareness (which keep to the routine while he's unaware); without, the routine. Writes the
+ * order into his state, and returns the change of what he's doing, if any, to emit.
  */
-export function think(g: GuardEntity, world: World, tuning: Tuning, tick: number): Order {
-  const m = guardMind(g, world, tuning, tick, mind);
-  return g.senses ? react(m, g.guard.order) : keepRoutine(m, g.guard.order);
+export function think(g: GuardEntity, world: World, tuning: Tuning, tick: number, draw?: () => number, nav?: NavAllowance): ActChange | null {
+  const m = guardMind(g, world, tuning, tick, mind, draw, nav);
+  if (g.brain) return decide(m, g.guard.order);
+  if (g.senses) react(m, g.guard.order);
+  else keepRoutine(m, g.guard.order);
+  return null;
 }
