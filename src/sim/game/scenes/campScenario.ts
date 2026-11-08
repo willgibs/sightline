@@ -2,15 +2,17 @@ import { Surface } from '../../kernel/world/surfaces';
 import type { System } from '../../kernel/systems';
 import { WaypointDriver, type Waypoint } from '../bots/waypoints';
 import { campRules } from '../combat';
-import { campCheckins, campCommander, commanderOf, commsVoice, giveCommander } from '../comms';
+import { campCheckins, campCommander, commanderOf, commsVoice, giveCommander, giveDevices } from '../comms';
+import { MarksmanDriver, type Step } from '../bots/marksman';
+import type { InputFrame } from '../../kernel/input';
 import { giveBrains } from '../brains';
 import { player } from '../entities';
 import { PERCEPTION, giveSenses } from '../perception';
 import { arm } from '../shooting';
 import { placePlayer } from '../setup';
-import { SIGHTLINE } from '../sim';
+import { SIGHTLINE, type Simulation } from '../sim';
 import type { Scene } from '.';
-import { campWorld } from './campBrain';
+import { CAMP, campWorld } from './campBrain';
 
 /**
  * The exit test's scripted scenarios (E12), run in the scenario runner: scenes with
@@ -21,13 +23,15 @@ import { campWorld } from './campBrain';
  *                       everyone goes back to routine, with no one in combat.
  *           search      the player is spotted, breaks contact and lies still: the camp
  *                       searches and settles again, ended by belief, in 30–45 s.
+ *           alarm       a sentry sees the player and runs for the alarm box; a scripted
+ *                       marksman drops him on the way: the alarm never sounds.
  *   seed    which variant of the script's place and timing (a small fixed table)
  *
- * The scenarios "alarm" and "overlook" join them with E7 and E12.
+ * The scenario "overlook" joins them with E12.
  */
 
 export interface CampScenarioParams {
-  script: 'suspicion' | 'search';
+  script: 'suspicion' | 'search' | 'alarm';
   seed: number;
 }
 
@@ -42,7 +46,7 @@ export function parseCampScenario(text: string | undefined): CampScenarioParams 
     const key = at < 0 ? part : part.slice(0, at);
     const v = at < 0 ? '' : part.slice(at + 1);
     if (key === 'script') {
-      if (v !== 'suspicion' && v !== 'search') throw new Error(`Camp scenario: script must be suspicion or search; got '${v}'`);
+      if (v !== 'suspicion' && v !== 'search' && v !== 'alarm') throw new Error(`Camp scenario: script must be suspicion, search or alarm; got '${v}'`);
       p.script = v;
     } else if (key === 'seed') {
       const n = Number(v);
@@ -140,6 +144,59 @@ export function campScenario(params?: string): Scene {
       ],
     };
   }
+  if (p.script === 'alarm') {
+    // Just the gate sentry and an operator: he sees the player and sprints for the alarm
+    // box; when he does, a scripted marksman drops him on the way.
+    const seen = { ran: false, raised: false, died: false };
+    return {
+      name,
+      version: 1,
+      params: canonical,
+      title: 'Camp: an alarm, interrupted',
+      description: 'The gate sentry sees you and sprints for the alarm box. Drop him before he reaches it and it never sounds.',
+      game: SIGHTLINE,
+      world: (tuning) => {
+        const w = campWorld(tuning);
+        return { ...w, camp: { ...w.camp, guards: [w.camp.guards[0]!, w.camp.guards[5]!] } };
+      },
+      systems: tuningSystems,
+      setup: (sim) => {
+        placePlayer(sim, 62, 8, -1, 0);
+        giveSenses(sim);
+        giveBrains(sim);
+        giveCommander(sim);
+        giveDevices(sim, [CAMP.alarm]);
+        const pl = player(sim.index);
+        arm(pl, sim.tuning);
+        pl.health = { hits: 0 };
+      },
+      driver: () => new InterruptDriver(),
+      seconds: 40,
+      expect: [
+        {
+          name: 'the sentry runs for the alarm box',
+          during: (_sim, events) => {
+            for (const e of events) if (e.type === 'act' && e.to === 'alarm') seen.ran = true;
+          },
+          after: () => (seen.ran ? undefined : 'nobody ran for the alarm'),
+        },
+        {
+          name: 'he is dropped on the way: the alarm never sounds, and the camp is not locked down',
+          during: (_sim, events) => {
+            for (const e of events) {
+              if (e.type === 'alarm') seen.raised = true;
+              if (e.type === 'death') seen.died = true;
+            }
+          },
+          after: (sim) => {
+            if (!seen.died) return 'the sentry was never shot';
+            if (seen.raised) return 'an alarm box was reached';
+            if (commanderOf(sim)!.camp.level === 'lockdown') return 'the camp locked down';
+          },
+        },
+      ],
+    };
+  }
   // A search, evaded.
   const hide = HIDES[p.seed % HIDES.length]!;
   const route: Waypoint[] = [
@@ -207,4 +264,24 @@ export function campScenario(params?: string): Scene {
 }
 
 /** The exit test's scripted scenarios, by params (E12): every validated script. */
-export const CAMP_SCENARIOS: readonly string[] = ['script=suspicion&seed=0', 'script=suspicion&seed=1', 'script=search&seed=0', 'script=search&seed=1'];
+/**
+ * The alarm scenario's marksman: scopes in early, and when the sentry at the gate sets off
+ * for the alarm box, fires on him as he runs (lab B's scripted shooter, exact and led).
+ */
+class InterruptDriver {
+  private readonly steps: Step[] = [{ at: 1, act: 'scope' }];
+  private readonly marksman = new MarksmanDriver(this.steps);
+  private armed = false;
+
+  next(sim: Simulation, out: InputFrame): InputFrame {
+    const runner = sim.guards.find((g) => g.guard.spawn === 0);
+    if (!this.armed && runner?.brain?.act === 'alarm') {
+      this.armed = true;
+      const now = sim.tick / sim.tuning.sim.tickHz;
+      for (let k = 0; k < 6; k++) this.steps.push({ at: now + 0.2 + k * 1.4, act: 'fire', target: { post: 0 }, part: 'torso' });
+    }
+    return this.marksman.next(sim, out);
+  }
+}
+
+export const CAMP_SCENARIOS: readonly string[] = ['script=suspicion&seed=0', 'script=suspicion&seed=1', 'script=search&seed=0', 'script=search&seed=1', 'script=alarm&seed=0'];

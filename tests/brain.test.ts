@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { ACTS, choose, type ActName, type GuardMind } from '../src/sim/brain';
+import { EVENTS } from '../src/sim/kernel/events';
 import { emptyMind, guardMind } from '../src/sim/game/guards';
 import { giveBrains } from '../src/sim/game/brains';
 import { PERCEPTION, giveSenses } from '../src/sim/game/perception';
@@ -135,7 +136,7 @@ describe('a guard with a brain', () => {
   });
 
   it('every act it can take is one the events can record', () => {
-    expect([...ACTS]).toEqual(['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover']);
+    expect([...ACTS]).toEqual([...(EVENTS.act.fields.from as { enum: readonly string[] }).enum]);
   });
 });
 
@@ -166,7 +167,7 @@ function hashMind(m: GuardMind, rngWords: readonly number[] | undefined): string
   const t = br.task;
   if (t) h.u32(t.id).str(t.kind).f64(t.x).f64(t.z).u32(t.issued).u32(t.cause);
   else h.u32(0);
-  h.f64(br.fireAt).u32(br.covered ? 1 : 0).f64(br.coverX).f64(br.coverZ);
+  h.f64(br.fireAt).u32(br.covered ? 1 : 0).f64(br.coverX).f64(br.coverZ).f64(br.box).f64(br.useUntil);
   if (rngWords) for (const w of rngWords) h.u32(w);
   return h.digest();
 }
