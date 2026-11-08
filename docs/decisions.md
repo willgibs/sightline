@@ -2,6 +2,50 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-07 · Planning Phase 1
+
+The plan, with each lab's milestones and how its exit test is measured, is `docs/phase-1-plan.md`.
+
+### Seams first, then the labs in two waves
+
+**Decision:** a short Wave 0 lands on `main` before any lab branch opens:
+- brains decide in the 'decide' phase and steer through orders;
+- systems can query bodies and spawn entities inside a tick;
+- one grid search serves generation and the simulation;
+- every lab gets a range of codes;
+- all seven guard roles exist.
+
+Then labs A, B and D run in parallel sessions, and C and E follow once A's percepts land.
+
+**Why:** these are the seams that more than one lab would otherwise build its own way:
+- A's hearing, D's analysis and E's navigation all search the grid;
+- A's sight, B's bullets and E's reinforcements all need bodies and spawning inside a tick.
+
+Landed once, before the branches, they turn merges of meaning into merges of text.
+
+### One merge at a time, and goldens regenerated
+
+**Decision:**
+- Labs land on `main` one merge at a time, from branches that are up to date with it.
+- Golden values and the golden recording are regenerated after each rebase, never merged by hand.
+- Version numbers are taken at merge time.
+- Changes that move every golden land alone, and are announced.
+- Event and command codes come from a range per lab, and a test keeps them unique.
+
+**Why:** two pull requests that are each green on their own can leave `main`'s golden values wrong. Codes are permanent once recorded. Two branches that picked the same one would make recordings ambiguous.
+
+### Camp analysis sees with its own model
+
+**Decision:** lab D's analysis and validation use a sight model of their own, in `tuning.gen`. A scenario-runner check holds it to lab A's detection at sampled points.
+
+**Why:** generation reads only `tuning.gen`. Copying lab A's numbers there would make every retune of perception change every valley and bump `GEN_VERSION`.
+
+### One overlook doesn't clear a camp
+
+**Decision:** validation gains a rule, "no single perch wins". Its starting values are in the plan (D8). Lab E proves the rule from the other side: a scripted, perfect shooter on the best perch must be stopped by the camp's response before it finishes the objective.
+
+**Why:** the owner found today's compound too easy to clear from a single overlook. Sniping stays central, but a long-range plan has to relocate, split clusters or time its shots.
+
 ## 2026-11-07 · Handing over to Phase 1
 
 Phase 1 is planned and built in fresh Claude Code sessions, which know only what the repository holds. `docs/phase-1-handoff.md` is where they start.

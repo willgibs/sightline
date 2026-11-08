@@ -1,6 +1,6 @@
 # Sightline · Game Design & Build Plan
 
-> **This is a copy.** The design doc lives at [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), and the live doc wins wherever the two differ. This is its revision 36, exported on Nov 7, 2026, for sessions that can't open it, such as a Claude Code session without the Claude Docs connector. The live doc's four diagrams are written out here as text. Don't edit this copy to change the design: change the live doc, or propose the change to the owner, then export it again over this file.
+> **This is a copy.** The design doc lives at [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), and the live doc wins wherever the two differ. This is its revision 37, exported on Nov 7, 2026, for sessions that can't open it, such as a Claude Code session without the Claude Docs connector. The live doc's four diagrams are written out here as text. Don't edit this copy to change the design: change the live doc, or propose the change to the owner, then export it again over this file.
 
 Nov 7, 2026 · @Will Gibson
 
@@ -338,6 +338,7 @@ Every camp must pass all of these:
   - infiltration: a path to the objective with exposure under the threshold;
   - systems: a reachable sabotage target (generator, radio or alarm) that materially changes the camp.
 - **No unsolvable cluster:** each has a timing window or a way to split it.
+- **No single-perch win:** no one perch sees most of the guards, or the target for long, so a long-range plan has to relocate, split clusters or time its shots.
 - **An interceptable escape:** the target's escape route crosses a perch's sightline or passes a sabotage point.
 - **Two or more exfil routes.**
 - **Budgets hold:** at most 16 active guards, within the frame-time budget.
@@ -571,6 +572,7 @@ Each lab is an isolated wireframe scene, built to its final quality bar before i
   - recordings that seek exactly.
 
   Sound is timed against the picture, and footsteps and the head bob land on the stride. Playtests are kept as they are played, summarized with `npm run playtest`, and watched in a replay viewer, the base of the debrief replay. Every push checks that the simulation gives the same bits in Chrome's, Firefox's and Safari's engines and in Bun. The plan and its status are in `docs/foundation-plan.md` in the repository.
+- **Phase 1 · Core labs (planned Nov 7):** a short pass of shared seams lands first. Then labs A (perception), B (shooting) and D (camps) run in parallel, and C (movement) and E (camp brain) follow once A's percepts land. The owner runs the blind trials; an agent reviews lab D's camps and the owner checks three. The plan, its status and how each exit test is measured are in `docs/phase-1-plan.md` in the repository.
 - **Phase 2 · Core mission:** brief, insert, recon with the auto-annotated map, execute, exfil and the debrief replay, on generated camps. Nothing moves on until Concept proven passes.
 - **Phase 3 · Enhance in every direction:** four parallel tracks. Depth adds tools, weapons, night, weather, more archetypes and objectives. Adaptation adds doctrine, operations, unlocks and scoring. Look starts with look tests on proven camps, then modules, characters and animation. Sound adds production audio, voiced barks and the score.
 - **Phase 4 · Ship:** an onboarding mission, settings and accessibility, performance, the daily contract with a leaderboard, share cards and the desktop wrapper evaluation.
@@ -640,6 +642,8 @@ Calls 1–3 shape the core and have working defaults; the rest are deliberately 
 
 | Date | Decision | Outcome |
 | --- | --- | --- |
+| Nov 7, 2026 | Phase 1 plan | Owner's calls: the labs run in two parallel waves after a short pass of shared seams; the owner runs the blind trials; an agent reviews lab D's camps and the owner checks three; the core archetype is a compound |
+| Nov 7, 2026 | Sniping's limits | Owner: one overlook must never clear a camp. Validation gains a no-single-perch-win rule, and lab E tests it against a perfect shooter |
 | Nov 7, 2026 | Phase 0 gate | Passed. The owner played it at 120 fps on a Mac. Whether movement feels deliberate enough gets judged once there's more gameplay. |
 | Nov 7, 2026 | Wireframe look | Approved by the owner as the canvas for Phases 1–2 |
 | Nov 7, 2026 | Perspective and platform | Owner's call: first-person; browser-first, with a desktop wrapper later |

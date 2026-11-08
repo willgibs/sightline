@@ -10,9 +10,10 @@ The foundation pass that followed is done.
 - `docs/foundation-plan.md` is its record: milestones M1–M10, what is deliberately left to the labs, and the Horizons (futures that may shape interfaces, never add features).
 - Only the owner's check on his Mac is still open.
 
-**Now: plan Phase 1.**
-- Start with `docs/phase-1-handoff.md`. It says where things stand, what each lab starts from, what planning needs to settle, and the gotchas.
-- Write the Phase 1 plan as its own file in `docs/`, and keep its checkboxes current as work lands, as the foundation plan was kept.
+**Now: Phase 1, planned on Nov 7 in `docs/phase-1-plan.md`.**
+- Wave 0 comes first: one session lands the shared seams on `main`, one change at a time. Then labs A, B and D run in parallel, each in its own session, branch and pull request. C and E follow once A's percepts land.
+- A lab session starts from this file, `docs/phase-1-handoff.md` (what each lab starts from, and the gotchas) and its lab's section of the plan. The plan's rules for landing on `main` apply to every branch.
+- Keep the plan's checkboxes current as work lands, as the foundation plan was kept.
 
 **Phase 1:** five labs, each an isolated wireframe scene built to its exit test.
 

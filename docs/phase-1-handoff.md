@@ -1,12 +1,14 @@
 # Phase 1: start here
 
+> **Planning is done.** The plan is `docs/phase-1-plan.md`. It holds each lab's milestones, the rules for landing on `main` and how each exit test is measured. This file still says what each lab starts from, and its gotchas hold.
+
 Written on Nov 7, 2026, at the end of the session that ran the foundation pass, so that a new session can plan and build Phase 1 without it. Read `CLAUDE.md` first (Claude Code loads it by itself), then this, then the design doc's Part 2 sections for the lab at hand.
 
 ## Where things stand
 
 - **Phase 0 passed its gate,** Engine runs, on Nov 7, 2026. The **foundation pass** that followed is done: `docs/foundation-plan.md` records each milestone (M1–M10), what was deliberately left to the labs, and the Horizons.
 - **One item waits on the owner:** checking the deployed build on his Mac with the screen in view. That means frame rate, sound, the runs the game keeps, and a replay. It doesn't block planning.
-- **Phase 1 hasn't started.** No lab has a plan, a branch or a scene yet. The next step is to plan Phase 1 with the owner.
+- **Phase 1 is planned** (`docs/phase-1-plan.md`), and no lab has a branch or a scene yet.
 - **`main` is green** at the commit that added this file.
   - CI runs the check on Linux, macOS and Windows, and a 20-minute run gives the same hash on all three (`e9311dda2ac00379`).
   - A 40-hour fuzz run passed, and Chromium, Firefox, WebKit and Bun all give the golden values.
@@ -106,7 +108,7 @@ The foundation pass widened the interfaces every lab extends, so each lab builds
 
 ## What planning needs to settle
 
-These questions are for the planning conversation with the owner. None has been decided.
+These were settled when Phase 1 was planned, on Nov 7, 2026. `docs/phase-1-plan.md` has the answers.
 
 - **Order and overlap.** The design doc lets the labs run in parallel, and its risk table puts the perception lab first. They depend on each other:
   - E's brains act on A's percepts.

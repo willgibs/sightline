@@ -2,11 +2,12 @@
 
 A first-person stealth-sniper game. Each mission is a freshly generated enemy camp that you scout, plan against and take apart your own way.
 
-**Where it stands:** Phase 0 · Foundations passed its gate on Nov 7, 2026, and the foundation pass after it is done. That gives a deterministic simulation, a walkable wireframe valley, and the tooling every later system builds on. Phase 1, five labs, is being planned; [docs/phase-1-handoff.md](docs/phase-1-handoff.md) is where to start.
+**Where it stands:** Phase 0 · Foundations passed its gate on Nov 7, 2026, and the foundation pass after it is done. That gives a deterministic simulation, a walkable wireframe valley, and the tooling every later system builds on. Phase 1, five labs, is planned in [docs/phase-1-plan.md](docs/phase-1-plan.md): a short pass of shared seams, then the labs in two waves.
 
-The design lives in the [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), with a copy in [docs/design-doc.md](docs/design-doc.md). Three other documents record the work so far:
+The design lives in the [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), with a copy in [docs/design-doc.md](docs/design-doc.md). Four other documents record the work so far:
 - [docs/phase-0-report.md](docs/phase-0-report.md): Phase 0.
 - [docs/foundation-plan.md](docs/foundation-plan.md): the pass after it.
+- [docs/phase-1-plan.md](docs/phase-1-plan.md): Phase 1, its labs and their status.
 - [docs/decisions.md](docs/decisions.md): the reasoning behind each change.
 
 ![The first view: a valley overlook with the camp below](docs/images/overlook.png)
