@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { dtanDeg } from '../src/sim/core/detmath';
-import { generateWorld, type World } from '../src/sim/gen/world';
-import { neutralInput } from '../src/sim/input';
-import { missionSpec } from '../src/sim/mission';
-import { Simulation } from '../src/sim/sim';
-import { Blocks, circleOverlaps } from '../src/sim/world/colliders';
-import { makeTerrainSample } from '../src/sim/world/heightfield';
+import { dtanDeg } from '../src/sim/kernel/core/detmath';
+import { generateWorld } from '../src/sim/generation/world';
+import type { World } from '../src/sim/kernel/world/world';
+import { neutralInput } from '../src/sim/kernel/input';
+import { missionSpec } from '../src/sim/kernel/mission';
+import { Simulation } from '../src/sim/game/sim';
+import { Blocks, circleOverlaps } from '../src/sim/kernel/world/colliders';
+import { makeTerrainSample } from '../src/sim/kernel/world/heightfield';
 
 /**
  * Ground too steep to stand on is a barrier from every angle, on real valleys. Before the

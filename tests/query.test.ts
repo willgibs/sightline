@@ -1,15 +1,17 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { Rng } from '../src/sim/core/rng';
-import { generateWorld, type World } from '../src/sim/gen/world';
-import { neutralInput } from '../src/sim/input';
-import { missionSpec } from '../src/sim/mission';
-import type { BodyState } from '../src/sim/motor/body';
-import { bodyShape, emptyShape, rayCapsule, raySphere, type Capsule, type Sphere } from '../src/sim/motor/shape';
-import { Simulation } from '../src/sim/sim';
-import { Blocks } from '../src/sim/world/colliders';
-import { emptyHit, raycast, sightLine, type QueryBody } from '../src/sim/world/query';
-import { Surface } from '../src/sim/world/surfaces';
+import { Rng } from '../src/sim/kernel/core/rng';
+import { generateWorld } from '../src/sim/generation/world';
+import type { World } from '../src/sim/kernel/world/world';
+import { neutralInput } from '../src/sim/kernel/input';
+import { missionSpec } from '../src/sim/kernel/mission';
+import type { BodyState } from '../src/sim/body/body';
+import { bodyShape } from '../src/sim/body/shape';
+import { emptyShape, rayCapsule, raySphere, type Capsule, type Sphere } from '../src/sim/kernel/world/shape';
+import { Simulation } from '../src/sim/game/sim';
+import { Blocks } from '../src/sim/kernel/world/colliders';
+import { emptyHit, raycast, sightLine, type QueryBody } from '../src/sim/kernel/world/query';
+import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testWorld, viewOf } from './fixtures';
 
 const n = { x: 0, y: 0, z: 0 };

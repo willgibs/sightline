@@ -1,15 +1,18 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning } from '../src/config/tuning';
-import { WanderBot } from '../src/sim/bots/wander';
-import { generateWorld, type World } from '../src/sim/gen/world';
-import { neutralInput } from '../src/sim/input';
-import { missionSpec } from '../src/sim/mission';
-import { ByteReader, ByteWriter, RecordingFormatError, concat } from '../src/sim/record/bytes';
-import { Recorder, Recording, RECORDING_VERSION } from '../src/sim/record/recording';
-import { resimulate } from '../src/sim/record/resim';
-import { ReplaySeeker } from '../src/sim/record/seek';
-import { Simulation } from '../src/sim/sim';
-import { SYSTEMS, withSystem, type System } from '../src/sim/systems';
+import { WanderBot } from '../src/sim/game/bots/wander';
+import { generateWorld } from '../src/sim/generation/world';
+import type { World } from '../src/sim/kernel/world/world';
+import { neutralInput } from '../src/sim/kernel/input';
+import { missionSpec } from '../src/sim/kernel/mission';
+import { ByteReader, ByteWriter, RecordingFormatError, concat } from '../src/sim/kernel/record/bytes';
+import { Recorder, Recording, RECORDING_VERSION } from '../src/sim/kernel/record/recording';
+import { resimulate } from '../src/sim/kernel/record/resim';
+import { ReplaySeeker } from '../src/sim/kernel/record/seek';
+import { SIGHTLINE, Simulation } from '../src/sim/game/sim';
+import { SYSTEMS } from '../src/sim/game/systems';
+import { player } from '../src/sim/game/entities';
+import { withSystem, type System } from '../src/sim/kernel/systems';
 import { tuningCopy } from './fixtures';
 
 let world: World;
@@ -104,10 +107,10 @@ describe('re-simulating a recording', () => {
       }
     });
     expect(rec.tuningChanges().map((c) => c.tick)).toEqual([301]);
-    expect(resimulate(Recording.fromBytes(rec.toBytes()), { world }).ok).toBe(true);
+    expect(resimulate(Recording.fromBytes(rec.toBytes()), { game: SIGHTLINE, world }).ok).toBe(true);
     // Without the change the run diverges, and the checkpoint says where.
     const stripped = new Recording(rec.header, { ...rec.tracks, TUNE: new TextEncoder().encode('[]') });
-    const result = resimulate(stripped, { world });
+    const result = resimulate(stripped, { game: SIGHTLINE, world });
     expect(result.ok).toBe(false);
     expect(result.firstDivergence).toBe(600);
     expect(result.divergedParts).toContain('player:1');
@@ -128,15 +131,15 @@ describe('re-simulating a recording', () => {
     });
     expect(rec.tuningChanges()).toHaveLength(1);
     expect(rec.tuningChanges()[0]!.tuning.bodies.player.accel).toBe(12);
-    expect(resimulate(rec, { world }).ok).toBe(true);
+    expect(resimulate(rec, { game: SIGHTLINE, world }).ok).toBe(true);
   });
 
   it('says why a recording from another build or another valley cannot be compared', () => {
     const { rec } = play(60);
     const older = new Recording({ ...rec.header, simVersion: rec.header.simVersion - 1, build: 'abc123' }, rec.tracks);
-    expect(resimulate(older, { world }).problem).toMatch(/simulation .* abc123/);
+    expect(resimulate(older, { game: SIGHTLINE, world }).problem).toMatch(/simulation .* abc123/);
     const elsewhere = generateWorld(missionSpec('KOR-1188'), defaultTuning);
-    expect(resimulate(rec, { world: elsewhere }).problem).toMatch(/different valley/);
+    expect(resimulate(rec, { game: SIGHTLINE, world: elsewhere }).problem).toMatch(/different valley/);
   });
 });
 
@@ -145,8 +148,11 @@ describe('a run that ends in a fault', () => {
   const faulty: System = {
     name: 'faulty',
     phase: 'world',
+    reads: ['player.body'],
+    writes: ['player.body.x'],
+    emits: [],
     run(ctx) {
-      ctx.index.player.body.x += 0.25;
+      player(ctx.index).body.x += 0.25;
       if (ctx.tick === 40) throw new Error('the door has no hinge');
     },
   };
@@ -179,15 +185,15 @@ describe('a run that ends in a fault', () => {
     const { rec } = faulted();
     expect(rec.header.ticks).toBe(40);
     expect(rec.header.fault).toEqual({ tick: 40, system: 'faulty', message: 'the door has no hinge' });
-    const re = resimulate(rec, { world, systems });
+    const re = resimulate(rec, { game: SIGHTLINE, world, systems });
     expect(re.ok, JSON.stringify(re)).toBe(true);
     expect(re.fault).toEqual({ expected: 'faulty: the door has no hinge', got: 'faulty: the door has no hinge' });
     // Without the system that failed, the fault doesn't reproduce.
-    const plain = resimulate(rec, { world });
+    const plain = resimulate(rec, { game: SIGHTLINE, world });
     expect(plain.ok).toBe(false);
     expect(plain.fault?.got).toBe(null);
     // The replay shows everything up to the tick before.
-    expect(new ReplaySeeker(rec, { world }).ticks).toBe(39);
+    expect(new ReplaySeeker(rec, { game: SIGHTLINE, world }).ticks).toBe(39);
   });
 
   it('is cleared by restoring a save-state', () => {
@@ -211,7 +217,7 @@ describe('seeking in a recording', () => {
         r.tuningChanged(sim);
       }
     });
-    const seeker = new ReplaySeeker(rec, { world });
+    const seeker = new ReplaySeeker(rec, { game: SIGHTLINE, world });
     for (const tick of [1200, 0, 777, 150, 151, 499, 500, 501, 1199, 3, 1000]) {
       expect(seeker.seek(tick).hash(), `tick ${tick}`).toBe(hashes[tick]);
     }

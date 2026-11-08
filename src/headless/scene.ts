@@ -9,9 +9,9 @@
  */
 import { writeFileSync } from 'node:fs';
 import { defaultTuning } from '../config/tuning';
-import { resimulate } from '../sim/record/resim';
-import { runScene } from '../sim/scene';
-import { SCENES } from '../sim/scenes';
+import { resimulate } from '../sim/kernel/record/resim';
+import { runScene } from '../sim/kernel/scene';
+import { SCENES } from '../sim/game/scenes';
 import { fmt, parseArgs } from './args';
 import { buildStamp } from './build';
 

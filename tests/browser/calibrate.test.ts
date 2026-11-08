@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LOUDNESS_TRIM_DB, footstep, gaitBand, makeNoiseBuffers, makeRand, type GaitBand } from '../../src/audio/voices';
-import { SURFACE_NAMES } from '../../src/sim/world/surfaces';
+import { SURFACE_NAMES } from '../../src/sim/kernel/world/surfaces';
 
 /**
  * Footstep voice calibration (not a test): measures how loud every surface and gait comes

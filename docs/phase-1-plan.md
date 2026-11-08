@@ -88,7 +88,7 @@ Several branches change the same goldens, versions and registries at once. W0.7 
 
 - **One merge at a time,** from a branch that is up to date with `main` and green there. Two pull requests that are each green on their own can still leave `main`'s golden values wrong. W0.7 enforces this with a merge queue, or a branch rule where the repository's plan has no queue.
 - **Goldens are regenerated after a rebase, never merged by hand.** That means:
-  - `GOLDEN` in `src/sim/selftest.ts`;
+  - `GOLDEN` in `src/sim/game/selftest.ts`;
   - `GOLDEN_TAL_4471` in `tests/world.test.ts`;
   - each lane's pinned scenes;
   - the golden recording (`npm run golden`).
@@ -225,7 +225,7 @@ The statistics behind these protocols are in `docs/research/foundations.md`. A p
   - repair fixes the rest within its iteration budget;
   - each seed reports how close it came to that budget.
 
-  The default series is the one D tunes against, so the gate runs on another. Today's `attempt` counts re-rolls of the whole world (`src/sim/gen/world.ts`); D counts camp attempts and repairs separately.
+  The default series is the one D tunes against, so the gate runs on another. Today's `attempt` counts re-rolls of the whole world (`src/sim/generation/world.ts`); D counts camp attempts and repairs separately.
 - **Before any review, the simulation proves diversity.**
   - Restricted-play bots (long range only, infiltration only, systems only) find each camp's best plans.
   - The plans are clustered by signature: the opening perch or approach, the first target, how the first cluster is split, and the tool or timing that does it.
@@ -288,7 +288,7 @@ The kernel boundary goes first, so everything after it lands in its final place.
 - [x] W0.1 · This plan, the foundation's shape, the research, and the pointers to them.
   - In the repository: `CLAUDE.md`, the README, the handoff and `decisions.md`.
   - In the design doc: its phase notes, its validation rule, the owner's calls on sight, hearing and light, and its decision log.
-- [ ] W0.2 · The kernel boundary and lanes, behaviour-preserving. Every golden holds.
+- [x] W0.2 · The kernel boundary and lanes, behaviour-preserving. Every golden holds.
   - `src/sim` splits into the kernel, one directory per lane (each with one `index.ts`), and the game.
   - The lane map, as data, drives the architecture test.
   - Every system declares what it reads, writes and emits, with one writer per state subtree. A test fails when two systems in a phase touch the same path with no declared order.
@@ -305,7 +305,7 @@ The kernel boundary goes first, so everything after it lands in its final place.
   - A scene pins the tick on which a spawned body first exists, for the motor and for perception.
   - Today systems can't see bodies' shapes, and `sim.spawn` works only between ticks.
   - Behaviour doesn't change.
-- [ ] W0.5 · Grid search over both layers of the spatial grid (`world/grid.ts`).
+- [ ] W0.5 · Grid search over both layers of the spatial grid (`kernel/world/grid.ts`).
   - Bounded Dijkstra with a bucket queue, and A\*.
   - A cost per edge, and a fixed neighbour order.
   - Budgeted by iterations (rule 18), deterministic.
@@ -354,7 +354,7 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
 - [ ] A1 · The lab scene.
   - It holds a sentry, a patrol, a marksman post, cover, shade, a skyline ridge, gravel and grass, and a generator.
   - It grows with each milestone.
-  - Handmade worlds have no foliage yet (`gen/handmade.ts`), so the scene adds it or uses generated terrain.
+  - Handmade worlds have no foliage yet (`generation/handmade.ts`), so the scene adds it or uses generated terrain.
 - [ ] A2 · Sight: the detection meter, restructured (owner, Nov 7).
   - Stance and light are range caps, and peripheral vision is a short-range zone. Time grows linearly with distance inside each zone, and each edge ramps over a few metres instead of a cliff.
   - Rays go to head, chest and feet, with a minimum number clear per stance.
@@ -364,7 +364,7 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - Rates per second (rule 17), in `tuning.perception`.
   - Its debug overlay: zones at their real ranges, rays to the three parts, and the factors.
 - [ ] A3 · The scenario runner (see The three tools).
-  - Scenes take no parameters today, and a recording's header names its scene by exactly `{name, version}` (`record/recording.ts`). Parameters therefore join the scene's identity.
+  - Scenes take no parameters today, and a recording's header names its scene by exactly `{name, version}` (`kernel/record/recording.ts`). Parameters therefore join the scene's identity.
   - Its first table sweeps the design doc's ranges over the factor grid, asserting monotonicity and the minimum interval from cue to detection.
 - [ ] A4 · Shade and foliage, drawn as simulated.
   - Each body's lit state comes from the simulation, in the snapshot.
@@ -375,7 +375,7 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
 - [ ] A5 · Hearing, with one law of sound (owner, Nov 7).
   - A bounded flood on the site grid (W0.5), once per sound, which every listener and the player's speakers read at their own cell.
   - A second, through-wall route that loses a set number of decibels per wall, as in Rainbow Six Siege. The louder route wins.
-  - Masking by the steady sources in `world/ambient.ts`, as a shift of the hearing threshold.
+  - Masking by the steady sources in `generation/ambient.ts`, as a shift of the hearing threshold.
   - A heard sound gives a guess, not a fix. It arrives from the doorway it came through, blurred by how much longer its path was than a straight line, with the error drawn from the guard's own stream.
   - The crack comes from the point the bullet's shock cone predicts, about 55–62° off the shooter's true bearing, scheduled at its exact arrival (B8).
   - No offscreen bias: anything unfair gets a cue.
@@ -446,7 +446,7 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
   - Each bullet's path is swept between two ticks' poses against each body part, the terrain and the colliders. A path bends about 1.4 mm in a tick, so there is no sub-stepping. Hit and impact events follow.
   - A headshot kills. A torso shot kills an unarmored guard, but may let the guard cry out first (drawn from the guard's own stream).
   - A killed guard leaves a body, spawned within the tick (W0.4).
-- [ ] B5 · Bob: whether walking bodies bob in the simulation, and whether a shot leaves from the bobbing eye. Decided by measuring at 300 m; `motor/bob.ts` is ready.
+- [ ] B5 · Bob: whether walking bodies bob in the simulation, and whether a shot leaves from the bobbing eye. Decided by measuring at 300 m; `body/bob.ts` is ready.
 - [ ] B6 · Instruments in the honest view, which today has no crosshair.
   - The scope, with its mil reticle and a zero dial in 100 m steps, and mil holds between steps. A target 50 m from the nearest step sits 11–34 cm off.
   - Binoculars with the rangefinder and a wind readout.
@@ -513,7 +513,7 @@ Playable at `?scene=movement-lab`; the movement course stays as a regression tes
   - A chain of circles along the facing, or a capsule, for collision, in place of a 0.3 m circle. It grows over the transition, so it never ends a tick inside anything.
   - It turns by the largest yaw that keeps every part clear, found with a fixed number of bisections, pivoting near the chest.
   - It's pitched from the terrain under head and feet.
-  - It moves every golden (the fuzzing bot goes prone, `bots/chaos.ts`), so it lands alone.
+  - It moves every golden (the fuzzing bot goes prone, `game/bots/chaos.ts`), so it lands alone.
 - [ ] C3 · Lean.
   - The eye sits at the centre of the simulated head that guards target.
   - A peek exposes one eye; a lean with the weapon goes far enough to clear the corner (Ground Branch).
@@ -717,7 +717,7 @@ These add to the handoff's list.
 - **Generation reads only `tuning.gen`,** which is why D7 has its own sight model.
 - **Scenes take no parameters,** and a recording names its scene by exactly `{name, version}` (A3).
 - **Handmade worlds have no foliage** (A1).
-- **The recording's 10 Hz state track stores five values per guard.** In-browser replays re-simulate, so a new guard cue needs only `GUARD_FIELDS` and `snapshot()` in `src/sim/sim.ts`.
+- **The recording's 10 Hz state track stores five values per guard.** In-browser replays re-simulate, so a new guard cue needs only `GUARD_FIELDS` and `snapshot()` in `src/sim/game/sim.ts`, and the state track's sample in `src/sim/game/samples.ts`.
 - **`sightline.generate()` ignores the seed inside a scene.** The start screen also has no scene picker, so a lab is reached by `?scene=<name>`.
 - **Time scaling exists only in the debug view,** with no automation hook (A10 adds one).
 - **The fuzzing bot goes prone,** so C2 moves every golden.

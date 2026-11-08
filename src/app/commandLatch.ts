@@ -1,4 +1,4 @@
-import { MAX_LAG, type Command } from '../sim/commands';
+import { MAX_LAG, type Command } from '../sim/kernel/commands';
 
 /**
  * Turns clicks into commands that remember what was on screen.

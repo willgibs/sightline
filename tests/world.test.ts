@@ -1,9 +1,10 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning } from '../src/config/tuning';
-import { closestOnPolyline, type PathHit } from '../src/sim/gen/paths';
-import { generateWorld, worldFingerprint, type World } from '../src/sim/gen/world';
-import { makeTerrainSample } from '../src/sim/world/heightfield';
-import { missionSpec } from '../src/sim/mission';
+import { closestOnPolyline, type PathHit } from '../src/sim/generation/paths';
+import { generateWorld, worldFingerprint } from '../src/sim/generation/world';
+import type { World } from '../src/sim/kernel/world/world';
+import { makeTerrainSample } from '../src/sim/kernel/world/heightfield';
+import { missionSpec } from '../src/sim/kernel/mission';
 
 const fingerprint = worldFingerprint;
 

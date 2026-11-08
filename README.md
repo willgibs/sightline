@@ -113,16 +113,19 @@ To watch a run, drop its recording on the page, pick it from the start screen (W
 ```
 src/config/tuning.ts   every gameplay number and content definition, hot-reloadable
 src/sim/               the simulation: pure TypeScript, no rendering, no DOM, deterministic
-  core/                fixed-step clock, seeded RNG, deterministic math, hashing, seeds
-  gen/                 the valley, sites, the camp, routines, analysis and validation
-  world/               heightfield, colliders and solids, the world query, the grid, surfaces
-  motor/               the shared motor every body moves with, body shapes, the head bob
-  entities/            the player and the guards
-  ai/                  brains, behind the perception boundary (a guard knows only his mind)
-  perception/          how visible a body is
-  record/              recordings, re-simulation and exact seeking
-  scenes/              scenes: hand-built worlds with rules and expectations
-  bots/                scripted players and the invariant watch for headless runs
+  lanes.ts             the lane map: which layer may import which (docs/foundation-shape.md)
+  kernel/              runs any game, imports nothing else
+    core/              fixed-step clock, seeded RNG, deterministic math, hashing, seeds
+    world/             heightfield, colliders and solids, the world query, the grid, surfaces
+    record/            recordings, re-simulation and exact seeking
+    *.ts               the state tree, the tick and its declared access, events and commands,
+                       input, the environment and sound, the scene harness, the kernel alone
+  generation/          lane: the valley, sites, the camp, routines, analysis and validation
+  body/                lane: the shared motor every body moves with, body shapes, the head bob
+  perception/          lane: how visible a body is, and percepts
+  brain/               lane: brains, behind the perception boundary (a guard knows only his mind)
+  ballistics/          lane: empty until lab B
+  game/                Sightline: the player and guards, its systems, setup, scenes, bots, self-test
 src/render/            three.js wireframe renderer; reads snapshots, never writes
 src/audio/             the sound engine and its voices
 src/app/               the browser loop, input and actions, HUD, overlay, sound, playtests, replays

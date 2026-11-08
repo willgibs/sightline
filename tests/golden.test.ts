@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { Recording } from '../src/sim/record/recording';
-import { resimulate } from '../src/sim/record/resim';
+import { Recording } from '../src/sim/kernel/record/recording';
+import { resimulate } from '../src/sim/kernel/record/resim';
+import { SIGHTLINE } from '../src/sim/game/sim';
 
 /**
  * A recording kept in the repository, re-simulated bit for bit: the loader, the input
@@ -13,7 +14,7 @@ describe('the golden recording', () => {
   const rec = Recording.fromBytes(new Uint8Array(readFileSync('tests/golden/TAL-4471-wander.slrec')));
 
   it('re-simulates bit for bit', () => {
-    const result = resimulate(rec);
+    const result = resimulate(rec, { game: SIGHTLINE });
     expect(result.problem).toBeNull();
     expect(result.firstDivergence).toBeNull();
     expect(result.ok).toBe(true);

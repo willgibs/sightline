@@ -1,12 +1,14 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning } from '../src/config/tuning';
-import { WanderBot } from '../src/sim/bots/wander';
-import { generateWorld, type World } from '../src/sim/gen/world';
-import { neutralInput } from '../src/sim/input';
-import { Recorder, Recording } from '../src/sim/record/recording';
-import { resimulate } from '../src/sim/record/resim';
-import { Simulation } from '../src/sim/sim';
-import { missionSpec } from '../src/sim/mission';
+import { WanderBot } from '../src/sim/game/bots/wander';
+import { generateWorld } from '../src/sim/generation/world';
+import type { World } from '../src/sim/kernel/world/world';
+import { neutralInput } from '../src/sim/kernel/input';
+import { Recorder, Recording } from '../src/sim/kernel/record/recording';
+import { resimulate } from '../src/sim/kernel/record/resim';
+import { SIGHTLINE, Simulation } from '../src/sim/game/sim';
+import { missionSpec } from '../src/sim/kernel/mission';
+import { readSample, sampleCount } from '../src/sim/game/samples';
 
 let world: World;
 beforeAll(() => {
@@ -44,12 +46,12 @@ describe('recordings', () => {
     expect(back.header).toEqual(rec.header);
     expect(back.tracks).toEqual(rec.tracks);
     expect(back.readEvents()).toEqual(rec.readEvents());
-    expect(back.stateCount).toBe(60 * 10);
+    expect(sampleCount(back)).toBe(60 * 10);
   });
 
   it('store the state at 10 Hz', () => {
     const { sim, rec } = play(30);
-    const last = rec.readState(rec.stateCount - 1);
+    const last = readSample(rec, sampleCount(rec) - 1);
     expect(last.tick).toBe(sim.tick);
     expect(last.px).toBeCloseTo(sim.player.x, 3);
     expect(last.pz).toBeCloseTo(sim.player.z, 3);
@@ -58,7 +60,7 @@ describe('recordings', () => {
 
   it('re-simulate bit for bit', () => {
     const { rec } = play(120);
-    const result = resimulate(Recording.fromBytes(rec.toBytes()), { world });
+    const result = resimulate(Recording.fromBytes(rec.toBytes()), { game: SIGHTLINE, world });
     expect(result.firstDivergence).toBeNull();
     expect(result.ok).toBe(true);
     expect(result.finalHash).toBe(rec.header.finalHash);
@@ -72,7 +74,7 @@ describe('recordings', () => {
     const at = 900 * 13 + 1;
     bytes[at] = bytes[at] === 127 ? 0 : 127;
     const tampered = new Recording(rec.header, { ...rec.tracks, INPT: bytes });
-    const result = resimulate(tampered, { world });
+    const result = resimulate(tampered, { game: SIGHTLINE, world });
     expect(result.ok).toBe(false);
     expect(result.firstDivergence).toBe(1200); // the first checkpoint after the change
   });
@@ -93,7 +95,7 @@ describe('recordings', () => {
       recorder.record(sim, events);
     }
     const rec = recorder.finish(sim);
-    expect(resimulate(Recording.fromBytes(rec.toBytes()), { world }).ok).toBe(true);
+    expect(resimulate(Recording.fromBytes(rec.toBytes()), { game: SIGHTLINE, world }).ok).toBe(true);
   });
 
   it('refuse to skip a tick', () => {

@@ -1,7 +1,7 @@
-import { Optic, type InputFrame } from '../sim/input';
-import type { Command } from '../sim/commands';
+import { Optic, type InputFrame } from '../sim/kernel/input';
+import type { Command } from '../sim/kernel/commands';
 import { CommandLatch } from './commandLatch';
-import { wrapAngle } from '../sim/core/math';
+import { wrapAngle } from '../sim/kernel/core/math';
 import { ActionMap, type Action, type Context } from './actions';
 
 /**

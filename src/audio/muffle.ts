@@ -1,5 +1,5 @@
-import { Blocks } from '../sim/world/colliders';
-import { sightLine, type QueryView } from '../sim/world/query';
+import { Blocks } from '../sim/kernel/world/colliders';
+import { sightLine, type QueryView } from '../sim/kernel/world/query';
 import type { Muffle, MuffleFn } from './engine';
 
 /**

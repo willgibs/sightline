@@ -1,12 +1,12 @@
 import type { Tuning } from '../config/tuning';
 import { SoundEngine, type ListenerPose, type SoundTiming } from '../audio/engine';
 import { makeMuffle } from '../audio/muffle';
-import { air } from '../sim/env';
-import type { SimEvent } from '../sim/events';
-import type { World } from '../sim/gen/world';
-import type { Simulation } from '../sim/sim';
-import { ambientSources } from '../sim/world/ambient';
-import type { QueryView } from '../sim/world/query';
+import { air } from '../sim/kernel/env';
+import type { SimEvent } from '../sim/kernel/events';
+import type { World } from '../sim/kernel/world/world';
+import type { Simulation } from '../sim/game/sim';
+import { ambientSources } from '../sim/generation';
+import type { QueryView } from '../sim/kernel/world/query';
 
 /**
  * The game's sound: the engine (audio/engine.ts) wired to the run.

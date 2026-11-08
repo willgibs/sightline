@@ -5,7 +5,7 @@
  *   npm run selftest                     Node (V8)
  *   bun src/headless/selftest.ts         Bun (JavaScriptCore, Safari's engine)
  */
-import { runSelfTest } from '../sim/selftest';
+import { runSelfTest } from '../sim/game/selftest';
 
 const now = (): number => globalThis.performance?.now() ?? Date.now();
 const engine = typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined' ? 'Bun (JavaScriptCore)' : `Node ${process.version} (V8)`;

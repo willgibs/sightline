@@ -1,16 +1,16 @@
-import { handmadeMission } from '../src/sim/gen/handmade';
+import { handmadeMission } from '../src/sim/generation/handmade';
 import { describe, expect, it } from 'vitest';
 import { defaultTuning } from '../src/config/tuning';
-import { FixedStepClock } from '../src/sim/core/clock';
-import { datan2, dtanDeg } from '../src/sim/core/detmath';
-import { Hasher } from '../src/sim/core/hash';
-import { Rng } from '../src/sim/core/rng';
-import { neutralInput, quantizeInput, type InputFrame } from '../src/sim/input';
-import { quantYaw } from '../src/sim/quantize';
-import { ByteWriter } from '../src/sim/record/bytes';
-import { Recorder, Recording } from '../src/sim/record/recording';
-import { resimulate } from '../src/sim/record/resim';
-import { Simulation } from '../src/sim/sim';
+import { FixedStepClock } from '../src/sim/kernel/core/clock';
+import { datan2, dtanDeg } from '../src/sim/kernel/core/detmath';
+import { Hasher } from '../src/sim/kernel/core/hash';
+import { Rng } from '../src/sim/kernel/core/rng';
+import { neutralInput, quantizeInput, type InputFrame } from '../src/sim/kernel/input';
+import { quantYaw } from '../src/sim/kernel/quantize';
+import { ByteWriter } from '../src/sim/kernel/record/bytes';
+import { Recorder, Recording } from '../src/sim/kernel/record/recording';
+import { resimulate } from '../src/sim/kernel/record/resim';
+import { SIGHTLINE, Simulation } from '../src/sim/game/sim';
 import { testWorld } from './fixtures';
 
 /**
@@ -58,7 +58,7 @@ describe('input quantization', () => {
       rec.record(sim, sim.step(f));
     }
     const back = Recording.fromBytes(rec.finish(sim).toBytes());
-    expect(resimulate(back, { world }).ok).toBe(true);
+    expect(resimulate(back, { game: SIGHTLINE, world }).ok).toBe(true);
   });
 
   it('keeps non-finite numbers out of the simulation', () => {

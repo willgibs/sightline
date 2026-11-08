@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import type { GuardRole } from '../sim/gen/camp';
-import { GUARD_FIELDS, type Snapshot } from '../sim/sim';
-import { lerp } from '../sim/core/math';
+import type { GuardRole } from '../sim/generation';
+import { GUARD_FIELDS, type Snapshot } from '../sim/game/sim';
+import { lerp } from '../sim/kernel/core/math';
 import type { Tuning } from '../config/tuning';
-import type { BodyState } from '../sim/motor/body';
-import { bodyShape, emptyShape } from '../sim/motor/shape';
+import { bodyShape, type BodyState } from '../sim/body';
+import { emptyShape } from '../sim/kernel/world/shape';
 import { createFlatMaterial, type LookUniforms } from './materials';
 import { palette } from './palette';
 
@@ -19,7 +19,7 @@ interface GuardMesh {
  * Guards as the design doc's wireframe stand-ins: a torso and legs as capsules, a head
  * sphere, a pale visor showing where the head points, and a rifle. Facing has to read at
  * 300 m through a scope, so the visor and rifle carry it. The capsules and the sphere are
- * the body's shape (sim/motor/shape.ts), built from the same numbers sight and hits use,
+ * the body's shape (sim/body/shape.ts), built from the same numbers sight and hits use,
  * and drawn exactly where the body is, so what is drawn is what can be hit. (They don't
  * bob as they walk: the body's shape doesn't. Whether walking bodies bob in the
  * simulation, with sim/motor/bob.ts, is lab B's call for its moving targets.)

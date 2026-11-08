@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { disposeTree } from './dispose';
 import { SolidMeshes } from './solidMeshes';
-import type { DebugShape } from '../sim/debugDraw';
-import { sunDirection } from '../sim/env';
+import type { DebugShape } from '../sim/kernel/debugDraw';
+import { sunDirection } from '../sim/kernel/env';
 import type { Tuning } from '../config/tuning';
-import type { SimEvent } from '../sim/events';
-import type { World } from '../sim/gen/world';
-import type { Snapshot } from '../sim/sim';
+import type { SimEvent } from '../sim/kernel/events';
+import type { World } from '../sim/kernel/world/world';
+import type { Snapshot } from '../sim/game/sim';
 import { DebugLayer } from './debugLayer';
 import { GuardMeshes } from './guardMeshes';
 import { FoliageInteriors } from './interiors';
@@ -38,7 +38,7 @@ export interface RenderStats {
 }
 
 /** Afternoon sun from the south-west, 35° up. */
-/** The sun until a world says where it is (the simulation owns it: sim/env.ts). */
+/** The sun until a world says where it is (the simulation owns it: sim/kernel/env.ts). */
 const NO_WORLD_SUN = new THREE.Vector3(-0.579, 0.574, 0.579).normalize();
 
 export class GameRenderer {
@@ -72,7 +72,7 @@ export class GameRenderer {
     this.scene.add(this.sky, this.worldGroup);
   }
 
-  /** Lights the scene and the sky from the simulation's sun (sim/env.ts). */
+  /** Lights the scene and the sky from the simulation's sun (sim/kernel/env.ts). */
   setSun(dir: { x: number; y: number; z: number }): void {
     this.look.uSunDir.value.set(dir.x, dir.y, dir.z).normalize();
     ((this.sky.material as THREE.ShaderMaterial).uniforms.uSun!.value as THREE.Vector3).set(dir.x, dir.y, dir.z).normalize();

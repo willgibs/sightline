@@ -1,9 +1,9 @@
 import type { Tuning } from '../config/tuning';
-import type { SimEvent } from '../sim/events';
-import { PLAYER_ID } from '../sim/state';
-import { audibility, travelTime } from '../sim/sound';
-import { surfaceName } from '../sim/world/surfaces';
-import type { AmbientSource } from '../sim/world/ambient';
+import type { SimEvent } from '../sim/kernel/events';
+import { PLAYER_ID } from '../sim/game/entities';
+import { audibility, travelTime } from '../sim/kernel/sound';
+import { surfaceName } from '../sim/kernel/world/surfaces';
+import type { AmbientSource } from '../sim/generation';
 import { footstep, humLoop, makeNoiseBuffers, makeRand, rustle, waterLoop, windBed, type Loop, type NoiseBuffers, type Rand } from './voices';
 
 /**
@@ -11,7 +11,7 @@ import { footstep, humLoop, makeNoiseBuffers, makeRand, rustle, waterLoop, windB
  * behaves. It reads events and never writes simulation state (like the renderer).
  *
  * What "behaves correctly" means here (design doc · Audio direction):
- *   - Level follows the simulation's own hearing law (sim/sound.ts): every sound is at the
+ *   - Level follows the simulation's own hearing law (sim/kernel/sound.ts): every sound is at the
  *     threshold of hearing at its radius and fades out just beyond it, so if you can hear
  *     it, a guard where you stand could too.
  *   - Distant sounds arrive late, at the speed of sound.
@@ -71,7 +71,7 @@ export interface AmbientHeard {
 
 export interface SoundOptions {
   tuning: Tuning;
-  /** The mission air's speed of sound (sim/env.ts, air), m/s. Default 343. */
+  /** The mission air's speed of sound (sim/kernel/env.ts, air), m/s. Default 343. */
   speedOfSound?: number;
   muffle?: MuffleFn;
   seed?: number;
@@ -304,7 +304,7 @@ export class SoundEngine {
     return n < MAX_VOICES;
   }
 
-  /** A new world: its fixed sources (sim/world/ambient.ts) and its air's speed of sound (sim/env.ts, air). */
+  /** A new world: its fixed sources (sim/generation/ambient.ts) and its air's speed of sound (sim/kernel/env.ts, air). */
   setWorld(sources: readonly AmbientSource[], speedOfSound: number): void {
     this.speedOfSound = speedOfSound > 0 ? speedOfSound : 343;
     this.setAmbientSources(sources);

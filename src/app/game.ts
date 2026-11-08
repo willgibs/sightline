@@ -1,20 +1,21 @@
 import * as THREE from 'three';
 import type { Tuning } from '../config/tuning';
-import { FixedStepClock } from '../sim/core/clock';
-import { headingDegrees, lerp, moveTowards } from '../sim/core/math';
-import { headBob } from '../sim/motor/bob';
-import { exposure } from '../sim/perception/visibility';
-import { lightAt } from '../sim/env';
-import { generateWorld, simTuningKey, worldTuningKey, type SpawnKind, type World } from '../sim/gen/world';
-import { neutralInput } from '../sim/input';
-import { Recorder, Recording } from '../sim/record/recording';
-import { Simulation, type Snapshot } from '../sim/sim';
-import type { SimEvent } from '../sim/events';
-import { normalizeSeed } from '../sim/core/seed';
-import { Blocks, type Collider } from '../sim/world/colliders';
-import { emptyHit, raycast } from '../sim/world/query';
-import { entityOfCollider } from '../sim/world/solids';
-import { Surface, surfaceName } from '../sim/world/surfaces';
+import { FixedStepClock } from '../sim/kernel/core/clock';
+import { headingDegrees, lerp, moveTowards } from '../sim/kernel/core/math';
+import { headBob } from '../sim/body';
+import { exposure } from '../sim/perception';
+import { lightAt } from '../sim/kernel/env';
+import { generateWorld, simTuningKey, worldTuningKey } from '../sim/generation';
+import type { World } from '../sim/kernel/world/world';
+import { neutralInput } from '../sim/kernel/input';
+import { Recorder, Recording } from '../sim/kernel/record/recording';
+import { Simulation, type Snapshot } from '../sim/game/sim';
+import type { SimEvent } from '../sim/kernel/events';
+import { normalizeSeed } from '../sim/kernel/core/seed';
+import { Blocks, type Collider } from '../sim/kernel/world/colliders';
+import { emptyHit, raycast } from '../sim/kernel/world/query';
+import { entityOfCollider } from '../sim/kernel/world/solids';
+import { Surface, surfaceName } from '../sim/kernel/world/surfaces';
 import { GameRenderer, type CameraPose } from '../render/renderer';
 import type { Action } from './actions';
 import { loadSettings, saveSettings, type Settings } from './settings';
@@ -28,9 +29,10 @@ import { Replay, REPLAY_SOUND_SPEED } from './replay';
 import { Timeline } from './timeline';
 import { frameSpan, type SoundTiming } from '../audio/engine';
 import { FrameStats, percentile } from './perf';
-import { missionSpec } from '../sim/mission';
-import { startScene, type Scene } from '../sim/scene';
-import { SystemProfile } from '../sim/profile';
+import { missionSpec, type SpawnKind } from '../sim/kernel/mission';
+import { startScene } from '../sim/kernel/scene';
+import type { Scene } from '../sim/game/scenes';
+import { SystemProfile } from '../sim/kernel/profile';
 import { BUILD } from './build';
 import { tuningProblems } from '../config/validate';
 
@@ -151,7 +153,7 @@ export class Game {
   /** The rules decided the run during the last ticks: show the outcome once they're drawn. */
   private decided = false;
   private readonly drawnLabels: Array<{ x: number; y: number; text: string; color: string }> = [];
-  /** The scene being played, if any (sim/scene.ts): its world, systems and setup. */
+  /** The scene being played, if any (sim/kernel/scene.ts): its world, systems and setup. */
   private scene: Scene | null;
   /** What the last drawn frame showed, so a paused screen isn't drawn again unchanged. */
   private readonly drawnPose: CameraPose = { x: NaN, y: 0, z: 0, yaw: 0, pitch: 0, fov: 0 };
@@ -809,7 +811,7 @@ export class Game {
 
   /**
    * The camera in your body: interpolated between the last two ticks, with the head bob
-   * of the body's own stride (sim/motor/bob.ts), so the view dips as each step sounds.
+   * of the body's own stride (sim/body/bob.ts), so the view dips as each step sounds.
    * The bob fades out as an optic comes up: through one, the camera is exactly where the
    * simulation's eye is, which is where a shot leaves from.
    */

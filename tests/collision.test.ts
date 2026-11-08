@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Rng } from '../src/sim/core/rng';
-import { Blocks, ColliderSet, pushOutCircle, rayCollider, type RayHit } from '../src/sim/world/colliders';
-import { Heightfield, makeTerrainSample } from '../src/sim/world/heightfield';
-import { Surface } from '../src/sim/world/surfaces';
+import { Rng } from '../src/sim/kernel/core/rng';
+import { Blocks, ColliderSet, pushOutCircle, rayCollider, type RayHit } from '../src/sim/kernel/world/colliders';
+import { Heightfield, makeTerrainSample } from '../src/sim/kernel/world/heightfield';
+import { Surface } from '../src/sim/kernel/world/surfaces';
 
 function plane(size: number, cell: number, f: (x: number, z: number) => number): Heightfield {
   const hf = new Heightfield(size, cell);

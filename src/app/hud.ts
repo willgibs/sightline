@@ -1,4 +1,4 @@
-import { headingDegrees } from '../sim/core/math';
+import { headingDegrees } from '../sim/kernel/core/math';
 import { labelKeys } from './keys';
 import { ActionMap, keysHtml, type Action } from './actions';
 

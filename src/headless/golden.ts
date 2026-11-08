@@ -7,12 +7,12 @@
  */
 import { writeFileSync } from 'node:fs';
 import { defaultTuning } from '../config/tuning';
-import { WanderBot } from '../sim/bots/wander';
-import { generateWorld } from '../sim/gen/world';
-import { neutralInput } from '../sim/input';
-import { missionSpec } from '../sim/mission';
-import { Recorder } from '../sim/record/recording';
-import { Simulation } from '../sim/sim';
+import { WanderBot } from '../sim/game/bots/wander';
+import { generateWorld } from '../sim/generation';
+import { neutralInput } from '../sim/kernel/input';
+import { missionSpec } from '../sim/kernel/mission';
+import { Recorder } from '../sim/kernel/record/recording';
+import { Simulation } from '../sim/game/sim';
 
 export const GOLDEN_RECORDING = 'tests/golden/TAL-4471-wander.slrec';
 

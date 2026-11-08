@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { ChaosBot } from '../src/sim/bots/chaos';
-import { InvariantWatch, OVERLAP_TOLERANCE, STEEP_TOLERANCE, type InvariantReport } from '../src/sim/bots/invariants';
-import { WanderBot } from '../src/sim/bots/wander';
-import { generateWorld } from '../src/sim/gen/world';
-import { neutralInput, type InputFrame } from '../src/sim/input';
-import { missionSpec } from '../src/sim/mission';
-import { Simulation } from '../src/sim/sim';
+import { ChaosBot } from '../src/sim/game/bots/chaos';
+import { InvariantWatch, OVERLAP_TOLERANCE, STEEP_TOLERANCE, type InvariantReport } from '../src/sim/body/invariants';
+import { WanderBot } from '../src/sim/game/bots/wander';
+import { generateWorld } from '../src/sim/generation/world';
+import { neutralInput, type InputFrame } from '../src/sim/kernel/input';
+import { missionSpec } from '../src/sim/kernel/mission';
+import { Simulation } from '../src/sim/game/sim';
 
 /**
  * Long bot runs over real valleys, checking after every tick what the motor promises
- * every body (CLAUDE.md rule 10, src/sim/bots/invariants.ts). One bot plays like a
+ * every body (CLAUDE.md rule 10, src/sim/body/invariants.ts). One bot plays like a
  * person, the other like a fuzzer; the guards keep their routines throughout. The weekly
  * run goes much longer, over fresh valleys (`npm run fuzz`).
  */

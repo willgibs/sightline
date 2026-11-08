@@ -1,19 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { Rng } from '../src/sim/core/rng';
-import { neutralInput, type InputFrame } from '../src/sim/input';
-import { bodyHeight } from '../src/sim/motor/body';
-import { Simulation } from '../src/sim/sim';
-import { Faction, type SolidEntity } from '../src/sim/state';
-import { SYSTEMS, withSystem, type System } from '../src/sim/systems';
-import { Blocks, ColliderSet, footprintExtent, overlapsBody, pushOutCircle, type Collider, type ColliderInput } from '../src/sim/world/colliders';
-import { emptyHit, raycast, sightLine } from '../src/sim/world/query';
-import { ENTITY_SOLID, Solids, entityOfCollider, solidId } from '../src/sim/world/solids';
-import { Surface } from '../src/sim/world/surfaces';
+import { Rng } from '../src/sim/kernel/core/rng';
+import { neutralInput, type InputFrame } from '../src/sim/kernel/input';
+import { bodyHeight } from '../src/sim/body/body';
+import { Simulation } from '../src/sim/game/sim';
+import { Faction, type SolidEntity } from '../src/sim/kernel/state';
+import { SYSTEMS } from '../src/sim/game/systems';
+import { withSystem, type System } from '../src/sim/kernel/systems';
+import { Blocks, ColliderSet, footprintExtent, overlapsBody, pushOutCircle, type Collider, type ColliderInput } from '../src/sim/kernel/world/colliders';
+import { emptyHit, raycast, sightLine } from '../src/sim/kernel/world/query';
+import { ENTITY_SOLID, Solids, entityOfCollider, solidId } from '../src/sim/kernel/world/solids';
+import { Surface } from '../src/sim/kernel/world/surfaces';
 import { EAST, testWorld } from './fixtures';
 
 /**
- * Entities' solid shapes (world/solids.ts): the motor and every query see them exactly as
+ * Entities' solid shapes (kernel/world/solids.ts): the motor and every query see them exactly as
  * they see the world's colliders, they live in the state tree, and a moving one that
  * waits for bodies to clear keeps the motor's invariants.
  */
@@ -158,6 +159,9 @@ describe("entities' solid shapes", () => {
     const gate: System = {
       name: 'test-gate',
       phase: 'world',
+      reads: ['*.body'],
+      writes: ['solid.solid'],
+      emits: [],
       run(ctx) {
         const e = ctx.state.entities.find((x) => x.id === gateId);
         if (!e || e.kind !== 'solid') return;

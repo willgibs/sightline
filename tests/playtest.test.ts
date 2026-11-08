@@ -3,9 +3,9 @@ import { defaultTuning as T } from '../src/config/tuning';
 import { PLAYTEST_NAME } from '../src/headless/playtestInbox';
 import { FrameHistogram } from '../src/app/perf';
 import { PlaytestCapture, type PlaytestStore, type TelemetryReport } from '../src/app/playtest';
-import { neutralInput, quantizeInput } from '../src/sim/input';
-import { Recorder, Recording } from '../src/sim/record/recording';
-import { Simulation } from '../src/sim/sim';
+import { neutralInput, quantizeInput } from '../src/sim/kernel/input';
+import { Recorder, Recording } from '../src/sim/kernel/record/recording';
+import { Simulation } from '../src/sim/game/sim';
 import { EAST, testWorld } from './fixtures';
 
 /**

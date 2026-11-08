@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import type { World } from '../sim/gen/world';
-import type { Bush, Tree } from '../sim/gen/props';
+import type { World } from '../sim/kernel/world/world';
+import type { Bush, Tree } from '../sim/generation';
 import { createFlatMaterial, type LookUniforms } from './materials';
 import { palette } from './palette';
 import { bushGeometry, bushMatrix, canopyGeometry, canopyMatrix } from './worldMeshes';

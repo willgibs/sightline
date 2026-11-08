@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import type { Tuning } from '../config/tuning';
-import { lerp } from '../sim/core/math';
-import { isSound, type SimEvent } from '../sim/events';
-import { PLAYER_ID } from '../sim/state';
-import type { World } from '../sim/gen/world';
-import { GUARD_FIELDS, type Snapshot } from '../sim/sim';
-import { routinePose, type RoutinePose } from '../sim/gen/routine';
-import { Cell } from '../sim/world/grid';
-import { Blocks } from '../sim/world/colliders';
-import type { DebugShape } from '../sim/debugDraw';
+import { lerp } from '../sim/kernel/core/math';
+import { isSound, type SimEvent } from '../sim/kernel/events';
+import { PLAYER_ID } from '../sim/game/entities';
+import type { World } from '../sim/kernel/world/world';
+import { GUARD_FIELDS, type Snapshot } from '../sim/game/sim';
+import { routinePose, type RoutinePose } from '../sim/generation';
+import { Cell } from '../sim/kernel/world/grid';
+import { Blocks } from '../sim/kernel/world/colliders';
+import type { DebugShape } from '../sim/kernel/debugDraw';
 import { disposeTree } from './dispose';
 import { palette } from './palette';
 
@@ -180,7 +180,7 @@ export class DebugLayer {
     }
   }
 
-  /** The fine grid around the camp (sim/world/grid.ts): where bodies can't stand, what stops sound, what is roofed. Built on first use. */
+  /** The fine grid around the camp (sim/kernel/world/grid.ts): where bodies can't stand, what stops sound, what is roofed. Built on first use. */
   setGridVisible(on: boolean): void {
     if (on && !this.grid) this.grid = buildGridPoints(this.world);
     if (this.grid) {

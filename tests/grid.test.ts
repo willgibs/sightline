@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { generateWorld } from '../src/sim/gen/world';
-import { missionSpec } from '../src/sim/mission';
-import { Blocks } from '../src/sim/world/colliders';
-import { Cell, Edge, cellAt, cellIndex, type GridLayer } from '../src/sim/world/grid';
-import { Surface } from '../src/sim/world/surfaces';
+import { generateWorld } from '../src/sim/generation/world';
+import { missionSpec } from '../src/sim/kernel/mission';
+import { Blocks } from '../src/sim/kernel/world/colliders';
+import { Cell, Edge, cellAt, cellIndex, type GridLayer } from '../src/sim/kernel/world/grid';
+import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testWorld } from './fixtures';
 
 const has = (L: GridLayer, x: number, z: number, flag: number): boolean => (L.flags[cellIndex(L, x, z)]! & flag) !== 0;

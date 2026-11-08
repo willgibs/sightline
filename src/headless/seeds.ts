@@ -5,11 +5,11 @@
  *   npm run seeds -- --count 100
  */
 import { defaultTuning } from '../config/tuning';
-import { Rng } from '../sim/core/rng';
-import { randomSeed } from '../sim/core/seed';
-import { generateWorld } from '../sim/gen/world';
+import { Rng } from '../sim/kernel/core/rng';
+import { randomSeed } from '../sim/kernel/core/seed';
+import { generateWorld } from '../sim/generation';
 import { fmt, parseArgs } from './args';
-import { missionSpec } from '../sim/mission';
+import { missionSpec } from '../sim/kernel/mission';
 
 const args = parseArgs(process.argv.slice(2));
 const count = Number(args.get('count') ?? 50);

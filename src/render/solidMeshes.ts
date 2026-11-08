@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { lerp } from '../sim/core/math';
-import type { Snapshot } from '../sim/sim';
-import { Blocks, type Collider } from '../sim/world/colliders';
+import { lerp } from '../sim/kernel/core/math';
+import type { Snapshot } from '../sim/game/sim';
+import { Blocks, type Collider } from '../sim/kernel/world/colliders';
 import { createFlatMaterial, createLineMaterial, type LookUniforms } from './materials';
 import { palette } from './palette';
 
 /**
- * Entities' solid shapes (sim/world/solids.ts) drawn as what they are, until a kind of
+ * Entities' solid shapes (sim/kernel/world/solids.ts) drawn as what they are, until a kind of
  * entity gets a mesh of its own: a box or a cylinder with crisp edges, like the camp's
  * structures, or just its edges if it doesn't block sight (a chain-link gate). Drawn in
  * both views, so nothing solid is ever invisible. Matched by collider id between

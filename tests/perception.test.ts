@@ -1,17 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { Hasher } from '../src/sim/core/hash';
-import { WanderBot } from '../src/sim/bots/wander';
-import { emptyMind, guardMind } from '../src/sim/entities/guards';
-import { generateWorld } from '../src/sim/gen/world';
-import { neutralInput } from '../src/sim/input';
-import { missionSpec } from '../src/sim/mission';
-import { placePlayer } from '../src/sim/scene';
-import { Simulation } from '../src/sim/sim';
-import { SYSTEMS, withSystem, type System } from '../src/sim/systems';
+import { Hasher } from '../src/sim/kernel/core/hash';
+import { WanderBot } from '../src/sim/game/bots/wander';
+import { emptyMind, guardMind } from '../src/sim/game/guards';
+import { generateWorld } from '../src/sim/generation/world';
+import { neutralInput } from '../src/sim/kernel/input';
+import { missionSpec } from '../src/sim/kernel/mission';
+import { placePlayer } from '../src/sim/game/setup';
+import { Simulation } from '../src/sim/game/sim';
+import { SYSTEMS } from '../src/sim/game/systems';
+import { withSystem, type System } from '../src/sim/kernel/systems';
+import { intents } from '../src/sim/body';
+import { player } from '../src/sim/game/entities';
 
 /**
- * The perception boundary (ai/mind.ts): a guard decides from his mind alone. Run the
+ * The perception boundary (brain/mind.ts): a guard decides from his mind alone. Run the
  * same valley twice with the player in two places no guard can perceive; wherever the
  * two runs give a guard the same mind, his decisions must match bit for bit. A brain
  * that peeks at the player's true position fails this.
@@ -28,14 +31,18 @@ function run(place: { x: number; z: number }, extra: System[] = []): Trace {
   const probe: System = {
     name: 'test-probe',
     phase: 'intent',
+    reads: ['guard.body', 'guard.guard', '@intents.guard'],
+    writes: [],
+    emits: [],
+    after: ['guard-routines', ...extra.map((s) => s.name)],
     run(ctx) {
       const tick = new Map<number, { mind: string; decision: string }>();
-      for (const g of ctx.index.guards) {
+      for (const g of ctx.index.of('guard')) {
         const m = guardMind(g, ctx.world, ctx.tuning, ctx.tick, mind);
         const h = new Hasher().u32(m.id).f64(m.self.x).f64(m.self.y).f64(m.self.z).f64(m.self.yaw).f64(m.self.pitch).str(m.self.stance).f64(m.self.speed);
         h.u32(ctx.world.camp.guards.indexOf(m.post)).u32(m.tick).f64(m.time).u32(m.percepts.length);
         for (const p of m.percepts) h.str(p.kind).f64(p.x).f64(p.y).f64(p.z).f64(p.strength).u32(p.cause);
-        const i = ctx.intents.get(g.id)!;
+        const i = intents(ctx).get(g.id)!;
         const d = new Hasher().f64(i.wishX).f64(i.wishZ).str(i.gait).f64(i.yaw).f64(i.pitch).f64(g.guard.headYaw);
         tick.set(g.id, { mind: h.digest(), decision: d.digest() });
       }
@@ -94,9 +101,13 @@ describe('the perception boundary', () => {
     const peek: System = {
       name: 'test-peek',
       phase: 'intent',
+      reads: ['player.body', 'guard.body'],
+      writes: ['guard.guard.headYaw'],
+      emits: [],
+      after: ['player-intent', 'guard-routines'],
       run(ctx) {
-        const g = ctx.index.guards[0]!;
-        const p = ctx.index.player.body;
+        const g = ctx.index.of('guard')[0]!;
+        const p = player(ctx.index).body;
         g.guard.headYaw = Math.atan2(-(p.x - g.body.x), -(p.z - g.body.z)) - g.body.yaw;
       },
     };

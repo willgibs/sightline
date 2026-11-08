@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import type { World } from '../sim/gen/world';
-import type { Bush, Tree } from '../sim/gen/props';
-import type { BoxCollider, Collider } from '../sim/world/colliders';
-import { SURFACE_NAMES } from '../sim/world/surfaces';
+import type { World } from '../sim/kernel/world/world';
+import type { Bush, Tree } from '../sim/generation';
+import type { BoxCollider, Collider } from '../sim/kernel/world/colliders';
+import { SURFACE_NAMES } from '../sim/kernel/world/surfaces';
 import { createFlatMaterial, createLineMaterial, type LookUniforms } from './materials';
 import { palette } from './palette';
 import { createTerrainMaterial } from './terrainMaterial';

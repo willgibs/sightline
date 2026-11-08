@@ -1,5 +1,5 @@
-import type { Recorder } from '../sim/record/recording';
-import type { Simulation } from '../sim/sim';
+import type { Recorder } from '../sim/kernel/record/recording';
+import type { Simulation } from '../sim/game/sim';
 import { FrameHistogram } from './perf';
 
 /**

@@ -1,0 +1,87 @@
+import { intentFor, motorSystem, poseAt, type PoseSample } from '../body';
+import { keepRoutine, type GuardDecision } from '../brain';
+import { dcos, dsin } from '../kernel/core/detmath';
+import { scheduleSystem, type ScheduleHandler, type System } from '../kernel/systems';
+import { player } from './entities';
+import { emptyMind, guardMind } from './guards';
+import { playerIntent } from './player';
+
+/**
+ * Sightline's tick: which lanes' systems run, in which phase (kernel/systems.ts, PHASES).
+ * Each system declares what it reads, writes and emits, and the kernel refuses two systems
+ * in a phase that touch the same data with no declared order between them.
+ */
+
+/** Handlers for scheduled entries. Empty until a lab schedules its first effect. */
+export const SCHEDULE_HANDLERS: Readonly<Record<string, ScheduleHandler>> = {};
+
+const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
+
+/** Scratch: a guard's mind and decision, rewritten for each guard. */
+const mind = emptyMind();
+const decision: GuardDecision = { move: { tick: 0, wishX: 0, wishZ: 0, gait: 'idle', yaw: 0, pitch: 0 }, headYaw: 0 };
+
+/** The player's commands, resolved against what was on screen when they were given. */
+const playerCommands: System = {
+  name: 'player-commands',
+  phase: 'commands',
+  reads: ['input', 'player.body'],
+  writes: [],
+  emits: ['shot'],
+  run(ctx) {
+    const p = player(ctx.index);
+    for (const c of ctx.input.commands) {
+      if (c.kind === 'fire') {
+        // The moment the player saw: `lag` ticks before this tick's start state.
+        poseAt(p.body, c.lag, pose);
+        const cp = dcos(c.pitch);
+        ctx.emit({
+          type: 'shot',
+          source: p.id,
+          t: (ctx.tick - 1 - c.lag) / ctx.tuning.sim.tickHz,
+          x: pose.x,
+          y: pose.y + pose.eyeHeight,
+          z: pose.z,
+          dx: -dsin(c.yaw) * cp,
+          dy: dsin(c.pitch),
+          dz: -dcos(c.yaw) * cp,
+        });
+      }
+    }
+  },
+};
+
+/** The player's controls: input becomes the body's intent, and starts any stance change it asks for. */
+const playerIntentSystem: System = {
+  name: 'player-intent',
+  phase: 'intent',
+  reads: ['input', 'player.body', 'solid.solid'],
+  writes: ['player.control', 'player.body.stance', 'player.body.stanceTimer', 'player.body.stanceDuration', 'player.body.proneTransition', 'player.body.eyeFrom', '@intents.player'],
+  emits: ['stance'],
+  run(ctx) {
+    const p = player(ctx.index);
+    const motor = { world: ctx.world, solids: ctx.solids, tick: ctx.tick, source: p.id, emit: ctx.emit };
+    playerIntent(p.body, p.control, ctx.input, ctx.tuning.bodies.player, motor, intentFor(ctx, p.id));
+  },
+};
+
+/**
+ * Guards keep to their routines (brain lane) until a brain says otherwise (lab E). Each
+ * decides from his mind alone: the perception boundary (brain/mind.ts).
+ */
+const guardRoutines: System = {
+  name: 'guard-routines',
+  phase: 'intent',
+  reads: ['guard.body', 'guard.guard.spawn'],
+  writes: ['guard.guard.headYaw', '@intents.guard'],
+  emits: [],
+  run(ctx) {
+    for (const g of ctx.index.of('guard')) {
+      decision.move = intentFor(ctx, g.id);
+      keepRoutine(guardMind(g, ctx.world, ctx.tuning, ctx.tick, mind), decision);
+      g.guard.headYaw = decision.headYaw;
+    }
+  },
+};
+
+export const SYSTEMS: readonly System[] = [scheduleSystem(SCHEDULE_HANDLERS), playerCommands, playerIntentSystem, guardRoutines, motorSystem];

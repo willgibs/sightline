@@ -1,4 +1,4 @@
-import { normalizeSeed, randomSeed } from '../sim/core/seed';
+import { normalizeSeed, randomSeed } from '../sim/kernel/core/seed';
 import { labelKeys } from './keys';
 import { ActionMap, keysHtml, type Action } from './actions';
 import type { Settings } from './settings';

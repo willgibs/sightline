@@ -1,15 +1,15 @@
 import * as THREE from 'three';
 import type { Tuning } from '../config/tuning';
-import { lerp } from '../sim/core/math';
-import type { BodyState } from '../sim/motor/body';
-import { bodyShape, emptyShape, type Capsule } from '../sim/motor/shape';
-import type { Snapshot } from '../sim/sim';
+import { lerp } from '../sim/kernel/core/math';
+import { bodyShape, type BodyState } from '../sim/body';
+import { emptyShape, type Capsule } from '../sim/kernel/world/shape';
+import type { Snapshot } from '../sim/game/sim';
 import { createFlatMaterial, type LookUniforms } from './materials';
 import { palette } from './palette';
 
 /**
  * The player's own body, drawn whenever the camera is out of it: the fly camera, or a
- * replay watched from outside. Its parts are the body's shape (sim/motor/shape.ts) in its
+ * replay watched from outside. Its parts are the body's shape (sim/body/shape.ts) in its
  * stance, the same head, torso and legs that sight and hits use, so a replay shows
  * exactly how much of you a guard had to see. From your own eyes it isn't drawn.
  */

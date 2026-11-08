@@ -1,14 +1,14 @@
 import { defaultTuning } from '../config/tuning';
-import { normalizeSeed } from '../sim/core/seed';
-import type { SpawnKind } from '../sim/gen/world';
+import { normalizeSeed } from '../sim/kernel/core/seed';
+import type { SpawnKind } from '../sim/kernel/mission';
 import { Game } from './game';
-import { SCENES } from '../sim/scenes';
+import { SCENES } from '../sim/game/scenes';
 import './styles.css';
 
 /**
  * Entry point. URL parameters:
  *   ?seed=TAL-4471   which valley to generate
- *   ?scene=movement-course   play a scene instead (sim/scenes/index.ts)
+ *   ?scene=movement-course   play a scene instead (sim/game/scenes/index.ts)
  *   ?view=debug      start in the debug view
  *   ?spawn=edge      start where the road leaves the map instead of on an overlook
  *   ?bench           run the 20-second performance flythrough and report

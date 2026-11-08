@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { Rng } from '../src/sim/core/rng';
-import { buildTestCamp, type Camp } from '../src/sim/gen/camp';
-import type { Site } from '../src/sim/gen/site';
-import type { TerrainFeatures } from '../src/sim/gen/terrain';
-import { ColliderSet } from '../src/sim/world/colliders';
+import { Rng } from '../src/sim/kernel/core/rng';
+import { buildTestCamp, type Camp } from '../src/sim/generation/camp';
+import type { Site } from '../src/sim/generation/site';
+import type { TerrainFeatures } from '../src/sim/generation/terrain';
+import { ColliderSet } from '../src/sim/kernel/world/colliders';
 import { testWorld } from './fixtures';
 
 /**
- * Camps stand at sites (gen/site.ts): the same camp at another site is the same camp,
+ * Camps stand at sites (generation/site.ts): the same camp at another site is the same camp,
  * moved. Nothing in it assumes it stands at the origin.
  */
 describe('a camp at a site', () => {

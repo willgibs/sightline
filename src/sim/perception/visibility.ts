@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import type { BodySpec, BodyState } from '../motor/body';
+import type { BodySpec, BodyState } from '../body';
 
 /**
  * How visible a body is, from the design doc's sight table (stance × movement × light).

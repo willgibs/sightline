@@ -1,13 +1,14 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CommandLatch } from '../src/app/commandLatch';
 import { defaultTuning as T } from '../src/config/tuning';
-import { FixedStepClock } from '../src/sim/core/clock';
-import type { ShotEvent } from '../src/sim/events';
-import { generateWorld, type World } from '../src/sim/gen/world';
-import { neutralInput } from '../src/sim/input';
-import { missionSpec } from '../src/sim/mission';
-import { Simulation, type Snapshot } from '../src/sim/sim';
-import { lerp } from '../src/sim/core/math';
+import { FixedStepClock } from '../src/sim/kernel/core/clock';
+import type { ShotEvent } from '../src/sim/kernel/events';
+import { generateWorld } from '../src/sim/generation/world';
+import type { World } from '../src/sim/kernel/world/world';
+import { neutralInput } from '../src/sim/kernel/input';
+import { missionSpec } from '../src/sim/kernel/mission';
+import { Simulation, type Snapshot } from '../src/sim/game/sim';
+import { lerp } from '../src/sim/kernel/core/math';
 
 /**
  * A shot goes where the crosshair was on the frame the player clicked on, at any frame

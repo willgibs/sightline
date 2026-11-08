@@ -1,12 +1,13 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { routinePose, type RoutinePose } from '../src/sim/gen/routine';
-import { generateWorld, type World } from '../src/sim/gen/world';
-import { neutralInput } from '../src/sim/input';
-import { missionSpec } from '../src/sim/mission';
-import { Simulation } from '../src/sim/sim';
-import { Blocks } from '../src/sim/world/colliders';
-import { Surface } from '../src/sim/world/surfaces';
+import { routinePose, type RoutinePose } from '../src/sim/generation/routine';
+import { generateWorld } from '../src/sim/generation/world';
+import type { World } from '../src/sim/kernel/world/world';
+import { neutralInput } from '../src/sim/kernel/input';
+import { missionSpec } from '../src/sim/kernel/mission';
+import { Simulation } from '../src/sim/game/sim';
+import { Blocks } from '../src/sim/kernel/world/colliders';
+import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testGuard, testWorld, tuningCopy } from './fixtures';
 
 const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
@@ -139,6 +140,9 @@ describe('guards on routine', () => {
       {
         name: 'probe',
         phase: 'mission',
+        reads: [],
+        writes: ['rng.test'],
+        emits: [],
         run: (ctx) => {
           draws.push(ctx.draw(a, 'test', (r) => r.next()), ctx.draw(b, 'test', (r) => r.next()), ctx.draw(a, 'test', (r) => r.next()));
         },
@@ -149,7 +153,7 @@ describe('guards on routine', () => {
     expect(Object.keys(probe.state.rng).sort()).toEqual([`${a}.test`, `${b}.test`]);
     // Guard b's numbers don't depend on how much guard a drew.
     const lone: number[] = [];
-    const other = new Simulation(worlds[0]!, T, [...sim.systems, { name: 'probe', phase: 'mission', run: (ctx) => void lone.push(ctx.draw(b, 'test', (r) => r.next())) }]);
+    const other = new Simulation(worlds[0]!, T, [...sim.systems, { name: 'probe', phase: 'mission', reads: [], writes: ['rng.test'], emits: [], run: (ctx) => void lone.push(ctx.draw(b, 'test', (r) => r.next())) }]);
     other.step(neutralInput());
     expect(lone[0]).toBe(draws[1]);
   });

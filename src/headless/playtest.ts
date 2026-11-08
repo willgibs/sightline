@@ -1,7 +1,7 @@
 /**
  * Playtest sessions, summarized. Each recording is re-simulated, which checks that it
  * replays bit for bit and that every body kept the motor's promises all the way through
- * (sim/bots/invariants.ts). The summary says what happened, from the recording, and how
+ * (sim/body/invariants.ts). The summary says what happened, from the recording, and how
  * it ran, from the telemetry report saved beside it (src/app/playtest.ts).
  *
  *   npm run playtest                        every session in playtests/
@@ -9,12 +9,12 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { InvariantWatch } from '../sim/bots/invariants';
-import { Recording, type Annotation } from '../sim/record/recording';
-import { resimulate } from '../sim/record/resim';
-import { sceneOf } from '../sim/scenes';
-import type { Simulation } from '../sim/sim';
-import { surfaceName } from '../sim/world/surfaces';
+import { InvariantWatch } from '../sim/body';
+import { Recording, type Annotation } from '../sim/kernel/record/recording';
+import { resimulate } from '../sim/kernel/record/resim';
+import { sceneOf } from '../sim/game/scenes';
+import { SIGHTLINE, type Simulation } from '../sim/game/sim';
+import { surfaceName } from '../sim/kernel/world/surfaces';
 import { fmt } from './args';
 
 const target = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'playtests';
@@ -72,6 +72,7 @@ function summarize(file: string): boolean {
   let x0 = 0;
   let z0 = 0;
   const re = resimulate(rec, {
+    game: SIGHTLINE,
     scene: sceneOf(h),
     clock: () => performance.now(),
     watch: {

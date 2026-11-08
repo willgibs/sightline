@@ -1,9 +1,9 @@
-import { Solids } from '../src/sim/world/solids';
+import { Solids } from '../src/sim/kernel/world/solids';
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { air, defaultEnv, lightAt, sunDirection, timeOfDay, windAt, type EnvSpec } from '../src/sim/env';
-import { Blocks } from '../src/sim/world/colliders';
-import { Surface } from '../src/sim/world/surfaces';
+import { air, defaultEnv, lightAt, sunDirection, timeOfDay, windAt, type EnvSpec } from '../src/sim/kernel/env';
+import { Blocks } from '../src/sim/kernel/world/colliders';
+import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testWorld } from './fixtures';
 
 const v = { x: 0, y: 0, z: 0 };

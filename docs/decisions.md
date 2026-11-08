@@ -2,6 +2,30 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-07 · Wave 0
+
+The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.
+
+### The kernel boundary, the lanes and the game (W0.2)
+
+**Decision:** `src/sim` is now `kernel/`, five lanes (`generation/`, `body/`, `perception/`, `brain/`, `ballistics/`) and `game/`, with the lane map as data in `src/sim/lanes.ts`. Every golden held: the selftest's fingerprints, TAL-4471's, the golden recording (rewritten byte for byte by `npm run golden`), and the 20-minute CI hash `e9311dda2ac00379`.
+
+**How the kernel stays free of the game:**
+- **One contract.** What the kernel needs from a game is the `Game` interface (`kernel/game.ts`): its systems, how a run starts (spawning the player and the guards moved here from `Simulation`'s constructor), every body's shape for queries, how to build a world from a mission spec and fingerprint it, and the recording's 10 Hz state sample. Sightline's is `SIGHTLINE` (`game/sim.ts`), whose `Simulation` subclass keeps `sim.player`, `sim.guards` and `snapshot()`.
+- **Open registries.** The game adds its entity kinds, and generation adds its fields of `World`, by module augmentation, so the kernel's types grow without the kernel naming them. `npm run typecheck` compiles the kernel alone (`tsconfig.kernel.json`), where none of those additions exist, so kernel code can't quietly use them.
+- **Shared vocabulary stays in the kernel.** The event and command registries are one table each in the kernel, which every lane adds to from its own code range (W0.6), so recordings decode without a game.
+- **Channels instead of shared maps.** The intents the 'intent' phase hands to the motor go through `ctx.channel`, which starts empty every tick, so nothing outside the state tree lasts between ticks.
+
+**Declared access:** every system declares the state paths it reads and writes and the events it emits. The simulation refuses two systems in one phase that touch the same data unless the later names the earlier in `after`, and stops a system that emits an undeclared event. A test diffs the state tree around every system, in two valleys and every scene, against its declared writes. One writer per subtree holds within each phase; the player's stance is written by the controls in 'intent' and by the motor in 'motor', which the phase order makes safe.
+
+**Smaller calls:**
+- The invariant watch lives with the motor in the body lane, since its promises are the motor's.
+- The STAT track's sample is the game's: the kernel stores what `Game.sample` writes, and `game/samples.ts` reads and checks it. The file format didn't change.
+- Re-simulating a plain mission takes its game (`{ game: SIGHTLINE }`); a scene names its own.
+- Outside `src/sim`, code reaches a lane only through its `index.ts` too.
+
+**Why:** `docs/foundation-shape.md`, approved by the owner. The kernel-alone scene (`kernel/alone.ts`, `tests/kernel.test.ts`) and two simulations stepped in alternation (`tests/state.test.ts`) show the kernel keeps no hidden state.
+
 ## 2026-11-07 · Planning Phase 1
 
 The plan, with each lab's milestones and how its exit test is measured, is `docs/phase-1-plan.md`.

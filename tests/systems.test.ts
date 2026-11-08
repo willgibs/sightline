@@ -1,36 +1,47 @@
-import { Solids } from '../src/sim/world/solids';
+import { Solids } from '../src/sim/kernel/world/solids';
 import { describe, expect, it } from 'vitest';
 import { defaultTuning } from '../src/config/tuning';
-import { Rng } from '../src/sim/core/rng';
-import type { SimEvent } from '../src/sim/events';
-import { neutralInput } from '../src/sim/input';
-import { createBody, type BodySpec } from '../src/sim/motor/body';
-import { stepMotor, type MotorContext, type MoveIntent } from '../src/sim/motor/motor';
-import { emptySchedule, popDue, scheduleAt, ticksAfter, type Scheduled } from '../src/sim/schedule';
-import { Simulation } from '../src/sim/sim';
-import { assertPlain } from '../src/sim/state';
-import { SYSTEMS, planSystems, scheduleSystem, withSystem, type ScheduleHandler, type System } from '../src/sim/systems';
-import { Blocks } from '../src/sim/world/colliders';
-import { Surface } from '../src/sim/world/surfaces';
+import { Rng } from '../src/sim/kernel/core/rng';
+import type { SimEvent } from '../src/sim/kernel/events';
+import { neutralInput } from '../src/sim/kernel/input';
+import { createBody, type BodySpec } from '../src/sim/body/body';
+import { stepMotor, type MotorContext, type MoveIntent } from '../src/sim/body/motor';
+import { emptySchedule, popDue, scheduleAt, ticksAfter, type Scheduled } from '../src/sim/kernel/schedule';
+import { Simulation } from '../src/sim/game/sim';
+import { assertPlain, type SimState } from '../src/sim/kernel/state';
+import { SYSTEMS } from '../src/sim/game/systems';
+import { accessConflicts, overlaps, planSystems, scheduleSystem, withSystem, type ScheduleHandler, type System } from '../src/sim/kernel/systems';
+import type { Simulation as KernelSimulation } from '../src/sim/kernel/sim';
+import { ChaosBot } from '../src/sim/game/bots/chaos';
+import { WanderBot } from '../src/sim/game/bots/wander';
+import { SCENES } from '../src/sim/game/scenes';
+import { generateWorld } from '../src/sim/generation';
+import { missionSpec } from '../src/sim/kernel/mission';
+import { kernelAloneScene } from '../src/sim/kernel/alone';
+import { runScene } from '../src/sim/kernel/scene';
+import { Blocks } from '../src/sim/kernel/world/colliders';
+import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testWorld, tuningCopy } from './fixtures';
 
 const noop = (): void => {};
+/** A system's access when it touches nothing. */
+const NONE = { reads: [], writes: [], emits: [] } as const;
 
 describe('the system list', () => {
   it('runs in phase order, with unique names and rates that divide the tick rate', () => {
     expect(() => planSystems(SYSTEMS, 30)).not.toThrow();
-    const a: System = { name: 'a', phase: 'motor', run: noop };
-    const b: System = { name: 'b', phase: 'intent', run: noop };
+    const a: System = { name: 'a', phase: 'motor', ...NONE, run: noop };
+    const b: System = { name: 'b', phase: 'intent', ...NONE, run: noop };
     expect(() => planSystems([a, b], 30)).toThrow(/after a later phase/);
     expect(() => planSystems([a, { ...a }], 30)).toThrow(/Two systems/);
-    expect(() => planSystems([{ name: 'x', phase: 'nowhere' as never, run: noop }], 30)).toThrow(/unknown phase/);
-    expect(() => planSystems([{ name: 'slow', phase: 'awareness', hz: 7, run: noop }], 30)).toThrow(/doesn't divide/);
-    expect(planSystems([{ name: 'slow', phase: 'awareness', hz: 10, run: noop }], 30)).toEqual([3]);
+    expect(() => planSystems([{ name: 'x', phase: 'nowhere' as never, ...NONE, run: noop }], 30)).toThrow(/unknown phase/);
+    expect(() => planSystems([{ name: 'slow', phase: 'awareness', hz: 7, ...NONE, run: noop }], 30)).toThrow(/doesn't divide/);
+    expect(planSystems([{ name: 'slow', phase: 'awareness', hz: 10, ...NONE, run: noop }], 30)).toEqual([3]);
   });
 
   it('runs a slower system on a fixed rhythm, with the time since its last run', () => {
     const runs: Array<{ tick: number; dt: number }> = [];
-    const slow: System = { name: 'slow', phase: 'awareness', hz: 10, run: (ctx, dt) => runs.push({ tick: ctx.tick, dt }) };
+    const slow: System = { name: 'slow', phase: 'awareness', hz: 10, ...NONE, run: (ctx, dt) => runs.push({ tick: ctx.tick, dt }) };
     const sim = new Simulation(testWorld(), tuningCopy(), withSystem(SYSTEMS, slow));
     for (let i = 0; i < 9; i++) sim.step(neutralInput());
     expect(runs.map((r) => r.tick)).toEqual([3, 6, 9]);
@@ -86,6 +97,9 @@ describe('the schedule', () => {
     const kick: System = {
       name: 'kick',
       phase: 'intent',
+      reads: [],
+      writes: ['schedule'],
+      emits: [],
       run: (ctx) => {
         if (ctx.tick === 1) ctx.schedule(0.2, 'ping', 4);
       },
@@ -117,7 +131,7 @@ describe('the schedule', () => {
   });
 
   it('refuses an entry nothing handles', () => {
-    const kick: System = { name: 'kick', phase: 'intent', run: (ctx) => ctx.tick === 1 && ctx.schedule(0.1, 'nobody') };
+    const kick: System = { name: 'kick', phase: 'intent', reads: [], writes: ['schedule'], emits: [], run: (ctx) => ctx.tick === 1 && ctx.schedule(0.1, 'nobody') };
     const sim = new Simulation(testWorld(), tuningCopy(), withSystem(SYSTEMS, kick));
     expect(() => {
       for (let i = 0; i < 10; i++) sim.step(neutralInput());
@@ -166,5 +180,143 @@ describe('the shared motor', () => {
     const land = r.events.find((e) => e.type === 'land');
     expect(land && land.type === 'land' && land.source).toBe(42);
     expect(r.events.filter((e) => e.type === 'footstep').every((e) => e.type === 'footstep' && e.source === 42)).toBe(true);
+  });
+});
+
+describe('declared data access', () => {
+  const sys = (name: string, phase: System['phase'], access: Partial<Pick<System, 'reads' | 'writes' | 'emits' | 'after'>>): System => ({
+    name,
+    phase,
+    reads: [],
+    writes: [],
+    emits: [],
+    ...access,
+    run: noop,
+  });
+
+  it('says which paths overlap: a prefix, any kind for *, every entity for entities', () => {
+    expect(overlaps('*.body', 'guard.body.x')).toBe(true);
+    expect(overlaps('player.body.stance', 'player.body')).toBe(true);
+    expect(overlaps('player.body.stance', 'player.body.x')).toBe(false);
+    expect(overlaps('player.control', 'guard.control')).toBe(false);
+    expect(overlaps('*.body', 'schedule')).toBe(false);
+    expect(overlaps('entities', 'guard.guard.headYaw')).toBe(true);
+    expect(overlaps('entities', 'outcome')).toBe(false);
+    expect(overlaps('@intents', '@intents.guard')).toBe(true);
+    expect(overlaps('@intents.player', '@intents.guard')).toBe(false);
+    expect(overlaps('rng.wander', 'rng')).toBe(true);
+    expect(overlaps('rng.wander', 'rng.aim')).toBe(false);
+  });
+
+  it('refuses two systems in a phase that touch the same data with no declared order', () => {
+    const writer = sys('writer', 'awareness', { writes: ['guard.guard.alert'] });
+    const reader = sys('reader', 'awareness', { reads: ['guard.guard'] });
+    expect(accessConflicts([writer, reader])).toEqual(["'writer' and 'reader' in 'awareness' (guard.guard.alert and guard.guard)"]);
+    expect(() => planSystems([writer, reader], 30)).toThrow(/no declared order/);
+    // Declaring the order resolves it, directly or through another system.
+    expect(accessConflicts([writer, { ...reader, after: ['writer'] }])).toEqual([]);
+    const middle = sys('middle', 'awareness', { after: ['writer'] });
+    expect(accessConflicts([writer, middle, { ...reader, after: ['middle'] }])).toEqual([]);
+    // Two writers of one subtree, and two emitters, conflict too.
+    expect(accessConflicts([writer, sys('other', 'awareness', { writes: ['*.guard'] })])).toHaveLength(1);
+    expect(accessConflicts([sys('a', 'camp', { emits: ['stance'] }), sys('b', 'camp', { emits: ['shot'] })])).toEqual(["'a' and 'b' in 'camp' (both emit events)"]);
+    // Different phases, or different kinds, or only reads: no conflict.
+    expect(accessConflicts([writer, { ...reader, phase: 'camp' }])).toEqual([]);
+    expect(accessConflicts([writer, sys('player', 'awareness', { writes: ['player.control'] })])).toEqual([]);
+    expect(accessConflicts([sys('a', 'camp', { reads: ['*.body'] }), sys('b', 'camp', { reads: ['*.body'] })])).toEqual([]);
+    // An order must name a system earlier in the phase.
+    expect(accessConflicts([{ ...reader, after: ['writer'] }, writer])).toContain("'reader' runs after 'writer', which isn't earlier in its phase");
+  });
+
+  it('refuses malformed access: missing declarations, bad paths, unknown events, writing the input', () => {
+    expect(() => planSystems([{ name: 'x', phase: 'camp', run: noop } as unknown as System], 30)).toThrow(/doesn't declare/);
+    expect(() => planSystems([sys('x', 'camp', { writes: ['guard..body'] })], 30)).toThrow(/malformed/);
+    expect(() => planSystems([sys('x', 'camp', { reads: ['guard.*'] })], 30)).toThrow(/malformed/);
+    expect(() => planSystems([sys('x', 'camp', { emits: ['explosion' as never] })], 30)).toThrow(/no event type/);
+    expect(() => planSystems([sys('x', 'camp', { writes: ['input'] })], 30)).toThrow(/read only/);
+  });
+
+  it('stops a system that emits an event it does not declare', () => {
+    const liar: System = { ...sys('liar', 'camp', {}), run: (ctx) => void ctx.emit({ type: 'outcome', source: 1, status: 'failed' }) };
+    const sim = new Simulation(testWorld(), tuningCopy(), withSystem(SYSTEMS, liar));
+    expect(() => sim.step(neutralInput())).toThrow(/emitted 'outcome', which it doesn't declare/);
+    expect(sim.fault?.system).toBe('liar');
+  });
+
+  /** The access path of a changed leaf of the state tree: entities by their kind, random streams by their purpose. */
+  function accessPath(path: readonly (string | number)[], after: SimState): string {
+    const [root, k, ...rest] = path;
+    if (root === 'entities') {
+      const e = typeof k === 'number' ? after.entities[k] : undefined;
+      return e && rest.length > 0 ? [e.kind, ...rest].join('.') : 'entities';
+    }
+    if (root === 'nextId') return 'entities';
+    if (root === 'rng' && typeof k === 'string') return `rng.${k.slice(k.indexOf('.') + 1)}`;
+    return String(root);
+  }
+
+  /** Every leaf that differs between two plain trees, as a path; a key added or removed is a change at that key, a changed length a change of the whole array. */
+  function changes(a: unknown, b: unknown, path: (string | number)[] = [], out: (string | number)[][] = []): (string | number)[][] {
+    if (a === b || (typeof a === 'number' && typeof b === 'number' && Object.is(a, b))) return out;
+    if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
+      out.push(path);
+      return out;
+    }
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) out.push(path);
+      else a.forEach((x, i) => changes(x, b[i], [...path, i], out));
+      return out;
+    }
+    const x = a as Record<string, unknown>;
+    const y = b as Record<string, unknown>;
+    for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
+      if (!(k in x) || !(k in y)) out.push([...path, k]);
+      else changes(x[k], y[k], [...path, k], out);
+    }
+    return out;
+  }
+
+  /** True if a declared write covers a changed path: it is a prefix of it, with * standing for any kind. */
+  function covers(write: string, path: string): boolean {
+    const w = write.split('.');
+    const p = path.split('.');
+    if (w.length > p.length) return false;
+    const isKind = (r: string): boolean => !['schedule', 'outcome', 'rng', 'entities', 'input', 'nextEventId', 'tick'].includes(r);
+    if (w[0] === 'entities') return isKind(p[0]!) || p[0] === 'entities';
+    if (w[0] !== p[0] && !(w[0] === '*' && isKind(p[0]!))) return false;
+    return w.every((x, i) => i === 0 || x === p[i]);
+  }
+
+  /** Watches every system of a run: whatever it changes in the state tree must be covered by what it declares. */
+  function watchWrites(sim: KernelSimulation, found: Set<string>): void {
+    let before: SimState | null = null;
+    sim.profiler = {
+      begin: () => {
+        before = structuredClone(sim.state);
+      },
+      end: (system) => {
+        for (const path of changes(before, sim.state)) {
+          const p = accessPath(path, sim.state);
+          if (p === 'nextEventId' ? system.emits.length === 0 : !system.writes.some((w) => covers(w, p))) found.add(`${system.name} wrote ${p}, which it doesn't declare`);
+        }
+      },
+    };
+  }
+
+  it('lets every system write only what it declares, in valleys and in every scene', () => {
+    const found = new Set<string>();
+    const world = generateWorld(missionSpec('TAL-4471'), defaultTuning);
+    for (const bot of [new ChaosBot('TAL-4471'), new WanderBot('TAL-4471')]) {
+      const sim = new Simulation(world, defaultTuning);
+      watchWrites(sim, found);
+      const raw = neutralInput();
+      for (let i = 0; i < 900; i++) sim.step({ ...bot.next(sim, raw), commands: i % 100 === 50 ? [{ kind: 'fire', lag: 0.5, yaw: 0, pitch: 0 }] : [] });
+    }
+    const scenes = [...Object.values(SCENES).map((make) => make()), kernelAloneScene()];
+    for (const scene of scenes) {
+      const run = runScene({ ...scene, setup: (sim) => (scene.setup?.(sim as never), watchWrites(sim, found)) } as typeof scene, defaultTuning);
+      expect(run.failures).toEqual([]);
+    }
+    expect([...found]).toEqual([]);
   });
 });

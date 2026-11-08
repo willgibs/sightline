@@ -1,18 +1,19 @@
-import { SYSTEMS, decide, withSystem, type System } from '../src/sim/systems';
+import { SYSTEMS } from '../src/sim/game/systems';
+import { decide, withSystem, type System } from '../src/sim/kernel/systems';
 import { describe, expect, it } from 'vitest';
 import { defaultTuning } from '../src/config/tuning';
-import { ChaosBot } from '../src/sim/bots/chaos';
-import { EventLog } from '../src/sim/eventlog';
-import { EVENTS, isSound, type EventType, type SimEvent } from '../src/sim/events';
-import { generateWorld } from '../src/sim/gen/world';
-import { neutralInput } from '../src/sim/input';
-import { missionSpec } from '../src/sim/mission';
-import { ByteReader, ByteWriter, RecordingFormatError } from '../src/sim/record/bytes';
-import { readEvent, writeEvent } from '../src/sim/record/eventCodec';
-import { Simulation } from '../src/sim/sim';
-import { PLAYER_ID } from '../src/sim/state';
-import { Blocks } from '../src/sim/world/colliders';
-import { Surface } from '../src/sim/world/surfaces';
+import { ChaosBot } from '../src/sim/game/bots/chaos';
+import { EventLog } from '../src/sim/kernel/eventlog';
+import { EVENTS, isSound, type EventType, type SimEvent } from '../src/sim/kernel/events';
+import { generateWorld } from '../src/sim/generation/world';
+import { neutralInput } from '../src/sim/kernel/input';
+import { missionSpec } from '../src/sim/kernel/mission';
+import { ByteReader, ByteWriter, RecordingFormatError } from '../src/sim/kernel/record/bytes';
+import { readEvent, writeEvent } from '../src/sim/kernel/record/eventCodec';
+import { Simulation } from '../src/sim/game/sim';
+import { PLAYER_ID, player } from '../src/sim/game/entities';
+import { Blocks } from '../src/sim/kernel/world/colliders';
+import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testWorld } from './fixtures';
 
 /** A minute of the fuzzing bot (footsteps and stance changes from the player and guards), then a drop off a roof (a landing), a shot and an outcome. */
@@ -23,7 +24,14 @@ function events(): { sim: Simulation; all: SimEvent[] } {
   const all: SimEvent[] = [];
   for (let i = 0; i < 60 * 30; i++) for (const e of sim.step(bot.next(sim, raw))) all.push({ ...e });
   const roof = { kind: 'box' as const, x: 0, z: 0, y0: -1, y1: 3, hx: 2, hz: 2, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Metal };
-  const rules: System = { name: 'test-rules', phase: 'mission', run: (ctx) => (ctx.tick === 30 ? decide(ctx, 'succeeded', 'off the roof', ctx.index.player.id) : undefined) };
+  const rules: System = {
+    name: 'test-rules',
+    phase: 'mission',
+    reads: [],
+    writes: ['outcome'],
+    emits: ['outcome'],
+    run: (ctx) => (ctx.tick === 30 ? decide(ctx, 'succeeded', 'off the roof', player(ctx.index).id) : undefined),
+  };
   const drop = new Simulation(testWorld({ colliders: [roof], spawnOnTop: true }), defaultTuning, withSystem(SYSTEMS, rules));
   const walk = { ...neutralInput(), moveZ: 1 };
   const landings: SimEvent[] = [];

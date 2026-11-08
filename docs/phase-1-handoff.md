@@ -46,16 +46,18 @@ Part 4 of the design doc (Roadmap) defines it.
 
 The foundation pass widened the interfaces every lab extends, so each lab builds on existing seams rather than inventing its own. The tables below say what is already there and what was deliberately left to each lab. `docs/decisions.md` has the reasoning.
 
+Wave 0 then split `src/sim` into the kernel, the lanes and the game (W0.2, `docs/foundation-shape.md`). Each lab works in its lane's directory and reaches other lanes only through their `index.ts`; the lane map is `src/sim/lanes.ts`.
+
 ### A · Perception and awareness
 
 | Already there | Left to this lab |
 | --- | --- |
-| **The perception boundary.** A brain decides from its `GuardMind` alone (`src/sim/ai/mind.ts`). An architecture test and the no-omniscience test in `tests/perception.test.ts` guard it. | **Percepts and beliefs:** the real kinds of percept, and beliefs in the mind. |
-| **Sight lines** through the world query (`src/sim/world/query.ts`). Entities' solid shapes block sight. | **The hearing solver.** |
-| **Body shapes** with a head, torso and legs (`src/sim/motor/shape.ts`). | **Ambient masking** from the steady sources (`src/sim/world/ambient.ts`, the list the speakers already play). |
+| **The perception boundary.** A brain decides from its `GuardMind` alone (`src/sim/brain/mind.ts`). An architecture test and the no-omniscience test in `tests/perception.test.ts` guard it. | **Percepts and beliefs:** the real kinds of percept, and beliefs in the mind. |
+| **Sight lines** through the world query (`src/sim/kernel/world/query.ts`). Entities' solid shapes block sight. | **The hearing solver.** |
+| **Body shapes** with a head, torso and legs (`src/sim/body/shape.ts`). | **Ambient masking** from the steady sources (`src/sim/generation/ambient.ts`, the list the speakers already play). |
 | **The player's visibility** factor from the sight table (`src/sim/perception/visibility.ts`). | **Foliage and sight, both ways.** Canopies block no sight in the simulation, so a guard sees you through a canopy that hides him from you. A bush hides you from a guard, but you see out of it freely. The lab decides; the renderer follows. |
-| **Light at a point** (sun, shade, dusk, dark) in `src/sim/env.ts`. | **Fast paths, only if perception's budget needs them:** a still body skips the motor, and distant guards skip perception. |
-| **The law of sound** shared by guards and speakers (`src/sim/sound.ts`), and footsteps that carry their gait and surface. | |
+| **Light at a point** (sun, shade, dusk, dark) in `src/sim/kernel/env.ts`. | **Fast paths, only if perception's budget needs them:** a still body skips the motor, and distant guards skip perception. |
+| **The law of sound** shared by guards and speakers (`src/sim/kernel/sound.ts`), and footsteps that carry their gait and surface. | |
 | **Cues.** The honest view draws only snapshots and events, which is what the shipped game can show. Systems explain themselves in the debug view through `ctx.debug`. | |
 
 ### B · Shooting
@@ -64,7 +66,7 @@ The foundation pass widened the interfaces every lab extends, so each lab builds
 | --- | --- |
 | **Timed commands.** A `fire` command carries the lag and view angles of the frame the player saw, against two ticks of pose history. The `shot` event leaves from the eye the player saw, tested at six frame rates. | **The ballistic model.** |
 | **Raycasts** return the hit point, normal, body part and surface. | **Segment sweeps** of the bullet's path against each body part, between two ticks' poses. |
-| **Wind and air** (density, speed of sound) in the environment. | **Whether walking bodies bob in the simulation,** sight lines and hits included. `src/sim/motor/bob.ts` is ready for it. |
+| **Wind and air** (density, speed of sound) in the environment. | **Whether walking bodies bob in the simulation,** sight lines and hits included. `src/sim/body/bob.ts` is ready for it. |
 | **Held states** for the optic and breath in the input. | **Whether a shot leaves from the bobbing eye.** |
 | **Sound timed** against the picture. | **Content as data in tuning** (rule 16): the rifle, ammunition, optics and the throwable. |
 | **The rangefinder.** | **The shot's sound:** the crack and thump, by distance. |
@@ -73,7 +75,7 @@ The foundation pass widened the interfaces every lab extends, so each lab builds
 
 | Already there | Left to this lab |
 | --- | --- |
-| **The shared motor** (`src/sim/motor/motor.ts`), with ground and air modes and invariants checked every tick by tests and the fuzz run. | **The prone body's real shape.** A 0.3 m circle stands in for a 1.5 m body today. |
+| **The shared motor** (`src/sim/body/motor.ts`), with ground and air modes and invariants checked every tick by tests and the fuzz run. | **The prone body's real shape.** A 0.3 m circle stands in for a 1.5 m body today. |
 | **Stances** and every body's sizes as kinds in `tuning.bodies`. Lean already has a held state in the input, waiting for the motor. | **Lean, mantle, ladders and carrying bodies.** Each new motor mode states its invariants (rule 10). |
 | **Surfaces** with their footstep loudness. | **Light exposure for the player.** |
 | **The head bob** on the stride. | **Judging whether movement feels deliberate.** The owner deferred this at the Phase 0 gate until there's more gameplay. |
@@ -85,12 +87,12 @@ The foundation pass widened the interfaces every lab extends, so each lab builds
 
 | Already there | Left to this lab |
 | --- | --- |
-| **Sites** (`src/sim/gen/site.ts`) and the `MissionSpec`. The Phase 0 test camp stands at a site. | **The camp generator.** It takes a site and a `CampSpec` of this lab's design, and builds one archetype from handmade modules. |
+| **Sites** (`src/sim/generation/site.ts`) and the `MissionSpec`. The Phase 0 test camp stands at a site. | **The camp generator.** It takes a site and a `CampSpec` of this lab's design, and builds one archetype from handmade modules. |
 | **The valley generator.** | **Validation moved onto the grid.** |
 | **Analysis and validation** (`analysis.ts`) with overwatch perches. | **The seed explorer.** |
 | **The spatial grid:** a 2.5 m map layer and a 0.5 m site layer. | **One deliberate `GEN_VERSION` bump** that brings in range reduction for `dsin` and `dcos`, together with scatter that depends only on seed and cell. |
 | **Routines** generated with the camp. | **Doors and vehicles,** as entity kinds with a `solid` when a lab needs them. |
-| **Handmade worlds** (`gen/handmade.ts`). | |
+| **Handmade worlds** (`generation/handmade.ts`). | |
 | **`npm run seeds`.** | |
 | **The TAL-4471 golden** fingerprint. | |
 
@@ -98,7 +100,7 @@ The foundation pass widened the interfaces every lab extends, so each lab builds
 
 | Already there | Left to this lab |
 | --- | --- |
-| **Brains behind the perception boundary.** The routine (`src/sim/ai/routine.ts`) is the first brain. | **The brain itself:** awareness states, with utility scoring within each state. |
+| **Brains behind the perception boundary.** The routine (`src/sim/brain/routine.ts`) is the first brain. | **The brain itself:** awareness states, with utility scoring within each state. |
 | **A random stream** per entity and purpose (`ctx.draw`). | **The camp commander and the pacing layer.** |
 | **The schedule** for delayed effects (`ctx.schedule`). | **Navigation:** grid A\* over the heightfield. |
 | **Entities that spawn mid-run,** for reinforcements. | **Brains with their own random streams.** |

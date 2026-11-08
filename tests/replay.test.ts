@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { Replay, REPLAY_SPEEDS } from '../src/app/replay';
-import { Optic, neutralInput, quantizeInput } from '../src/sim/input';
-import { Recorder, Recording } from '../src/sim/record/recording';
-import { startScene } from '../src/sim/scene';
-import { sceneOf } from '../src/sim/scenes';
-import type { SimEvent } from '../src/sim/events';
+import { Optic, neutralInput, quantizeInput } from '../src/sim/kernel/input';
+import { Recorder, Recording } from '../src/sim/kernel/record/recording';
+import { startScene } from '../src/sim/kernel/scene';
+import { sceneOf } from '../src/sim/game/scenes';
+import type { SimEvent } from '../src/sim/kernel/events';
 
 /**
  * Watching a recording (src/app/replay.ts): playing it forward gives exactly the events

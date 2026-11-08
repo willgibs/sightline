@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { ChaosBot } from '../src/sim/bots/chaos';
-import { WanderBot } from '../src/sim/bots/wander';
-import { generateWorld } from '../src/sim/gen/world';
-import { neutralInput, type InputFrame } from '../src/sim/input';
-import { missionSpec } from '../src/sim/mission';
-import { Simulation } from '../src/sim/sim';
-import { Faction, assertPlain, hashState, type SimState } from '../src/sim/state';
-import { Blocks } from '../src/sim/world/colliders';
-import { Surface } from '../src/sim/world/surfaces';
+import { ChaosBot } from '../src/sim/game/bots/chaos';
+import { WanderBot } from '../src/sim/game/bots/wander';
+import { generateWorld } from '../src/sim/generation/world';
+import { neutralInput, type InputFrame } from '../src/sim/kernel/input';
+import { missionSpec } from '../src/sim/kernel/mission';
+import { Simulation } from '../src/sim/game/sim';
+import { Faction, assertPlain, hashState, type SimState } from '../src/sim/kernel/state';
+import { Blocks } from '../src/sim/kernel/world/colliders';
+import { Surface } from '../src/sim/kernel/world/surfaces';
 
 /**
  * The state tree: plain data, completely covered by the hash, and restorable so that a
@@ -54,6 +54,28 @@ describe('the state tree', () => {
     // And the copy shares nothing with the original.
     b.player.x += 1;
     expect(b.hash()).not.toBe(a.hash());
+  });
+
+  it('keeps two simulations apart when they are stepped in alternation', () => {
+    // Two valleys and two bots, alone and then in turns: state kept anywhere but each
+    // simulation's own tree (in a module, a cache, a closure) would leak from one to the other.
+    const other = generateWorld(missionSpec('MUD-9031'), T);
+    const make = (k: number): { sim: Simulation; bot: { next(sim: Simulation, out: InputFrame): InputFrame } } =>
+      k === 0 ? { sim: new Simulation(world, T), bot: new WanderBot('VEX-0042') } : { sim: new Simulation(other, T), bot: new ChaosBot('MUD-9031') };
+    const alone = [0, 1].map((k) => {
+      const { sim, bot } = make(k);
+      const hashes: string[] = [];
+      play(sim, bot, 900, hashes);
+      return hashes;
+    });
+    const runs = [make(0), make(1)];
+    const raw = neutralInput();
+    for (let i = 0; i < 900; i++) {
+      for (const [k, { sim, bot }] of runs.entries()) {
+        sim.step(bot.next(sim, raw));
+        expect(sim.hash(), `run ${k} at tick ${i + 1}`).toBe(alone[k]![i]);
+      }
+    }
   });
 
   it('is changed by changing any leaf', () => {

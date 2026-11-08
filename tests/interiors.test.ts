@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { inBush, inCanopy } from '../src/render/interiors';
-import type { Bush, Tree } from '../src/sim/gen/props';
+import type { Bush, Tree } from '../src/sim/generation/props';
 
 /**
  * Which foliage the camera is inside (render/interiors.ts): inside, or close enough that

@@ -1,4 +1,4 @@
-import type { SurfaceName } from '../sim/world/surfaces';
+import type { SurfaceName } from '../sim/kernel/world/surfaces';
 
 /**
  * Procedural placeholder sounds. There are no audio files in the wireframe phases: every

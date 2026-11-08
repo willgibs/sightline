@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { FixedStepClock } from '../src/sim/core/clock';
-import { circleDirections, datan, datan2, dcos, dexp, dlog, dpow, dsin } from '../src/sim/core/detmath';
-import { Hasher, hashValue, stableStringify } from '../src/sim/core/hash';
-import { headingDegrees, turnTowards, wrapAngle, yawFromDirection } from '../src/sim/core/math';
-import { Rng } from '../src/sim/core/rng';
-import { DEFAULT_SEED, isCanonicalSeed, normalizeSeed, randomSeed } from '../src/sim/core/seed';
+import { FixedStepClock } from '../src/sim/kernel/core/clock';
+import { circleDirections, datan, datan2, dcos, dexp, dlog, dpow, dsin } from '../src/sim/kernel/core/detmath';
+import { Hasher, hashValue, stableStringify } from '../src/sim/kernel/core/hash';
+import { headingDegrees, turnTowards, wrapAngle, yawFromDirection } from '../src/sim/kernel/core/math';
+import { Rng } from '../src/sim/kernel/core/rng';
+import { DEFAULT_SEED, isCanonicalSeed, normalizeSeed, randomSeed } from '../src/sim/kernel/core/seed';
 
 describe('Rng', () => {
   it('repeats exactly for the same seed', () => {

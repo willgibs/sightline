@@ -1,6 +1,6 @@
 /**
  * The long invariant run: bots play many valleys for a long time while every body is
- * checked after every tick (sim/bots/invariants.ts). A run that breaks a promise is saved
+ * checked after every tick (sim/body/invariants.ts). A run that breaks a promise is saved
  * as a recording that reproduces it: `npm run sim -- --replay <file>` re-simulates it.
  *
  *   npm run fuzz                                    6 fresh valleys × both bots × 10 min
@@ -11,15 +11,15 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { defaultTuning } from '../config/tuning';
-import { ChaosBot } from '../sim/bots/chaos';
-import { InvariantWatch } from '../sim/bots/invariants';
-import { WanderBot } from '../sim/bots/wander';
-import { normalizeSeed, randomSeed } from '../sim/core/seed';
-import { generateWorld } from '../sim/gen/world';
-import { neutralInput } from '../sim/input';
-import { missionSpec } from '../sim/mission';
-import { Recorder } from '../sim/record/recording';
-import { Simulation } from '../sim/sim';
+import { ChaosBot } from '../sim/game/bots/chaos';
+import { InvariantWatch } from '../sim/body';
+import { WanderBot } from '../sim/game/bots/wander';
+import { normalizeSeed, randomSeed } from '../sim/kernel/core/seed';
+import { generateWorld } from '../sim/generation';
+import { neutralInput } from '../sim/kernel/input';
+import { missionSpec } from '../sim/kernel/mission';
+import { Recorder } from '../sim/kernel/record/recording';
+import { Simulation } from '../sim/game/sim';
 import { fmt, parseArgs } from './args';
 import { buildStamp } from './build';
 

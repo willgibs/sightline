@@ -53,7 +53,7 @@ export const defaultTuning = {
     // keeps the two equal.
     walkableSlopeDeg: 42,
 
-    // The spatial grid (world/grid.ts) is built for a standard body; tests keep these
+    // The spatial grid (sim/kernel/world/grid.ts) is built for a standard body; tests keep these
     // equal to the player's.
     grid: {
       bodyRadius: 0.3,
@@ -63,7 +63,7 @@ export const defaultTuning = {
       siteMargin: 12, // metres of fine grid beyond the camp's outermost structures
     },
 
-    // The camp's rhythm: how its guards walk their routines (gen/routine.ts). Part of the
+    // The camp's rhythm: how its guards walk their routines (sim/generation/routine.ts). Part of the
     // camp, like its layout: lab D validates the timing windows these make.
     routines: {
       pace: 1.35, // m/s along a patrol route
@@ -74,8 +74,8 @@ export const defaultTuning = {
     },
   },
 
-  // Kinds of body: what the shared motor moves (motor/body.ts) and what sight lines and
-  // hits see (motor/shape.ts). Each kind is complete, so a new one (a dog, a pilot in a
+  // Kinds of body: what the shared motor moves (sim/body/body.ts) and what sight lines and
+  // hits see (sim/body/shape.ts). Each kind is complete, so a new one (a dog, a pilot in a
   // harness) is data, not code; recordings carry them with the rest of the tuning.
   bodies: {
     player: {
@@ -160,7 +160,7 @@ export const defaultTuning = {
   },
 
   guards: {
-    // Their bodies are bodies.guard; this is how they keep to their routines (entities/guards.ts).
+    // Their bodies are bodies.guard; this is how they keep to their routines (sim/game/guards.ts).
     catchUp: 1.5, // how much faster than walking a guard may hurry back to his routine
   },
 
@@ -170,7 +170,7 @@ export const defaultTuning = {
     zoomTime: 0.16,
     lookSensitivity: 0.0022, // radians per pixel at the base field of view
     headBob: 1, // 0 turns camera bob off
-    // How far the eye dips as each foot comes down, metres, at each gait's speed (sim/motor/bob.ts).
+    // How far the eye dips as each foot comes down, metres, at each gait's speed (sim/body/bob.ts).
     bob: { crawl: 0.01, crouch: 0.016, walk: 0.026, sprint: 0.05 },
     fogDensity: 0.0012, // exp² fog: about 30% at 500 m, 75% at 1 km
   },

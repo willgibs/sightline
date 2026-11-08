@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { SoundEngine, type MuffleFn } from '../../src/audio/engine';
 import { footstep, makeNoiseBuffers, makeRand } from '../../src/audio/voices';
-import { PLAYER_ID } from '../../src/sim/state';
+import { PLAYER_ID } from '../../src/sim/game/entities';
 import { defaultTuning } from '../../src/config/tuning';
-import type { FootstepEvent } from '../../src/sim/events';
-import { SURFACE_NAMES, type Surface } from '../../src/sim/world/surfaces';
+import type { FootstepEvent } from '../../src/sim/kernel/events';
+import { SURFACE_NAMES, type Surface } from '../../src/sim/kernel/world/surfaces';
 
 /**
  * The sound engine, measured. Everything renders offline, so these are numbers, not

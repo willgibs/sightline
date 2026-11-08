@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { neutralInput, quantizeInput, type InputFrame } from '../src/sim/input';
-import { footfall } from '../src/sim/motor/footfall';
-import { Simulation } from '../src/sim/sim';
-import { PLAYER_ID } from '../src/sim/state';
-import type { SimEvent } from '../src/sim/events';
-import { Blocks } from '../src/sim/world/colliders';
-import { Surface } from '../src/sim/world/surfaces';
+import { neutralInput, quantizeInput, type InputFrame } from '../src/sim/kernel/input';
+import { footfall } from '../src/sim/body/footfall';
+import { Simulation } from '../src/sim/game/sim';
+import { PLAYER_ID } from '../src/sim/game/entities';
+import type { SimEvent } from '../src/sim/kernel/events';
+import { Blocks } from '../src/sim/kernel/world/colliders';
+import { Surface } from '../src/sim/kernel/world/surfaces';
 import { EAST, testGuard, testWorld, tuningCopy } from './fixtures';
 
 const HZ = 30;

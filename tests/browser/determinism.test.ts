@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runSelfTest } from '../../src/sim/selftest';
+import { runSelfTest } from '../../src/sim/game/selftest';
 
 /**
  * The simulation inside this browser's own JavaScript engine must produce exactly the

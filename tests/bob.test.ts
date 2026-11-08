@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { lerp } from '../src/sim/core/math';
-import { neutralInput, quantizeInput } from '../src/sim/input';
-import { bobDepth, headBob } from '../src/sim/motor/bob';
-import { Simulation } from '../src/sim/sim';
+import { lerp } from '../src/sim/kernel/core/math';
+import { neutralInput, quantizeInput } from '../src/sim/kernel/input';
+import { bobDepth, headBob } from '../src/sim/body/bob';
+import { Simulation } from '../src/sim/game/sim';
 import { EAST, testWorld } from './fixtures';
 
 /**
- * Head bob (sim/motor/bob.ts): the camera dips as each foot comes down, as deep as the
+ * Head bob (sim/body/bob.ts): the camera dips as each foot comes down, as deep as the
  * gait at that speed, and the dip lands on the moment the footstep sounds.
  */
 

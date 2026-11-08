@@ -1,0 +1,5 @@
+{
+  "//": "The kernel compiled on its own, with no lane or game in the program: it must not use anything they add to its types (CLAUDE.md, rule 19).",
+  "extends": "./tsconfig.json",
+  "include": ["src/sim/kernel", "tests/kernel.test.ts"]
+}

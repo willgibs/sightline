@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { Recording } from '../src/sim/record/recording';
-import { resimulate } from '../src/sim/record/resim';
-import { ReplaySeeker } from '../src/sim/record/seek';
-import { runScene } from '../src/sim/scene';
-import { SCENES, sceneOf } from '../src/sim/scenes';
+import { Recording } from '../src/sim/kernel/record/recording';
+import { resimulate } from '../src/sim/kernel/record/resim';
+import { ReplaySeeker } from '../src/sim/kernel/record/seek';
+import { runScene } from '../src/sim/kernel/scene';
+import { SCENES, sceneOf } from '../src/sim/game/scenes';
 
 /**
  * Every scene, run headless by its own driver: its expectations hold, and its recording
