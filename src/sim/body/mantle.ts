@@ -79,6 +79,12 @@ export function poseClear(x: number, y: number, z: number, height: number, spec:
 }
 
 /** Where a mantle is at `t` seconds along its path. */
+/** A path can cross rising ground while reaching for the ledge: its feet stay on top of it. */
+function keepOnGround(world: MotorContext['world'], p: MantlePose): void {
+  const ground = world.terrain.heightAt(p.x, p.z);
+  if (p.y < ground) p.y = ground;
+}
+
 /** A point along a path (mantle, ladder). */
 export interface MantlePose {
   x: number;
@@ -244,6 +250,7 @@ function plan(b: Pick<BodyState, 'x' | 'y' | 'z' | 'yaw' | 'motor' | 'sliding' |
   for (let k = 1; ; k++) {
     const t = k * dt < total ? k * dt : total;
     mantleAt(out, t, pose);
+    keepOnGround(world, pose);
     const eye = b.eyeHeight + (crouch - b.eyeHeight) * smoothstep(0, 1, ease > 0 ? t / ease : 1);
     const height = Math.max(spec.height.crouch, eye + clearance);
     if (!poseClear(pose.x, pose.y, pose.z, height, spec, ctx)) return false;
@@ -314,6 +321,7 @@ export function stepMantle(b: BodyState, spec: BodySpec, ctx: MotorContext): voi
   const total = totalTime(m);
   const next = m.t + dt < total ? m.t + dt : total;
   mantleAt(m, next, pose);
+  keepOnGround(world, pose);
   if (!poseClear(pose.x, pose.y, pose.z, bodyHeight(b, spec), spec, ctx)) {
     b.speed = 0;
     m.waited += dt;
