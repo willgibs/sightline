@@ -391,7 +391,7 @@ export function speak(ctx: TickContext, g: GuardEntity): void {
     b.say = null;
     const body = g.body;
     const y = body.y + body.eyeHeight - ctx.tuning.perception.hearing.lift;
-    const id = ctx.emit({ type: 'call', source: g.id, cause: report.cause, x: body.x, y, z: body.z, surface: Surface.Grass, loudness: radius / ctx.tuning.noise.radiusPerUnit, radius, radio: radio ? 1 : 0 });
+    const id = ctx.emit({ type: 'call', source: g.id, cause: report.cause, x: body.x, y, z: body.z, surface: Surface.Grass, loudness: radius / ctx.tuning.noise.radiusPerUnit, radius, radio: radio ? 1 : 0, say: report.kind });
     const c = commanderOf(ctx);
     if (c) c.camp.voices.push({ event: id, report, heardUntil: ctx.tick + Math.round((radius / 300 + 1) * ctx.tuning.sim.tickHz) });
     // The event lands after 'perception' this tick, so it is delivered by hand (perception.ts).

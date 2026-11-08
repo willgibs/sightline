@@ -290,6 +290,8 @@ export interface CallEvent extends EventBase, SoundFields {
   type: 'call';
   /** 1 if he's on the radio: delivered across the camp when he finishes (brain/reports.ts). */
   radio: number;
+  /** What he's saying (brain/reports.ts). */
+  say: ReportCode;
 }
 
 /** A radio report arrives across the net (E4): delivered to the camp and every guard with a radio. Source: the guard who said it; cause: the percept he reported. */
@@ -493,7 +495,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   ranged: { code: 34, range: 'ballistics', sound: false, fields: { range: 'f32', x: 'f32', y: 'f32', z: 'f32', what: { enum: ['none', ...STRIKES] } } },
   bolt: { code: 35, range: 'ballistics', sound: true, fields: { ...SOUND } },
   clatter: { code: 36, range: 'ballistics', sound: true, fields: { ...SOUND, thrown: 'u32', speed: 'f32' } },
-  call: { code: 91, range: 'brain', sound: true, fields: { ...SOUND, radio: 'u8' } },
+  call: { code: 91, range: 'brain', sound: true, fields: { ...SOUND, radio: 'u8', say: { enum: REPORT_CODES } } },
   radio: { code: 92, range: 'brain', sound: false, fields: { kind: { enum: REPORT_CODES }, x: 'f32', z: 'f32', radius: 'f32' } },
   order: { code: 93, range: 'brain', sound: false, fields: { to: 'u32', task: { enum: ['investigate', 'search', 'check', 'sweep', 'cover'] }, x: 'f32', z: 'f32' } },
   alarm: { code: 97, range: 'brain', sound: false, fields: { box: 'u8', stage: { enum: ['raised', 'dead'] } } },

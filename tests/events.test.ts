@@ -80,7 +80,7 @@ function events(): { sim: Simulation; all: SimEvent[]; valley: number; range: Si
     { type: 'spotted', id: 0, tick, t: tick / 30, source: guard, cause: 0, what: 'body', x: 12.5, y: 0.3, z: -40.25, distance: 42.5 },
     { type: 'noise', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, loudness: 2, radius: 24 },
     { type: 'act', id: 0, tick, t: tick / 30, source: guard, cause: 1, from: 'routine', to: 'look', why: 'heard', x: 3, z: -4, weight: 0.65 },
-    { type: 'call', id: 0, tick, t: tick / 30, source: guard, cause: 1, ...voice, loudness: 14 / defaultTuning.noise.radiusPerUnit, radius: 14, radio: 1 },
+    { type: 'call', id: 0, tick, t: tick / 30, source: guard, cause: 1, ...voice, loudness: 14 / defaultTuning.noise.radiusPerUnit, radius: 14, radio: 1, say: 'contact' },
     { type: 'radio', id: 0, tick, t: tick / 30, source: guard, cause: 1, kind: 'contact', x: 8, z: -2, radius: 6 },
     { type: 'order', id: 0, tick, t: tick / 30, source: guard, cause: 1, to: guard, task: 'search', x: 1, z: -2 },
     { type: 'level', id: 0, tick, t: tick / 30, source: guard, cause: 1, from: 'calm', to: 'uneasy' },

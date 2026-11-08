@@ -3,6 +3,7 @@ import type { Tuning } from '../config/tuning';
 import { FixedStepClock } from '../sim/kernel/core/clock';
 import { headingDegrees, lerp, moveTowards } from '../sim/kernel/core/math';
 import { headBob } from '../sim/body';
+import type { ReportCode } from '../sim/kernel/events';
 import { BARKS, beliefRadius, explainChain, groundLight, lightName, movementVisibility, stanceVisibility } from '../sim/perception';
 import { EventLog } from '../sim/kernel/eventlog';
 import { Cues } from './cues';
@@ -93,6 +94,17 @@ interface Bench {
   calls: number[];
   triangles: number[];
 }
+
+/** What a guard's radio or voice report says aloud (the captions you hear, by the law of sound). */
+const CALL_LINES: Readonly<Record<ReportCode, string>> = {
+  contact: 'Contact! Calling it in.',
+  heard: 'Heard something. Going to check.',
+  shot: 'Shots fired. Anybody see from where?',
+  body: 'Man down! Man down!',
+  missing: "Post isn't answering.",
+  clear: 'Clear here.',
+  claim: "I'll take a look.",
+};
 
 export class Game {
   private tuning: Tuning;
@@ -988,6 +1000,11 @@ export class Game {
     const ear = { x: p.x, y: p.y + p.eyeHeight, z: p.z };
     const view = { x: ear.x, z: ear.z, yaw: this.replay ? p.yaw : this.input.yaw };
     for (const e of events) {
+      if (e.type === 'call') {
+        if (this.sound.levelAt(e.x, e.y, e.z, e.radius, ear.x, ear.y, ear.z) < 1) continue;
+        this.cues.say(CALL_LINES[e.say], e.radio === 0, e.x, e.z, view, this.time);
+        continue;
+      }
       if (e.type !== 'bark') continue;
       const line = BARKS[e.line];
       if (!line || this.sound.levelAt(e.x, e.y, e.z, e.radius, ear.x, ear.y, ear.z) < 1) continue;

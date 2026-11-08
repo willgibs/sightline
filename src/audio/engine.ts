@@ -6,7 +6,7 @@ import type { AmbientSource } from '../sim/generation';
 import { emptyRoute, type RouteFn, type SteadyFn } from './hearing';
 import { footstep, humLoop, makeNoiseBuffers, makeRand, murmur, rustle, waterLoop, windBed, type Loop, type NoiseBuffers, type Rand } from './voices';
 import { BARKS } from '../sim/perception';
-import { bolt, clatter, crack, cry, impact, report } from './shotVoices';
+import { bolt, clatter, crack, cry, impact, report, siren } from './shotVoices';
 import { crackAt, type Crack, type Flight } from '../sim/ballistics';
 import { Surface, surfaceName } from '../sim/kernel/world/surfaces';
 
@@ -270,6 +270,12 @@ export class SoundEngine {
         this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) =>
           e.type === 'bark' ? murmur(this.ctx, out, this.noise, this.rand, when, words, line?.shout ?? false, amp) : footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), 1.6, amp), lead,
         );
+      } else if (e.type === 'call') {
+        // A guard talking, on the radio or to whoever is near: a murmur, heard by the law like a bark.
+        this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => murmur(this.ctx, out, this.noise, this.rand, when, 5, e.radio === 0, amp), lead);
+      } else if (e.type === 'siren') {
+        // The camp's alarm: a wail anyone in the valley can hear.
+        this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => siren(this.ctx, out, when, amp), lead);
       } else if (e.type === 'report') {
         // A shot's blast: at your own ears, loud (the suppressor makes it a cough); anyone else's, placed and late.
         const suppressed = e.suppressed === 1;
