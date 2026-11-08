@@ -129,6 +129,31 @@ Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Unt
 
 Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the generation lane.
 
+### The exit test so far: what the reviewers' plans showed
+
+**Reviewers.** Three fresh agents that never saw the generator planned ten held-out camps (series `lab-d-review`, as built before the fixes below) from what recon would show: the layout, the ridges, the guards and their timing, each in its own order and under its own letters (`npm run plans -- --briefs`). Each wrote each camp's best plan as a signature. `--evaluate` then took every plan at its word: `writtenShots` checks that the guard it names can be shot as it says from a perch in its sector and band, and lab B's scripted marksman fires it in the simulation.
+
+- **The plans work.** 29 of 30 on D's model. Of the 28 rifle plans that fired, 24 dropped their guards; 3 of the 4 misses were one perch a body slides off (below), and one shot grazed a wall the model's 1 m cells call clear. The one way in a reviewer chose was checked on D's model only. Guards don't answer a shot until lab E, so "nobody saw him fall" is still D's model.
+- **The reviewers agree.** Pairs of reviewers matched on three of four fields on one camp 19 times of 30.
+- **The plans are not "clearly different" by the plan's own test.** 29 of the 30 plans are the same kind: shoot the target from a ridge while he's out on his walk, when nobody is watching him. `split` is "window" in 23 of them and `tool` is "rifle window" in 22, so two camps match on three of four fields as soon as they share a ridge side or the target's side. Within one reviewer's ten plans, 7 to 12 of the 45 pairs of camps share a signature (the bots' best plans, which take a camp apart, stay 9 of 10 distinct). Run on another camp, a reviewer's plan is clearly worse (0.1 riskier, or impossible) in 64 to 71 of 90 cases, so the plans do depend on their camps; they are the same *kind* of plan.
+- **Why:** the design doc requires every camp to offer each approach, so the generator guarantees two perches that hold the target in view 10 s a cycle, and the brief asked how to eliminate him and get away. With no answer to a shot yet, that shot is the best plan almost everywhere. Whether a camp should steer players away from it is the owner's call; the review is left as it is rather than re-tuned against.
+
+**What firing them corrected:**
+- **A perch is ground a body can lie on,** at most 40° (`gen.analysis.perchSlopeDeg`; the motor's limit is 42°). Perches came from the terrain's skyline alone: on the review set 58 of 320 (18%) stood on ground too steep to lie on, and a shooter placed there slides off. Rules were being satisfied by places no one can be.
+- **A perch's eye is the body's prone eye** (`gen.sight.proneEye`, 0.32 m; it was 0.5 m).
+- **The reviewers' briefs gave facings as world bearings** beside positions in the camp's frame; one reviewer worked it out from the sweeps. Now in the camp's frame, for later runs.
+
+**Lab C:** a climber at the top of a tower's ladder can never step onto the deck: the rail is too tall to mantle from there. The rail on the ladder's side now has a gap at the ladder's head (`gen.compound.ladderGap`, 0.8 m, as lab C's checks ask). Whichever of #6 and lab C's ladder lands second confirms a climb ends on the deck.
+
+**Measured after those fixes, on a fresh series** (`lab-d-exit-3`): 97 of 100 at the first camp attempt, 3 repaired or rebuilt, none invalid, in 2.2 s a camp (p95 3.5 s, the slowest 13 s); first-attempt failures: perch coverage 2, perch witnessed 1. Over those 100:
+- the bots' best plans fall into 36 distinct signatures (long range 40, infiltration 13, systems 1);
+- the sightline graph ranges from no clusters to 3, with hard cores from 2 to 7 (22 above the intended 4);
+- 88 certified ways in held when walked through the simulation (94 on the series before). The margin decides it: of the 42 ways that peak under 75% on D's model, 41 held; of the 58 close calls, 47.
+
+The review set rebuilt on the fixed generator: the bots' best plans 8 of 10 distinct, 77 of 90 clearly worse elsewhere, 10 of 10 ways in held. The reviewers weren't asked again: their finding is about kinds of plan, which these fixes don't touch, and it waits on the owner.
+
+**What moved:** nothing in Phase 0's valley, and no version: no recording on `main` has a lab D camp yet. The `camp-systems` run moved with the camps (`e5c646c959574b12`, state `d922e4245070fa08`), the tuning gained two values, so the golden recording is rewritten, and the generation bench's busiest search is 75,249 of 400,000.
+
 ### Validation and repair: the rules, built in first (D8)
 
 **Decision:**

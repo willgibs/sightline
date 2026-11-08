@@ -748,9 +748,16 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
   - **Built** (`generation/validate.ts`, `repair.ts`, `plans.ts`, and in `compound.ts` and `staffing.ts`). Every rule above, measured as `docs/decisions.md` says, with `seeds --camps` reporting first attempts, repairs, rebuilds and each seed's margin.
     - The generator builds to the rules first: the antenna and alarm boxes hidden from the overviews (walls, else indoors), the target's walk and his vehicle chosen against the perches, workers and the officer waiting indoors, posts moved off a dominant perch.
     - Repair: shift a patrol's phase, turn or move a post, or move it out of an offending perch's sight, kept only if the camp comes closer to valid, within 12 re-analyses. A camp it can't save is rebuilt from fresh forks, up to 3 times.
+    - Firing the reviewers' plans in the simulation (`npm run plans -- --evaluate`) corrected two more: a perch is ground a body can lie on (at most 40°), and its eye is the body's prone eye. Lab C's check gave each tower's rail a gap at the ladder's head.
     - Running the ways in through the real simulation (`npm run plans -- --simulate`) corrected four things in D7's model: the crouched pace (a step takes 5/9 s), towers (open under the roof), how the raster stamps thin things (by cell centres, so a certificate of stealth errs the safe way), and a margin (a certified way may fill the meter only to 85%). With them, every way in tried held in the simulation.
 - [ ] D9 · The valley switches to the generator, and the test camp retires. It lands alone.
 - [ ] Exit test, the bench numbers, a note, a playable link.
+  - **Where it stands (Nov 8), waiting on the owner:**
+    - **The held-out series passes:** 97 of 100 at the first camp attempt, 3 repaired or rebuilt, none invalid (`lab-d-exit-3`).
+    - **The bots prove diversity:** 36 distinct best-plan signatures over those 100, and 8 of 10 on the review set, whose plans are clearly worse elsewhere in 77 of 90 cases.
+    - **The reviewers:** 3 agents, 10 camps. Their plans work (29 of 30 on D's model; 24 of the 28 rifle plans dropped their guards in the simulation) and they agree (19 of 30 pairs).
+    - **"Clearly different" does not pass on the reviewers' signatures.** 29 of their 30 plans are the same kind (shoot the target from a ridge while he's out on his walk, unwatched), so 7 to 12 of the 45 pairs of camps share a signature. `docs/decisions.md` (Lab D) has the numbers and why; whether camps should steer players away from that shot is the owner's call.
+    - **The owner's spot check of three camps** is still to come.
 
 ### E · Camp brain
 
