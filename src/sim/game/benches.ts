@@ -1,3 +1,4 @@
+import type { World } from '../kernel/world/world';
 import { defaultTuning } from '../../config/tuning';
 import { InvariantWatch } from '../body';
 import { analyzeCamp, campMission, generateWorld, infiltrate, spaceTimeSearch } from '../generation';
@@ -95,6 +96,8 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
       let mostAttempts = 0;
       let sipp = 0;
       let plain = 0;
+      let hardest: World | null = null;
+      let hardestWork = -1;
       for (const seed of GENERATION_SEEDS) {
         const w = generateWorld(campMission(seed), defaultTuning);
         const a = w.report.camp!;
@@ -106,11 +109,17 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
         else if (w.report.validation!.ok) repaired++;
         broken += w.report.validation!.failed.length;
         mostAttempts = Math.max(mostAttempts, w.report.repairAttempts ?? 0);
-        if (seed === GENERATION_SEEDS[0]) {
-          // The exact search against the plain one (the analysis itself runs a greedy one first, which finds a way sooner still).
-          sipp = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, undefined, (S, E, M, Q) => infiltrate(S, E, M, { ...Q, weight: 1 })).analysis.infiltration.expanded;
-          plain = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, undefined, spaceTimeSearch).analysis.infiltration.expanded;
+        if (!hardest || a.infiltration.expanded > hardestWork) {
+          hardest = w;
+          hardestWork = a.infiltration.expanded;
         }
+      }
+      // The exact search against the plain one, on the camp whose way in was hardest to find
+      // (the analysis itself runs a greedy search first, which finds a way sooner still).
+      if (hardest) {
+        const w = hardest;
+        sipp = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, undefined, (S, E, M, Q) => infiltrate(S, E, M, { ...Q, weight: 1 })).analysis.infiltration.expanded;
+        plain = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, undefined, spaceTimeSearch).analysis.infiltration.expanded;
       }
       return {
         [`valid at the first attempt (of ${GENERATION_SEEDS.length})`]: first,
@@ -126,8 +135,8 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
         [`lab D camps with a way in and out (of ${GENERATION_SEEDS.length})`]: wayIn,
         'lab D clusters left unsolved': unsolved,
         [`lab D busiest search (of ${defaultTuning.gen.analysis.maxExpansions} expansions)`]: busiest,
-        'lab D way in, states expanded: safe intervals': sipp,
-        'lab D way in, states expanded: plain space-time search': plain,
+        'lab D hardest way in, states expanded: safe intervals': sipp,
+        'lab D hardest way in, states expanded: plain space-time search': plain,
       };
     },
   },

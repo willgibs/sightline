@@ -42,11 +42,10 @@ export function campSystems(): Scene {
   const take: System = {
     name: 'take-the-target',
     phase: 'commands',
-    after: ['rifle'],
+    after: ['rifle', 'cut-the-generator', 'player-commands'],
     reads: ['objective.objective'],
     writes: ['entities'],
     emits: [],
-    after: ['cut-the-generator', 'player-commands'],
     run(ctx) {
       if (ctx.tick !== TAKEN) return;
       for (const o of ctx.index.of('objective')) ctx.despawn(o.objective.target);

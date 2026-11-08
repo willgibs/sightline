@@ -34,14 +34,14 @@ export const BENCH_GOLDEN: PinnedBench = {
       "lab D most re-analyses in a repair (of 12)": 0,
       "lab D camps with a way in and out (of 6)": 6,
       "lab D clusters left unsolved": 0,
-      "lab D busiest search (of 400000 expansions)": 91041,
-      "lab D way in, states expanded: safe intervals": 51,
-      "lab D way in, states expanded: plain space-time search": 50
+      "lab D busiest search (of 400000 expansions)": 78404,
+      "lab D hardest way in, states expanded: safe intervals": 11532,
+      "lab D hardest way in, states expanded: plain space-time search": 100478
     },
     "runs": {
       "camp-systems": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 2279 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 2519 }
         }
       }
     }

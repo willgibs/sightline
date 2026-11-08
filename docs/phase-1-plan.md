@@ -727,11 +727,11 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
   - Generation reads only `tuning.gen`, so its sight model is its own, and a scenario-runner check holds it to A's detection at sampled points. A retune of A then never changes a valley.
   - **Built** (`generation/raster.ts`, `field.ts`, `sight.ts`, `infiltrate.ts`, `clusters.ts`, `perches.ts`, `campAnalysis.ts`). Every world with a camp carries its analysis (`report.camp`), and the explorer draws it.
     - A 1 m raster in the camp's frame, and one cycle sampled every half second. The exposure field sums every guard's view, by D's copy of A's law for a crouched intruder on the move: A's zones, ramps, fill, cap and contact zone. A's scenario runner holds it to A at 112 points: never later than A by more than a sample, never twice as quick inside a zone.
-    - SIPP with a 128-level meter, its labels in Pareto fronts per interval. It agrees with brute force and the plain space-time search on 400 small camps. On the bench's first camp it expands 106k states to the plain search's 168k.
+    - SIPP with a 128-level meter, its labels in Pareto fronts per interval. It agrees with brute force and the plain space-time search on 400 small camps. The bench pins it against the plain search on its hardest way in (11,532 states to 100,478).
     - The ways: in (to a close shot at the target: within 12 m, a clear line, outside his contact zone), to the generator, and out.
     - Clusters are the strongly connected parts of the witness graph. They are certified watchers first by a bounded search: chains inside the 1.5 s reaction, waits for windows, relocation between perches, one distraction.
     - Staffing places each guard so the graph stays within limits (no part over 4, one over 3 at most) and the corridor stays a way in.
-    - Over 16 camps: every one has a way in, to the generator and out, and no cluster is unsolved. The best perch sees 38–56% of guard time, but the target is in some perch's view for 10–37% of the cycle, which D8's rule (25%) will repair. A camp generates in about 2.3 s.
+    - The analysis carries every camp's way in, to the generator and out, and its clusters; D8's rules read them.
 - [x] D8 · Validation and repair.
   - The design doc's rules, plus **no single perch wins**, checked exhaustively over the finite list of perches.
   - Both perch rules count coverage the same way: the share of each guard's time in view over the cycle, or a minimum time in view. Never "ever in view", which would count every passing patrol.
@@ -746,7 +746,7 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
   - Repair is a bounded greedy search over a fixed list of operators (move a sentry, shift a patrol's phase, swap a module, add cover, re-time a light circuit). Each attempt draws from its own labelled fork and stops after a fixed number of iterations (rule 18).
   - Difficulty comes from cluster count and size.
   - **Built** (`generation/validate.ts`, `repair.ts`, `plans.ts`, and in `compound.ts` and `staffing.ts`). Every rule above, measured as `docs/decisions.md` says, with `seeds --camps` reporting first attempts, repairs, rebuilds and each seed's margin.
-    - The generator builds to the rules first: the antenna and alarm boxes hidden from the overviews (walls, else indoors), the target's walk and his vehicle chosen against the perches, chores indoors, posts moved off a dominant perch.
+    - The generator builds to the rules first: the antenna and alarm boxes hidden from the overviews (walls, else indoors), the target's walk and his vehicle chosen against the perches, workers and the officer waiting indoors, posts moved off a dominant perch.
     - Repair: shift a patrol's phase, turn or move a post, or move it out of an offending perch's sight, kept only if the camp comes closer to valid, within 12 re-analyses. A camp it can't save is rebuilt from fresh forks, up to 3 times.
     - Running the ways in through the real simulation (`npm run plans -- --simulate`) corrected four things in D7's model: the crouched pace (a step takes 5/9 s), towers (open under the roof), how the raster stamps thin things (by cell centres, so a certificate of stealth errs the safe way), and a margin (a certified way may fill the meter only to 85%). With them, every way in tried held in the simulation.
 - [ ] D9 · The valley switches to the generator, and the test camp retires. It lands alone.

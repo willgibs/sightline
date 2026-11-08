@@ -130,7 +130,9 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
   }
   // The officer: between the target's door and the barracks, watching the yard.
   const barracksDoor = doorOf('barracks');
-  const officerWalk = barracksDoor ? route([step(hqDoor, 3), step(barracksDoor, 3)], [lookAt(step(hqDoor, 3), at(0, 0)), lookAt(step(barracksDoor, 3), at(0, 0))], ['half', 'quarter']) : null;
+  // He waits a pace inside each door, watching out through it: out of the perches' sight, not out of the yard's.
+  const officerStop = (d: DoorSpec): Point2 => step(d, -S.workerInside);
+  const officerWalk = barracksDoor ? route([officerStop(hqDoor), officerStop(barracksDoor)], [lookAt(officerStop(hqDoor), at(0, 0)), lookAt(officerStop(barracksDoor), at(0, 0))], ['half', 'quarter']) : null;
   // Workers' chores: the generator, the stores, the motor pool.
   // Most of them indoors (a pace inside the door), out of the perches' sight.
   const chores = [L.skeleton.sabotage, ...(['storage', 'mess', 'barracks'] as const).map((m) => doorOf(m)).filter((d): d is DoorSpec => d !== null).map((d) => step(d, -S.workerInside))];
