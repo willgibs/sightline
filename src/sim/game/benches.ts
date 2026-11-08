@@ -1,6 +1,7 @@
+import type { World } from '../kernel/world/world';
 import { defaultTuning } from '../../config/tuning';
 import { InvariantWatch, bodyHeight, bodyShape, createBody, eyeOf, mantleAt, stepMotor, type Cylinder, type MotorContext } from '../body';
-import { buildWorld, generateWorld } from '../generation';
+import { analyzeCamp, buildWorld, campMission, generateWorld, infiltrate, spaceTimeSearch } from '../generation';
 import type { LayerName } from '../lanes';
 import { LAYERS } from '../lanes';
 import { Hasher } from '../kernel/core/hash';
@@ -77,7 +78,8 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
     metrics: () => ({}),
   },
   generation: {
-    about: "Lab D: valleys valid at their first attempt, of a held-out series, and the least margin left under the attempt budget.",
+    about:
+      "Lab D: of a held-out series, Phase 0's valleys and lab D's valid at their first attempt, the least margin left under each budget, how much of the horizon lab D's ridges overlook, and the analysis of lab D's camps: valid at the first attempt, repaired, rules left broken, ways in and out, unsolved clusters, the busiest search, and safe intervals against the plain search.",
     metrics() {
       let first = 0;
       let margin = Infinity;
@@ -87,7 +89,74 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
         if (w.attempt === 0 && w.report.ok) first++;
         margin = Math.min(margin, budget - (w.attempt + 1));
       }
-      return { [`valid at the first attempt (of ${GENERATION_SEEDS.length})`]: first, 'least margin under the attempt budget': margin };
+      // Lab D's valleys (D3), until D9 makes them the default.
+      let campFirst = 0;
+      let campMargin = Infinity;
+      let widest = 0;
+      let narrowestOpen = Infinity;
+      const valleyBudget = defaultTuning.gen.landform.attempts;
+      for (const seed of GENERATION_SEEDS) {
+        const w = generateWorld(campMission(seed), defaultTuning);
+        const v = w.report.valley!;
+        if (w.attempt === 0 && v.ok) campFirst++;
+        campMargin = Math.min(campMargin, valleyBudget - (w.attempt + 1));
+        widest = Math.max(widest, Math.round(v.perchArcDeg));
+        narrowestOpen = Math.min(narrowestOpen, Math.round(v.openGapDeg));
+      }
+      // Lab D's analysis of its camps (D7): ways in found, clusters left unsolved, and the
+      // busiest search against its budget; and on the first, the gain of safe intervals over
+      // the plain space-time search, by states expanded on the way in.
+      let wayIn = 0;
+      let unsolved = 0;
+      let busiest = 0;
+      let firstTry = 0;
+      let repaired = 0;
+      let broken = 0;
+      let mostAttempts = 0;
+      let sipp = 0;
+      let plain = 0;
+      let hardest: World | null = null;
+      let hardestWork = -1;
+      for (const seed of GENERATION_SEEDS) {
+        const w = generateWorld(campMission(seed), defaultTuning);
+        const a = w.report.camp!;
+        if (a.infiltration.found && a.exfil.found) wayIn++;
+        unsolved += a.clusters.filter((c) => c.certified === 'unsolved').length;
+        busiest = Math.max(busiest, a.infiltration.expanded, a.sabotage.expanded, a.exfil.expanded, a.exfil2.expanded, a.vehicle.expanded);
+        const repairs = w.report.repairs ?? [];
+        if (w.report.validation!.ok && repairs.length === 0 && w.attempt === 0 && (w.report.campAttempt ?? 0) === 0) firstTry++;
+        else if (w.report.validation!.ok) repaired++;
+        broken += w.report.validation!.failed.length;
+        mostAttempts = Math.max(mostAttempts, w.report.repairAttempts ?? 0);
+        if (!hardest || a.infiltration.expanded > hardestWork) {
+          hardest = w;
+          hardestWork = a.infiltration.expanded;
+        }
+      }
+      // The exact search against the plain one, on the camp whose way in was hardest to find
+      // (the analysis itself runs a greedy search first, which finds a way sooner still).
+      if (hardest) {
+        const w = hardest;
+        sipp = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, undefined, (S, E, M, Q) => infiltrate(S, E, M, { ...Q, weight: 1 })).analysis.infiltration.expanded;
+        plain = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, undefined, spaceTimeSearch).analysis.infiltration.expanded;
+      }
+      return {
+        [`valid at the first attempt (of ${GENERATION_SEEDS.length})`]: first,
+        'least margin under the attempt budget': margin,
+        [`lab D valleys valid at the first attempt (of ${GENERATION_SEEDS.length})`]: campFirst,
+        'lab D least margin under the valley budget': campMargin,
+        'lab D widest overwatched horizon (°)': widest,
+        'lab D narrowest open horizon (°)': narrowestOpen,
+        [`lab D camps valid at the first attempt, no repair (of ${GENERATION_SEEDS.length})`]: firstTry,
+        'lab D camps repaired': repaired,
+        'lab D rules still broken': broken,
+        [`lab D most re-analyses in a repair (of ${defaultTuning.gen.validation.repairAttempts})`]: mostAttempts,
+        [`lab D camps with a way in and out (of ${GENERATION_SEEDS.length})`]: wayIn,
+        'lab D clusters left unsolved': unsolved,
+        [`lab D busiest search (of ${defaultTuning.gen.analysis.maxExpansions} expansions)`]: busiest,
+        'lab D hardest way in, states expanded: safe intervals': sipp,
+        'lab D hardest way in, states expanded: plain space-time search': plain,
+      };
     },
   },
   body: {

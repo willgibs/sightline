@@ -70,10 +70,11 @@ export function spawnTick(): Scene {
   const arriveAfterMotor: System = {
     name: 'arrive-after-motor',
     phase: 'world',
-    after: [],
     reads: [],
     writes: ['entities'],
     emits: [],
+    // Last in its phase, after the camp's power (game/camp.ts), as it was added.
+    after: ['camp-power'],
     run: (ctx) => void (ctx.tick === ARRIVALS[0].tick && arrive(ctx, 0)),
   };
   const arriveBeforeIntent: System = {

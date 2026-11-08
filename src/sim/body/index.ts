@@ -25,7 +25,7 @@ export {
 } from './body';
 export { idleIntent, stepMotor, type Cylinder, type MotorContext, type MoveIntent } from './motor';
 export { canMantle, mantleAt } from './mantle';
-export { climbPrompt, ladderInReach, ladderLine, ladderLinks, ladderTop, type Ladder, type LadderLink, type LadderState } from './ladder';
+export { climbPrompt, ladderInReach, ladderLine, ladderLinks, ladderTop, laddersOf, type Ladder, type LadderLink, type LadderState } from './ladder';
 export { requestStance } from './stance';
 export { intentFor, intents, motorSystem } from './system';
 export { bodyShape, bodyShapeAt, eyeOf, hipHeight, queryBodies, type ShapePose } from './shape';

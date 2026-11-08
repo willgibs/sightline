@@ -130,6 +130,7 @@ Built on the `lab-c-movement` branch to `docs/phase-1-plan.md`, section C. Lean 
 **Decision:**
 - A ladder is a motor mode (`body/ladder.ts`): the climb press takes it from its foot or its top, forward and back move up and down it (1.8 m/s up, 2.2 m/s down), and a press lets go. The world's ladders are data (`world.ladders`, same shape as lab D's `LadderSpec`); `ladderLinks()` gives navigation (lab E) the two places each one joins, and how long it takes.
 - Getting off the top is a mantle over the edge, checked pose by pose before it starts and every tick after (Half-Life 2's validated dismounts, without the fixed points); getting on from the top runs that same way backwards.
+- A world's ladders are its own or its camp's (`laddersOf`): lab D's towers work as built, through the 0.8 m gap lab D left in the rail at the ladder's head. A test climbs every tower of a generated camp to its deck.
 - A long fuzz in valleys says little about ladders: three hours of the chaos bot in the lab took a ladder six times. So the fuzz run also plays towers drawn from a seed, ground and clutter varied, with a bot that climbs them (`scene:ladder-tower`, `bots/ladderBot.ts`), and the watch checks that a mantle or a ladder doesn't move into another body.
 - The fuzzing bot learned to lean hard into walls, press climb at walls and guards again and again, swing the body around while prone, and pump a ladder. The fuzz run also plays the movement lab (`movement-lab`), where the walls, windows, ladder and moving guards are.
 - The chaos bot's new behaviours move `TAL-4471 chaos` and the benches' fuzz numbers; lean, mantle and ladders stay out of every other golden.
@@ -356,6 +357,208 @@ Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Unt
 ## 2026-11-08 · Lab D
 
 Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the generation lane.
+
+### The exit test so far: what the reviewers' plans showed
+
+**Reviewers.** Three fresh agents that never saw the generator planned ten held-out camps (series `lab-d-review`, as built before the fixes below) from what recon would show: the layout, the ridges, the guards and their timing, each in its own order and under its own letters (`npm run plans -- --briefs`). Each wrote each camp's best plan as a signature. `--evaluate` then took every plan at its word: `writtenShots` checks that the guard it names can be shot as it says from a perch in its sector and band, and lab B's scripted marksman fires it in the simulation.
+
+- **The plans work.** 29 of 30 on D's model. Of the 28 rifle plans that fired, 24 dropped their guards; 3 of the 4 misses were one perch a body slides off (below), and one shot grazed a wall the model's 1 m cells call clear. The one way in a reviewer chose was checked on D's model only. Guards don't answer a shot until lab E, so "nobody saw him fall" is still D's model.
+- **The reviewers agree.** Pairs of reviewers matched on three of four fields on one camp 19 times of 30.
+- **The plans are not "clearly different" by the plan's own test.** 29 of the 30 plans are the same kind: shoot the target from a ridge while he's out on his walk, when nobody is watching him. `split` is "window" in 23 of them and `tool` is "rifle window" in 22, so two camps match on three of four fields as soon as they share a ridge side or the target's side. Within one reviewer's ten plans, 7 to 12 of the 45 pairs of camps share a signature (the bots' best plans, which take a camp apart, stay 9 of 10 distinct). Run on another camp, a reviewer's plan is clearly worse (0.1 riskier, or impossible) in 64 to 71 of 90 cases, so the plans do depend on their camps; they are the same *kind* of plan.
+- **Why:** the design doc requires every camp to offer each approach, so the generator guarantees two perches that hold the target in view 10 s a cycle, and the brief asked how to eliminate him and get away. With no answer to a shot yet, that shot is the best plan almost everywhere. Whether a camp should steer players away from it is the owner's call; the review is left as it is rather than re-tuned against.
+
+**What firing them corrected:**
+- **A perch is ground a body can lie on,** at most 40° (`gen.analysis.perchSlopeDeg`; the motor's limit is 42°). Perches came from the terrain's skyline alone: on the review set 58 of 320 (18%) stood on ground too steep to lie on, and a shooter placed there slides off. Rules were being satisfied by places no one can be.
+- **A perch's eye is the body's prone eye** (`gen.sight.proneEye`, 0.32 m; it was 0.5 m).
+- **The reviewers' briefs gave facings as world bearings** beside positions in the camp's frame; one reviewer worked it out from the sweeps. Now in the camp's frame, for later runs.
+
+**Lab C:** a climber at the top of a tower's ladder can never step onto the deck: the rail is too tall to mantle from there. The rail on the ladder's side now has a gap at the ladder's head (`gen.compound.ladderGap`, 0.8 m, as lab C's checks ask). Whichever of #6 and lab C's ladder lands second confirms a climb ends on the deck.
+
+**Measured after those fixes, on a fresh series** (`lab-d-exit-3`): 97 of 100 at the first camp attempt, 3 repaired or rebuilt, none invalid, in 2.2 s a camp (p95 3.5 s, the slowest 13 s); first-attempt failures: perch coverage 2, perch witnessed 1. Over those 100:
+- the bots' best plans fall into 36 distinct signatures (long range 40, infiltration 13, systems 1);
+- the sightline graph ranges from no clusters to 3, with hard cores from 2 to 7 (22 above the intended 4);
+- 88 certified ways in held when walked through the simulation (94 on the series before). The margin decides it: of the 42 ways that peak under 75% on D's model, 41 held; of the 58 close calls, 47.
+
+The review set rebuilt on the fixed generator: the bots' best plans 8 of 10 distinct, 77 of 90 clearly worse elsewhere, 10 of 10 ways in held. The reviewers weren't asked again: their finding is about kinds of plan, which these fixes don't touch, and it waits on the owner.
+
+**What moved:** nothing in Phase 0's valley, and no version: no recording on `main` has a lab D camp yet. The `camp-systems` run moved with the camps (`e5c646c959574b12`, state `d922e4245070fa08`), the tuning gained two values, so the golden recording is rewritten, and the generation bench's busiest search is 75,249 of 400,000.
+
+### Validation and repair: the rules, built in first (D8)
+
+**Decision:**
+- **Validation** (`generation/validate.ts`) reads the analysis and says how far each rule is from passing. Every perch rule is checked over the whole list of perches. Coverage counts the plan's way (a guard's time in view over the cycle), or a minimum time in view (15 s a cycle), never "ever in view".
+  - **Three approaches.** Long range: two perches that each see half the guards and the target for 10 s a cycle. Infiltration: a certified way to a close shot. Systems: an unseen way to the generator, which powers an alarm or the radio.
+  - **No unsolved cluster.**
+  - **No single perch.** At most 60% of guard time and 25% of the target's. And a shot from a perch that sees two guards or more must be witnessed by someone it can't see, unless it's timed. That one is resolved over time: at a moment the perch sees the guard, another guard would see him drop, and the perch can't see that other guard then, for at least 3% of the cycle. (Counted per guard over the whole cycle, as first written, a patrol who passes behind a building never counted as out of view, and 17 of 40 camps failed.)
+  - **Companions.** Every perch is overlooked by a marksman post, or a counter-perch, or by ground the camp can walk to with a clear line within 450 m (the research's reading: "a ground position a counter-sniper team can reach"). No alarm box or antenna in the fire of a perch that sees 40% of guard time. And the escape: **the best overview** is the perch that sees the most of the camp's ground, and it mustn't have the target in view for 1.5 s on his run from his door to his vehicle; another perch must, or his vehicle can be reached unseen and sabotaged (the design doc's "crosses a perch's sightline or passes a sabotage point").
+    - The run is what matters because the research's reason for the rule is Hitman's evacuation exploit: a camper triggers the escape and shoots the target on the run; the vehicle is "fast or armoured". Measuring the whole route had the best overview seeing 54–93% of it, in every camp.
+  - **Two ways out,** leaving the raster at least 40 m apart, from the shot with the intruder's meter at rest.
+  - **At most 16 guards,** by count.
+- **Solution first, again.** Perches come from the terrain alone, and viewsheds from the first raster, so the generator builds to the rules rather than repairing into them:
+  - **Fixtures** (`placeFixtures`, after a first raster and viewsheds): the antenna is a 2 m whip on the most hidden wall (of the radio room, else the nearest building, else indoors beside the set); alarm boxes go on hidden walls or, if none, just inside a door. "Hidden" is judged against the overviews first: perches that see at least 30% of the camp's ground.
+  - **The escape vehicle** is parked 6–22 m from a door of the target's building, on the spot that best hides his run from the best overview and shows it to another perch.
+  - **The target's walk** (`staffing.ts`) is chosen against the perches: the spot indoors the fewest perches see; his errand the first that keeps every perch within the limit and lets two overviews have him 10 s; re-chosen once every guard is placed if the perches seeing half the camp don't have him.
+  - **Workers and the officer** wait a pace inside their doors, watching out through them (the officer's two stops are the target's door and the barracks door), and while a perch comes within 2 points of the coverage limit, the post it sees most moves to the nearest ground none of the perches over the limit can see.
+- **Repair** (`repair.ts`) is the bounded greedy search the plan names: a fixed list of local operators (shift a patrol's phase, turn a post, move a post along its arc, move a post out of an offending perch's sight), each attempt on its own labelled fork, kept only if the camp comes closer to valid (fewer rules broken, then by how much), stopping after 12 re-analyses. Swapping a module and adding cover are left for when these prove too weak (they weren't needed); re-timing a light circuit changes nothing under D's daylight sight law.
+- **A camp repair can't save is rejected** and built again from fresh forks, up to 3 times (the design doc: "repaired or rejected"). `seeds --camps` reports first attempts, repairs, rebuilds and each seed's margin.
+- **Difficulty comes from clusters, too:** the largest sightline cluster runs from 2 to 3 and the hard core from 3 to 5 across the difficulty range (they were fixed at 3 and 4; the default, 0.5, is unchanged).
+- **Four corrections to D7's model, found by running ways in through the simulation** with lab A's real perception (`npm run plans -- --simulate`):
+  - A step of a cell now takes 5/9 s, a crouched pace of 1.8 m/s (it was 0.5 s, faster than a body can follow).
+  - A tower is open under its roof: its deck and parapet count as solid, only its roof as the overhead slab, and perches see a guard on a deck by the direct line. Before, a marksman's own tower blocked his sight and hid him from every perch.
+  - A thing in the raster fills the cells whose centres it covers, or, if thinner than a cell, the row its centre line runs through. Stamping every cell it touched hid the intruder behind things that only clipped a cell, which is the wrong way for a certificate of stealth to err.
+  - A certified way in may fill the meter only to 85%: the two models differ a little (a patrol's gaze as he walks, how fast a meter falls), and paths that peaked at 90–95% in D's model were sometimes completed in A's.
+  - With these, every way in of 20 camps run through the simulation held (no guard reached 100% before arrival), against 3 of 6 before them.
+- **A greedy search first.** Validation only needs to know a way exists, so the analysis runs the search with its distance estimate weighted 40 times, and falls back to exact A* only if that runs out of budget. (The exact search stays the tested one: on 400 small camps it agrees with brute force.) Exact searches ran out of their 400k expansions on camps where a way exists; the greedy ones find it in 10–100k. A camp's generation dropped from 4–30 s to about 2 s.
+
+**Measured, on series nothing was tuned against** (`npm run seeds -- --count 100 --from <series> --camps`): the first held-out series, `lab-d-exit`, gave 86 of 100 at the first camp attempt, the rest repaired or rebuilt, none invalid; 12 of the failures were perch coverage at 61–65%. The officer's stops moved indoors as a result, and a fresh series, `lab-d-exit-2`, gave 97 of 100, 3 repaired or rebuilt, none invalid, in 2.1 s a camp (p95 2.6 s, the slowest 21 s). Over those 100:
+- 94 certified ways in held when walked through the simulation with lab A's real perception (nobody reached 100% before arrival);
+- the bots' best plans fall into 32 distinct signatures (long range is the best plan in 63 camps, infiltration in 37);
+- the sightline graph ranges from no clusters to 3, with hard cores from 2 to 9 (the 28 above 4 are more than staffing's limit intends: a tower's marksman, now seeing properly, joins groups that staffing's placement estimate allowed);
+- on D's model alone a single perch can take 6 to 10 guards, one by one, given time. That model has no reaction to shots: the camp's answer is lab E's half of "one overlook mustn't clear a camp" (its exit test, a perfect shooter on the best perch failing).
+
+**What moved:** nothing in Phase 0's valley. The `camp-systems` run moved with its staffing (`f1c3cabd3c2f6ab7`, state `234887d847d060db`), the tuning gained `gen.validation`, so the golden recording is rewritten, and the generation bench gained D8's numbers: all 6 of its camps pass at the first attempt, and on its hardest way in safe intervals expand 11,532 states to the plain search's 100,478.
+
+**Why:** the plan's D8. Rules a camp must pass, built in first so most camps pass as built, with a bounded, labelled repair for the rest and a rebuild for what repair can't save.
+
+### The camp's analysis: who sees whom, what each perch sees, and the ways in (D7)
+
+**Decision:**
+- **One raster, aligned with the camp** (`generation/raster.ts`): 1 m cells in the camp's frame, over the fence and 30 m round it, each with its ground, its tallest top, an overhead slab (roofs, lintels), whether it's walkable and its moves. Sight colliders and vehicles are stamped by their extents in the camp's frame, and doorways carved under their lintels. Its lines of sight agree with exact raycasts on more than 85% of random pairs and err toward blocking (a test).
+- **One cycle, sampled every half second** (`field.ts`). Every routine divides the camp's cycle, so one cycle of every guard's eye and gaze is exact for the whole mission. The exposure field says, for each cell and sample, how many levels of the intruder's meter it adds, summed over guards: one meter for every guard fills at least as fast as any one guard's. It is stored cell by cell, so a search reads a cell's cycle in one run.
+- **D's sight law is A's, copied** (`sight.ts`, `tuning.gen.sight`). Generation reads only `tuning.gen`, so the law is D's own: lab A's for one body, a crouched intruder on the move, lit, in the open.
+  - A's zones, with ranges A's × 0.6 for the stance: the core ±30° to 90 m, the periphery ±60° to 15 m, a marksman's binoculars ±2.5° to 240 m. Then A's edge ramps, the fill linear in distance from 2 s to 8 s, the telegraph's cap (0.47 of the meter a second), contact (2.5 m in any direction, 0.8 s) and the still factor (0.4).
+  - What it leaves out only makes it quicker than A: light, foliage, the share of the body A's three rays see, and per-guard meters. The one exception is the sky behind a body; on the camp's pad, guards see an intruder against the ground.
+  - `tests/campSight.test.ts` runs A's sight scenario at 112 points across the zones and their edges. D is never later than A by more than a sample, and never more than twice as quick wherever the scenario's circle lies wholly inside one zone.
+  - The meter has 128 levels and falls at 0.0625 of full a second: half A's rate, with no hold, which covers A's 1.5 s hold for any pause of 3 s or more.
+  - The first calibration came from the design doc before A landed: 27 m of periphery, a 0.4 s fill up close, and no contact zone. A's numbers replaced it.
+- **Infiltration by safe intervals, exactly** (`infiltrate.ts`).
+  - SIPP over (cell, interval), with the meter. An interval is a safe run, where waiting lowers the meter, or one watched sample, whose rate the meter takes on arrival. It is a wall where even a still intruder couldn't take it.
+  - Each interval keeps the Pareto front of its labels (arrival, meter), counting the meter's fall while a label waits in a safe run. The labels live in a pool, so a 128-level meter costs no memory. A* orders them by arrival plus the walking distance.
+  - On 400 random small camps, it, the plain space-time search and brute force agree on whether a way exists and how soon, and every path replays. The generation bench pins it against the plain search on the hardest of its camps' ways in.
+  - The budget is 400k expansions (rule 18).
+  - **The three ways.**
+    - In: from anywhere on the rim to a close shot at the target, within 12 m with a clear line to his chest and outside his contact zone. Reaching him within 1.5 m means entering that zone, which A's law makes all but impossible.
+    - To the generator: within 2.2 m.
+    - Out: from the shot to the rim, with the target's own view gone.
+- **The sightline graph** (`clusters.ts`).
+  - Witness edges: a sees b drop when b stands in a's cone within D's witness ranges (80 m in the core, 30 m in the periphery: lab D's own until lab E's brain says how guards take it) with a clear line. Each carries its duty over the cycle.
+  - Edges holding for at least a tenth of the cycle join guards, and clusters are the strongly connected components (Tarjan, iterative, in guard order). No published method clusters guards by mutual visibility over time (`docs/research/labs.md`), so this is lab D's own.
+  - **Certified, watchers first.** A bounded search (20k expansions a cluster) looks for a kill order from the perches:
+    - shots 0.75 s apart from one perch while anyone is pending, and every witness dropped within the 1.5 s reaction;
+    - or waiting for a moment nobody alive is watching;
+    - relocating between perches at 2 m/s;
+    - one distraction: a witness looks away for 6 s, from one of 12 moments.
+
+    Clusters are taken apart in a topological order (a watcher's cluster before those he watches), each with the guards shot before it dead. Each is labelled isolated, window, chain, distraction, out of sight (no perch sees a member), or unsolved. The first version tried only each guard's next sighting, so it missed windows and left lone guards unsolved. With waiting and the kill order, none of 16 camps has an unsolved cluster.
+- **Perches** (`perches.ts`). A 720-ray sweep of the valley finds spots that overlook the camp, thinned to 32 at least 25 m apart, steepest first. Each gets a viewshed over the raster (the lowest height visible in each cell), held to exact raycasts. Each perch reports:
+  - each guard's share of the cycle in view, counted as the plan pinned before D8;
+  - the target's share;
+  - the alarm boxes and the antenna in view;
+  - the share of the escape route it sees.
+- **Heatmaps:** coverage (the share of the cycle some guard watches a cell) and idleness (its longest quiet stretch, wrapping round the cycle).
+- **Staffing sees through the analysis** (`staffing.ts`). Each guard is placed only where the sightline graph stays within limits: no component over 4, at most one over 3, and no guard watching the skeleton's corridor for more than a fifth of the cycle. Posts try four facings, walkers 12 start times, and the roles that must stay take their best fallback. The target walks once a cycle, mostly inside, and guards indoors face away from doors.
+- **Drawn.** The explorer's camp view draws the coverage heatmap, the sightline edges coloured by cluster (unsolved in red), the three ways (in green, to the generator orange, out blue) and the perches shaded by coverage, ringed where they see the target.
+- **Its cost.** A camp now generates in about 2.3 s in Node (mean of 16): terrain 0.35 s, the grid 0.2 s, staffing 0.6 s, the fields 0.35 s, and the searches 0.2–1.5 s. A search that runs out of budget costs about 0.75 s. Laying the field out cell by cell, folding the target's view in densely, and the label pool brought it down from about 4 s.
+
+**What moved:** nothing in Phase 0's valley. The `camp-systems` run moved with its staffing (`f38577ac4a34e3b6`, state `40446ee293103458`). The tuning gained `gen.sight` and `gen.analysis`, so the golden recording is rewritten. The generation bench gained D7's numbers: camps with a way in and out, unsolved clusters, the busiest search, and the expansions of both searches.
+
+**Why:** the plan's D7. Validation (D8) needs to know who sees whom, what each perch sees, and whether a way in exists, exactly and within budgets. And D's model must be its own, yet held to A's.
+
+### Staffing: points, chokepoints, a grammar, one cycle (D6)
+
+**Decision:**
+- **Points buy guards** (`generation/staffing.ts`).
+  - Difficulty sets the budget: 16 to 40 points.
+  - Each of the seven roles is bought once first. The roles cost: target 0, worker 1, sentry 2, radio operator 2, patrol 3, officer 3, marksman 4.
+  - Then extras come from a priority list, at most one officer and radio operator, a marksman per tower, three workers, never past 16 guards (counted).
+- **Sentries at the real chokepoints.** Brogue blocks each one-cell corridor and counts what it cuts off. A camp's passages are metres wide, so `minimumCut` (`chokepoints.ts`) finds the minimum vertex cut between two zones by max flow (Edmonds–Karp, breadth first in a fixed order).
+  - It runs on the site layer contracted to 1 m cells, connected wherever the fine walk edges connect, so it agrees with the fine grid on what connects.
+  - A cut wider than 10 m is no chokepoint. A test holds it to a hand-built wall with a 4 m gap.
+  - Sentries stand inside the gate, at the cuts between the camp's zones, then at doors, and never within 8 m of the skeleton's corridor.
+- **Patrols on lanes, with a grammar** (`patrols.ts`, after Xu, Tremblay and Verbrugge).
+  - Loops: the perimeter lane, the yard, and the alleys round each side.
+  - They walk grid paths pulled taut, and stops are snapped to walkable cells.
+  - At each stop, a word of the grammar: a glance, a quarter turn, a half turn, a sweep back and forth, a full turn. Two patrols on one loop walk it half a period apart, and loops that share a lane run it the same way round.
+- **One cycle for the camp.** Every routine divides it: a patrol's period is the cycle over a whole number, its stops' dwell stretched to fit, and a post holds the whole cycle. Each head sweep fits it a whole number of times. Routines gained an optional `offset` (absent for Phase 0's guards, whose bits are unchanged).
+  - The camp repeats exactly every cycle (160–300 s), so its windows can be learned, and analysis (D7) can certify them over one cycle.
+  - A route too long for 300 s drops its dwells, then the cycle grows. A clamped cycle had cut routines short, making them jump metres at the wrap.
+- **No two guards meet on routine.** Before the check existed, guards on different loops reached a lane corner together, shoved each other, and in the worst cases locked for most of a minute.
+  - Each walking guard tries up to 12 start times until he passes everyone at least 1 m clear, all cycle, sampled every quarter second.
+  - The last of a role who can't walk clear holds one of his stops instead, so all seven roles always stay.
+  - Guards now keep to their routines through the motor within 25 cm (tested for two minutes; measured within 11 cm over five, in four camps).
+- **Open doors lie flat** against the inside wall beside their doorway. The grid doesn't know entity solids, so a leaf standing in the room was in routes' way.
+
+**What moved:** nothing in Phase 0's valley. The `camp-systems` run moved with its camp's guards (`e430ba9fbbf75bd5`, state `02a8b5ec0ec11fbc`). The tuning gained `gen.staffing`, so the golden recording is rewritten.
+
+**Why:** the plan's D6. Fitting routines to one cycle makes timing windows exact, and a clear routine is one the analysis can trust.
+
+### The camp's systems and the objective (D5)
+
+**Decision:**
+- **Systems are data, and entities where they have state.** Generation records the devices (`camp.devices`: the generator, each light, alarm box and the radio set, each with its structure and its feed, the generator it draws from) and the objective (`camp.objective`: eliminate the target, with his building and his escape vehicle). In a run, each is an entity of its own kind (`game/camp.ts`):
+  - a `generator` that runs;
+  - a `light` that is on;
+  - an `alarm` box that is powered and can be raised;
+  - a `radio` that is powered and working;
+  - an `objective` that is open, done or escaped.
+
+  They spawn after the doors and vehicles, so no earlier id moves.
+- **One system powers the circuit.** `camp-power`, in the 'world' phase, sets every light, alarm box and radio from its generator's state each tick, so a cut is seen in the tick it happens: before perception, and before lab E's camp acts. `objective`, in the 'mission' phase, marks the objective done when its target is gone.
+  - Lab E raises alarms and drives the escape; lab C's use action and lab E's sabotage stop the generator or break the radio. Each writes the state that is already here.
+- **Explained.** The snapshot carries each device's state, and the debug view draws the wiring from the generator to each device, live or dead. The `camp-systems` scene cuts the generator at tick 60, restores it at 180 and takes the target at 120, with expectations on each. It is pinned as the generation lane's run (`64d0c1711e6ab4c0`, state `af5ba8029683ec86`).
+
+**What moved:** no existing golden. The new pinned run changes the build's behaviour digest, so the golden recording is rewritten. `camp-power` shares the 'world' phase with systems that spawn, so they name it in `after` (the spawn-tick scene, a test); their order is unchanged.
+
+**Why:** the plan's who-defines-what gives lab D camp systems as data, plus entity kinds for those with state, so labs C and E build on one answer to "is that alarm box live?".
+
+### The compound: plots, parcels and modules, skeleton first (D4)
+
+**Decision:**
+- **Solution first.** `buildCompound` (`generation/compound.ts`) lays down the approaches before any fill, as the research proposed from Spelunky:
+  - the breach goes in the fence side that faces a ridge most squarely, so its gully is the way down toward it;
+  - a corridor runs from 30 m outside the breach to the target's back door, with low cover along it;
+  - the generator's shed stands beside that corridor;
+  - the breach and the gate are the two ways out;
+  - the escape route runs from the target's building to the escape vehicle, the gate and the road.
+
+  The layout records these as its `skeleton`, so validation (D8) asks whether the fill broke them.
+- **Plots and parcels**, as XCOM 2 builds them.
+  - The plot is the fence (its gate toward the road, the breach), two to four corner towers (corners away from the breach first), a 7 m lane inside the fence for patrols, and the road to an open yard.
+  - Seven parcels around the yard take modules: the target's building, barracks, mess, storage (60% of camps), the radio room with its mast, the generator's shed, and the motor pool. Each is placed in its slot by its own labelled fork.
+  - The modules' sizes are data in `tuning.gen.compound`, so recordings embed them (rule 16).
+- **Hollow buildings.** Walls with doorways, lintels and a roof, so the target can be reached inside, and the grid knows the inside is roofed. Doorways are 1.5 m wide: at 1.2 m, a camp turned to the grid at about 40° left no lattice step through some doorways for a 0.3 m body, while the motor would have passed. At 1.5 m, 306 of 306 doors over 40 camps pass.
+- **Doors and vehicles are entities** (`game/camp.ts`). The `door` and `vehicle` kinds carry their camp index and state (open, escape), with a solid shape the motor and every query see. They spawn after the guards, so ids stay the player's, then the guards'. Doors start open, swung into the room: guards' routines walk through them, and labs E and C shut them.
+- **Ladders are data** (`camp.ladders`: foot, top and the side a climber stands on), for lab C's ladder mode and lab E's navigation links. Each is drawn as a structure that blocks nothing.
+
+**What moved:** nothing in Phase 0's valley. The tuning gained `gen.compound`, so the golden recording is rewritten. Guards are a fixed placeholder until D6.
+
+**Why:** the plan's D4. Solution first keeps the first-try rate high, because the approaches validation checks for exist by construction. Doors and vehicles are lab D's to define and labs C and E's to use, so they exist as kinds now.
+
+### Terrain with teeth, and how a mission asks for a camp (D3)
+
+**Decision:**
+- **A mission asks for a generated camp with a camp spec** (`generation/campSpec.ts`): `{ archetype: 'compound', difficulty }`, carried in the mission spec by module augmentation. The recording header accepts it as a small object of plain values, which the generator checks; the kernel doesn't read it. Until D9, a mission with no camp spec builds Phase 0's valley and test camp, so no golden moved. The game and the explorer take `?camp` (`&difficulty=`).
+- **The valley is placed feature-first** (`generation/landform.ts`).
+  - An open side of 130–170° is chosen first, and two or three ridge spines stand around the rest, 240–420 m out, each spanning 50–80° of the horizon.
+  - Each camp face is a profile with a cliff band, too steep to climb, broken by one or two gullies whose run keeps their slope under about 37°.
+  - The creek enters across the open side, passes the camp at 130–170 m and leaves through the widest gap between spines. Its bed sits 4–8 m below the floor, with banks that rise 2.2 m per metre except within 16 m of a ford, and where the road crosses.
+  - Relief goes on after the features, with the crags kept out of the gullies.
+- **D3's checks** (`generation/overwatch.ts`):
+  - A radial sweep from the camp's eye finds perches: prone shooters' eyes 150–560 m out that clear the horizon and look down at least 2.5°.
+  - Every placed ridge must hold one, perches may cover at most half the horizon (counted in degrees, not in 22.5° sectors, which overstate a long spine), and the widest open side must be at least 120°.
+  - On the spatial grid's map layer (no colliders yet), the camp must be reachable from at least 3 of 8 directions, and a second way out must stay 20 m from the first beyond 90 m of the camp.
+  - A valley that fails is re-rolled from its own stream (`valley#k`), up to `landform.attempts` times.
+- The props, the camp and its routines draw from their own root streams, so a re-rolled valley leaves their draws as they were.
+
+**What moved:** nothing. The tuning gained `gen.landform` and `gen.overwatch`, so the golden recording is rewritten for the new shape. The generation bench adds lab D's valleys: 6 of 6 held-out ones valid at their first attempt, a margin of 7 of 8, overlooked over at most 157°, with an open side of at least 164°.
+
+**Why:** the owner found that one overlook could take a compound apart (phase-1-plan.md, D3). In Phase 0's valley, every valley was overlooked from all 8 of 8 directions, and reachable from all 16 of 16, so no approach differed from another. Counting overwatch in degrees keeps the rule exact for long spines. The creek had to be deep to be a barrier at all: 2.5 m terrain cells smear a shallow bank into a walkable slope.
+
+### The seed explorer (D2)
+
+**Decision:** `?explore` opens the seed explorer instead of the game (`app/explore.ts`): a grid of camps from a named series, the same seeds `npm run seeds -- --from <name>` reports on, each card drawing the valley and the camp from above with its validation results, and linking to the seed. Workers generate the camps (`app/exploreWorker.ts`), a few at a time, with the tuning the page was given, so the page never imports tuning of its own and hot reload keeps working. What a card draws is the world's survey (`generation/survey.ts`): plain data a worker can post, which each later milestone extends with its layer.
+
+**Why:** the plan's three Phase 1 tools give lab D the seed explorer (D2), and the generator's range is easier to judge from fifty camps side by side than from any number in a report.
 
 ### The one deliberate `GEN_VERSION` bump (D1)
 

@@ -32,7 +32,8 @@ export const GOLDEN = {
    * lab, guards seeing and hearing a walker who ends in a bush, and its crowd of sixteen (the
    * budget); the shooting range, a marksman's shots from the click to the body on the
    * ground; spawn timing,
-   * bodies spawned inside a tick; the kernel alone, a run with every lane switched off.
+   * bodies spawned inside a tick; the kernel alone, a run with every lane switched off;
+   * camp systems, a generated camp with its generator cut and its target taken (lab D).
    */
   scenes: {
     'movement-course': { behaviour: '0f2551d99837a6bc', state: '22ce87c566bcad20' },
@@ -41,6 +42,7 @@ export const GOLDEN = {
     'shooting-range': { behaviour: '8cc3e0f7a274c3c5', state: '4545cb7eb41540f3' },
     'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '42c55f2958b14cf0' },
     'kernel-alone': { behaviour: '0698e581024f5b35', state: '7797e5bc3b7451dc' },
+    'camp-systems': { behaviour: 'e5c646c959574b12', state: 'f445484f70376ce2' },
   },
 } as const;
 

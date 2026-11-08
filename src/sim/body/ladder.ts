@@ -39,6 +39,13 @@ declare module '../kernel/world/world' {
   }
 }
 
+const NONE: readonly Ladder[] = [];
+
+/** The ladders a world has: its own (a scene's), or those on its camp's towers (lab D). */
+export function laddersOf(world: World): readonly Ladder[] {
+  return world.ladders ?? world.camp?.ladders ?? NONE;
+}
+
 /**
  * A ladder as navigation sees it (lab E): the two places it joins, and how long the climb
  * takes: from the spot at its foot up to the landing on the deck (checked here as a
@@ -57,7 +64,7 @@ export interface LadderLink {
 
 /** Every ladder's link in `world`, for a body of `spec`. Empty where a world has none. */
 export function ladderLinks(world: World, solids: Solids, spec: BodySpec, tuning: Tuning): LadderLink[] {
-  const ladders = world.ladders ?? [];
+  const ladders = laddersOf(world);
   const links: LadderLink[] = [];
   const ctx: MotorContext = { world, solids, tuning, dt: 1 / tuning.sim.tickHz, tick: 0, source: 0, others: [], emit: () => 0 };
   ladders.forEach((l, index) => {
@@ -112,8 +119,8 @@ export function ladderTop(l: Ladder, spec: BodySpec): number {
  * near its top.
  */
 export function ladderInReach(b: BodyState, spec: BodySpec, ctx: MotorContext): number {
-  const ladders = ctx.world.ladders;
-  if (!ladders || ladders.length === 0) return -1;
+  const ladders = laddersOf(ctx.world);
+  if (ladders.length === 0) return -1;
   if (b.motor !== 'ground' || b.sliding || b.proneTransition || b.stance === 'prone' || b.lying > 0) return -1;
   const fx = -dsin(b.yaw);
   const fz = -dcos(b.yaw);
@@ -141,7 +148,7 @@ export function ladderInReach(b: BodyState, spec: BodySpec, ctx: MotorContext): 
 
 /** Takes the ladder: from the foot or from the top. True if it did. */
 export function startLadder(b: BodyState, spec: BodySpec, ctx: MotorContext, index: number): boolean {
-  const l = ctx.world.ladders![index]!;
+  const l = laddersOf(ctx.world)[index]!;
   ladderLine(l, spec, line);
   const fromTop = Math.abs(b.y - l.y1) < spec.ladder.footing && b.y > l.y0 + spec.ladder.footing;
   if (fromTop) return startFromTop(b, spec, ctx, index, l);
@@ -176,7 +183,7 @@ function startFromTop(b: BodyState, spec: BodySpec, ctx: MotorContext, index: nu
 /** One tick on a ladder: up or down it, off at either end, or letting go. */
 export function stepLadder(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext): void {
   const s = b.ladder!;
-  const l = ctx.world.ladders![s.index]!;
+  const l = laddersOf(ctx.world)[s.index]!;
   ladderLine(l, spec, line);
   const L = spec.ladder;
   const dt = ctx.dt;

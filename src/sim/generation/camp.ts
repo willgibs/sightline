@@ -32,7 +32,14 @@ export type StructureKind =
   /** A pole flying a flag that streams with the mission's wind: a cue to read it by (design doc · Wind). */
   | 'flag'
   /** A piece of hand-built geometry (handmade.ts): stairs, a ceiling, a wall in a scene. */
-  | 'block';
+  | 'block'
+  /** Generated camps (compound.ts): a tower's ladder, the generator's shed, a light pole, an alarm box. */
+  | 'ladder'
+  | 'shed'
+  | 'light'
+  | 'alarm'
+  /** The radio set inside the radio room; its antenna is the mast. */
+  | 'radio';
 
 export interface Structure {
   kind: StructureKind;

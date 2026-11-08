@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { InvariantWatch, climbPrompt, createBody, ladderTop, type Ladder } from '../src/sim/body';
-import { buildWorld } from '../src/sim/generation';
+import { InvariantWatch, climbPrompt, createBody, ladderLine, ladderLinks, ladderTop, laddersOf, type Ladder } from '../src/sim/body';
+import { buildWorld, campMission, generateWorld } from '../src/sim/generation';
+import { placePlayer } from '../src/sim/game/setup';
+import { Solids } from '../src/sim/kernel/world/solids';
 import { Simulation } from '../src/sim/game/sim';
 import { neutralInput } from '../src/sim/kernel/input';
 import { Blocks, type ColliderInput } from '../src/sim/kernel/world/colliders';
@@ -150,6 +152,28 @@ describe('a ladder', () => {
     expect(sim.player.motor).toBe('ladder');
     step(sim, watch, 1, 1, false);
     expect(sim.player.gait).not.toBe('sprint');
+  });
+
+  it('climbs lab D’s towers: up the ladder, through the rail’s gap, and onto the deck', () => {
+    const world = generateWorld(campMission('TAL-4471'), T);
+    const ladders = laddersOf(world);
+    expect(ladders.length).toBeGreaterThan(0);
+    const links = ladderLinks(world, new Solids(world.colliders), spec, T);
+    expect(links).toHaveLength(ladders.length);
+    for (const l of ladders) {
+      const sim = new Simulation(world, T);
+      const line = ladderLine(l, spec, { x: 0, z: 0 });
+      placePlayer(sim, line.x + l.ox * 0.3, line.z + l.oz * 0.3, -l.ox, -l.oz);
+      const watch = new InvariantWatch(sim);
+      step(sim, watch, 0, 0, true);
+      expect(sim.player.motor).toBe('ladder');
+      for (let t = 1; t < 400 && sim.player.motor !== 'ground'; t++) step(sim, watch, t, 1, false);
+      expect(sim.player.motor).toBe('ground');
+      expect(sim.player.y).toBeCloseTo(l.y1, 3);
+      // On the deck, on the tower's side of the ladder.
+      expect((sim.player.x - l.x) * l.ox + (sim.player.z - l.z) * l.oz).toBeLessThan(-0.1);
+      expect(watch.report.first).toBeNull();
+    }
   });
 
   it('waits for what is in its way, and never goes into it', () => {

@@ -63,6 +63,175 @@ export const defaultTuning = {
       siteMargin: 12, // metres of fine grid beyond the camp's outermost structures
     },
 
+    // Terrain with teeth (lab D, D3; sim/generation/landform.ts): the valley a generated camp
+    // stands in. Two or three ridge spines on chosen bearings overlook it from a few sectors,
+    // never a ring; their camp faces are cliffs broken by walkable gullies, and a creek with
+    // steep banks is crossed only at fords, so the way in is a choice.
+    landform: {
+      attempts: 8, // terrain re-rolls before a valley that fails its checks is kept anyway (rule 18)
+      openArcDeg: [130, 170], // the low side, with no ridge: the road comes in through it
+      ridges: [2, 3], // spines placed around the rest of the horizon
+      ridgeDistance: [240, 420], // from the camp to the middle of the crest
+      ridgeSpanDeg: [50, 80], // how much of the horizon each spine takes, seen from the camp
+      ridgeHeight: [30, 58], // crest above the pad
+      ridgeBack: [110, 190], // run of the far slope
+      ridgeBend: [-0.12, 0.3], // how far the crest's ends curl toward the camp, per metre of distance
+      cliffs: 0.9, // how much of a camp face is cliff away from its gullies (1: all of it)
+      gullies: [1, 2], // walkable gullies down each camp face
+      gullyWidth: 26, // across a gully, metres
+      floorRise: 9, // the valley floor's rise toward the play area's edge
+      floorHills: 4, // rolling relief on the floor
+      crags: 6, // broken relief on the spines
+      rim: 90, // hills beyond the play area, for the horizon
+      creekBank: 2.2, // creek banks between fords: too steep to climb (rise per metre)
+      fordBank: 0.45, // and at a ford
+      fords: [2, 3], // crossings besides the road's
+    },
+
+    // What D3 checks a valley for (sim/generation/overwatch.ts): overwatch from the placed
+    // ridges only, never a ring, and ways in and out that don't share a chokepoint.
+    overwatch: {
+      perchAngleDeg: 2.5, // a perch looks down into the camp at least this steeply
+      perchRange: [150, 560], // from the camp
+      maxPerchArcDeg: 180, // perches over at most half the horizon
+      minOpenGapDeg: 120, // the widest stretch of horizon with no perch
+      minAccess: 3, // of 8 octants of the play area's edge, the camp is reachable on foot from this many
+      exfilSeparation: 20, // two ways out stay at least this far apart beyond exfilFree of the camp
+      exfilFree: 90,
+    },
+
+    // The compound (lab D, D4; sim/generation/compound.ts): the core mission's archetype, as data
+    // a logging camp or a comms relay can follow. A plot (the fence, its gate and breach, towers,
+    // the road in) and parcels around a central yard, each filled from a handmade module.
+    // Sizes are metres: buildings are [length, depth, wall height].
+    compound: {
+      fenceHalf: [44, 52], // half-sizes of the perimeter, along the gate axis and across it
+      fenceHeight: 2.2,
+      gateWidth: 8,
+      breachWidth: 4,
+      lane: 7, // clear ground inside the fence, where the perimeter patrols walk
+      road: 8, // the road from the gate to the yard
+      yard: 13, // half-size of the open yard at the centre
+      towers: [2, 4], // watchtowers at the corners
+      towerDeck: 6, // height of a tower's deck
+      ladderGap: 0.8, // the gap in a tower's rail at the top of its ladder, or a climber can't step onto the deck
+      wallThickness: 0.2,
+      doorWidth: 1.5, // wide enough for the 0.5 m grid to pass a body through at any angle
+      doorHeight: 2.1,
+      hq: [12, 9, 3.2], // the target's building
+      barracks: [18, 8, 3],
+      mess: [13, 9, 3],
+      storage: [13, 10, 4.4],
+      radio: [6, 5, 2.8], // the radio room; its antenna, on its most hidden wall
+      mast: 2, // the antenna's height: a whip well below the roof line (radio room 2.8 m), so the building hides it
+      fixtureDoorGap: 2, // metres a wall fixture keeps from a door
+      escapeRun: [6, 22], // metres from the target's door to his vehicle, tried at this range
+      escapeClearance: 3, // metres his vehicle keeps off the skeleton's way in
+      overviewShare: 0.15, // a perch that sees this much of the camp's ground counts as an overview, which fixtures hide from first
+      alarmSpacing: 15, // metres between alarm boxes
+      shed: [5, 4, 2.6], // the generator's shed: a roof on posts
+      lights: [3, 5], // light poles around the yard, on the generator's circuit
+      alarms: [2, 3], // alarm boxes, on the generator's circuit
+      cover: [5, 9], // clusters of containers, crates and sandbags
+      corridorCover: [3, 5], // low cover along the way in from the breach
+    },
+
+    // Staffing a generated camp (lab D, D6; sim/generation/staffing.ts): guards bought with points,
+    // one of every role first, under the cap; sentries at the camp's real chokepoints; patrols on
+    // its lanes with stops and scans; every routine fitted to one cycle of the camp.
+    staffing: {
+      points: [16, 40], // to spend, from difficulty 0 to 1
+      cap: 16, // guards at most (design doc, Validation: budgets hold)
+      cost: { sentry: 2, patrol: 3, marksman: 4, radio: 2, officer: 3, worker: 1 }, // the target is free
+      cycle: [160, 300], // seconds: the camp's cycle, which every routine divides; longer only if a route needs it
+      dwell: [3, 9], // seconds held still at a patrol's stop
+      chokeWidth: 10, // the widest passage a sentry is posted at, metres
+      clearance: 1.0, // no two guards on routine come closer than this, metres
+      offsetTries: 12, // start times tried for a walking guard before he's left out
+      targetMargin: 0.02, // the target's walk out keeps this far under validation's limit on his time in view
+      targetOptions: 3, // he stops considering walks once this many fit and two overviews would see them (each is a grid search)
+      estimateStep: 3, // while staffing, sightlines are estimated from every this-many samples of the cycle (the analysis takes them all)
+      workerInside: 2.5, // metres inside a door that a worker's chores are done
+      targetFan: [6, 10, 14], // metres out from his door that the target's walks are tried, in a fan
+      coverageMargin: 0.02, // posts are moved while a perch comes this near validation's limit on guard time
+      coverageRounds: 6, // posts so moved, at most (rule 18)
+      witnessTries: 12, // walkers' phases tried to give every perch someone it can't see watching (rule 18)
+      clusterMax: [2, 3], // the largest sightline cluster, from the easiest camp to the hardest: all but one
+      coreMax: [3, 5], // and the hard core's
+      corridorWatch: 0.2, // the most of the cycle one guard may watch the skeleton's way in
+    },
+
+    // Lab D's own sight model (D7; sim/generation/sight.ts). Generation reads only gen, so its
+    // model is its own: lab A's law (tuning.perception.sight) for one body, a crouched intruder
+    // on the move, lit, in the open, with A's numbers copied here and the ranges A's × 0.6 for
+    // the stance. tests/campSight.test.ts holds it to A's detection through A's scenario runner,
+    // so a retune of perception never changes a valley; a deliberate one is copied here.
+    sight: {
+      cone: { core: 30, peripheral: 60, far: 2.5, edge: 4 }, // half-angles off the gaze, and the width of a cone's edge, degrees
+      intruder: { core: 90, peripheral: 15, far: 240 }, // metres: A's 150, 25 and 400 for a standing body, × 0.6 crouched
+      edge: { share: 0.08, min: 2, max: 12 }, // a range's edge ramps over this share of it, within these metres
+      fill: { near: 2, edge: 8 }, // seconds to fill the meter at no distance, and at the range: linear between
+      cap: 0.47, // the fastest fill outside contact, of a full meter per second (A's telegraph: the cue 1.5 s before 100%)
+      contact: { range: 2.5, ramp: 0.5, seconds: 0.8 }, // close enough to touch: any direction, and quickly
+      still: 0.4, // a still body fills a guard's meter at this share of a moving one's rate
+      // A guard seeing a comrade drop: a standing body, falling. Lab D's own, until lab E's
+      // brain says how guards take it.
+      witness: { core: 80, peripheral: 30 },
+      eye: 1.7, // a standing guard's eye
+      chest: 1.35, // where a standing body is seen, and shot
+      crouchHead: 1.05, // the crouched intruder's head and chest: what a guard sees of him
+      crouchChest: 0.75,
+      proneEye: 0.32, // a shooter lying on a perch: the body's own prone eye (bodies.player.eyeHeight.prone)
+    },
+
+    // What a camp must pass (D8; sim/generation/validate.ts): the design doc's rules (Maps and
+    // procedural camps · Validation rules), the plan's no-single-perch rule and its companions.
+    validation: {
+      seenSeconds: 15, // a perch sees a guard if he's in its view this long a cycle: the plan's minimum time in view
+      longRangePerches: 2, // perches that must each see half the guards and the target
+      targetSeconds: 10, // ...the target for at least this long a cycle
+      maxCoverage: 0.6, // no perch sees more than this share of guard time
+      maxTarget: 0.25, // nor the target for more than this share of the cycle
+      watchedDuty: 0.03, // a guard counts as watched if another would see him drop for this share of the cycle
+      manyGuards: 0.4, // a perch that sees this share of guard time keeps alarm boxes and the antenna out of its fire
+      counterRange: 450, // metres: a marksman post or a counter-perch overlooks a perch within this
+      counterRings: [60, 120, 200, 300, 400], // metres round a perch searched for ground the camp can reach that overlooks it
+      counterBearings: 24, // bearings tried on each ring
+      botPerches: 8, // the long-range bot (the exit test's) tries this many perches, the most-watching first
+      repairAttempts: 12, // re-analyses a repair may spend (rule 18)
+      campAttempts: 3, // camps built on one terrain before giving up: a camp repair can't save is rejected and built again
+      repairShifts: 8, // a patrol's phase is tried at this many even steps of its period
+      repairTurns: [30, -30, 60, -60, 90, -90], // degrees a post is tried turned
+      repairMoves: [3, -3, 6, -6], // metres a post is tried moved along its arc
+      hideReach: 14, // metres a post may be moved to get out of a perch's sight
+      runSpeed: 5.5, // metres per second: the target running from his door to his vehicle
+      interceptSeconds: 1.5, // a perch can stop the escape if it has him in view this long on that run
+    },
+
+    // How lab D analyses a camp (D7; sim/generation/analysis files).
+    analysis: {
+      cell: 1, // metres: the analysis raster, two of the site layer's cells a side
+      dt: 5 / 9, // seconds between samples of the camp's cycle: a crouched step of a cell (1 m at 1.8 m/s), so the ways in are walkable
+      margin: 30, // metres of ground around the fence that the intruder crosses
+      meterLevels: 128, // the intruder's detection meter, in whole levels: full is detected
+      meterLimit: 0.85, // the share of the meter a certified way in may reach: a margin over lab A's own
+      // How fast it falls while no guard sees him, of a full meter per second. A's falls at 0.12
+      // after holding 1.5 s; half that rate with no hold covers any pause of 3 s or more.
+      meterDecay: 0.0625,
+      maxExpansions: 400000, // the infiltration search's budget (rule 18)
+      searchWeight: 40, // the greedy search tried first: arrival + this × distance, which finds a way far sooner, if not the earliest
+      reaction: 1.5, // seconds from seeing a comrade drop to raising the camp (design doc)
+      closeShot: 12, // metres: where infiltration ends, near enough to see the target indoors, with a clear line
+      exitApart: 40, // metres between where two ways out leave the raster
+      shotInterval: 0.75, // seconds between two shots from one rifle
+      relocate: 2, // metres per second a shooter moves between perches
+      perches: 32, // the most perches analysed, after thinning
+      perchSpacing: 25, // metres between two perches kept
+      perchSlopeDeg: 40, // no perch on ground steeper than this: a body slides off it (the motor's maxSlopeDeg is 42)
+      clusterDuty: 0.1, // share of the cycle a witness edge must hold to join two guards in a cluster
+      clusterExpansions: 20000, // the cluster search's budget (rule 18)
+    },
+
     // The camp's rhythm: how its guards walk their routines (sim/generation/routine.ts). Part of the
     // camp, like its layout: lab D validates the timing windows these make.
     routines: {

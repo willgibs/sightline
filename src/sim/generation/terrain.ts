@@ -7,6 +7,7 @@ import { Heightfield } from '../kernel/world/heightfield';
 import { Surface } from '../kernel/world/surfaces';
 import { Noise2D } from './noise';
 import { catmullRom, makePolyline, pointAt, PolylineIndex, type PathHit, type Point2, type Polyline } from './paths';
+import type { Ford, Ridge } from './landform';
 
 /**
  * The valley.
@@ -53,6 +54,15 @@ export interface TerrainFeatures {
   roadPass: number;
   /** Where the valley's camp stands: the pad at the origin, its gate facing the road pass. */
   site: Site;
+  /**
+   * Terrain with teeth (landform.ts) only, absent from Phase 0's valley: the ridge spines,
+   * the creek's fords, and the open side of the horizon (its middle bearing and width,
+   * radians), where no spine stands.
+   */
+  ridges?: Ridge[];
+  fords?: Ford[];
+  openAngle?: number;
+  openArc?: number;
 }
 
 export interface Backdrop {
@@ -361,7 +371,7 @@ export function generateTerrain(rng: Rng, gen: GenTuning): TerrainResult {
 }
 
 /** Polynomial smooth minimum: like min(a, b) but rounds the crease over width k. */
-function smin(a: number, b: number, k: number): number {
+export function smin(a: number, b: number, k: number): number {
   const h = clamp(0.5 + (0.5 * (b - a)) / k, 0, 1);
   return lerp(b, a, h) - k * h * (1 - h);
 }
@@ -392,7 +402,7 @@ function findPass(s: Saddle, height: (x: number, z: number) => number, rMin: num
 }
 
 /** Bends a path sideways with noise, holding it still near the given anchor points. */
-function wiggle(points: Point2[], noise: Noise2D, amplitude: number, anchors: Point2[]): Point2[] {
+export function wiggle(points: Point2[], noise: Noise2D, amplitude: number, anchors: Point2[]): Point2[] {
   const out: Point2[] = [];
   let s = 0;
   for (let k = 0; k < points.length; k++) {
