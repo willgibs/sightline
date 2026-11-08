@@ -14,7 +14,7 @@
  * together give the exit test's verdict.
  */
 import type { Tuning } from '../config/tuning';
-import { SITTING, FACTORS, generateSitting, scoreSitting, verdict, type Score, type Trial } from '../sim/game/trials';
+import { SITTING, FACTORS, TOLD, generateSitting, probeTally, scoreSitting, verdict, type Score, type Told, type Trial } from '../sim/game/trials';
 import type { Annotation } from '../sim/kernel/record/recording';
 import type { SimEvent } from '../sim/kernel/events';
 
@@ -25,6 +25,8 @@ export interface KeptAnswer {
   warmup: boolean;
   answer: boolean;
   params: string;
+  /** What the player said told them, at a trial frozen at its first cue. */
+  told?: Told;
   /** What the recording shows: the guard saw the player within the trial's time. */
   seen: boolean;
   file: string;
@@ -38,6 +40,7 @@ interface SittingFile {
   seed: string;
   trials: Trial[];
   answers: Record<string, boolean>;
+  probes?: Record<string, Told>;
   tuning?: Tuning;
 }
 
@@ -46,11 +49,22 @@ export function answersIn(file: string, annotations: readonly Annotation[], even
   const out: KeptAnswer[] = [];
   const limit = SITTING.seconds;
   const seen = events.some((e) => e.type === 'detected' && e.t <= limit + 1e-9);
+  const told = new Map<number, Told>();
+  for (const a of annotations) {
+    if (a.kind !== 'trial-probe') continue;
+    try {
+      const j = JSON.parse(a.text ?? '') as { k: number; told: Told };
+      told.set(j.k, j.told);
+    } catch {
+      // Not a probe's JSON, so not a probe.
+    }
+  }
   for (const a of annotations) {
     if (a.kind !== 'trial-answer') continue;
     try {
       const j = JSON.parse(a.text ?? '') as { sitting: string; k: number; warmup: boolean; answer: boolean; params: string };
-      out.push({ sitting: j.sitting, k: j.k, warmup: j.warmup, answer: j.answer, params: j.params, seen, file, tuning });
+      const t = told.get(j.k);
+      out.push({ sitting: j.sitting, k: j.k, warmup: j.warmup, answer: j.answer, params: j.params, seen, file, tuning, ...(t ? { told: t } : {}) });
     } catch {
       // An annotation that isn't an answer's JSON is not an answer.
     }
@@ -75,6 +89,7 @@ interface Sitting {
   order: number;
   trials: Trial[];
   answers: Map<number, boolean>;
+  probes: Map<number, Told>;
   problems: string[];
 }
 
@@ -98,7 +113,7 @@ export function reportSittings(
   for (const a of kept) bySeed.set(a.sitting, [...(bySeed.get(a.sitting) ?? []), a]);
   for (const [seed, answers] of bySeed) {
     const trials = generate(seed, answers[0]!.tuning);
-    const s: Sitting = { seed, from: `${new Set(answers.map((a) => a.file)).size} recordings`, order: order++, trials, answers: new Map(), problems: [] };
+    const s: Sitting = { seed, from: `${new Set(answers.map((a) => a.file)).size} recordings`, order: order++, trials, answers: new Map(), probes: new Map(), problems: [] };
     for (const a of answers) {
       const t = trials[a.k];
       if (!t || t.params !== a.params) {
@@ -107,6 +122,7 @@ export function reportSittings(
       }
       if (t.seen !== a.seen) s.problems.push(`trial ${a.k} (${a.file}): the recording shows ${a.seen ? 'seen' : 'not seen'}, the key says ${t.seen ? 'seen' : 'not seen'}`);
       s.answers.set(a.k, a.answer);
+      if (a.told) s.probes.set(a.k, a.told);
     }
     sittings.push(s);
   }
@@ -115,7 +131,7 @@ export function reportSittings(
   for (const f of files) {
     const j = sittingFile(f.text);
     if (!j) continue;
-    const s: Sitting = { seed: j.seed, from: f.name, order: order++, trials: j.trials, answers: new Map(Object.entries(j.answers).map(([k, v]) => [Number(k), v])), problems: [] };
+    const s: Sitting = { seed: j.seed, from: f.name, order: order++, trials: j.trials, answers: new Map(Object.entries(j.answers).map(([k, v]) => [Number(k), v])), probes: new Map(Object.entries(j.probes ?? {}).map(([k, v]) => [Number(k), v])), problems: [] };
     const again = generate(j.seed, j.tuning ?? fallback);
     const differ = j.trials.filter((t, k) => again[k]?.params !== t.params || again[k]?.seen !== t.seen).length;
     if (differ) s.problems.push(`${differ} of ${j.trials.length} trials differ from the seed's${j.tuning ? '' : ' (the file has no tuning, so this build’s was used)'}`);
@@ -134,6 +150,9 @@ export function reportSittings(
     console.log(`  score     ${line(sc)}`);
     const factors = FACTORS.filter((f) => sc.byFactor[f]).map((f) => `${f} ${sc.byFactor[f]!.right} of ${sc.byFactor[f]!.of} (table ${sc.byFactor[f]!.rules})`);
     if (factors.length) console.log(`  factors   ${factors.join(' · ')}`);
+    const p = probeTally(s.trials, s.answers, s.probes);
+    const told = TOLD.filter((t) => p.by[t].said > 0).map((t) => `${t} ${p.by[t].said} (${p.by[t].right} right)`);
+    if (told.length) console.log(`  told by   ${told.join(' · ')}${p.unreadable ? ` · ${p.unreadable} naming a cue that couldn't be read` : ''}`);
     for (const p of s.problems) console.log(`  ✗ ${p}`);
     if (s.problems.length) ok = false;
   }

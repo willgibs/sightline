@@ -19,7 +19,7 @@ import { Rng } from '../kernel/core/rng';
 import { runScene } from '../kernel/scene';
 import { labWorld } from './scenes/perceptionLab';
 import { SIGHT_TABLE, sightScenario } from './scenes/sightScenario';
-import { FACTORS, generateSitting, scoreSitting, verdict, type Trial } from './trials';
+import { FACTORS, SITTING, generateSitting, pairsCovered, scoreSitting, verdict, type Trial } from './trials';
 
 /**
  * A bench for every lane (docs/foundation-shape.md): where "better" is measured instead
@@ -216,6 +216,8 @@ function trialMetrics(): Record<string, number> {
   const scored = sittings.flatMap((ts) => ts.filter((t) => !t.warmup));
   m['trials: candidates run for two sittings'] = candidates;
   m['trials: scored trials in two sittings'] = scored.length;
+  m['trials: pairs of factor levels the first sitting covers'] = pairsCovered(sittings[0]!);
+  m['seed · trials: pairs of factor levels covered, taken first come'] = pairsCovered(generateSitting('BENCH-A-1', defaultTuning, { ...SITTING, pool: 1 }));
   const key = (ts: readonly Trial[], f: (t: Trial) => boolean): Map<number, boolean> => new Map(ts.map((t) => [t.k, f(t)]));
   const rules = sittings.map((ts) => scoreSitting(ts, key(ts, (t) => t.rules)));
   m['trials: borderline right by the sight table alone (of 30)'] = rules[0]!.borderlineRight + rules[1]!.borderlineRight;

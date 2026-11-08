@@ -32,6 +32,10 @@ import type { Simulation } from './sim';
  *   sky or cues. Beating it on the borderline trials is the evidence that the cues are read
  *   (docs/research/foundations.md: the baseline is strong; Tremblay found people judge by
  *   distance).
+ * - **The trials are spread over the factors.** Each cell gathers more candidates than it
+ *   needs, and the sitting takes those that add the most new pairs of factor levels (a
+ *   greedy pairwise covering array, as the research advises), the outcome and the kind of
+ *   trial among the levels, so no surface feature comes to mean one outcome or the other.
  * - **Legible cues** are the simulation's own record of what could be seen at the freeze:
  *   the indicator at a cue freeze, the guard's head where it spans 2 pixels and the line
  *   from your eye to it is clear, his voice within a bark's reach. The agents' pre-screen
@@ -74,6 +78,8 @@ export interface SittingOptions {
   scored: number;
   /** The most candidates run before the sitting settles for what it has (rule 18). */
   maxCandidates: number;
+  /** How many candidates each cell gathers, as a multiple of what it needs, for the sitting to pick from. */
+  pool: number;
   /** Seconds each trial runs. */
   seconds: number;
   /** A cue-frozen trial stops this long after the first cue: long enough for his head to start turning. */
@@ -89,7 +95,7 @@ export interface SittingOptions {
   seeThrough: number;
 }
 
-export const SITTING: SittingOptions = { warmups: 5, scored: 30, maxCandidates: 1600, seconds: 8, cueHoldSeconds: 0.3, headPixels: 2, seeThrough: 0.15 };
+export const SITTING: SittingOptions = { warmups: 5, scored: 30, maxCandidates: 1600, pool: 3, seconds: 8, cueHoldSeconds: 0.3, headPixels: 2, seeThrough: 0.15 };
 
 interface Outcome {
   seen: boolean;
@@ -294,6 +300,70 @@ function draw(rng: Rng, tuning: Tuning): SightParams {
   return { guard, spot, d, off, stance, move, secs: 8, react: true, face: true, expect: null };
 }
 
+/** A situation's levels, for spreading a sitting over them: its seven factors (light, cover and skyline are one draw, the spot), and its place in the key. */
+function levelsOf(p: SightParams, t: Pick<Trial, 'seen' | 'borderline'>): string[] {
+  return [
+    `who:${p.guard}`,
+    `gaze:${p.off <= 10 ? 'ahead' : p.off <= 40 ? 'aside' : 'edge'}`,
+    `range:${p.d <= 15 ? 'near' : p.d <= 60 ? 'mid' : 'far'}`,
+    `stance:${p.stance}`,
+    `move:${p.move}`,
+    `spot:${p.spot}`,
+    `outcome:${t.seen ? 'seen' : 'not'}`,
+    `kind:${t.borderline ? 'borderline' : 'clear'}`,
+  ];
+}
+
+/** Every pair of a situation's levels. */
+function pairsOf(t: Trial): string[] {
+  const levels = levelsOf(parseSight(t.params), t);
+  const pairs: string[] = [];
+  for (let i = 0; i < levels.length; i++) for (let j = i + 1; j < levels.length; j++) pairs.push(`${levels[i]}|${levels[j]}`);
+  return pairs;
+}
+
+/** How many distinct pairs of factor levels a sitting's scored trials cover. */
+export function pairsCovered(trials: readonly Trial[]): number {
+  const covered = new Set<string>();
+  for (const t of trials) if (!t.warmup) for (const pair of pairsOf(t)) covered.add(pair);
+  return covered.size;
+}
+
+/**
+ * Picks each cell's quota from its candidates, greedily: the candidate that adds the most
+ * pairs not yet covered, the earliest drawn among equals. Cells are kept separate, so the
+ * key's balance holds.
+ */
+function spread(cells: readonly Trial[][], quotas: readonly number[]): Trial[][] {
+  const chosen: Trial[][] = cells.map(() => []);
+  const taken = new Set<Trial>();
+  const covered = new Set<string>();
+  const pairs = new Map<Trial, string[]>();
+  for (const cell of cells) for (const t of cell) pairs.set(t, pairsOf(t));
+  for (;;) {
+    let best: Trial | null = null;
+    let bestCell = -1;
+    let bestGain = -1;
+    for (let c = 0; c < cells.length; c++) {
+      if (chosen[c]!.length >= quotas[c]!) continue;
+      for (const t of cells[c]!) {
+        if (taken.has(t)) continue;
+        let gain = 0;
+        for (const pair of pairs.get(t)!) if (!covered.has(pair)) gain++;
+        if (gain > bestGain) {
+          best = t;
+          bestCell = c;
+          bestGain = gain;
+        }
+      }
+    }
+    if (best === null) return chosen;
+    chosen[bestCell]!.push(best);
+    taken.add(best);
+    for (const pair of pairs.get(best)!) covered.add(pair);
+  }
+}
+
 /**
  * A sitting's trials from its seed: candidates drawn and run until each of the four cells
  * has its quarter of the scored trials and the warm-ups are found, or the candidates run
@@ -314,11 +384,13 @@ export function generateSitting(seed: string, tuning: Tuning, opts: SittingOptio
 export function* sittingSteps(seed: string, tuning: Tuning, opts: SittingOptions = SITTING): Generator<number, Trial[]> {
   const rng = new Rng(seed, 'trials');
   const quotas = cellQuotas(opts.scored);
-  const cells: Trial[][] = quotas.map(() => []);
+  const capacity = quotas.map((q) => q * opts.pool);
+  const gathered: Trial[][] = quotas.map(() => []);
+  const drawn: Trial[] = [];
+  const enough = opts.scored + opts.warmups;
   const clears = new Map<Trial, Outcome['clear']>();
-  const warmups: Trial[] = [];
   const seen = new Set<string>();
-  const want = (): boolean => warmups.length < opts.warmups || cells.some((c, i) => c.length < quotas[i]!);
+  const want = (): boolean => drawn.length < enough || gathered.some((c, i) => c.length < capacity[i]!);
   for (let n = 0; n < opts.maxCandidates && want(); n++) {
     yield n;
     const p = draw(rng, tuning);
@@ -329,8 +401,8 @@ export function* sittingSteps(seed: string, tuning: Tuning, opts: SittingOptions
     const rules = rulesPredict(p, tuning);
     const borderlineCell = cellOf({ seen: o.seen, borderline: true, rules });
     const clearCell = cellOf({ seen: o.seen, borderline: false, rules });
-    // A candidate no cell can take, once the warm-ups are found, isn't worth its flips.
-    if (warmups.length >= opts.warmups && cells[borderlineCell]!.length >= quotas[borderlineCell]! && cells[clearCell]!.length >= quotas[clearCell]!) continue;
+    // A candidate no cell can take, once there are enough for the warm-ups, isn't worth its flips.
+    if (drawn.length >= enough && gathered[borderlineCell]!.length >= capacity[borderlineCell]! && gathered[clearCell]!.length >= capacity[clearCell]!) continue;
     // Borderline: one factor's step toward the other outcome flips it. Every factor that does.
     const flips: Factor[] = [];
     for (const f of FACTORS) {
@@ -352,13 +424,21 @@ export function* sittingSteps(seed: string, tuning: Tuning, opts: SittingOptions
       legible: { indicator: false, head: false, voice: false },
     };
     clears.set(t, o.clear);
+    drawn.push(t);
     const c = cellOf(t);
-    if (cells[c]!.length < quotas[c]!) cells[c]!.push(t);
-    else if (warmups.length < opts.warmups) {
-      const w = { ...t, warmup: true };
-      clears.set(w, o.clear);
-      warmups.push(w);
-    }
+    if (gathered[c]!.length < capacity[c]!) gathered[c]!.push(t);
+  }
+  const cells = spread(gathered, quotas);
+  // The warm-ups: what's left, in the order drawn, turn about seen and not, so they show both.
+  const picked = new Set(cells.flat());
+  const rest = drawn.filter((t) => !picked.has(t));
+  const warmups: Trial[] = [];
+  for (let wantSeen = true; warmups.length < opts.warmups && rest.length > 0; wantSeen = !wantSeen) {
+    const at = Math.max(0, rest.findIndex((t) => t.seen === wantSeen));
+    const t = rest.splice(at, 1)[0]!;
+    const w = { ...t, warmup: true };
+    clears.set(w, clears.get(t)!);
+    warmups.push(w);
   }
   // Half the scored trials frozen at their first cue, taken from the cells in turn (a
   // trial that never reaches the cue can only be judged from the situation).
@@ -449,6 +529,30 @@ export function scoreSitting(trials: readonly Trial[], answers: ReadonlyMap<numb
   s.balanced = (share(seenRight, seenOf) + share(unseenRight, unseenOf)) / 2;
   s.rulesBalanced = (share(rulesSeen, seenOf) + share(rulesUnseen, unseenOf)) / 2;
   return s;
+}
+
+/** What the player says told them, at a trial frozen at its first cue (the probe: diagnoses, never gates). */
+export type Told = 'mark' | 'head' | 'voice' | 'situation';
+export const TOLD: readonly Told[] = ['mark', 'head', 'voice', 'situation'];
+
+export interface ProbeTally {
+  /** How often each was named, and how many of those answers were right. */
+  by: Record<Told, { said: number; right: number }>;
+  /** How often a cue was named that the simulation says couldn't be read at that freeze. */
+  unreadable: number;
+}
+
+/** The probes of a sitting, against its key and what the simulation says could be read. */
+export function probeTally(trials: readonly Trial[], answers: ReadonlyMap<number, boolean>, probes: ReadonlyMap<number, Told>): ProbeTally {
+  const out: ProbeTally = { by: { mark: { said: 0, right: 0 }, head: { said: 0, right: 0 }, voice: { said: 0, right: 0 }, situation: { said: 0, right: 0 } }, unreadable: 0 };
+  for (const t of trials) {
+    const told = probes.get(t.k);
+    if (told === undefined || t.warmup) continue;
+    out.by[told].said++;
+    if (answers.get(t.k) === t.seen) out.by[told].right++;
+    if ((told === 'mark' && !t.legible.indicator) || (told === 'head' && !t.legible.head) || (told === 'voice' && !t.legible.voice)) out.unreadable++;
+  }
+  return out;
 }
 
 /** Two sittings, scored together: the exit test's verdict (docs/phase-1-plan.md, Exit tests · A). */

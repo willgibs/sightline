@@ -5,7 +5,7 @@ import type { Driver } from '../sim/kernel/scene';
 import type { Scene } from '../sim/game/scenes';
 import { sightScenario } from '../sim/game/scenes/sightScenario';
 import type { Simulation } from '../sim/game/sim';
-import { FACTORS, SITTING, scoreSitting, sittingSteps, type Score, type Trial } from '../sim/game/trials';
+import { FACTORS, SITTING, TOLD, probeTally, scoreSitting, sittingSteps, type ProbeTally, type Score, type Told, type Trial } from '../sim/game/trials';
 
 /**
  * Trial mode in the browser (A12, `?trials=<seed>`): a sitting of the exit test, run the way
@@ -17,11 +17,15 @@ import { FACTORS, SITTING, scoreSitting, sittingSteps, type Score, type Trial } 
  * guard is noticing you (his meter at 30%: the indicator, then his head and his voice), and
  * asks: will he see you within 8 seconds? Y or N.
  *
+ * A trial frozen at its first cue then asks what told you (1 the mark, 2 his head, 3 his
+ * voice, 4 the situation): a one-tap probe that diagnoses and never gates.
+ *
  * The 5 warm-ups then play on, so you see what happened. The 30 scored trials don't: they
  * finish out of sight (their recordings hold the whole trial), and nothing is shown until
  * the sitting ends, when the score is: balanced accuracy, the borderline trials, the
- * rules-only predictor on the same trials, and accuracy by the factor that decided each
- * borderline one.
+ * rules-only predictor on the same trials, and accuracy by the factors that decided each
+ * borderline one. R then plays back the trials you got wrong, each with what happened and
+ * what would have changed it: a sitting's misses, watched while they're fresh.
  */
 
 /** What the sitting needs from the game. */
@@ -40,16 +44,27 @@ export interface TrialHost {
   ready(): void;
   /** Shows the sitting's result, and offers it as a file. */
   results(html: string, save: () => void): void;
+  /** Runs again after the results, for a review; what's played from here isn't kept. */
+  resume(): void;
   download(name: string, text: string): void;
 }
 
-type Phase = 'preparing' | 'ready' | 'running' | 'asking' | 'playing-on' | 'outcome' | 'done';
+type Phase = 'preparing' | 'ready' | 'running' | 'asking' | 'probe' | 'playing-on' | 'outcome' | 'done';
+
+/** The probe's keys. */
+const PROBE_KEYS: Readonly<Record<string, Told>> = { Digit1: 'mark', Digit2: 'head', Digit3: 'voice', Digit4: 'situation' };
+const TOLD_WORDS: Readonly<Record<Told, string>> = { mark: 'the mark', head: 'his head', voice: 'his voice', situation: 'the situation' };
 
 export class TrialSitting {
   private phase: Phase = 'preparing';
   private trials: Trial[] = [];
   private k = -1;
   private readonly answers = new Map<number, boolean>();
+  private readonly probes = new Map<number, Told>();
+  /** The misses being played back after the results, and which of them is on; null when not reviewing. */
+  private reviewing: number[] | null = null;
+  private reviewAt = -1;
+  private score: Score | null = null;
   private driver: Driver<Simulation> | null = null;
   private freezeAt = -1;
   private seenAt = -1;
@@ -152,6 +167,18 @@ export class TrialSitting {
     if (!t || this.phase !== 'asking') return;
     this.answers.set(t.k, yes);
     this.host.annotate('trial-answer', JSON.stringify({ sitting: this.seed, k: t.k, warmup: t.warmup, freeze: t.freeze, answer: yes, params: t.params }));
+    if (t.freeze === 'cue') {
+      // What told you? It diagnoses, and never gates.
+      this.phase = 'probe';
+      this.render();
+      return;
+    }
+    this.answered();
+  }
+
+  /** The answer is in (and the probe, if there was one): the trial goes on. */
+  private answered(): void {
+    const t = this.trials[this.k]!;
     if (t.warmup) {
       // Warm-ups play on to their end, so you see what happened.
       this.phase = 'playing-on';
@@ -164,19 +191,71 @@ export class TrialSitting {
     this.next();
   }
 
+  private tell(told: Told | null): void {
+    const t = this.trials[this.k]!;
+    if (told !== null) {
+      this.probes.set(t.k, told);
+      this.host.annotate('trial-probe', JSON.stringify({ sitting: this.seed, k: t.k, told }));
+    }
+    this.answered();
+  }
+
+  /** Plays back the scored trials answered wrong, one by one, after the results. */
+  private review(): void {
+    const misses = this.trials.filter((t) => !t.warmup && this.answers.has(t.k) && this.answers.get(t.k) !== t.seen).map((t) => t.k);
+    if (misses.length === 0) return;
+    this.reviewing = misses;
+    this.reviewAt = -1;
+    this.host.resume();
+    this.nextMiss();
+  }
+
+  private nextMiss(): void {
+    this.reviewAt++;
+    const k = this.reviewing![this.reviewAt];
+    if (k === undefined) {
+      this.reviewing = null;
+      this.phase = 'done';
+      this.render();
+      this.showResults();
+      return;
+    }
+    this.k = k;
+    const scene = sightScenario(this.trials[k]!.params);
+    this.host.loadTrial(scene);
+    this.driver = scene.driver!() as Driver<Simulation>;
+    this.freezeAt = -1;
+    this.seenAt = -1;
+    this.phase = 'playing-on';
+    this.render();
+  }
+
   private onKey = (e: KeyboardEvent): void => {
     if (e.repeat) return;
     if (this.press(e.code)) e.preventDefault();
   };
 
-  /** A key, as the sitting takes it: Y or N answers a frozen trial; Space or Enter moves on from a warm-up's outcome. */
+  /** A key, as the sitting takes it: Y or N answers a frozen trial; 1–4 (or Space to skip) says what told you; Space or Enter moves on from an outcome; R plays back the misses, on the results. */
   press(code: string): boolean {
     if (this.phase === 'asking' && (code === 'KeyY' || code === 'KeyN')) {
       this.answer(code === 'KeyY');
       return true;
     }
+    if (this.phase === 'probe') {
+      const told = PROBE_KEYS[code];
+      if (told !== undefined || code === 'Space') {
+        this.tell(told ?? null);
+        return true;
+      }
+      return false;
+    }
     if (this.phase === 'outcome' && (code === 'Space' || code === 'Enter')) {
-      this.next();
+      if (this.reviewing) this.nextMiss();
+      else this.next();
+      return true;
+    }
+    if (this.phase === 'done' && code === 'KeyR' && this.score) {
+      this.review();
       return true;
     }
     return false;
@@ -197,12 +276,17 @@ export class TrialSitting {
     this.panel.hidden = false;
     const scored = this.trials.filter((x) => !x.warmup).length;
     const warmups = this.trials.length - scored;
-    const title = t.warmup ? `Warm-up ${t.k + 1} of ${warmups}` : `Trial ${t.k - warmups + 1} of ${scored}`;
+    const title = this.reviewing ? `Reviewing miss ${this.reviewAt + 1} of ${this.reviewing.length}` : t.warmup ? `Warm-up ${t.k + 1} of ${warmups}` : `Trial ${t.k - warmups + 1} of ${scored}`;
+    const said = `You said ${this.answers.get(t.k) ? 'he would' : "he wouldn't"}.`;
     let prompt: string;
     if (this.phase === 'asking') prompt = `<b>Y</b> he'll see you · <b>N</b> he won't${t.freeze === 'cue' ? ' · frozen at the first sign he noticed something' : ' · frozen at the start'}`;
+    else if (this.phase === 'probe') prompt = `What told you? <b>1</b> the mark · <b>2</b> his head · <b>3</b> his voice · <b>4</b> the situation alone · <b>Space</b> skip`;
     else if (this.phase === 'running') prompt = 'Watch…';
-    else if (this.phase === 'playing-on') prompt = 'Playing on…';
-    else prompt = `${this.seenAt >= 0 ? `<b>Seen</b> at ${this.seenAt.toFixed(1)} s.` : `<b>Not seen</b> in ${SITTING.seconds} s.`} You said ${this.answers.get(t.k) ? 'he would' : "he wouldn't"}. <b>Space</b> for the next.`;
+    else if (this.phase === 'playing-on') prompt = this.reviewing ? `${said} Playing it back…` : 'Playing on…';
+    else {
+      const why = !this.reviewing ? '' : t.flips.length ? ` One step of ${t.flips.join(' or ')} would have changed it.` : ' No one step would have changed it.';
+      prompt = `${this.seenAt >= 0 ? `<b>Seen</b> at ${this.seenAt.toFixed(1)} s.` : `<b>Not seen</b> in ${SITTING.seconds} s.`} ${said}${why} <b>Space</b> for the next.`;
+    }
     this.panel.innerHTML = `<div class="trial-title">${title}</div><div class="trial-brief"></div><div class="trial-prompt">${prompt}</div>`;
     this.panel.querySelector('.trial-brief')!.textContent = t.brief;
   }
@@ -210,15 +294,21 @@ export class TrialSitting {
   private finish(): void {
     this.phase = 'done';
     this.render();
-    const s = scoreSitting(this.trials, this.answers);
-    this.host.annotate('trial-sitting', JSON.stringify({ sitting: this.seed, ...s }));
-    this.host.results(resultsHtml(this.seed, s), () => this.host.download(`sitting-${this.seed}.json`, this.report(s)));
+    this.score = scoreSitting(this.trials, this.answers);
+    this.host.annotate('trial-sitting', JSON.stringify({ sitting: this.seed, ...this.score }));
+    this.showResults();
+  }
+
+  private showResults(): void {
+    const s = this.score!;
+    const misses = this.trials.filter((t) => !t.warmup && this.answers.has(t.k) && this.answers.get(t.k) !== t.seen).length;
+    this.host.results(resultsHtml(this.seed, s, probeTally(this.trials, this.answers, this.probes), misses), () => this.host.download(`sitting-${this.seed}.json`, this.report(s)));
   }
 
   /** The sitting as a file (`npm run playtest` scores it): every trial with its key, every answer, the score. */
   private report(s: Score): string {
     // With the tuning it was made with, so `npm run playtest` can generate it again and check it.
-    return JSON.stringify({ format: 'sightline-sitting', version: 1, seed: this.seed, trials: this.trials, answers: Object.fromEntries(this.answers), score: s, tuning: this.tuning }, null, 2);
+    return JSON.stringify({ format: 'sightline-sitting', version: 1, seed: this.seed, trials: this.trials, answers: Object.fromEntries(this.answers), probes: Object.fromEntries(this.probes), score: s, tuning: this.tuning }, null, 2);
   }
 
   dispose(): void {
@@ -229,8 +319,15 @@ export class TrialSitting {
 
 const pct = (v: number): string => `${Math.round(v * 100)}%`;
 
+/** What told you, in a line; null if the probe was never answered. */
+function probeLine(p: ProbeTally): string | null {
+  const said = TOLD.filter((t) => p.by[t].said > 0).map((t) => `${TOLD_WORDS[t]} ${p.by[t].said} (${p.by[t].right} right)`);
+  if (said.length === 0) return null;
+  return `What told you: ${said.join(' · ')}${p.unreadable ? ` · ${p.unreadable} naming a cue the simulation says couldn't be read` : ''}`;
+}
+
 /** The sitting's result, for the overlay. */
-export function resultsHtml(seed: string, s: Score): string {
+export function resultsHtml(seed: string, s: Score, probes: ProbeTally, misses: number): string {
   const factors = FACTORS.filter((f) => s.byFactor[f])
     .map((f) => `${f} ${s.byFactor[f]!.right} of ${s.byFactor[f]!.of} (table ${s.byFactor[f]!.rules})`)
     .join(' · ');
@@ -242,6 +339,8 @@ export function resultsHtml(seed: string, s: Score): string {
     `Borderline trials: ${s.borderlineRight} of ${s.borderline} right · the sight table alone: ${s.rulesBorderlineRight} of ${s.borderline}`,
     `The rules-only predictor on all the same trials: ${pct(s.rulesBalanced)}`,
     `By each factor that flips a borderline trial: ${factors || '—'}`,
+    ...[probeLine(probes)].filter((l): l is string => l !== null),
+    ...(misses > 0 ? [`Press R to watch the ${misses} you got wrong, with what happened and what would have changed it.`] : []),
     ``,
     `The exit test passes over two sittings: 80% balanced accuracy across both, 70% in each,`,
     `21 of the 30 borderline answers, and 3 more of them than the sight table alone.`,

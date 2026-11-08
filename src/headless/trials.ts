@@ -85,6 +85,9 @@ async function picture(seed: string, trials: readonly Trial[]): Promise<void> {
           seen: t.seen,
         });
         await g.run(`sightline.answer(${t.seen})`);
+      } else if (st.phase === 'probe') {
+        // The probe: the mark on odd trials, skipped on even ones, so both paths are exercised.
+        await g.run(`document.dispatchEvent(new KeyboardEvent('keydown', { code: '${st.trial % 2 === 1 ? 'Digit1' : 'Space'}' }))`);
       } else if (st.phase === 'outcome') await g.run(`document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }))`);
       else await g.page.waitForTimeout(200);
     }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { Rng } from '../src/sim/kernel/core/rng';
 import { formatSight, parseSight } from '../src/sim/game/scenes/sightScenario';
-import { CELL_NAMES, FACTORS, cellOfTrial, cellQuotas, generateSitting, outcomeOf, scoreSitting, stepFactor, verdict, type Trial } from '../src/sim/game/trials';
+import { CELL_NAMES, FACTORS, SITTING, cellOfTrial, cellQuotas, generateSitting, outcomeOf, pairsCovered, probeTally, scoreSitting, stepFactor, verdict, type Told, type Trial } from '../src/sim/game/trials';
 
 /**
  * Trial mode (A12): the exit test's protocol (docs/phase-1-plan.md, Exit tests · A). A
@@ -10,10 +10,12 @@ import { CELL_NAMES, FACTORS, cellOfTrial, cellQuotas, generateSitting, outcomeO
  * not, clear or borderline) evenly; every answer key and every borderline flip re-runs
  * true; half the trials freeze at their first cue; and the scoring is the protocol's.
  */
-describe('a sitting', () => {
-  const trials = generateSitting('SIT-TEST', T);
-  const scored = trials.filter((t) => !t.warmup);
+const trials = generateSitting('SIT-TEST', T);
+const scored = trials.filter((t) => !t.warmup);
+/** A sitting's trials made first come, first taken: what the spread improves on. */
+const firstCome = generateSitting('SIT-TEST', T, { ...SITTING, pool: 1 });
 
+describe('a sitting', () => {
   it('is the same for the same seed', () => {
     const again = generateSitting('SIT-TEST', T);
     expect(again.map((t) => [t.params, t.seen, t.borderline, t.freeze])).toEqual(trials.map((t) => [t.params, t.seen, t.borderline, t.freeze]));
@@ -59,6 +61,21 @@ describe('a sitting', () => {
     }
   });
 
+  it('spreads the trials over the factors: more pairs of levels than first come, first taken, with the key unchanged', () => {
+    expect(pairsCovered(trials)).toBeGreaterThan(pairsCovered(firstCome) + 5);
+    const cells = (ts: readonly Trial[]): number[] => {
+      const n = CELL_NAMES.map(() => 0);
+      for (const t of ts) if (!t.warmup) n[cellOfTrial(t)]!++;
+      return n;
+    };
+    expect(cells(trials)).toEqual(cells(firstCome));
+  });
+
+  it('has warm-ups that show both outcomes', () => {
+    const warmups = trials.filter((t) => t.warmup);
+    expect(warmups.map((t) => t.seen)).toEqual([true, false, true, false, true]);
+  });
+
   it('freezes about half at their first cue, and only where there is one', () => {
     const cue = scored.filter((t) => t.freeze === 'cue');
     expect(cue.length).toBeGreaterThanOrEqual(12);
@@ -83,8 +100,6 @@ describe('a sitting', () => {
 });
 
 describe('scoring', () => {
-  const trials = generateSitting('SIT-TEST', T);
-  const scored = trials.filter((t) => !t.warmup);
   const answer = (f: (t: Trial) => boolean): Map<number, boolean> => new Map(trials.map((t) => [t.k, f(t)]));
 
   it('is balanced accuracy: yes to everything scores 50%, the key 100%', () => {
@@ -105,6 +120,21 @@ describe('scoring', () => {
     const of = Object.values(s.byFactor).reduce((n, f) => n + f!.of, 0);
     expect(of).toBe(scored.reduce((n, t) => n + t.flips.length, 0));
     for (const f of FACTORS) if (s.byFactor[f]) expect(s.byFactor[f]!.right).toBe(s.byFactor[f]!.of);
+  });
+
+  it('tallies the probe: how often each cue was named, how often that was right, and cues that could not be read', () => {
+    const cue = scored.filter((t) => t.freeze === 'cue');
+    const unreadableHead = cue.slice(2).find((t) => !t.legible.head);
+    const said = new Map<number, Told>([
+      [cue[0]!.k, 'mark'],
+      [cue[1]!.k, 'situation'],
+    ]);
+    if (unreadableHead) said.set(unreadableHead.k, 'head');
+    const wrongOnFirst = answer((t) => (t.k === cue[0]!.k ? !t.seen : t.seen));
+    const p = probeTally(trials, wrongOnFirst, said);
+    expect(p.by.mark).toEqual({ said: 1, right: 0 });
+    expect(p.by.situation).toEqual({ said: 1, right: 1 });
+    expect(p.unreadable).toBe(unreadableHead ? 1 : 0);
   });
 
   it('passes two sittings only on all four conditions', () => {

@@ -512,6 +512,14 @@ export class Game {
         this.retry = save;
         this.overlay.showMessage('outcome', 'The sitting is done', text, 'Save the sitting');
       },
+      resume: () => {
+        // A review of the misses: nothing played from here is kept.
+        this.capture.minSeconds = Infinity;
+        this.paused = false;
+        this.overlay.hide();
+        this.hud.setVisible(true);
+        this.lastNow = 0;
+      },
       download: (name, text) => this.download(new Blob([text], { type: 'application/json' }), name),
     };
   }

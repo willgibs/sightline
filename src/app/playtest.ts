@@ -164,7 +164,7 @@ export class PlaytestCapture {
   status = 'nothing saved yet';
   /**
    * Runs shorter than this aren't kept. Trial mode (A12) keeps every trial, however short:
-   * each holds an answer.
+   * each holds an answer. A review of its misses after the results keeps none (Infinity).
    */
   minSeconds = MIN_SECONDS;
 
