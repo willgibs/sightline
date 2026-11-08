@@ -1,0 +1,119 @@
+import { describe, expect, it } from 'vitest';
+import { defaultTuning as T } from '../src/config/tuning';
+import { MarksmanDriver, type Step } from '../src/sim/game/bots/marksman';
+import { commanderOf } from '../src/sim/game/comms';
+import { PERCEPT_ROOTS } from '../src/sim/game/benches';
+import { liveCamp } from '../src/sim/game/scenes/liveCamp';
+import { placePlayer } from '../src/sim/game/setup';
+import type { Simulation } from '../src/sim/game/sim';
+import { generateWorld, campMission } from '../src/sim/generation';
+import type { SimEvent } from '../src/sim/kernel/events';
+import { runScene, startScene, type Scene } from '../src/sim/kernel/scene';
+import { resimulate } from '../src/sim/kernel/record/resim';
+import type { World } from '../src/sim/kernel/world/world';
+
+/**
+ * The camp brain on generated camps (E13): everything lab E built, on the camps lab D
+ * generates. A marksman fires from the camp's best overview at whatever he can see.
+ */
+
+const SEEDS = ['LEB-2534', 'KUV-9210', 'HUM-0755'];
+const worlds = new Map<string, World>();
+function worldOf(seed: string): World {
+  let w = worlds.get(seed);
+  if (!w) worlds.set(seed, (w = generateWorld(campMission(seed), T)));
+  return w;
+}
+
+/** The scene with a marksman on the camp's best overview, firing every 6 s at what he sees best. */
+function shooter(seed: string, seconds: number): { scene: Scene<Simulation>; steps: Step[] } {
+  const world = worldOf(seed);
+  const a = world.report.camp!;
+  const perch = [...a.perches].sort((x, y) => y.coverage - x.coverage || x.x - y.x)[0]!;
+  const order = perch.guards
+    .map((v, i) => [v, i] as const)
+    .sort((p, q) => q[0] - p[0] || p[1] - q[1])
+    .filter(([v]) => v > 0.2)
+    .map(([, i]) => i);
+  const steps: Step[] = [{ at: 0.2, act: 'prone' }, { at: 3, act: 'scope' }];
+  order.slice(0, 8).forEach((post, i) => steps.push({ at: 8 + i * 6, act: 'fire', target: { post }, breath: 1.5 }));
+  const base = liveCamp(`seed=${seed}`) as Scene<Simulation>;
+  const scene: Scene<Simulation> = {
+    ...base,
+    world: () => world,
+    setup: (sim) => {
+      base.setup!(sim);
+      placePlayer(sim, perch.x, perch.z, world.camp.site.x - perch.x, world.camp.site.z - perch.z);
+    },
+    driver: () => new MarksmanDriver(steps),
+    seconds,
+    expect: [],
+  };
+  return { scene, steps };
+}
+
+function play(seed: string, seconds: number): { sim: Simulation; events: SimEvent[] } {
+  const { scene } = shooter(seed, seconds);
+  const sim = startScene(scene, T);
+  const driver = scene.driver!();
+  const raw = scene.game.still(sim);
+  const events: SimEvent[] = [];
+  for (let t = 0; t < seconds * T.sim.tickHz && sim.state.outcome.status === 'playing'; t++) events.push(...sim.step(driver.next(sim, raw)).map((e) => ({ ...e })));
+  return { sim, events };
+}
+
+describe('a live camp (E13)', () => {
+  for (const seed of SEEDS) {
+    it(`answers shots from its best overview, ${seed}: a reaction inside 2 s, an alarm at its own box, and the target away`, () => {
+      const { sim, events } = play(seed, 120);
+      expect(sim.fault).toBeFalsy();
+      const shot = events.find((e) => e.type === 'shot' && e.source === sim.playerId)!;
+      expect(shot).toBeDefined();
+      const reaction = events.find((e) => e.type === 'act' && e.tick >= shot.tick && e.to !== 'routine' && e.to !== 'return');
+      expect(reaction, 'nobody reacted').toBeDefined();
+      expect((reaction!.tick - shot.tick) / T.sim.tickHz).toBeLessThanOrEqual(2);
+      const raised = events.find((e) => e.type === 'alarm' && e.stage === 'raised') as Extract<SimEvent, { type: 'alarm' }> | undefined;
+      expect(raised, 'no alarm raised').toBeDefined();
+      // The box the commander knows is lab D's entity, raised with it.
+      expect(sim.index.of('alarm').filter((a) => a.alarm.raised).length).toBe(1);
+      expect(commanderOf(sim)!.camp.level).toBe('lockdown');
+      expect(events.some((e) => e.type === 'act' && e.to === 'flee'), 'the target never ran').toBe(true);
+      expect(sim.state.outcome).toMatchObject({ status: 'failed', reason: 'the target got away' });
+      expect(sim.index.of('objective')[0]!.objective.status).toBe('escaped');
+    }, 180_000);
+  }
+
+  it('explains every reaction, back to something sensed', () => {
+    const { events } = play(SEEDS[0]!, 90);
+    const byId = new Map(events.map((e) => [e.id, e]));
+    const reactions = events.filter((e) => e.type === 'act' && e.to !== 'routine' && e.to !== 'return');
+    expect(reactions.length).toBeGreaterThan(10);
+    const unexplained = reactions.filter((r) => {
+      let cause = r.cause;
+      for (let hops = 0; hops < 32 && cause !== 0; hops++) {
+        const c = byId.get(cause);
+        if (!c) return true;
+        if (PERCEPT_ROOTS.has(c.type)) return false;
+        cause = c.cause;
+      }
+      return true;
+    });
+    expect(unexplained.map((e) => `${e.type} ${(e as { to?: string }).to} at ${e.tick}`)).toEqual([]);
+  }, 180_000);
+
+  it('re-simulates bit for bit, at any seed', () => {
+    const { scene } = shooter(SEEDS[1]!, 40);
+    const run = runScene(scene, T);
+    expect(run.failures).toEqual([]);
+    const again = resimulate(run.recording, { scene });
+    expect(again.problem).toBeNull();
+    expect(again.ok).toBe(true);
+  }, 180_000);
+
+  it('is named by its seed and difficulty, and refuses what it cannot build', () => {
+    expect(liveCamp('seed=ABC-1234&difficulty=0.25').params).toBe('seed=ABC-1234&difficulty=0.25');
+    expect(liveCamp().params).toBe('seed=LEB-2534&difficulty=0.5');
+    expect(() => liveCamp('difficulty=2')).toThrow(/between 0 and 1/);
+    expect(() => liveCamp('plan=now')).toThrow(/doesn't know/);
+  });
+});

@@ -4,6 +4,7 @@ import { ladderTower } from './ladderTower';
 import { campBrain } from './campBrain';
 import { CAMP_SCENARIOS, campScenario } from './campScenario';
 import { campSystems } from './campSystems';
+import { liveCamp } from './liveCamp';
 import { movementCourse } from './movementCourse';
 import { movementLab } from './movementLab';
 import { perceptionCrowd, perceptionLab } from './perceptionLab';
@@ -32,6 +33,7 @@ export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   sight: sightScenario,
   'spawn-tick': spawnTick,
   'camp-systems': campSystems,
+  'live-camp': liveCamp,
   'shooting-range': shootingRange,
 };
 

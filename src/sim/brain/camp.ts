@@ -56,7 +56,8 @@ export interface SearchState {
 }
 
 export interface CampDevices {
-  alarms: Array<{ x: number; z: number; raised: boolean; powered: boolean }>;
+  /** The alarm boxes, in order: where each stands, whether it's raised and has power, and its device in world.camp.devices, for a generated camp. */
+  alarms: Array<{ x: number; z: number; raised: boolean; powered: boolean; device?: number }>;
   generatorRunning: boolean;
   /** Where the target's vehicle stands, if the camp has one (E7): where he runs at lockdown. */
   escape: { x: number; z: number } | null;
@@ -65,7 +66,7 @@ export interface CampDevices {
 export interface CampState {
   /** The mission's objective (E7): the target's entity id and whether he's still to be got, a stand-in until lab D's. */
   objective: { target: number; status: 'open' | 'done' | 'escaped' } | null;
-  /** The camp's devices (E7): where they are and whether they work. A stand-in until lab D's entities land. */
+  /** The camp's devices (E7): where they are and whether they work. On a generated camp, kept current from lab D's entities (`game/comms.ts`, campDevices). */
   devices: CampDevices;
   /** A shooter the camp has triangulated (E8): the bearings it fuses, and its estimate. */
   shots: { bearings: Array<Bearing & { tick: number }>; estimate: ShotEstimate | null; tick: number; dirty: boolean };

@@ -2,6 +2,14 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · The camp brain on generated camps (E13)
+
+**Decision:** a scene, `live-camp`, puts lab E's whole brain on any generated camp, with the rifle. It is a scene rather than a change to the valley's systems, so the default valley's behaviour doesn't move until Phase 2 joins the labs. Lab D's entities hold the one answer about whether a box has power or the radio works; `campDevices` keeps the commander's copy of it, and raising a box raises its entity. A handmade scene's camp, with no such entities, keeps the list its scene gave it, so the scripted scenarios and benches are untouched.
+
+**Why:** the review point read E7, E8 and E12 as nearly done. None could finish while the brain had only ever run on one handmade camp.
+
+**What moved:** nothing pinned. The tuning gained the gap beside a vehicle where its driver gets in, so the golden recording is rewritten.
+
 ## 2026-11-08 · The valley is lab D's (D9)
 
 **Decision:** every generated world now has lab D's valley and compound. A mission that names no camp gets the default one, and its spec says so (`world.spec.camp`), so a recording names the camp it was played in. Phase 0's terrain, test camp and terrain analysis are gone, with the ten `gen.world` values only they read. `?camp` still loads and does nothing; `&difficulty=` still sets how hard the camp is.

@@ -7,6 +7,7 @@ import { Faction, type EntityBase } from '../kernel/state';
 import type { ScheduleHandler, System, TickContext } from '../kernel/systems';
 import { Surface } from '../kernel/world/surfaces';
 import { believe, createSenses, stimulate, type Percept } from '../perception';
+import { boardingPoint } from './camp';
 import type { GuardEntity } from './entities';
 import { deliverSound } from './perception';
 import type { Simulation } from './sim';
@@ -248,6 +249,7 @@ export function targetEscapes(ctx: TickContext, g: GuardEntity): void {
   const c = commanderOf(ctx);
   if (!c?.camp.objective || c.camp.objective.target !== g.id) return;
   c.camp.objective.status = 'escaped';
+  for (const o of ctx.index.of('objective')) if (o.objective.target === g.id) o.objective.status = 'escaped';
   ctx.despawn(g.id);
 }
 
@@ -258,6 +260,53 @@ export function giveDevices(sim: Simulation, alarms: ReadonlyArray<{ x: number; 
   for (const a of alarms) c.camp.devices.alarms.push({ x: a.x, z: a.z, raised: false, powered: true });
   if (escape) c.camp.devices.escape = { x: escape.x, z: escape.z };
 }
+
+/**
+ * Gives the camp the equipment a generated camp came with (lab D, D5): its alarm boxes, in
+ * the order of world.camp.devices, the place the target gets into his vehicle, and the
+ * objective's target. `campDevices` keeps the camp's record current from then on.
+ */
+export function giveCampDevices(sim: Simulation): void {
+  const c = sim.index.of('commander')[0];
+  if (!c) return;
+  const camp = sim.world.camp;
+  (camp.devices ?? []).forEach((d, device) => {
+    if (d.kind === 'alarm') c.camp.devices.alarms.push({ x: d.x, z: d.z, raised: false, powered: true, device });
+  });
+  const o = camp.objective;
+  const vehicle = o ? camp.vehicles?.[o.vehicle] : undefined;
+  if (vehicle) c.camp.devices.escape = boardingPoint(sim.world, vehicle, sim.tuning);
+  const objective = sim.index.of('objective')[0];
+  if (objective) giveObjective(sim, objective.objective.target);
+}
+
+/**
+ * The camp's equipment as it stands (lab D's entities, game/camp.ts): whether each alarm box
+ * has power, whether the generator runs, whether the radio works. Lab D's entities hold the
+ * one answer; this keeps the commander's copy of it, so a cut is felt in the tick it happens.
+ * A camp with no such entities (a handmade scene's) keeps what its scene gave it.
+ */
+export const campDevices: System = {
+  name: 'camp-devices',
+  phase: 'world',
+  after: ['camp-power'],
+  reads: ['alarm.alarm', 'radio.radio', 'generator.generator', 'commander.camp'],
+  writes: ['commander.camp.devices', 'commander.camp.netWorking'],
+  emits: [],
+  run(ctx) {
+    const c = commanderOf(ctx);
+    if (!c) return;
+    const camp = c.camp;
+    for (const a of ctx.index.of('alarm')) {
+      const box = camp.devices.alarms.find((x) => x.device === a.alarm.device);
+      if (box) box.powered = a.alarm.powered;
+    }
+    const generators = ctx.index.of('generator');
+    if (generators.length > 0) camp.devices.generatorRunning = generators.some((g) => g.generator.running);
+    const radios = ctx.index.of('radio');
+    if (radios.length > 0) camp.netWorking = radios.some((r) => r.radio.powered && r.radio.working);
+  },
+};
 
 /** Names the mission's target (E7): the entity whose death is the objective, and who runs for the vehicle at lockdown. */
 export function giveObjective(sim: Simulation, target: number): void {
@@ -291,6 +340,7 @@ export function raiseAlarm(ctx: TickContext, g: GuardEntity): void {
     return;
   }
   box.raised = true;
+  for (const a of ctx.index.of('alarm')) if (a.alarm.device === box.device) a.alarm.raised = true;
   const raised = ctx.emit({ type: 'alarm', source: g.id, cause: b.event, box: b.box, stage: 'raised' });
   const was = c.camp.level;
   c.camp.level = 'lockdown';

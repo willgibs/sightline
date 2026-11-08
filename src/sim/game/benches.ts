@@ -591,7 +591,7 @@ export function inWorldCalibration(T: Tuning, shots: number): { one: number; two
 }
 
 /** What a chain of causes can end in: something sensed (a sound or a sighting), or an order from what was sensed. */
-const PERCEPT_ROOTS = new Set(['footstep', 'land', 'noise', 'report', 'impact', 'bark', 'heard', 'noticed', 'detected', 'radio', 'call', 'clatter', 'cry', 'bolt', 'death', 'checkin', 'order']);
+export const PERCEPT_ROOTS: ReadonlySet<string> = new Set(['footstep', 'land', 'noise', 'report', 'impact', 'bark', 'heard', 'noticed', 'detected', 'spotted', 'radio', 'call', 'clatter', 'cry', 'bolt', 'death', 'checkin', 'order']);
 
 /** Lab A's bench (perception lane): docs/phase-1-plan.md, A · recorded before building, says what each should be. */
 function perceptionMetrics(): Record<string, number> {

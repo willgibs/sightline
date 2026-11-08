@@ -1,9 +1,12 @@
+import type { Tuning } from '../../config/tuning';
 import type { DoorSpec, VehicleSpec } from '../generation';
 import type { Simulation as KernelSimulation } from '../kernel/sim';
 import type { System } from '../kernel/systems';
 import { Faction, type EntityBase } from '../kernel/state';
 import { Blocks, type Collider } from '../kernel/world/colliders';
+import { Cell, cellAt } from '../kernel/world/grid';
 import { Surface } from '../kernel/world/surfaces';
+import type { World } from '../kernel/world/world';
 
 /**
  * The camp's things with state (lab D, D4): its doors and its vehicles, spawned from the
@@ -43,6 +46,24 @@ declare module '../kernel/state' {
     door: DoorEntity;
     vehicle: VehicleEntity;
   }
+}
+
+/**
+ * Where someone gets into a vehicle (E7): beside it, on whichever side is nearer the
+ * camp's centre and clear to stand on. Lab D's vehicles park beside walls, so the nearer
+ * side may be taken.
+ */
+export function boardingPoint(world: World, v: VehicleSpec, tuning: Tuning): { x: number; z: number } {
+  const reach = v.width / 2 + tuning.brain.alarm.flee.boardGap;
+  const site = world.camp.site;
+  const sides = [1, -1]
+    .map((s) => ({ x: v.x - v.fz * s * reach, z: v.z + v.fx * s * reach }))
+    .sort((a, b) => (a.x - site.x) * (a.x - site.x) + (a.z - site.z) * (a.z - site.z) - ((b.x - site.x) * (b.x - site.x) + (b.z - site.z) * (b.z - site.z)) || a.x - b.x || a.z - b.z);
+  for (const p of sides) {
+    const c = cellAt(world.grid, p.x, p.z);
+    if (c && (c.layer.flags[c.index]! & Cell.Walkable) !== 0) return p;
+  }
+  return sides[0]!;
 }
 
 /** The camp's doors and vehicles, as entities, in the camp's order: doors first. */
