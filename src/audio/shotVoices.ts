@@ -100,3 +100,13 @@ export function cry(ctx: BaseAudioContext, out: AudioNode, noise: NoiseBuffers, 
   osc.stop(when + length + 0.02);
   return Math.max(when + length + 0.02, burst(ctx, voice, noise.white, rand, when, 'bandpass', 1800, 0.8, 0.02, length * 0.7, 0.25));
 }
+
+/** A thrown stone touching down: a sharp knock and a short scuff, by how hard. */
+export function clatter(ctx: BaseAudioContext, out: AudioNode, noise: NoiseBuffers, rand: Rand, when: number, amp: number): number {
+  const voice = new GainNode(ctx, { gain: capped(amp) });
+  voice.connect(out);
+  let end = burst(ctx, voice, noise.white, rand, when, 'bandpass', 2200 + rand() * 600, 2, 0.001, 0.025, 1);
+  end = Math.max(end, burst(ctx, voice, noise.white, rand, when + 0.004, 'lowpass', 900, 0.7, 0.003, 0.06, 0.5));
+  end = Math.max(end, burst(ctx, voice, noise.white, rand, when + 0.03, 'bandpass', 1600, 1, 0.01, 0.07, 0.25));
+  return end;
+}

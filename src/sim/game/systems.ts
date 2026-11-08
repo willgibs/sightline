@@ -107,6 +107,7 @@ export const SYSTEMS: readonly System[] = [
   guardOrders,
   motorSystem,
   SHOOTING_SYSTEMS.bullets,
+  SHOOTING_SYSTEMS.thrown,
   SHOOTING_SYSTEMS.aim,
   guardBrains,
 ];

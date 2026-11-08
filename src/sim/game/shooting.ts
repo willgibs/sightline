@@ -1,16 +1,20 @@
 import type { Tuning } from '../../config/tuning';
 import {
   ballisticOf,
+  boreLine,
   dialZero,
   emptyStrike,
   flightAt,
   fly,
+  flyThrown,
+  landingRadius,
   freshRifle,
   launch,
   lineOfSight,
   markDirection,
   pushSway,
   restAvailable,
+  smallAngle,
   solveAim,
   swayAt,
   swaySample,
@@ -18,18 +22,19 @@ import {
   zeroOf,
   type BulletEntity,
   type RifleState,
+  type ThrownEntity,
   type Strike,
   type SwaySample,
 } from '../ballistics';
 import { calmVitals, poseAt, stepVitals, type PoseSample } from '../body';
 import type { Command } from '../kernel/commands';
-import { datan2, dcos, dsin } from '../kernel/core/detmath';
+import { DEG, datan2, dcos, dsin } from '../kernel/core/detmath';
 import { air, windAt } from '../kernel/env';
 import { Faction } from '../kernel/state';
 import type { System, TickContext } from '../kernel/systems';
 import { Blocks } from '../kernel/world/colliders';
 import { emptyHit, raycast } from '../kernel/world/query';
-import { Surface } from '../kernel/world/surfaces';
+import { SURFACE_NAMES, Surface } from '../kernel/world/surfaces';
 import { player, type GuardEntity, type PlayerEntity } from './entities';
 import { bodiesAt } from './remains';
 
@@ -76,8 +81,8 @@ const rifleSystem: System = {
   phase: 'commands',
   after: ['player-commands'],
   reads: ['input', 'player.body', 'player.rifle', '*.body', 'guard.guard.spawn', 'remains.remains', 'solid.solid'],
-  writes: ['player.rifle', 'entities', 'bullet.bullet', 'rng.unaimed', 'rng.wound'],
-  emits: ['shot', 'report', 'ranged', 'impact', 'death', 'cry'],
+  writes: ['player.rifle', 'entities', 'bullet.bullet', 'thrown.thrown', 'rng.unaimed', 'rng.wound'],
+  emits: ['shot', 'report', 'ranged', 'impact', 'death', 'cry', 'clatter'],
   run(ctx) {
     const p = player(ctx.index);
     for (const c of ctx.input.commands) if (c.kind === 'shotDrop') dropShot(ctx, p, c);
@@ -88,6 +93,7 @@ const rifleSystem: System = {
       else if (c.kind === 'range') rangefind(ctx, p, c);
       else if (c.kind === 'zeroUp') dialZero(rifle, 1, ctx.tuning.ballistics);
       else if (c.kind === 'zeroDown') dialZero(rifle, -1, ctx.tuning.ballistics);
+      else if (c.kind === 'throw') throwOne(ctx, p, rifle, c);
       else if (c.kind === 'suppressor' && rifle.fitting <= 0) {
         rifle.suppressed = !rifle.suppressed;
         rifle.fitting = ctx.tuning.ballistics.rifle.fitTime;
@@ -173,6 +179,66 @@ function dropShot(ctx: TickContext, p: PlayerEntity, c: Extract<Command, { kind:
   const bullet = ctx.spawn((id): BulletEntity => ({ id, kind: 'bullet', faction: p.faction, bullet: { shooter: p.id, shot: shotId, flight, swept: t } }));
   flyAndStrike(ctx, bullet, (ctx.tick - 1) / T.sim.tickHz);
 }
+
+/**
+ * Throws the throwable (B9) along the frame's line of sight, lifted a little, from just in
+ * front of the eye, carried by the body's own speed; then flies it on to the tick's start
+ * against the world as the player saw it, like a shot.
+ */
+function throwOne(ctx: TickContext, p: PlayerEntity, rifle: RifleState, c: Extract<Command, { kind: 'throw' }>): void {
+  if (rifle.throwables <= 0) return;
+  const T = ctx.tuning;
+  const R = T.ballistics.throwable;
+  const t = (ctx.tick - 1 - c.lag) / T.sim.tickHz;
+  poseAt(p.body, c.lag, pose);
+  lineOfSight(c.yaw, c.pitch, sight);
+  const lift = smallAngle(R.liftDeg * DEG);
+  boreLine(sight.x, sight.y, sight.z, lift.cos, lift.sin, aim);
+  rifle.throwables--;
+  const thrown = ctx.spawn((id): ThrownEntity => ({
+    id,
+    kind: 'thrown',
+    faction: Faction.None,
+    thrown: {
+      thrower: p.id,
+      x: pose.x + sight.x * 0.35,
+      y: pose.y + pose.eyeHeight - 0.1,
+      z: pose.z + sight.z * 0.35,
+      vx: aim.x * R.speed + p.body.vx,
+      vy: aim.y * R.speed,
+      vz: aim.z * R.speed + p.body.vz,
+      t,
+      swept: t,
+      rest: false,
+      touches: 0,
+    },
+  }));
+  flyThrownOn(ctx, thrown, (ctx.tick - 1) / T.sim.tickHz);
+}
+
+/** Flies a throwable on to `now`, sounding every touch. */
+function flyThrownOn(ctx: TickContext, e: ThrownEntity, now: number): void {
+  const T = ctx.tuning;
+  flyThrown(e.thrown, now, 1 / T.sim.tickHz, ctx.query(), T, (touch) => {
+    const radius = landingRadius(touch.speed, T.noise.surface[SURFACE_NAMES[touch.surface]], T);
+    if (radius < 1) return;
+    ctx.emit({ type: 'clatter', source: e.thrown.thrower, t: touch.t, x: touch.x, y: touch.y, z: touch.z, surface: touch.surface, loudness: radius / T.noise.radiusPerUnit, radius, thrown: e.id, speed: touch.speed });
+  });
+}
+
+/** Every throwable in the air flies on through the tick. */
+const thrownSystem: System = {
+  name: 'thrown',
+  phase: 'projectiles',
+  after: ['bullets'],
+  reads: ['thrown.thrown', '*.body', 'remains.remains', 'solid.solid'],
+  writes: ['thrown.thrown'],
+  emits: ['clatter'],
+  run(ctx) {
+    const now = ctx.tick / ctx.tuning.sim.tickHz;
+    for (const e of ctx.index.of('thrown')) if (!e.thrown.rest) flyThrownOn(ctx, e, now);
+  },
+};
 
 /** Lasers the range along the frame's line of sight: the distance to the first thing that stops light, to the metre. */
 function rangefind(ctx: TickContext, p: PlayerEntity, c: Extract<Command, { kind: 'range' }>): void {
@@ -270,7 +336,7 @@ function kill(ctx: TickContext, g: GuardEntity, s: Strike, bullet: BulletEntity,
     id,
     kind: 'remains' as const,
     faction: Faction.Camp,
-    remains: { of: g.id, post: g.guard.spawn, x: pose.x, y: pose.y, z: pose.z, yaw: datan2(-f.dx, -f.dz), eye: pose.eyeHeight, fell: s.t, part },
+    remains: { of: g.id, post: g.guard.spawn, x: pose.x, y: pose.y, z: pose.z, yaw: datan2(-f.dx, -f.dz), eye: pose.eyeHeight, vx: g.body.vx, vz: g.body.vz, fell: s.t, part },
   }));
   ctx.emit({ type: 'death', source: bullet.bullet.shooter, t: s.t, cause, victim: g.id, remains: remains.id, post: g.guard.spawn, part, x: pose.x, y: pose.y, z: pose.z });
   ctx.despawn(g.id);
@@ -309,7 +375,7 @@ const bulletsSystem: System = {
 const aimSystem: System = {
   name: 'aim',
   phase: 'projectiles',
-  after: ['bullets'],
+  after: ['thrown'],
   reads: ['input', 'player.body', 'solid.solid'],
   writes: ['player.rifle', 'player.vitals'],
   emits: ['bolt'],
@@ -355,4 +421,4 @@ const aimSystem: System = {
   },
 };
 
-export const SHOOTING_SYSTEMS = { rifle: rifleSystem, bullets: bulletsSystem, aim: aimSystem } as const;
+export const SHOOTING_SYSTEMS = { rifle: rifleSystem, bullets: bulletsSystem, thrown: thrownSystem, aim: aimSystem } as const;

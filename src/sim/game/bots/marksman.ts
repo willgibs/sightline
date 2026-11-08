@@ -26,6 +26,8 @@ export type Step =
   | { at: number; act: 'prone' }
   | { at: number; act: 'scope' }
   | { at: number; act: 'binoculars' }
+  /** Throw the throwable straight ahead, lifted by `pitchDeg`. */
+  | { at: number; act: 'throw'; pitchDeg: number }
   | { at: number; act: 'range'; target: Target }
   | { at: number; act: 'fire'; target: Target; skip?: 'lead' | 'wind'; breath?: number; part?: 'head' | 'torso' | 'legs' };
 
@@ -59,6 +61,10 @@ export class MarksmanDriver {
       if (step.act === 'prone') out.prone = true;
       else if (step.act === 'scope') this.optic = Optic.Scope;
       else if (step.act === 'binoculars') this.optic = Optic.Binoculars;
+      else if (step.act === 'throw') {
+        this.optic = Optic.None;
+        out.commands = [{ kind: 'throw', lag: 0, yaw: p.body.yaw, pitch: (step.pitchDeg * Math.PI) / 180 }];
+      }
       else if (step.act === 'range') {
         // The laser goes straight: no hold, no lead.
         if (!this.solve(sim, step.target, false, false, true)) break;
@@ -94,11 +100,11 @@ export class MarksmanDriver {
     if (next?.act === 'fire' && now >= next.at - (next.breath ?? 0)) out.breath = true;
     if (out.commands.length > 0) {
       const c = out.commands[0]!;
-      if (c.kind === 'fire' || c.kind === 'range') {
+      if (c.kind === 'fire' || c.kind === 'range' || c.kind === 'throw') {
         out.yaw = c.yaw;
         out.pitch = c.pitch;
       }
-    } else if (next && next.act !== 'prone' && next.act !== 'scope' && next.act !== 'binoculars' && this.solve(sim, next.target, false, false)) {
+    } else if (next && (next.act === 'fire' || next.act === 'range') && this.solve(sim, next.target, false, false)) {
       const a = this.angles(this.los);
       out.yaw = a.yaw;
       out.pitch = a.pitch;

@@ -119,7 +119,7 @@ describe('events', () => {
     // On the range the guards who cry out are gone by the end: every source was an entity of that run.
     for (const e of all.slice(valley)) expect(e.source >= 1 && e.source < range.state.nextId).toBe(true);
     const shooter = new Set(all.slice(valley).filter((e) => e.source === PLAYER_ID).map((e) => e.type));
-    expect([...shooter].sort()).toEqual(['bolt', 'death', 'impact', 'ranged', 'report', 'shot', 'stance']);
+    expect([...shooter].sort()).toEqual(['bolt', 'clatter', 'death', 'impact', 'ranged', 'report', 'shot', 'stance']);
     expect(all.slice(valley).some((e) => e.type === 'cry' && e.source !== PLAYER_ID)).toBe(true);
   });
 

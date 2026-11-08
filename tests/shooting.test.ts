@@ -125,3 +125,57 @@ describe('the sandbox', () => {
     expect(sim.index.of('remains')).toHaveLength(1);
   });
 });
+
+describe('the throwable', () => {
+  it('flies its arc exactly, lands where the arc meets the ground, bounces lower each time and settles', () => {
+    const sim = range();
+    arm(player(sim.index), T);
+    const R = T.ballistics.throwable;
+    const pitch = (20 * Math.PI) / 180;
+    const events: SimEvent[] = [];
+    const p = sim.player;
+    const eye = { x: p.x, y: p.y + p.eyeHeight, z: p.z };
+    events.push(...step(sim, neutralInput(0, pitch), [{ kind: 'throw', lag: 0, yaw: 0, pitch }]));
+    for (let i = 0; i < 6 * 30; i++) events.push(...step(sim, neutralInput(0, pitch)));
+    expect(player(sim.index).rifle!.throwables).toBe(R.count - 1);
+    const clatters = events.filter((e) => e.type === 'clatter');
+    expect(clatters.length).toBeGreaterThan(1);
+    // Where the arc meets the flat ground: thrown from just ahead of the eye, lifted by liftDeg.
+    const a = pitch + (R.liftDeg * Math.PI) / 180;
+    const y0 = eye.y - 0.1;
+    const z0 = eye.z - 0.35 * Math.cos(pitch);
+    const vy = R.speed * Math.sin(a);
+    const vz = R.speed * Math.cos(a);
+    const g = T.sim.gravity;
+    const tau = (vy + Math.sqrt(vy * vy + 2 * g * y0)) / g;
+    const first = clatters[0]!;
+    if (first.type !== 'clatter') throw new Error('not a clatter');
+    expect(Math.abs(first.z - (z0 - vz * tau)), `landed at z ${first.z}, the arc says ${z0 - vz * tau}`).toBeLessThan(0.02);
+    // Thrown at the start of the first tick (lag 0), so at mission time 0.
+    expect(Math.abs(first.t - tau)).toBeLessThan(1e-3);
+    // Each touch slower and quieter than the one before.
+    for (let k = 1; k < clatters.length; k++) {
+      const c = clatters[k]!;
+      const b = clatters[k - 1]!;
+      if (c.type === 'clatter' && b.type === 'clatter') expect(c.speed).toBeLessThan(b.speed);
+    }
+    const stone = sim.index.of('thrown')[0]!;
+    expect(stone.thrown.rest).toBe(true);
+    // Heard as far as a hard landing on its surface carries: about 30–40 m at a full throw.
+    expect(first.radius).toBeGreaterThan(25);
+    expect(first.radius).toBeLessThan(45);
+  });
+
+  it('is only thrown while one is left', () => {
+    const sim = range();
+    arm(player(sim.index), T);
+    player(sim.index).rifle!.throwables = 1;
+    const throws = (n: number) => {
+      let count = 0;
+      for (let i = 0; i < n; i++) count += sim.step({ ...neutralInput(), commands: [{ kind: 'throw', lag: 0, yaw: 0, pitch: 0.3 }] }).length >= 0 ? 0 : 1;
+      return count;
+    };
+    throws(3);
+    expect(sim.index.of('thrown')).toHaveLength(1);
+  });
+});

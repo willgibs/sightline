@@ -156,6 +156,15 @@ export interface BoltEvent extends EventBase, SoundFields {
   type: 'bolt';
 }
 
+/** A thrown thing landing, or bouncing: a sound where it touched, as loud as it hit (ballistics lane). */
+export interface ClatterEvent extends EventBase, SoundFields {
+  type: 'clatter';
+  /** The thrown entity's id. */
+  thrown: number;
+  /** Its speed at the touch, m/s. */
+  speed: number;
+}
+
 export interface StanceEvent extends EventBase {
   type: 'stance';
   from: StanceName;
@@ -274,7 +283,8 @@ export type SimEvent =
   | DeathEvent
   | CryEvent
   | RangedEvent
-  | BoltEvent;
+  | BoltEvent
+  | ClatterEvent;
 export type EventType = SimEvent['type'];
 export type EventOf<K extends EventType> = Extract<SimEvent, { type: K }>;
 
@@ -364,6 +374,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   cry: { code: 33, range: 'ballistics', sound: true, fields: { ...SOUND } },
   ranged: { code: 34, range: 'ballistics', sound: false, fields: { range: 'f32', x: 'f32', y: 'f32', z: 'f32', what: { enum: ['none', ...STRIKES] } } },
   bolt: { code: 35, range: 'ballistics', sound: true, fields: { ...SOUND } },
+  clatter: { code: 36, range: 'ballistics', sound: true, fields: { ...SOUND, thrown: 'u32', speed: 'f32' } },
 };
 
 export function isSound(e: SimEvent): e is Extract<SimEvent, SoundFields> {

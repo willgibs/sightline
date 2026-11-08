@@ -530,7 +530,8 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
   - Voices in the audio engine.
   - Sandbox shot drops.
   - Landed: `report`, `impact` and `cry` events (sounds, with radii by the suppressor, the load and what was struck) and the crack as a function of the path (`ballistics/crack.ts`: the Mach cone's point, d·tan μ upstream of the nearest pass), for lab A's hearing and the speakers alike. Voices in `audio/shotVoices.ts`. Measured offline in Chromium (`tests/browser/shot.test.ts`): the strike of a 300 m shot comes back 1.24–1.33 s after the trigger; a listener 10 m off the path hears the crack near 0.4 s and the report after 0.8 s; the shooter hears no crack; the suppressor cuts the report by more than 12 dB. Sandbox: J in the debug view drops a shot where you look (`shotDrop`, command 35), rifle or not.
-- [ ] B9 · The throwable: its arc, and a landing sound that draws one guard.
+- [x] B9 · The throwable: its arc, and a landing sound that draws one guard.
+  - Landed: X throws a stone (`ballistics/thrown.ts`, three carried) on an exact arc, swept a chord a tick against the world and the bodies, bouncing (30% of the speed into a surface kept, 55% along it) until it settles; each touch is a `clatter` sound (code 36), loudest at the first: 31 m on grass at a full throw, about 40 m on gravel. Measured against the Phase 0 test camp, where guards stand in pairs 7–10 m apart, a landing beside one guard reaches his partner too: which single guard walks over is lab A's (A7's minimal reactions, A9 wires the stimulus) and lab E's (E5's commander), not the sound's.
 - [ ] B10 · Hit confirmation, and telemetry.
   - Dust on a miss, so the player can correct like a spotter.
   - The decision-sensitivity check, and the miss breakdown in the playtest summary.

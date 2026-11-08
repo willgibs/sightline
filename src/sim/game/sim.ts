@@ -11,7 +11,7 @@ import type { System } from '../kernel/systems';
 import type { Collider } from '../kernel/world/colliders';
 import type { World } from '../kernel/world/world';
 import { PLAYER_ID, player, type GuardEntity, type PlayerEntity, type RemainsEntity } from './entities';
-import { glint, vec3, viewLine, type Flight } from '../ballistics';
+import { glint, thrownAt, vec3, viewLine, type Flight } from '../ballistics';
 import { sunDirection } from '../kernel/env';
 import type { PlayerControl } from './player';
 import { writeSample } from './samples';
@@ -68,6 +68,8 @@ export interface Snapshot {
   remains: Array<RemainsEntity['remains'] & { id: number }>;
   /** Bullets in flight: their launches, so a trace is drawn along the simulated path. */
   bullets: Array<{ id: number; flight: Flight }>;
+  /** Thrown things, where each is at the tick's end. */
+  thrown: Array<{ id: number; x: number; y: number; z: number }>;
 }
 
 /** What the scope and the HUD show of the player's rifle and vitals, at a tick's end. */
@@ -171,6 +173,7 @@ export class Simulation extends KernelSimulation {
             rifle: null,
             remains: [],
             bullets: [],
+            thrown: [],
           };
     const p = this.player;
     s.tick = this.tick;
@@ -236,6 +239,13 @@ export class Simulation extends KernelSimulation {
       const b = (s.bullets[k] ??= { id: 0, flight: { ...bullets[k]!.bullet.flight } });
       b.id = bullets[k]!.id;
       Object.assign(b.flight, bullets[k]!.bullet.flight);
+    }
+    const thrown = this.index.of('thrown');
+    s.thrown.length = thrown.length;
+    for (let k = 0; k < thrown.length; k++) {
+      const o = (s.thrown[k] ??= { id: 0, x: 0, y: 0, z: 0 });
+      o.id = thrown[k]!.id;
+      thrownAt(thrown[k]!.thrown, this.tuning.sim.gravity, this.tick / this.tuning.sim.tickHz, o);
     }
     return s;
   }

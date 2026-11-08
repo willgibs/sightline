@@ -39,3 +39,4 @@ export { smoothNoise, swaySample } from './sway';
 export { restAvailable } from './rest';
 export { glint } from './glint';
 export { crackAt, type Crack } from './crack';
+export { flyThrown, landingRadius, thrownAt, type ThrownEntity, type ThrownState, type Touch } from './thrown';

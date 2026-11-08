@@ -5,7 +5,7 @@ import { audibility, travelTime } from '../sim/kernel/sound';
 import type { AmbientSource } from '../sim/generation';
 import { emptyRoute, type RouteFn, type SteadyFn } from './hearing';
 import { footstep, humLoop, makeNoiseBuffers, makeRand, rustle, waterLoop, windBed, type Loop, type NoiseBuffers, type Rand } from './voices';
-import { bolt, crack, cry, impact, report } from './shotVoices';
+import { bolt, clatter, crack, cry, impact, report } from './shotVoices';
 import { crackAt, type Crack, type Flight } from '../sim/ballistics';
 import { Surface, surfaceName } from '../sim/kernel/world/surfaces';
 
@@ -289,6 +289,8 @@ export class SoundEngine {
         // Heard where it struck, after the way back: about 1.28 s after the trigger at 300 m.
         const kind = e.what === 'body' ? 'body' : e.surface === Surface.Metal ? 'metal' : e.surface === Surface.Water ? 'water' : 'ground';
         this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => impact(this.ctx, out, this.noise, this.rand, when, amp, kind), lead);
+      } else if (e.type === 'clatter') {
+        this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => clatter(this.ctx, out, this.noise, this.rand, when, amp), lead);
       } else if (e.type === 'cry') {
         this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => cry(this.ctx, out, this.noise, this.rand, when, amp), lead);
       } else if (e.type === 'bolt') {

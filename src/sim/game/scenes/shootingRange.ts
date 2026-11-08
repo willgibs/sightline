@@ -9,6 +9,7 @@ import { decide, type System } from '../../kernel/systems';
 import { Blocks, type ColliderInput } from '../../kernel/world/colliders';
 import { Surface } from '../../kernel/world/surfaces';
 import { MarksmanDriver, type Step } from '../bots/marksman';
+import { analyzeShot, describeShot, type ShotReport } from '../telemetry';
 import { player } from '../entities';
 import { placePlayer } from '../setup';
 import { arm } from '../shooting';
@@ -143,10 +144,12 @@ interface Watch {
   shots: number;
   lastStrike: number;
   events: SimEvent[];
+  /** Each shot's breakdown (game/telemetry.ts), in order. */
+  reports: ShotReport[];
 }
 
 export function shootingRange(): Scene {
-  const watch: Watch = { shots: 0, lastStrike: 0, events: [] };
+  const watch: Watch = { shots: 0, lastStrike: 0, events: [], reports: [] };
 
   /** The sitting ends once the last round has landed. */
   const rules: System = {
@@ -183,6 +186,8 @@ export function shootingRange(): Scene {
     { at: 17.0, act: 'fire', target: { post: 6 }, breath: 1.4 },
     // The 200 m sentry, in the legs: he cries out before he falls.
     { at: 19.5, act: 'fire', target: { post: 1 }, part: 'legs', breath: 1.0 },
+    // A stone, straight ahead: it arcs, lands, bounces and settles, heard where it lands.
+    { at: 21.0, act: 'throw', pitchDeg: 25 },
   ];
 
   return {
@@ -215,16 +220,21 @@ export function shootingRange(): Scene {
       watch.shots = 0;
       watch.lastStrike = 0;
       watch.events.length = 0;
+      watch.reports.length = 0;
       placePlayer(sim, RANGE.firing.x, RANGE.firing.z, 0, -1);
       arm(player(sim.index), sim.tuning);
     },
     driver: () => new MarksmanDriver(SCRIPT),
-    seconds: 23,
+    seconds: 24,
     expect: [
       {
         name: "the marksman's shot at the 300 m walker strikes his head, and he falls",
-        during: (_sim, events) => {
-          for (const e of events) watch.events.push({ ...e });
+        during: (sim, events) => {
+          for (const e of events) {
+            watch.events.push({ ...e });
+            const fire = sim.lastInput.commands.find((c) => c.kind === 'fire');
+            if (e.type === 'shot' && fire?.kind === 'fire') watch.reports.push(analyzeShot(sim, e, fire));
+          }
         },
         after: () => {
           const shot = watch.events.find((e) => e.type === 'shot');
@@ -272,6 +282,19 @@ export function shootingRange(): Scene {
         },
       },
       {
+        name: "the miss breakdown names what each shot left out: nothing for the marksman's hits, the lead for the miss",
+        after: () => {
+          const r = watch.reports;
+          if (r.length < 5) return `${r.length} shots analysed`;
+          for (const k of [0, 1, 4]) {
+            const e = r[k]!.errors;
+            if (!r[k]!.target || r[k]!.skipped !== 'none' || Math.abs(e.range) > 0.05 || Math.abs(e.lead) > 0.05 || Math.abs(e.wind) > 0.05) return `shot ${k + 1}: ${describeShot(r[k]!, '?', false)}`;
+          }
+          const miss = r[3]!;
+          if (miss.skipped !== 'lead' || Math.abs(miss.errors.lead + miss.needed.lead) > 0.05 || Math.abs(miss.needed.lead) < 1.5) return `the lead-skipping shot: ${describeShot(miss, 'miss', false)}`;
+        },
+      },
+      {
         name: 'a strike is heard back at the shooter after the flight and the way back: about 1.28 s at 300 m',
         after: () => {
           const shot = watch.events.find((e) => e.type === 'shot');
@@ -283,6 +306,19 @@ export function shootingRange(): Scene {
           // Sea level at 15 °C: the speed of sound is 340.3 m/s (kernel/env.ts, air).
           const back = impact.t - shot.t + Math.sqrt(dx * dx + dy * dy + dz * dz) / 340.3;
           if (Math.abs(back - 1.28) > 0.05) return `heard after ${back.toFixed(3)} s`;
+        },
+      },
+      {
+        name: 'a thrown stone lands ahead, loudest at its first touch, and settles',
+        after: (sim) => {
+          const clatters = watch.events.filter((e) => e.type === 'clatter');
+          if (clatters.length === 0) return 'no stone landed';
+          const first = clatters[0]!;
+          if (first.type !== 'clatter' || clatters.some((c) => c.type === 'clatter' && c.radius > first.radius)) return 'a bounce was louder than the landing';
+          const stone = sim.index.of('thrown')[0];
+          if (!stone?.thrown.rest) return 'it never settled';
+          const ahead = RANGE.firing.z - stone.thrown.z;
+          if (ahead < 8 || ahead > 30) return `it settled ${ahead.toFixed(1)} m ahead`;
         },
       },
       {

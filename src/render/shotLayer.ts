@@ -52,6 +52,8 @@ export class ShotLayer {
   private readonly puffGeometry = new THREE.IcosahedronGeometry(1, 1);
   private readonly p = vec3();
   private readonly q = vec3();
+  private readonly rocks = new Map<number, THREE.Mesh>();
+  private readonly rockGeometry = new THREE.IcosahedronGeometry(1, 0);
 
   constructor(
     look: LookUniforms,
@@ -100,6 +102,29 @@ export class ShotLayer {
     this.updateFallen(curr, t);
     this.updateTraces(curr, t);
     this.updatePuffs(t);
+    this.updateRocks(prev, curr, alpha);
+  }
+
+  /** Thrown things, between their last two positions. */
+  private updateRocks(prev: Snapshot, curr: Snapshot, alpha: number): void {
+    const seen = new Set<number>();
+    for (const o of curr.thrown) {
+      seen.add(o.id);
+      let m = this.rocks.get(o.id);
+      if (!m) {
+        m = new THREE.Mesh(this.rockGeometry, this.material);
+        m.scale.setScalar(this.tuning.ballistics.throwable.radius);
+        this.group.add(m);
+        this.rocks.set(o.id, m);
+      }
+      const a = prev.thrown.find((p) => p.id === o.id) ?? o;
+      m.position.set(a.x + (o.x - a.x) * alpha, a.y + (o.y - a.y) * alpha, a.z + (o.z - a.z) * alpha);
+    }
+    for (const [id, m] of this.rocks) {
+      if (seen.has(id)) continue;
+      this.group.remove(m);
+      this.rocks.delete(id);
+    }
   }
 
   private updateFallen(curr: Snapshot, t: number): void {
@@ -199,6 +224,8 @@ export class ShotLayer {
     this.cylinder.dispose();
     this.cap.dispose();
     this.puffGeometry.dispose();
+    this.rockGeometry.dispose();
+    this.rocks.clear();
     this.traces.geometry.dispose();
     (this.traces.material as THREE.Material).dispose();
     this.fallen.clear();

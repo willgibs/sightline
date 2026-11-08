@@ -61,8 +61,10 @@ export interface RemainsEntity extends EntityBase {
     z: number;
     /** Which way he falls: the bullet's way across the ground. */
     yaw: number;
-    /** His eye height when he was hit. */
+    /** His eye height when he was hit, and how he was moving (m/s). */
     eye: number;
+    vx: number;
+    vz: number;
     /** When he was hit, mission seconds. */
     fell: number;
     part: BodyPart;

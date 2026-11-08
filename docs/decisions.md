@@ -165,6 +165,18 @@ Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the gener
 
 **Why:** the plan's B6 and B7. The research found no game that publishes sway numbers, so the bench pins Sightline's, and the sweep pins the claim that a reticle and its bullet can't disagree.
 
+### The shot's sound, the throwable, and a query that reached too far (B8, B9)
+
+**Decision:**
+- **The crack is a function of the path,** not an event per listener (`ballistics/crack.ts`): the first arrival is where t + |L − P(t)|/c is least, found by a fixed golden-section search over the flight, which lands on the Mach cone's point. The speakers use it for the camera; lab A's hearing uses it per guard, scheduling the percept at the arrival.
+- **The shot's own sounds are events:** `report` (the suppressor's and the load's radius), `impact` by what was struck, `cry`, `bolt`, and the throwable's `clatter`. Voices are procedural (`audio/shotVoices.ts`); the shooter hears his report at his ears and no crack of his own.
+- **Sandbox shots** are a command (`shotDrop`, J in the debug view): a match round solved to land where you look, from the eye, rifle or not, so a recording replays it. Lab A's sandbox (A10) can call it from its own UI.
+- **The throwable** is an entity on an exact arc (no drag), its chord swept per tick against the world and bodies, bouncing until it settles. Its landing is loud enough to reach the guard it lands by (31–40 m at a full throw); drawing exactly one guard is perception's and the brain's call, since guards in the test camp stand in pairs.
+- **The miss breakdown** (`game/telemetry.ts`) solves what each shot needed with the instruments' own function (drop, lead, wind) from where its target's head was at the shot's instant, compares what was held and what the sway added, and names which sideways decision was most nearly left out. The playtest summary prints it per shot; the range's expectations check it reads the marksman's deliberate miss as "lead left out".
+- **A kernel fix:** `raycast` (`kernel/world/query.ts`) accepted a body beyond `maxDist` when nothing else was within reach, so a short ray could return a guard 60 m away (a thrown stone found one). Bodies now count only within reach, like the terrain and colliders. No golden moved: nothing relied on it, and sight lines (`sightLine`) already treated a far hit as clear. Lab A's rays get the bound for free.
+
+**What moved:** the shooting range's fingerprints (its script gained a throw), the golden recording. No valley value.
+
 ## 2026-11-07 · Wave 0
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.
