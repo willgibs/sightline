@@ -23,9 +23,28 @@ export const BENCH_GOLDEN: PinnedBench = {
   "generation": {
     "metrics": {
       "valid at the first attempt (of 6)": 6,
-      "least margin under the attempt budget": 5
+      "least margin under the attempt budget": 5,
+      "lab D valleys valid at the first attempt (of 6)": 6,
+      "lab D least margin under the valley budget": 7,
+      "lab D widest overwatched horizon (°)": 157,
+      "lab D narrowest open horizon (°)": 164,
+      "lab D camps valid at the first attempt, no repair (of 6)": 6,
+      "lab D camps repaired": 0,
+      "lab D rules still broken": 0,
+      "lab D most re-analyses in a repair (of 12)": 0,
+      "lab D camps with a way in and out (of 6)": 6,
+      "lab D clusters left unsolved": 0,
+      "lab D busiest search (of 400000 expansions)": 75249,
+      "lab D hardest way in, states expanded: safe intervals": 11532,
+      "lab D hardest way in, states expanded: plain space-time search": 100478
     },
-    "runs": {}
+    "runs": {
+      "camp-systems": {
+        "work": {
+          "motor": { "rays": 0, "nodes": 0, "bodies": 2519 }
+        }
+      }
+    }
   },
   "body": {
     "metrics": {

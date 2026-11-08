@@ -2,6 +2,7 @@ import type { Scene as KernelScene } from '../../kernel/scene';
 import type { Simulation } from '../sim';
 import { campBrain } from './campBrain';
 import { CAMP_SCENARIOS, campScenario } from './campScenario';
+import { campSystems } from './campSystems';
 import { movementCourse } from './movementCourse';
 import { perceptionCrowd, perceptionLab } from './perceptionLab';
 import { SIGHT_TABLE, sightScenario } from './sightScenario';
@@ -24,6 +25,7 @@ export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   'perception-lab': perceptionLab,
   sight: sightScenario,
   'spawn-tick': spawnTick,
+  'camp-systems': campSystems,
   'shooting-range': shootingRange,
 };
 

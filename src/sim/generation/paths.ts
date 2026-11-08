@@ -195,3 +195,15 @@ export function catmullRom(ctrl: Point2[], per: number): Point2[] {
   out.push({ ...ctrl[ctrl.length - 1]! });
   return out;
 }
+
+/** The distance from a point to a segment, on the ground. */
+export function segmentDistance(p: Point2, a: Point2, b: Point2): number {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const l2 = dx * dx + dz * dz;
+  let t = l2 > 0 ? ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const x = a.x + dx * t - p.x;
+  const z = a.z + dz * t - p.z;
+  return Math.sqrt(x * x + z * z);
+}

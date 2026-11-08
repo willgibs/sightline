@@ -64,6 +64,9 @@ export class DebugLayer {
   private colliders: THREE.LineSegments | null = null;
   private perches: THREE.Group | null = null;
   private grid: THREE.Points | null = null;
+  /** The camp's wiring (lab D, D5): a line from its generator to each device, coloured by whether it's live. */
+  private readonly wiring: THREE.LineSegments | null = null;
+  private wiringKey = '';
   /** What systems drew in the last tick (sim/debugDraw.ts), as one set of coloured lines. */
   private readonly drawn: THREE.LineSegments;
   private drawnCapacity = 512;
@@ -91,6 +94,23 @@ export class DebugLayer {
     this.preview = new THREE.LineSegments(previewGeo, new THREE.LineBasicMaterial({ color: palette.debug.route, transparent: true, opacity: 0.7 }));
     this.preview.frustumCulled = false;
     this.group.add(this.preview);
+
+    // The camp's wiring: from the generator, a little above head height, to each device.
+    const devices = world.camp.devices ?? [];
+    if (devices.length > 1) {
+      const pos: number[] = [];
+      for (const d of devices) {
+        if (d.feed < 0) continue;
+        const g = devices[d.feed]!;
+        pos.push(g.x, g.y + 1.5, g.z, d.x, d.y, d.z);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.length), 3));
+      this.wiring = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 }));
+      this.wiring.name = 'camp-wiring';
+      this.group.add(this.wiring);
+    }
 
     // Patrol routes, dashed along the ground.
     for (const g of world.camp.guards) {
@@ -294,6 +314,7 @@ export class DebugLayer {
 
   update(prev: Snapshot, curr: Snapshot, alpha: number, time: number, aim: THREE.Vector3 | null, cameraPos: THREE.Vector3): void {
     const hf = this.world.terrain;
+    this.colourWiring(curr.devices);
 
     // Cones and facing lines follow each guard's head, matched by entity id.
     const n = curr.guardIds.length;
@@ -402,6 +423,24 @@ export class DebugLayer {
   }
 
   /** Frees everything, including overlays built and then turned off (no longer in the group). */
+  /** Live devices in the good tone, dead ones muted, a raised alarm in the bad tone. */
+  private colourWiring(states: readonly number[]): void {
+    if (!this.wiring) return;
+    const key = states.join('');
+    if (key === this.wiringKey) return;
+    this.wiringKey = key;
+    const colors = this.wiring.geometry.getAttribute('color') as THREE.BufferAttribute;
+    const devices = this.world.camp.devices ?? [];
+    let k = 0;
+    devices.forEach((d, i) => {
+      if (d.feed < 0) return;
+      const c = this.tones[states[i] === 2 ? 'bad' : states[i] === 1 && states[d.feed] === 1 ? 'good' : 'muted']!;
+      colors.setXYZ(k++, c.r, c.g, c.b);
+      colors.setXYZ(k++, c.r, c.g, c.b);
+    });
+    colors.needsUpdate = true;
+  }
+
   dispose(): void {
     disposeTree(this.group);
     for (const o of [this.colliders, this.perches, this.grid]) if (o && !o.parent) disposeTree(o);

@@ -3,6 +3,9 @@ import type { GenTuning } from '../../config/tuning';
 import { circleDirections, dtanDeg } from '../kernel/core/detmath';
 import { Blocks, type ColliderSet, type RayHit } from '../kernel/world/colliders';
 import type { Heightfield } from '../kernel/world/heightfield';
+import type { CampAnalysis } from './campAnalysis';
+import type { RuleName, Validation } from './validate';
+import type { Overwatch } from './overwatch';
 
 /**
  * Reads a generated valley the way a sniper would: where are the overwatch perches, and
@@ -36,6 +39,19 @@ export interface TerrainReport {
   steepShare: number;
   ok: boolean;
   problems: string[];
+  /** Terrain with teeth only (landform.ts), absent from Phase 0's valley: D3's checks in full. */
+  valley?: Overwatch;
+  /** Generated camps only (D7): the camp's analysis over its cycle. */
+  camp?: CampAnalysis;
+  /** Generated camps only (D8): how it stands against the rules, after any repairs. */
+  validation?: Validation;
+  /** Which camp attempt this is: 0 if the first camp built on this terrain stood. */
+  campAttempt?: number;
+  /** The repairs it took: empty if the camp as generated passed. */
+  repairs?: string[];
+  /** Re-analyses repair spent (of `validation.repairAttempts`), and the rules the camp broke as first built. */
+  repairAttempts?: number;
+  firstFailed?: RuleName[];
 }
 
 export const DIRECTIONS = 32;

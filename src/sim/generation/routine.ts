@@ -45,6 +45,11 @@ export type Leg = HoldLeg | WalkLeg;
 export interface Routine {
   /** Seconds in one cycle. */
   period: number;
+  /**
+   * Seconds into the cycle at mission time 0 (generated camps, staffing.ts), so patrols on
+   * one loop can walk it apart. Absent for Phase 0's guards, which start their cycles at 0.
+   */
+  offset?: number;
   /** Contiguous, covering [0, period). */
   legs: Leg[];
   /** Turning speed in holds, rad/s. */
@@ -112,8 +117,9 @@ export function buildRoutine(spawn: GuardSpawn, R: GenTuning['routines'], rng: R
 
 /** Where a routine puts its guard at mission time `t` (seconds, from 0). Pure: the same t, the same pose. */
 export function routinePose(r: Routine, t: number, out: RoutinePose): RoutinePose {
-  const cycles = Math.floor(t / r.period);
-  const tc = t - cycles * r.period;
+  const tt = r.offset === undefined ? t : t + r.offset;
+  const cycles = Math.floor(tt / r.period);
+  const tc = tt - cycles * r.period;
   // Few legs: a linear scan is cheaper than a search and keeps this obviously right.
   let leg = r.legs[r.legs.length - 1]!;
   for (const l of r.legs) {

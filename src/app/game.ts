@@ -8,7 +8,7 @@ import { BARKS, beliefRadius, explainChain, groundLight, lightName, movementVisi
 import { EventLog } from '../sim/kernel/eventlog';
 import { Cues } from './cues';
 import { TrialSitting, type TrialHost } from './trials';
-import { generateWorld, simTuningKey, worldTuningKey } from '../sim/generation';
+import { campMission, generateWorld, simTuningKey, worldTuningKey, type CampSpec } from '../sim/generation';
 import type { World } from '../sim/kernel/world/world';
 import { neutralInput } from '../sim/kernel/input';
 import { Recorder, Recording } from '../sim/kernel/record/recording';
@@ -69,6 +69,8 @@ export interface GameOptions {
   sceneName: string | null;
   /** A recording to watch (?replay=<url>), instead of a valley to play. */
   replayUrl: string | null;
+  /** A generated camp to play (?camp, lab D), or null for Phase 0's valley: the default until D9. */
+  camp: CampSpec | null;
   /** Trial mode (A12): a sitting of the perception lab's exit test, from this seed; null for none. */
   trials?: string | null;
   /** Start that sitting over, forgetting any answers kept in this browser. */
@@ -455,7 +457,8 @@ export class Game {
       try {
         if (this.opts.sceneName && this.opts.scene === undefined) throw new Error(`There is no scene called '${this.opts.sceneName}'`);
         const t0 = performance.now();
-        world = this.scene ? this.scene.world(this.tuning) : generateWorld(missionSpec(seed, this.spawnKind), this.tuning, () => performance.now());
+        const spec = this.opts.camp ? campMission(seed, this.opts.camp, this.spawnKind) : missionSpec(seed, this.spawnKind);
+        world = this.scene ? this.scene.world(this.tuning) : generateWorld(spec, this.tuning, () => performance.now());
         if (this.scene) world.genMs = performance.now() - t0;
       } catch (e) {
         this.fail('generate', e);
@@ -478,7 +481,7 @@ export class Game {
         url.searchParams.set('seed', seed);
       }
       window.history.replaceState(null, '', url);
-      this.overlay.setStartTitle(this.scene ? `Scene · ${this.scene.title}` : 'Phase 0 · Foundations');
+      this.overlay.setStartTitle(this.scene ? `Scene · ${this.scene.title}` : this.opts.camp ? 'Phase 1 · Lab D · Camp generator' : 'Phase 0 · Foundations');
       this.overlay.setStatus(
         this.scene
           ? this.scene.description

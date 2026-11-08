@@ -252,6 +252,8 @@ describe('declared data access', () => {
     const seen: string[] = [];
     const maker: System = {
       ...sys('maker', 'world', { writes: ['entities'] }),
+      // After the camp's power, which shares the phase (game/camp.ts).
+      after: ['camp-power'],
       run(ctx) {
         if (ctx.tick === 1) {
           const c = ctx.spawn(crate);

@@ -28,6 +28,7 @@ function snapshot(tick: number, extra: Partial<Snapshot> = {}): Snapshot {
     step: 0,
     stance: 'stand',
     gait: 'idle',
+    devices: [],
     guardIds: [],
     guardSpawns: [],
     guards: new Float32Array(0),
