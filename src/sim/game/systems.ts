@@ -16,7 +16,7 @@ import { SHOOTING_SYSTEMS } from './shooting';
 /** Handlers for scheduled entries. Empty until a lab schedules its first effect. */
 export const SCHEDULE_HANDLERS: Readonly<Record<string, ScheduleHandler>> = {};
 
-const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0, lean: 0 };
+const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0, lean: 0, axis: 0, lying: 0, riseHead: 0, risePelvis: 0, riseFeet: 0 };
 const eye = { x: 0, y: 0, z: 0 };
 
 /**

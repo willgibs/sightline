@@ -23,7 +23,7 @@ const upright = emptyShape();
 const lying = emptyShape();
 
 /** What a body's shape follows: where its feet are, its facing, its eye height and its lean (a body's state, or a pose from its history). */
-export type ShapePose = Pick<BodyState, 'x' | 'y' | 'z' | 'yaw' | 'eyeHeight' | 'lean'>;
+export type ShapePose = Pick<BodyState, 'x' | 'y' | 'z' | 'yaw' | 'eyeHeight' | 'lean' | 'axis' | 'lying' | 'riseHead' | 'risePelvis' | 'riseFeet'>;
 
 /** Upright, how high the hips are for an eye at height `e`: they follow the eye between crouching and standing. */
 export function hipHeight(e: number, spec: BodySpec): number {
@@ -79,25 +79,26 @@ function leanDrop(spine: number, lean: number): number {
 }
 
 /**
- * Where a body's eye is: where its head is, as far as a lean has put it aside and down the
- * arc. The camera, a shot and anything an eye sees from use this, so what you can see
- * around a corner is what can see you.
+ * Where a body's eye is: the centre of its head (bodyShape), wherever a lean or lying
+ * down has put it. The camera, a shot and anything an eye sees from use this, so what
+ * you can see around a corner is what can see you.
  */
 export function eyeOf(b: ShapePose, spec: BodySpec, out: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
-  const lean = b.lean;
-  if (!lean) {
+  if (!b.lean && b.eyeHeight >= spec.eyeHeight.crouch) {
+    // Upright with no lean: over the feet.
     out.x = b.x;
     out.y = b.y + b.eyeHeight;
     out.z = b.z;
     return out;
   }
-  const upright = b.eyeHeight >= spec.eyeHeight.crouch;
-  const drop = upright ? leanDrop(b.eyeHeight - hipHeight(b.eyeHeight, spec), lean) : 0;
-  out.x = b.x + dcos(b.yaw) * lean;
-  out.y = b.y + b.eyeHeight - drop;
-  out.z = b.z - dsin(b.yaw) * lean;
+  const s = bodyShape(b, spec, eyeShape);
+  out.x = s.head.x;
+  out.y = s.head.y;
+  out.z = s.head.z;
   return out;
 }
+
+const eyeShape = emptyShape();
 
 function uprightShape(x: number, y: number, z: number, eye: number, hip: number, B: Parts, out: BodyShape): BodyShape {
   const shoulders = Math.max(hip, eye - B.neck);
@@ -111,22 +112,57 @@ function uprightShape(x: number, y: number, z: number, eye: number, hip: number,
 }
 
 function lyingShape(b: ShapePose, eye: number, B: Parts, out: BodyShape): BodyShape {
-  // Along the facing, centred on the body: head at the front, heels at the back.
-  const fx = -dsin(b.yaw);
-  const fz = -dcos(b.yaw);
-  const half = B.proneLength / 2;
-  const at = (s: number): [number, number] => [b.x + fx * s, b.z + fz * s];
-  const [hx, hz] = at(half - B.headRadius);
-  out.head.x = hx;
-  out.head.y = b.y + eye;
-  out.head.z = hz;
+  // Along the axis, turning on a pivot near the chest (chain.ts): the head at the front, the
+  // heels at the back, grown out from standing as it goes down, along the ground under it.
+  const axis = b.axis ?? b.yaw; // a body drawn from a bare pose has no axis yet
+  const fx = -dsin(axis);
+  const fz = -dcos(axis);
+  const f = b.lying ?? 1;
+  const place = (below: number, lift: number, target: Point): void => {
+    const s = (B.pivot - below) * f;
+    target.x = b.x + fx * s;
+    target.y = b.y + lift + groundRise(b, B, below);
+    target.z = b.z + fz * s;
+  };
+  place(B.headRadius, eye, head);
+  place(2 * B.headRadius + B.torsoRadius, B.torsoRadius, shoulder);
+  place(B.proneLength / 2, B.torsoRadius, pelvis);
+  place(B.proneLength - B.legRadius, B.legRadius, heel);
+  out.head.x = head.x;
+  out.head.y = head.y;
+  out.head.z = head.z;
   out.head.r = B.headRadius;
-  const [sx, sz] = at(half - 2 * B.headRadius - B.torsoRadius);
-  const [px, pz] = at(0);
-  setCapsule(out.torso, px, b.y + B.torsoRadius, pz, sx, b.y + B.torsoRadius, sz, B.torsoRadius);
-  const [fx2, fz2] = at(-half + B.legRadius);
-  setCapsule(out.legs, fx2, b.y + B.legRadius, fz2, px, b.y + B.legRadius, pz, B.legRadius);
+  setCapsule(out.torso, pelvis.x, pelvis.y, pelvis.z, shoulder.x, shoulder.y, shoulder.z, B.torsoRadius);
+  pelvis2.x = pelvis.x;
+  place(B.proneLength / 2, B.legRadius, pelvis2);
+  setCapsule(out.legs, heel.x, heel.y, heel.z, pelvis2.x, pelvis2.y, pelvis2.z, B.legRadius);
   return out;
+}
+
+interface Point {
+  x: number;
+  y: number;
+  z: number;
+}
+const head: Point = { x: 0, y: 0, z: 0 };
+const shoulder: Point = { x: 0, y: 0, z: 0 };
+const pelvis: Point = { x: 0, y: 0, z: 0 };
+const pelvis2: Point = { x: 0, y: 0, z: 0 };
+const heel: Point = { x: 0, y: 0, z: 0 };
+
+/**
+ * How far the ground rises under a part `below` metres back from the top of the head:
+ * straight from the pivot out to the head, and from the pivot through the pelvis to the feet.
+ */
+function groundRise(b: ShapePose, B: Parts, below: number): number {
+  const at = B.pivot - below;
+  if (at > 0) return ((b.riseHead ?? 0) * at) / (B.pivot - B.headRadius);
+  const pelvis = B.pivot - B.proneLength / 2;
+  const heel = B.pivot - (B.proneLength - B.legRadius);
+  const p = b.risePelvis ?? 0;
+  if (at >= pelvis) return pelvis < 0 ? (p * at) / pelvis : 0;
+  const f = b.riseFeet ?? 0;
+  return p + ((f - p) * (at - pelvis)) / (heel - pelvis);
 }
 
 function setCapsule(c: Capsule, ax: number, ay: number, az: number, bx: number, by: number, bz: number, r: number): void {
@@ -159,7 +195,7 @@ function mixCapsule(a: Capsule, b: Capsule, t: number, out: Capsule): void {
   );
 }
 
-const posed: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0, lean: 0 };
+const posed: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0, lean: 0, axis: 0, lying: 0, riseHead: 0, risePelvis: 0, riseFeet: 0 };
 
 /**
  * A body's shape `lag` ticks before now (0 to 2), between its samples (body.ts, poseAt):

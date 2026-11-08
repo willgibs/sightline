@@ -15,10 +15,11 @@ import { Acoustics, SEED_LAW, SIGHT_LAW, crackHeard, emptyHeard, foliageOf, swee
 import { datan2, dexp } from '../kernel/core/detmath';
 import { air, defaultEnv } from '../kernel/env';
 import { Rng } from '../kernel/core/rng';
-import { runScene } from '../kernel/scene';
+import { runScene, startScene, type Scene as KernelScene } from '../kernel/scene';
 import { labWorld } from './scenes/perceptionLab';
 import { arenaWorld } from './scenes/movementLab';
-import { Blocks } from '../kernel/world/colliders';
+import { SCENES } from './scenes';
+import { Blocks, pushOutCircle } from '../kernel/world/colliders';
 import { Surface } from '../kernel/world/surfaces';
 import { Solids } from '../kernel/world/solids';
 import { sightLine, type QueryView } from '../kernel/world/query';
@@ -111,7 +112,7 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
           m['worst gain on steep ground (m)'] = Math.max(m['worst gain on steep ground (m)'], r.steepGain);
         }
       }
-      return { ...m, ...eyeToHead(), ...mantleMeetsWalker() };
+      return { ...m, ...eyeToHead(), ...mantleMeetsWalker(), ...proneBench() };
     },
   },
   perception: {
@@ -137,6 +138,92 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
   },
   game: { about: "The valley's plays, which exercise every lane together: pinned by their fingerprints and work.", metrics: () => ({}) },
 };
+
+/**
+ * Prone (C2): how far a lying body's shape goes into what's solid, with the chain and with
+ * the seed's single 0.3 m circle standing in for it: the fuzzing bot on the movement course
+ * for three minutes, and a body turning right round between two walls a metre apart.
+ * Measured independently of the motor, as a part's penetration in three dimensions (the
+ * least of how far it is in horizontally, under the top and over the bottom); the shape is
+ * straight, so a body lying over a low edge bends across it by centimetres (that's why the
+ * measure allows 2 cm).
+ */
+function proneBench(): Record<string, number> {
+  const seed = structuredClone(defaultTuning);
+  seed.bodies.player.parts.chainSpacing = 0;
+  const walls = [
+    { kind: 'box' as const, x: 0, z: -0.6, y0: -0.3, y1: 2, hx: 8, hz: 0.1, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Rock },
+    { kind: 'box' as const, x: 0, z: 0.6, y0: -0.3, y1: 2, hx: 8, hz: 0.1, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Rock },
+  ];
+  const trench = buildWorld({ name: 'bench-trench', size: 40, cell: 0.5, colliders: walls, spawn: { x: 0, z: 0, faceX: 1, faceZ: 0 } }, defaultTuning.gen);
+  const ids: number[] = [];
+  const push = { x: 0, z: 0 };
+  const shape = emptyShape();
+  const depth = (sim: Simulation, x: number, y: number, z: number, r: number): number => {
+    let worst = 0;
+    sim.solids.query(x - r - 0.1, z - r - 0.1, x + r + 0.1, z + r + 0.1, ids);
+    for (const id of ids) {
+      const c = sim.solids.get(id);
+      if ((c.flags & Blocks.Move) === 0 || c.y1 <= y - r || c.y0 >= y + r || !pushOutCircle(c, x, z, r, push)) continue;
+      worst = Math.max(worst, Math.min(Math.sqrt(push.x * push.x + push.z * push.z), c.y1 - (y - r), y + r - c.y0));
+    }
+    return worst;
+  };
+  const measure = (sim: Simulation, tally: { inside: number; deepest: number; poses: number }): void => {
+    const b = sim.player;
+    if (!(b.lying > 0.99)) return;
+    tally.poses++;
+    const s = bodyShape(b, sim.tuning.bodies.player, shape);
+    let worst = depth(sim, s.head.x, s.head.y, s.head.z, s.head.r);
+    for (const c of [s.torso, s.legs]) {
+      for (let k = 0; k <= 8; k++) {
+        const f = k / 8;
+        worst = Math.max(worst, depth(sim, c.ax + (c.bx - c.ax) * f, c.ay + (c.by - c.ay) * f, c.az + (c.bz - c.az) * f, c.r));
+      }
+    }
+    if (worst > 0.02) tally.inside++;
+    tally.deepest = Math.max(tally.deepest, worst);
+  };
+  const course = (tuning: typeof defaultTuning): { inside: number; deepest: number; poses: number } => {
+    const tally = { inside: 0, deepest: 0, poses: 0 };
+    const sim = startScene(SCENES['movement-course']!() as unknown as KernelScene<Simulation>, tuning);
+    const bot = new ChaosBot('BENCH-COURSE');
+    const raw = neutralInput();
+    for (let i = 0; i < 180 * 30; i++) {
+      sim.step(bot.next(sim, raw));
+      measure(sim, tally);
+    }
+    return tally;
+  };
+  const between = (tuning: typeof defaultTuning): { inside: number; deepest: number; poses: number } => {
+    const tally = { inside: 0, deepest: 0, poses: 0 };
+    const sim = new Simulation(trench, tuning);
+    const input = neutralInput(sim.player.yaw);
+    for (let i = 0; i < 12 * 30; i++) {
+      input.prone = i === 0;
+      if (i > 30) {
+        input.yaw += 0.08;
+        input.moveZ = i % 60 < 30 ? 1 : -1;
+      }
+      sim.step(input);
+      measure(sim, tally);
+    }
+    return tally;
+  };
+  const a = course(defaultTuning);
+  const b = course(seed);
+  const c = between(defaultTuning);
+  const d = between(seed);
+  return {
+    'prone: fuzzing bot on the course, lying poses checked': a.poses,
+    'prone: fuzzing bot on the course, poses with a part inside something solid': a.inside,
+    'seed · single circle: fuzzing bot on the course, poses with a part inside something solid': b.inside,
+    'prone: turning between walls a metre apart, poses with a part inside something solid': c.inside,
+    'seed · single circle: turning between walls a metre apart, poses with a part inside something solid': d.inside,
+    'prone: deepest any part goes into something solid (m)': round(Math.max(a.deepest, c.deepest)),
+    'seed · single circle: deepest any part goes into something solid (m)': round(Math.max(b.deepest, d.deepest)),
+  };
+}
 
 /**
  * Lean, and the eye at the head (C3): for 2,000 lean poses around the movement lab's walls

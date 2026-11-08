@@ -610,7 +610,7 @@ Playable at `?scene=movement-lab`; the movement course stays as a regression tes
   - a guard listening and one watching;
   - walls to mantle, a window, a ladder, and a body to carry.
   - It stands at `?scene=movement-lab` (`game/scenes/movementLab.ts`): the noise yard, the wall garden and the field. The tower's ladder comes with C5, the body with C6 once B4 lands.
-- [ ] C2 · The prone body's real shape.
+- [x] C2 · The prone body's real shape.
   - A chain of circles along the facing, or a capsule, for collision, in place of a 0.3 m circle. It grows over the transition, so it never ends a tick inside anything.
   - It turns by the largest yaw that keeps every part clear, found with a fixed number of bisections, pivoting near the chest.
   - It's pitched from the terrain under head and feet.

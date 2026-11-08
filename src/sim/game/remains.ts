@@ -25,7 +25,7 @@ export function collapse(r: RemainsEntity['remains'], t: number, tuning: Tuning)
 export function remainsShape(r: RemainsEntity['remains'], t: number, tuning: Tuning, out: BodyShape): BodyShape {
   const spec = tuning.bodies.guard;
   const eye = r.eye + (spec.eyeHeight.prone - r.eye) * collapse(r, t, tuning);
-  return bodyShape({ x: r.x, y: r.y, z: r.z, yaw: r.yaw, eyeHeight: eye, lean: 0 }, spec, out);
+  return bodyShape({ x: r.x, y: r.y, z: r.z, yaw: r.yaw, eyeHeight: eye, lean: 0, axis: r.yaw, lying: collapse(r, t, tuning), riseHead: 0, risePelvis: 0, riseFeet: 0 }, spec, out);
 }
 
 /**

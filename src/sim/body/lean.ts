@@ -20,7 +20,7 @@ import { bodyShape, hipHeight } from './shape';
  */
 
 const shape = emptyShape();
-const pose = { x: 0, y: 0, z: 0, yaw: 0, eyeHeight: 0, lean: 0 };
+const pose = { x: 0, y: 0, z: 0, yaw: 0, eyeHeight: 0, lean: 0, axis: 0, lying: 0, riseHead: 0, risePelvis: 0, riseFeet: 0 };
 const ids: number[] = [];
 
 /** How far the eye may go aside right now, metres: by what's raised and how the body stands. */
@@ -62,6 +62,11 @@ function leanClear(b: BodyState, lean: number, spec: BodySpec, ctx: MotorContext
   pose.yaw = b.yaw;
   pose.eyeHeight = b.eyeHeight;
   pose.lean = lean;
+  pose.axis = b.axis;
+  pose.lying = b.lying;
+  pose.riseHead = b.riseHead;
+  pose.risePelvis = b.risePelvis;
+  pose.riseFeet = b.riseFeet;
   const s = bodyShape(pose, spec, shape);
   const t = s.torso;
   return sphereClear(s.head.x, s.head.y, s.head.z, s.head.r, ctx) && sphereClear(t.bx, t.by, t.bz, t.r, ctx);

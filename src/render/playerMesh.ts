@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Tuning } from '../config/tuning';
-import { lerp } from '../sim/kernel/core/math';
+import { lerp, wrapAngle } from '../sim/kernel/core/math';
 import { bodyShape, type BodyState } from '../sim/body';
 import { emptyShape, type Capsule } from '../sim/kernel/world/shape';
 import type { Snapshot } from '../sim/game/sim';
@@ -22,7 +22,7 @@ export class PlayerMesh {
   private readonly torso: CapsuleMesh;
   private readonly legs: CapsuleMesh;
   private readonly shape = emptyShape();
-  private readonly pose = { x: 0, y: 0, z: 0, yaw: 0, eyeHeight: 0, lean: 0 };
+  private readonly pose = { x: 0, y: 0, z: 0, yaw: 0, eyeHeight: 0, lean: 0, axis: 0, lying: 0, riseHead: 0, risePelvis: 0, riseFeet: 0 };
 
   constructor(
     look: LookUniforms,
@@ -50,6 +50,11 @@ export class PlayerMesh {
     p.yaw = curr.yaw;
     p.eyeHeight = lerp(prev.eye, curr.eye, alpha);
     p.lean = lerp(prev.lean, curr.lean, alpha);
+    p.axis = lerpAngle(prev.axis, curr.axis, alpha);
+    p.lying = lerp(prev.lying, curr.lying, alpha);
+    p.riseHead = lerp(prev.riseHead, curr.riseHead, alpha);
+    p.risePelvis = lerp(prev.risePelvis, curr.risePelvis, alpha);
+    p.riseFeet = lerp(prev.riseFeet, curr.riseFeet, alpha);
     const s = bodyShape(p as unknown as BodyState, this.spec, this.shape);
     // Inside its head or within a near plane of its body, the camera is the player's eyes.
     const dx = eye.x - p.x;
@@ -101,3 +106,7 @@ class CapsuleMesh {
 }
 
 const UP = new THREE.Vector3(0, 1, 0);
+
+function lerpAngle(a: number, b: number, t: number): number {
+  return a + wrapAngle(b - a) * t;
+}

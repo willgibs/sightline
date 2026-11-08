@@ -73,7 +73,7 @@ function eyeOfCommand(yaw: number, ctx: TickContext): void {
   eyeOf(pose, ctx.tuning.bodies.player, eye);
 }
 
-const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0, lean: 0 };
+const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0, lean: 0, axis: 0, lying: 0, riseHead: 0, risePelvis: 0, riseFeet: 0 };
 const eye = vec3();
 const sight = vec3();
 /** The debug view's drawing of a stone's arc: one line a step, for as long as a throw can last. */
@@ -432,13 +432,13 @@ const aimSystem: System = {
     rifle.raise = up ? Math.min(1, rifle.raise + step) : Math.max(0, rifle.raise - step);
     // Settling after moving, and onto a rest.
     rifle.steady = body.speed > S.movingSpeed ? 0 : Math.min(1, rifle.steady + dt / Math.max(S.settle, 1e-6));
-    const rested = restAvailable(ctx.world, ctx.solids, body, ctx.input.yaw, ctx.input.pitch, S);
+    const rested = restAvailable(ctx.world, ctx.solids, body, eyeOf(body, T.bodies.player, eye), ctx.input.yaw, ctx.input.pitch, S);
     // The debug view: where a rest is looked for, under the fore-end, green when there is one.
     ctx.debug((draw) => {
       const reach = body.stance === 'prone' ? S.restReach.prone : S.restReach.upright;
-      const x = body.x - dsin(ctx.input.yaw) * reach;
-      const z = body.z - dcos(ctx.input.yaw) * reach;
-      draw.point(x, body.y + body.eyeHeight - 0.15, z, 0.05, rested ? 'good' : 'muted');
+      const x = eye.x - dsin(ctx.input.yaw) * reach;
+      const z = eye.z - dcos(ctx.input.yaw) * reach;
+      draw.point(x, eye.y - 0.15, z, 0.05, rested ? 'good' : 'muted');
     });
     const restStep = dt / Math.max(S.restTime, 1e-6);
     rifle.rest = rested ? Math.min(1, rifle.rest + restStep) : Math.max(0, rifle.rest - restStep);

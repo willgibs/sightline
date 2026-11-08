@@ -34,18 +34,25 @@ export const BENCH_GOLDEN: PinnedBench = {
       "bodies under the terrain": 0,
       "bodies inside something solid": 0,
       "worst overlap (m)": 2.2093438190040615e-14,
-      "worst rise in a tick (m)": 0.28554800812780456,
+      "worst rise in a tick (m)": 0.2892865524785577,
       "worst gain on steep ground (m)": 0,
       "lean: eye-to-head lines that differ by direction (of 2000)": 0,
       "lean: pairs in view (of 2000)": 1496,
       "seed · lean: pairs where the camera sees a guard who has no line to the head (of 2000)": 19,
       "mantle: ticks inside someone walking across the landing": 0,
-      "seed · mantle checked once: ticks inside him": 15
+      "seed · mantle checked once: ticks inside him": 15,
+      "prone: fuzzing bot on the course, lying poses checked": 3761,
+      "prone: fuzzing bot on the course, poses with a part inside something solid": 0,
+      "seed · single circle: fuzzing bot on the course, poses with a part inside something solid": 0,
+      "prone: turning between walls a metre apart, poses with a part inside something solid": 0,
+      "seed · single circle: turning between walls a metre apart, poses with a part inside something solid": 259,
+      "prone: deepest any part goes into something solid (m)": 0.0000484311147,
+      "seed · single circle: deepest any part goes into something solid (m)": 0.249764984
     },
     "runs": {
       "movement-course": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 1418 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 1414 }
         }
       }
     }
@@ -81,7 +88,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       "perception-lab": {
         "work": {
           "motor": { "rays": 0, "nodes": 0, "bodies": 10800 },
-          "perception-sight": { "rays": 25723, "nodes": 0, "bodies": 0 }
+          "perception-sight": { "rays": 26014, "nodes": 0, "bodies": 0 }
         }
       }
     }

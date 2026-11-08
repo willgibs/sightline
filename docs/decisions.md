@@ -40,6 +40,18 @@ Built on its branch as `docs/phase-1-plan.md`, section B, plans it. Its seed, th
 
 Built on the `lab-c-movement` branch to `docs/phase-1-plan.md`, section C. Lean and the mantle use input the bots never give, so the valley's behaviour is untouched until the prone body (C2).
 
+### The prone body (C2): a chain of circles, and the eye at the head
+
+**Decision:**
+- A lying body is a chain of circles along its axis (`body/chain.ts`, derived from `parts`: head, torso, legs), pivoting at a point near the chest (`pivot` 0.55 m back from the top of the head), so turning swings the legs and steadies the view. The circles' radii and spacing are chosen so they cover the capsules everything else sees: nothing clear of the chain can be inside the head, torso or legs.
+- It grows out of the single standing circle over the stance change (`lying`, 0 to 1), pushing the body away from what it would meet, and stops if it can't; shrinking back is always free. It turns toward the view at `prone.turnRate` (2 rad/s), by the largest step that keeps every part clear, found with 6 bisections.
+- It lies along the ground: the head, pelvis and feet rise with what's under them, within what a walkable slope allows, so the body pitches over rocks and banks. Parts within the pivot's own circle can't rise more than the pivot can step.
+- The eye is the head's centre when prone too (`eyeOf`), so the camera moves to the head as a body goes down and the rifle's rest is found from the eye. `SIM_VERSION` 8: prone bodies collide as long as they are, and a prone shot leaves from the eye; only runs that go prone near things moved their behaviour (`movement-course`). The valley's bots rarely reach anything lying down within a minute, so their fingerprints held.
+- The fuzzing bot on the course: 0 lying poses with a part over 2 cm inside something solid, against 648 for the seed's 0.3 m circle over the same run (`docs/phase-1-plan.md` § C's numbers); turning right round between walls a metre apart: 0 poses, against 259 (up to 0.25 m deep).
+- A straight body lying across a low edge bends across it by a few centimetres: its capsules are straight lines. That's the known limit of the three-part shape; the chain's circles themselves never overlap anything solid (the invariant watch, 0.1 mm).
+
+**Why:** A 0.3 m circle standing in for a 1.75 m body is how prone clips in every shipped game that reported it (Arma, Hell Let Loose, Battlefield 2042); the chain makes the body as long as it is, for every promise the motor keeps.
+
 ### The mantle (C4): every pose, every tick, and no noise you didn't choose
 
 **Decision:**

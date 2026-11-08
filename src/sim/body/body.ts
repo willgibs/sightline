@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import { yawFromDirection } from '../kernel/core/math';
+import { wrapAngle, yawFromDirection } from '../kernel/core/math';
 import type { StanceName, StepGait } from '../kernel/events';
 import type { Entity } from '../kernel/state';
 import type { World } from '../kernel/world/world';
@@ -64,6 +64,11 @@ export interface PoseSample {
   pitch: number;
   eyeHeight: number;
   lean: number;
+  axis: number;
+  lying: number;
+  riseHead: number;
+  risePelvis: number;
+  riseFeet: number;
 }
 
 export interface BodyState {
@@ -92,6 +97,14 @@ export interface BodyState {
   motor: MotorModeName;
   /** The mantle under way, or null (mantle.ts). */
   mantle: MantleState | null;
+  /** The long axis of a lying body: a yaw, following the view by the largest turn that keeps every part clear (motor.ts). */
+  axis: number;
+  /** How far along its length a lying body has grown: 0 standing (one circle), 1 fully down (chain.ts). */
+  lying: number;
+  /** Lying, how far the ground rises under the head, the pelvis and the feet, from under the chest: the body lies along it. */
+  riseHead: number;
+  risePelvis: number;
+  riseFeet: number;
   /** On the ground but on terrain too steep to stand on: no traction, sliding down. */
   sliding: boolean;
   /** Distance walked since the last footstep (shoves from others don't count). */
@@ -154,7 +167,7 @@ export function createBody(world: World, solids: Solids, spec: BodySpec, x: numb
   const surface = ground.surface;
   const standingOn = ground.collider;
   const yaw = yawFromDirection(faceX, faceZ);
-  const pose = (): PoseSample => ({ x, y, z, yaw, pitch: 0, eyeHeight: spec.eyeHeight.stand, lean: 0 });
+  const pose = (): PoseSample => ({ x, y, z, yaw, pitch: 0, eyeHeight: spec.eyeHeight.stand, lean: 0, axis: yaw, lying: 0, riseHead: 0, risePelvis: 0, riseFeet: 0 });
   return {
     x,
     y,
@@ -173,6 +186,11 @@ export function createBody(world: World, solids: Solids, spec: BodySpec, x: numb
     lean: 0,
     motor: 'ground',
     mantle: null,
+    axis: yaw,
+    lying: 0,
+    riseHead: 0,
+    risePelvis: 0,
+    riseFeet: 0,
     sliding: false,
     stride: 0,
     gait: 'idle',
@@ -195,6 +213,11 @@ export function pushHistory(b: BodyState): void {
   h1.pitch = h0.pitch;
   h1.eyeHeight = h0.eyeHeight;
   h1.lean = h0.lean;
+  h1.axis = h0.axis;
+  h1.lying = h0.lying;
+  h1.riseHead = h0.riseHead;
+  h1.risePelvis = h0.risePelvis;
+  h1.riseFeet = h0.riseFeet;
   h0.x = b.x;
   h0.y = b.y;
   h0.z = b.z;
@@ -202,6 +225,11 @@ export function pushHistory(b: BodyState): void {
   h0.pitch = b.pitch;
   h0.eyeHeight = b.eyeHeight;
   h0.lean = b.lean;
+  h0.axis = b.axis;
+  h0.lying = b.lying;
+  h0.riseHead = b.riseHead;
+  h0.risePelvis = b.risePelvis;
+  h0.riseFeet = b.riseFeet;
 }
 
 /**
@@ -223,6 +251,12 @@ export function poseAt(b: BodyState, lag: number, out: PoseSample): PoseSample {
   out.pitch = newer.pitch;
   out.eyeHeight = newer.eyeHeight + (older.eyeHeight - newer.eyeHeight) * t;
   out.lean = newer.lean + (older.lean - newer.lean) * t;
+  // Lying is folding or unfolding through this: the axis takes the nearest way round.
+  out.axis = newer.axis + wrapAngle(older.axis - newer.axis) * t;
+  out.lying = newer.lying + (older.lying - newer.lying) * t;
+  out.riseHead = newer.riseHead + (older.riseHead - newer.riseHead) * t;
+  out.risePelvis = newer.risePelvis + (older.risePelvis - newer.risePelvis) * t;
+  out.riseFeet = newer.riseFeet + (older.riseFeet - newer.riseFeet) * t;
   return out;
 }
 

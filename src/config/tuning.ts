@@ -130,7 +130,12 @@ export const defaultTuning = {
         neck: 0.24, // the top of the torso sits this far below the eye
         hip: 0.5, // hips at this share of the stance's height
         proneLength: 1.75, // head to heels, lying down
+        pivot: 0.55, // the pivot a lying body turns on: this far back from the top of its head (near the chest)
+        chainSpacing: 0.25, // lying, its collision chain has a circle at least this often
       },
+      // Lying down (sim/body/motor.ts): the turn the body's axis makes toward where it looks, rad/s,
+      // by the largest step that keeps every part of it clear. No game publishes this; it's the lab's.
+      prone: { turnRate: 2 },
     },
     guard: {
       // A little taller than the player, and brisker to speed up and slow down, so he
@@ -175,7 +180,10 @@ export const defaultTuning = {
         neck: 0.24,
         hip: 0.5,
         proneLength: 1.75,
+        pivot: 0.55,
+        chainSpacing: 0.25,
       },
+      prone: { turnRate: 2 },
     },
   },
 

@@ -55,6 +55,12 @@ export interface Snapshot {
   lean: number;
   /** A press of climb would mantle what's in front: the prompt (body/mantle.ts). */
   climb: boolean;
+  /** Lying down: the body's long axis, how far along it it has grown, and how the ground runs under it (body/chain.ts). */
+  axis: number;
+  lying: number;
+  riseHead: number;
+  risePelvis: number;
+  riseFeet: number;
   yaw: number;
   pitch: number;
   speed: number;
@@ -179,6 +185,11 @@ export class Simulation extends KernelSimulation {
             eyeZ: 0,
             lean: 0,
             climb: false,
+            axis: 0,
+            lying: 0,
+            riseHead: 0,
+            risePelvis: 0,
+            riseFeet: 0,
             yaw: 0,
             pitch: 0,
             speed: 0,
@@ -206,6 +217,11 @@ export class Simulation extends KernelSimulation {
     s.eyeZ = eye.z - p.z;
     s.lean = p.lean;
     s.climb = canMantle(p, this.tuning.bodies.player, this.motorView());
+    s.axis = p.axis;
+    s.lying = p.lying;
+    s.riseHead = p.riseHead;
+    s.risePelvis = p.risePelvis;
+    s.riseFeet = p.riseFeet;
     s.yaw = p.yaw;
     s.pitch = p.pitch;
     s.speed = p.speed;

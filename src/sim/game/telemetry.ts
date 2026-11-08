@@ -62,7 +62,7 @@ export function shotRow(r: ShotReport, result: string, n: number): string {
   return `${num}  ${who} ${struck}${column(r.errors.range)}${column(r.errors.lead)}${column(r.errors.wind)}${sway}`;
 }
 
-const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0, lean: 0 };
+const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0, lean: 0, axis: 0, lying: 0, riseHead: 0, risePelvis: 0, riseFeet: 0 };
 const shape = emptyShape();
 
 /** The breakdown of a shot fired in the tick just run (`sim` after it), with the command that fired it. */
@@ -97,7 +97,7 @@ export function analyzeShot(sim: Simulation, shot: ShotEvent, cmd: Extract<Comma
     const since = m.fell - shot.t;
     if (since < 0 || since > maxFlight) continue;
     // Where his head was at the shot's instant: back along his walk from where he fell.
-    const head = bodyShape({ x: m.x - m.vx * since, y: m.y, z: m.z - m.vz * since, yaw: m.yaw, eyeHeight: m.eye, lean: 0 }, T.bodies.guard, shape).head;
+    const head = bodyShape({ x: m.x - m.vx * since, y: m.y, z: m.z - m.vz * since, yaw: m.yaw, eyeHeight: m.eye, lean: 0, axis: m.yaw, lying: 0, riseHead: 0, risePelvis: 0, riseFeet: 0 }, T.bodies.guard, shape).head;
     const at = { x: head.x, y: head.y, z: head.z };
     solveAim(eye, at, m.vx, m.vz, zero, windy, maxFlight, sight);
     const h = holdBetween(left, sight, { up: 0, right: 0 });

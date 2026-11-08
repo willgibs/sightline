@@ -1,6 +1,6 @@
 import type { Tuning } from '../../config/tuning';
 import { DEG, datan, dtanDeg } from '../kernel/core/detmath';
-import { clamp, smoothstep } from '../kernel/core/math';
+import { clamp, smoothstep, wrapAngle } from '../kernel/core/math';
 import type { EventDraft } from '../kernel/events';
 import type { World } from '../kernel/world/world';
 import { Blocks, pushOutCircle } from '../kernel/world/colliders';
@@ -8,6 +8,7 @@ import { makeTerrainSample } from '../kernel/world/heightfield';
 import type { Solids } from '../kernel/world/solids';
 import { surfaceLoudness } from '../kernel/world/surfaces';
 import { RIM, bodyHeight, groundBelow, pushHistory, rimExcess, type BodySpec, type BodyState, type Gait, type MotorModeName } from './body';
+import { footprint, restRadius, type FootCircle } from './chain';
 import { footfall } from './footfall';
 import { stepLean } from './lean';
 import { drawMantle, startMantle, stepMantle } from './mantle';
@@ -40,6 +41,10 @@ import type { DebugDraw } from '../kernel/debugDraw';
  *   any angle of approach;
  * - a lean (lean.ts) keeps the head and shoulders clear of anything solid, of the terrain and of
  *   other bodies, and grows by no more than its rate. (The world can force it back faster.)
+ * - a lying body (chain.ts) is a chain of circles along its axis, every one of which keeps
+ *   every promise above; it grows out of the standing circle over the stance change and
+ *   turns by the largest step that keeps every part clear, found with a fixed number of
+ *   bisections. Its head, torso and legs are inside the chain, so they are clear too;
  * - in a mantle (mantle.ts) the body follows a path whose every pose is re-checked every
  *   tick: never inside anything solid, with no allowance for steps, and never inside
  *   another body; it waits for what's in the way, and gives up if it stays. Only colliders can be
@@ -128,6 +133,8 @@ const push = { x: 0, z: 0 };
 const tmpPush = { x: 0, z: 0 };
 const dest = { x: 0, z: 0 };
 const leanEye = { x: 0, y: 0, z: 0 };
+const feetCircles: FootCircle[] = [];
+const turnCircles: FootCircle[] = [];
 
 /** Moves a body one tick toward what it intends. */
 export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext): void {
@@ -152,9 +159,15 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
   const { world, tuning, dt } = ctx;
   MODES[b.motor as 'ground' | 'air'].drive(b, i, spec, ctx, tanMax);
 
-  // --- Move and collide. ------------------------------------------------------------
+  // --- Move and collide, the body as long as it will be this tick. ---------------------
   const feet = b.y;
-  resolveMove(b, b.x + b.vx * dt, b.z + b.vz * dt, spec, ctx, dest);
+  const was = b.lying;
+  const grew = growLying(b, spec, ctx.dt);
+  if (!resolveMove(b, b.x + b.vx * dt, b.z + b.vz * dt, spec, ctx, dest) && grew) {
+    // No room to grow into: it stays as long as it was.
+    b.lying = was;
+    resolveMove(b, b.x, b.z, spec, ctx, dest);
+  }
   const nx = dest.x;
   const nz = dest.z;
   const mdx = nx - b.x;
@@ -162,7 +175,11 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
   const movedDist = Math.sqrt(mdx * mdx + mdz * mdz);
 
   // --- Settle: follow the ground, fall or land. ----------------------------------
-  const ground = groundBelow(world, ctx.solids, nx, nz, feet + spec.stepHeight, spec.radius);
+  const under = groundBelow(world, ctx.solids, nx, nz, feet + spec.stepHeight, restRadius(b, spec));
+  const ground = { height: under.height, surface: under.surface, collider: under.collider };
+  // Lying, the pivot steps down off a ledge only once the circles still on it could rest
+  // where they are from the lower height: until then it comes down only as far as they allow.
+  if (b.lying > 0 && ground.height < feet) ground.height = Math.max(ground.height, restFloor(b, nx, nz, spec, ctx));
   const destSlope = ground.collider >= 0 ? 0 : world.terrain.sample(nx, nz, sample).slopeTan;
   const drop = feet - ground.height;
   const wasFalling = b.motor !== 'ground' || b.sliding;
@@ -249,6 +266,11 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
         gait: soundGait(b, spec),
       });
     }
+  }
+  // Lying: the body turns, by what it can, and settles along the ground under it.
+  if (b.lying > 0) {
+    turnAxis(b, spec, ctx, tanMax);
+    lieAlongGround(b, spec, ctx);
   }
   const L = tuning.noise.landing;
   if (impact >= L.minSpeed) {
@@ -396,13 +418,17 @@ function driveAir(b: BodyState): void {
  * where it was. That keeps every tick's end position clear, by induction from a clear
  * spawn.
  */
-export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec, ctx: MotorContext, out: { x: number; z: number }): void {
+export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec, ctx: MotorContext, out: { x: number; z: number }): boolean {
   const { world, solids } = ctx;
-  const r = spec.radius;
   const height = bodyHeight(b, spec);
   const feet = b.y;
-  const stepTop = feet + spec.stepHeight;
   const tanMax = dtanDeg(spec.maxSlopeDeg);
+  const circles = footprint(b, spec, feetCircles);
+  const lying = circles.length > 1;
+  // A lying body that's falling must be clear at the height it falls to, which isn't known
+  // yet: its circles are taken as low as the tick can take it (the pivot is what the body
+  // rests on, not its ends, so a leg resting on a rock doesn't hold it up).
+  const low = lying ? fallFloor(b, spec, ctx) : feet;
   let nx = tx;
   let nz = tz;
 
@@ -411,18 +437,21 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
 
     for (const o of ctx.others) {
       if (o.y > feet + height || o.y + o.height < feet) continue;
-      const dx = nx - o.x;
-      const dz = nz - o.z;
-      const rr = r + o.radius;
-      const d2 = dx * dx + dz * dz;
-      if (d2 < rr * rr && d2 > 1e-12) {
-        const d = Math.sqrt(d2);
-        const k = Math.min(rr - d, spec.shoveMax) / d;
-        ctx.draw?.line(nx, feet + 0.1, nz, nx + dx * k, feet + 0.1, nz + dz * k, 'warn');
-        nx += dx * k;
-        nz += dz * k;
-        cancelInto(b, dx * k, dz * k);
-        moved = true;
+      for (let c = 0; c < circles.length; c++) {
+        const C = circles[c]!;
+        const dx = nx + C.x - o.x;
+        const dz = nz + C.z - o.z;
+        const rr = C.r + o.radius;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < rr * rr && d2 > 1e-12) {
+          const d = Math.sqrt(d2);
+          const k = Math.min(rr - d, spec.shoveMax) / d;
+          ctx.draw?.line(nx, feet + 0.1, nz, nx + dx * k, feet + 0.1, nz + dz * k, 'warn');
+          nx += dx * k;
+          nz += dz * k;
+          cancelInto(b, dx * k, dz * k);
+          moved = true;
+        }
       }
     }
 
@@ -450,37 +479,48 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
       }
     }
 
-    if (rimPush(world, nx, nz, feet, r, spec.stepHeight, push)) {
-      // Terrain rising too high inside the body's circle (the foot of a steep face): back off.
-      ctx.draw?.line(nx, feet + 0.1, nz, nx + push.x, feet + 0.1, nz + push.z, 'bad');
-      nx += push.x;
-      nz += push.z;
-      cancelInto(b, push.x, push.z);
-      moved = true;
+    for (let c = 0; c < circles.length; c++) {
+      const C = circles[c]!;
+      if (rimPush(world, nx + C.x, nz + C.z, feet + C.allow, C.r, spec.stepHeight, push)) {
+        // Terrain rising too high inside the body's circle (the foot of a steep face): back off.
+        ctx.draw?.line(nx, feet + 0.1, nz, nx + push.x, feet + 0.1, nz + push.z, 'bad');
+        nx += push.x;
+        nz += push.z;
+        cancelInto(b, push.x, push.z);
+        moved = true;
+      }
     }
 
-    const head = Math.max(feet, groundBelow(world, solids, nx, nz, stepTop, r).height) + height;
-    solids.query(nx - r - 0.1, nz - r - 0.1, nx + r + 0.1, nz + r + 0.1, ids);
-    for (let q = 0; q < ids.length; q++) {
-      const c = solids.get(ids[q]!);
-      if ((c.flags & Blocks.Move) === 0) continue;
-      if (c.y1 <= stepTop) continue; // low enough to step onto
-      if (c.y0 >= head) continue; // overhead
-      if (!pushOutCircle(c, nx, nz, r, push)) continue;
-      // It was above our head and over us at the start, and the ground has risen: a
-      // ceiling we no longer fit beneath. If the body's centre is under it, that's not a
-      // wall to slide off (pushing out could throw the body metres): leave it to isClear.
-      // If only the rim is under its edge, slide out like from a wall.
-      if (c.y0 >= feet + height && pushOutCircle(c, b.x, b.z, r, tmpPush)) {
-        const depth = Math.sqrt(push.x * push.x + push.z * push.z);
-        if (depth > r) continue;
+    for (let k = 0; k < circles.length; k++) {
+      const C = circles[k]!;
+      const r = C.r;
+      const g = groundBelow(world, solids, nx + C.x, nz + C.z, low + C.allow + spec.stepHeight, r).height;
+      const base = Math.max(low - C.allow, g);
+      const reach = lying ? base : feet;
+      // The band's top from as high as this tick can leave it, so what's overhead now still will be.
+      const head = (lying ? Math.max(highFeet(b, nx, nz, spec, ctx) - C.allow, groundBelow(world, solids, nx + C.x, nz + C.z, highFeet(b, nx, nz, spec, ctx) + C.allow + spec.stepHeight, r).height) : base) + height;
+      solids.query(nx + C.x - r - 0.1, nz + C.z - r - 0.1, nx + C.x + r + 0.1, nz + C.z + r + 0.1, ids);
+      for (let q = 0; q < ids.length; q++) {
+        const c = solids.get(ids[q]!);
+        if ((c.flags & Blocks.Move) === 0) continue;
+        if (c.y1 <= reach + spec.stepHeight) continue; // low enough to step onto
+        if (c.y0 >= head) continue; // overhead
+        if (!pushOutCircle(c, nx + C.x, nz + C.z, r, push)) continue;
+        // It was above our head and over us at the start, and the ground has risen: a
+        // ceiling we no longer fit beneath. If the body's centre is under it, that's not a
+        // wall to slide off (pushing out could throw the body metres): leave it to isClear.
+        // If only the rim is under its edge, slide out like from a wall.
+        if (c.y0 >= reach + height && pushOutCircle(c, b.x + C.x, b.z + C.z, r, tmpPush)) {
+          const depth = Math.sqrt(push.x * push.x + push.z * push.z);
+          if (depth > r) continue;
+        }
+        if (push.x * push.x + push.z * push.z < 1e-18) continue; // float dust, not a contact
+        ctx.draw?.line(nx + C.x, feet + 0.1, nz + C.z, nx + C.x + push.x, feet + 0.1, nz + C.z + push.z, 'muted');
+        nx += push.x;
+        nz += push.z;
+        cancelInto(b, push.x, push.z);
+        moved = true;
       }
-      if (push.x * push.x + push.z * push.z < 1e-18) continue; // float dust, not a contact
-      ctx.draw?.line(nx, feet + 0.1, nz, nx + push.x, feet + 0.1, nz + push.z, 'muted');
-      nx += push.x;
-      nz += push.z;
-      cancelInto(b, push.x, push.z);
-      moved = true;
     }
 
     if (!moved) break;
@@ -496,15 +536,16 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
     b.vz = 0;
   }
 
-  if (!isClear(b, nx, nz, spec, world, solids, tanMax)) {
+  if (!isClear(b, nx, nz, spec, world, solids, tanMax, circles, false, low)) {
     b.vx = 0;
     b.vz = 0;
     out.x = b.x;
     out.z = b.z;
-    return;
+    return false;
   }
   out.x = nx;
   out.z = nz;
+  return true;
 }
 
 /**
@@ -551,23 +592,151 @@ function rimPush(world: World, x: number, z: number, feet: number, r: number, st
   return true;
 }
 
-/** True if the body can end the tick at (x, z): nothing solid inside it, no cliff under it. */
-function isClear(b: BodyState, x: number, z: number, spec: BodySpec, world: World, solids: Solids, tanMax: number): boolean {
-  const r = spec.radius;
+/**
+ * True if the body can end the tick at (x, z): nothing solid inside it, no cliff under
+ * it. `strict` asks for a pose it isn't already in (a turn, growth): that may not lean any
+ * part further into a face.
+ */
+function isClear(b: BodyState, x: number, z: number, spec: BodySpec, world: World, solids: Solids, tanMax: number, circles: readonly FootCircle[], strict: boolean, low: number): boolean {
   const feet = b.y;
-  const stepTop = feet + spec.stepHeight;
+  const height = bodyHeight(b, spec);
   if (terrainBlocks(world, b, x, z, feet, tanMax, spec.stepHeight)) return false;
-  // Never press further into a face than the body already is. (A body falling or sliding
-  // beside a face is already overlapping it with its rim; moving away or along is fine.)
-  if (rimExcess(world, x, z, feet, r, spec.stepHeight) > Math.max(0, rimExcess(world, b.x, b.z, feet, r, spec.stepHeight)) + 1e-3) return false;
-  const head = Math.max(feet, groundBelow(world, solids, x, z, stepTop, r).height) + bodyHeight(b, spec);
-  solids.query(x - r, z - r, x + r, z + r, ids);
-  for (let q = 0; q < ids.length; q++) {
-    const c = solids.get(ids[q]!);
-    if ((c.flags & Blocks.Move) === 0 || c.y1 <= stepTop || c.y0 >= head) continue;
-    if (pushOutCircle(c, x, z, r, tmpPush) && tmpPush.x * tmpPush.x + tmpPush.z * tmpPush.z > 1e-8) return false;
+  const lying = circles.length > 1;
+  for (let k = 0; k < circles.length; k++) {
+    const C = circles[k]!;
+    const r = C.r;
+    const cx = x + C.x;
+    const cz = z + C.z;
+    // Never press further into a face than the body already is. (A body falling or sliding
+    // beside a face is already overlapping it with its rim; moving away or along is fine.)
+    const allowed = strict ? 0 : Math.max(0, rimExcess(world, b.x + C.x, b.z + C.z, feet + C.allow, r, spec.stepHeight));
+    if (rimExcess(world, cx, cz, feet + C.allow, r, spec.stepHeight) > allowed + 1e-3) return false;
+    const g = groundBelow(world, solids, cx, cz, low + C.allow + spec.stepHeight, r).height;
+    const base = Math.max(low - C.allow, g);
+    const reach = lying ? base : feet;
+    const high = lying ? Math.max(feet, groundBelow(world, solids, x, z, feet + spec.stepHeight, spec.radius).height) : feet;
+    const head = (lying ? Math.max(high - C.allow, groundBelow(world, solids, cx, cz, high + C.allow + spec.stepHeight, r).height) : base) + height;
+    solids.query(cx - r, cz - r, cx + r, cz + r, ids);
+    for (let q = 0; q < ids.length; q++) {
+      const c = solids.get(ids[q]!);
+      if ((c.flags & Blocks.Move) === 0 || c.y1 <= reach + spec.stepHeight || c.y0 >= head) continue;
+      if (pushOutCircle(c, cx, cz, r, tmpPush) && tmpPush.x * tmpPush.x + tmpPush.z * tmpPush.z > 1e-8) return false;
+    }
   }
   return true;
+}
+
+/**
+ * The lowest a lying body's feet can be at the end of this tick: its height, less what
+ * this tick can drop it (falling, or following a walkable slope down at its speed). A
+ * lying body's circles are taken as low as that: the pivot is what the body rests on, not
+ * its ends, so a leg resting on a rock doesn't hold it up, and a circle counted as standing
+ * on something this tick mustn't find itself inside it at the tick's end.
+ */
+function fallFloor(b: BodyState, spec: BodySpec, ctx: MotorContext): number {
+  const dt = ctx.dt;
+  if (b.motor === 'ground' && !b.sliding && b.vy >= 0) {
+    const v = Math.sqrt(b.vx * b.vx + b.vz * b.vz);
+    return b.y - dtanDeg(spec.maxSlopeDeg) * v * dt - 0.002;
+  }
+  return b.y - Math.max(0, -b.vy) * dt - 0.5 * ctx.tuning.sim.gravity * dt * dt - 0.002;
+}
+
+/** The highest a lying body's pivot can be standing at (x, z) at the end of this tick. */
+function highFeet(b: BodyState, x: number, z: number, spec: BodySpec, ctx: MotorContext): number {
+  return Math.max(b.y, groundBelow(ctx.world, ctx.solids, x, z, b.y + spec.stepHeight, spec.radius).height);
+}
+
+/** Where a lying body is growing toward (1 down, 0 up), and the step it takes this tick. Returns whether it grew. */
+function growLying(b: BodyState, spec: BodySpec, dt: number): boolean {
+  const target = b.stance === 'prone' ? 1 : 0;
+  if (b.lying === target) return false;
+  const T = spec.stanceTime.prone;
+  const step = T > 0 ? dt / T : 1;
+  if (target === 1) {
+    if (b.lying === 0) b.axis = b.yaw;
+    b.lying = b.lying + step < 1 ? b.lying + step : 1;
+    return true;
+  }
+  b.lying = b.lying - step > 0 ? b.lying - step : 0;
+  return false;
+}
+
+/** The chain as it stands, turned to `axis`: every circle clear of what's solid and other bodies. */
+function chainClear(b: BodyState, axis: number, spec: BodySpec, ctx: MotorContext, tanMax: number): boolean {
+  const circles = footprint(b, spec, turnCircles, axis);
+  if (!isClear(b, b.x, b.z, spec, ctx.world, ctx.solids, tanMax, circles, true, fallFloor(b, spec, ctx))) return false;
+  const height = bodyHeight(b, spec);
+  for (let k = 0; k < ctx.others.length; k++) {
+    const o = ctx.others[k]!;
+    if (o.y > b.y + height || o.y + o.height < b.y) continue;
+    for (let c = 0; c < circles.length; c++) {
+      const C = circles[c]!;
+      const dx = b.x + C.x - o.x;
+      const dz = b.z + C.z - o.z;
+      const rr = C.r + o.radius;
+      if (dx * dx + dz * dz < rr * rr) return false;
+    }
+  }
+  return true;
+}
+
+const TURN_BISECTIONS = 6;
+
+/**
+ * A lying body turns toward where it looks, at its turn rate, by the largest step that
+ * keeps every part clear, found with a fixed number of bisections. The pivot is near the
+ * chest, so the legs swing and the view stays steady.
+ */
+function turnAxis(b: BodyState, spec: BodySpec, ctx: MotorContext, tanMax: number): void {
+  const d = wrapAngle(b.yaw - b.axis);
+  if (d === 0) return;
+  const max = spec.prone.turnRate * ctx.dt;
+  const step = d > max ? max : d < -max ? -max : d;
+  if (chainClear(b, b.axis + step, spec, ctx, tanMax)) {
+    b.axis = wrapAngle(b.axis + step);
+    return;
+  }
+  let lo = 0;
+  let hi = 1;
+  for (let k = 0; k < TURN_BISECTIONS; k++) {
+    const mid = (lo + hi) / 2;
+    if (chainClear(b, b.axis + step * mid, spec, ctx, tanMax)) lo = mid;
+    else hi = mid;
+  }
+  b.axis = wrapAngle(b.axis + step * lo);
+}
+
+/** The lowest the pivot can go at (x, z): low enough that every circle still rests within its reach of what's under it. */
+function restFloor(b: BodyState, x: number, z: number, spec: BodySpec, ctx: MotorContext): number {
+  const circles = footprint(b, spec, feetCircles);
+  let floor = -Infinity;
+  for (let k = 0; k < circles.length; k++) {
+    const C = circles[k]!;
+    const g = groundBelow(ctx.world, ctx.solids, x + C.x, z + C.z, b.y + C.allow + spec.stepHeight, C.r).height;
+    const needed = g - C.allow - spec.stepHeight;
+    if (needed > floor) floor = needed;
+  }
+  return floor;
+}
+
+/** A lying body settles along the ground under its head and feet, within what its slope limit allows. */
+function lieAlongGround(b: BodyState, spec: BodySpec, ctx: MotorContext): void {
+  const circles = footprint(b, spec, feetCircles);
+  const first = circles[0]!;
+  const last = circles[circles.length - 1]!;
+  // The chain's seam: the pelvis, the node where the torso meets the legs.
+  const at = spec.parts.pivot - spec.parts.proneLength / 2;
+  let pelvis = circles[0]!;
+  for (let k = 1; k < circles.length; k++) if (Math.abs(circles[k]!.at - at * b.lying) < Math.abs(pelvis.at - at * b.lying)) pelvis = circles[k]!;
+  const groundAt = (C: FootCircle): number => {
+    const g = groundBelow(ctx.world, ctx.solids, b.x + C.x, b.z + C.z, b.y + C.allow + spec.stepHeight, C.r).height - b.y;
+    const up = C.allow + spec.stepHeight;
+    return g > up ? up : g < -C.allow ? -C.allow : g;
+  };
+  b.riseHead = groundAt(first);
+  b.risePelvis = groundAt(pelvis);
+  b.riseFeet = groundAt(last);
 }
 
 /** Removes the part of the velocity pointing into a surface we were pushed out of. */

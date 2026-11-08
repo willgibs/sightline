@@ -2,6 +2,7 @@ import type { DebugDraw } from '../kernel/debugDraw';
 import { Faction, type EntityId } from '../kernel/state';
 import type { System, TickContext } from '../kernel/systems';
 import { bodyHeight, hasBody, type BodySpec, type BodyState } from './body';
+import { footprint, type FootCircle } from './chain';
 import { idleIntent, stepMotor, type Cylinder, type MoveIntent } from './motor';
 
 /**
@@ -27,6 +28,7 @@ export function intentFor(ctx: TickContext, id: EntityId): MoveIntent {
 /** Scratch: the other bodies the moving one collides with, rewritten for each body. */
 const others: Cylinder[] = [];
 const cylinders: Cylinder[] = [];
+const circles: FootCircle[] = [];
 const bodies: Array<{ id: EntityId; faction: number; body: BodyState; spec: BodySpec }> = [];
 
 /** Every body in entity order, with its kind's spec. */
@@ -48,16 +50,22 @@ export const motorSystem: System = {
     for (let k = 0; k < bodies.length; k++) {
       const { id, faction, body, spec } = bodies[k]!;
       others.length = 0;
+      let n = 0;
       for (let j = 0; j < bodies.length; j++) {
         if (j === k) continue;
         const o = bodies[j]!;
-        const c = (cylinders[j] ??= { x: 0, y: 0, z: 0, radius: 0, height: 0 });
-        c.x = o.body.x;
-        c.y = o.body.y;
-        c.z = o.body.z;
-        c.radius = o.spec.radius;
-        c.height = bodyHeight(o.body, o.spec);
-        others.push(c);
+        // A lying body stands in the way along its whole length.
+        const foot = footprint(o.body, o.spec, circles);
+        for (let f = 0; f < foot.length; f++) {
+          const C = foot[f]!;
+          const c = (cylinders[n++] ??= { x: 0, y: 0, z: 0, radius: 0, height: 0 });
+          c.x = o.body.x + C.x;
+          c.y = o.body.y + C.rise;
+          c.z = o.body.z + C.z;
+          c.radius = C.r;
+          c.height = bodyHeight(o.body, o.spec);
+          others.push(c);
+        }
       }
       let intent = intentFor(ctx, id);
       if (intent.tick !== ctx.tick) intent = idleIntent(body, ctx.tick, intent);
