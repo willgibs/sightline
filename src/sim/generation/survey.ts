@@ -32,6 +32,10 @@ export interface Survey {
   /** Terrain with teeth only (D3): each ridge's crest and gullies, and the creek's fords. */
   ridges?: Array<{ crest: Point2[]; gullies: Point2[] }>;
   fords?: Point2[];
+  /** Generated camps only (D4): doors, vehicles, and the skeleton laid before the fill. */
+  doors?: Array<{ x: number; z: number; ux: number; uz: number; width: number }>;
+  vehicles?: Array<{ corners: Point2[]; escape: boolean }>;
+  skeleton?: { corridor: Point2[]; escape: Point2[]; exfil: Point2[][]; sabotage: Point2; target: Point2 };
 }
 
 export interface SurveyTerrain {
@@ -109,7 +113,7 @@ export function surveyWorld(w: World, n = 160): Survey {
         'steep (%)': Math.round(v.steepShare * 1000) / 10,
       }
     : { 'overwatch sectors (of 8)': r.overwatchSectors, 'access sectors (of 16)': r.accessSectors, ridges: r.ridges, 'steep (%)': Math.round(r.steepShare * 1000) / 10 };
-  const extra: Pick<Survey, 'ridges' | 'fords'> = {};
+  const extra: Pick<Survey, 'ridges' | 'fords' | 'doors' | 'vehicles' | 'skeleton'> = {};
   if (w.features.ridges) {
     extra.ridges = w.features.ridges.map((rd) => ({
       crest: rd.crest.points.map((p) => ({ x: p.x, z: p.z })),
@@ -117,6 +121,26 @@ export function surveyWorld(w: World, n = 160): Survey {
     }));
   }
   if (w.features.fords) extra.fords = w.features.fords.map((f) => ({ x: f.x, z: f.z }));
+  if (w.camp.doors) extra.doors = w.camp.doors.map((d) => ({ x: d.x, z: d.z, ux: d.ux, uz: d.uz, width: d.width }));
+  if (w.camp.vehicles) {
+    extra.vehicles = w.camp.vehicles.map((ve) => {
+      const lx = ve.fx * (ve.length / 2);
+      const lz = ve.fz * (ve.length / 2);
+      const wx = -ve.fz * (ve.width / 2);
+      const wz = ve.fx * (ve.width / 2);
+      return {
+        corners: [
+          { x: ve.x - lx - wx, z: ve.z - lz - wz },
+          { x: ve.x + lx - wx, z: ve.z + lz - wz },
+          { x: ve.x + lx + wx, z: ve.z + lz + wz },
+          { x: ve.x - lx + wx, z: ve.z - lz + wz },
+        ],
+        escape: ve.escape,
+      };
+    });
+  }
+  const sk = w.camp.layout?.skeleton;
+  if (sk) extra.skeleton = structuredClone(sk);
   return {
     ...extra,
     seed: w.seed,

@@ -11,6 +11,7 @@ export { siteAt, type Site } from './site';
 export { ARCHETYPES, campMission, campSpecProblems, defaultCampSpec, type CampArchetype, type CampSpec } from './campSpec';
 export type { Ford, Ridge } from './landform';
 export type { Overwatch } from './overwatch';
+export type { BuildingSpec, CampLayout, DoorSpec, LadderSpec, ModuleName, Opening, Parcel, Side, Skeleton, SlotName, VehicleSpec } from './compound';
 export { buildTestCamp, GUARD_ROLES, type Camp, type GuardRole, type GuardSpawn, type Structure, type StructureKind } from './camp';
 export { buildRoutine, routinePose, type Leg, type Routine, type RoutinePose } from './routine';
 export type { Bush, Props, Rock, Tree } from './props';

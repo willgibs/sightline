@@ -30,7 +30,12 @@ export type StructureKind =
   | 'mast'
   | 'vehicle'
   /** A piece of hand-built geometry (handmade.ts): stairs, a ceiling, a wall in a scene. */
-  | 'block';
+  | 'block'
+  /** Generated camps (compound.ts): a tower's ladder, the generator's shed, a light pole, an alarm box. */
+  | 'ladder'
+  | 'shed'
+  | 'light'
+  | 'alarm';
 
 export interface Structure {
   kind: StructureKind;

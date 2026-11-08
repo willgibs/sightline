@@ -1,5 +1,5 @@
 import type { Tuning } from '../config/tuning';
-import { defaultCampSpec, type CampSpec, type Survey } from '../sim/generation';
+import { defaultCampSpec, type CampSpec, type Point2, type Survey } from '../sim/generation';
 import { Rng } from '../sim/kernel/core/rng';
 import { randomSeed } from '../sim/kernel/core/seed';
 import { palette } from '../render/palette';
@@ -217,6 +217,10 @@ function drawCamp(ctx: CanvasRenderingContext2D, s: Survey): void {
     generator: '#e8590c',
     mast: '#1864ab',
     pole: '#868e96',
+    light: '#f08c00',
+    alarm: '#e03131',
+    shed: '#e9ecef',
+    ladder: '#868e96',
   };
   for (const st of s.structures) {
     for (const sh of st.shapes) {
@@ -247,6 +251,48 @@ function drawCamp(ctx: CanvasRenderingContext2D, s: Survey): void {
         ctx.fill();
       }
     }
+  }
+  const path = (pts: Point2[], color: string, width: number, dash: number[] = []) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.setLineDash(dash);
+    ctx.beginPath();
+    pts.forEach((p, k) => {
+      const [x, y] = toPx(p.x, p.z);
+      if (k === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+  };
+  for (const ve of s.vehicles ?? []) {
+    ctx.beginPath();
+    ve.corners.forEach((p, k) => {
+      const [x, y] = toPx(p.x, p.z);
+      if (k === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = ve.escape ? '#c92a2a' : '#868e96';
+    ctx.fill();
+  }
+  for (const d of s.doors ?? []) {
+    const [x0, y0] = toPx(d.x - (d.ux * d.width) / 2, d.z - (d.uz * d.width) / 2);
+    const [x1, y1] = toPx(d.x + (d.ux * d.width) / 2, d.z + (d.uz * d.width) / 2);
+    ctx.strokeStyle = '#2b8a3e';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+  }
+  if (s.skeleton) {
+    path(s.skeleton.corridor, 'rgba(43,138,62,0.85)', 1.5, [4, 3]);
+    path(s.skeleton.escape, 'rgba(201,42,42,0.75)', 1.5, [2, 2]);
+    const [sx, sy] = toPx(s.skeleton.sabotage.x, s.skeleton.sabotage.z);
+    ctx.strokeStyle = '#e8590c';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(sx - 4, sy - 4, 8, 8);
   }
   for (const g of s.guards) {
     const color = palette.debug.roles[g.role];

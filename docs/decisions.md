@@ -107,6 +107,29 @@ Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Unt
 
 Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the generation lane.
 
+### The compound: plots, parcels and modules, skeleton first (D4)
+
+**Decision:**
+- **Solution first.** `buildCompound` (`generation/compound.ts`) lays down the approaches before any fill, as the research proposed from Spelunky:
+  - the breach goes in the fence side that faces a ridge most squarely, so its gully is the way down toward it;
+  - a corridor runs from 30 m outside the breach to the target's back door, with low cover along it;
+  - the generator's shed stands beside that corridor;
+  - the breach and the gate are the two ways out;
+  - the escape route runs from the target's building to the escape vehicle, the gate and the road.
+
+  The layout records these as its `skeleton`, so validation (D8) asks whether the fill broke them.
+- **Plots and parcels**, as XCOM 2 builds them.
+  - The plot is the fence (its gate toward the road, the breach), two to four corner towers (corners away from the breach first), a 7 m lane inside the fence for patrols, and the road to an open yard.
+  - Seven parcels around the yard take modules: the target's building, barracks, mess, storage (60% of camps), the radio room with its mast, the generator's shed, and the motor pool. Each is placed in its slot by its own labelled fork.
+  - The modules' sizes are data in `tuning.gen.compound`, so recordings embed them (rule 16).
+- **Hollow buildings.** Walls with doorways, lintels and a roof, so the target can be reached inside, and the grid knows the inside is roofed. Doorways are 1.5 m wide: at 1.2 m, a camp turned to the grid at about 40° left no lattice step through some doorways for a 0.3 m body, while the motor would have passed. At 1.5 m, 306 of 306 doors over 40 camps pass.
+- **Doors and vehicles are entities** (`game/camp.ts`). The `door` and `vehicle` kinds carry their camp index and state (open, escape), with a solid shape the motor and every query see. They spawn after the guards, so ids stay the player's, then the guards'. Doors start open, swung into the room: guards' routines walk through them, and labs E and C shut them.
+- **Ladders are data** (`camp.ladders`: foot, top and the side a climber stands on), for lab C's ladder mode and lab E's navigation links. Each is drawn as a structure that blocks nothing.
+
+**What moved:** nothing in Phase 0's valley. The tuning gained `gen.compound`, so the golden recording is rewritten. Guards are a fixed placeholder until D6.
+
+**Why:** the plan's D4. Solution first keeps the first-try rate high, because the approaches validation checks for exist by construction. Doors and vehicles are lab D's to define and labs C and E's to use, so they exist as kinds now.
+
 ### Terrain with teeth, and how a mission asks for a camp (D3)
 
 **Decision:**

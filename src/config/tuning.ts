@@ -100,6 +100,36 @@ export const defaultTuning = {
       exfilFree: 90,
     },
 
+    // The compound (lab D, D4; sim/generation/compound.ts): the core mission's archetype, as data
+    // a logging camp or a comms relay can follow. A plot (the fence, its gate and breach, towers,
+    // the road in) and parcels around a central yard, each filled from a handmade module.
+    // Sizes are metres: buildings are [length, depth, wall height].
+    compound: {
+      fenceHalf: [44, 52], // half-sizes of the perimeter, along the gate axis and across it
+      fenceHeight: 2.2,
+      gateWidth: 8,
+      breachWidth: 4,
+      lane: 7, // clear ground inside the fence, where the perimeter patrols walk
+      road: 8, // the road from the gate to the yard
+      yard: 13, // half-size of the open yard at the centre
+      towers: [2, 4], // watchtowers at the corners
+      towerDeck: 6, // height of a tower's deck
+      wallThickness: 0.2,
+      doorWidth: 1.5, // wide enough for the 0.5 m grid to pass a body through at any angle
+      doorHeight: 2.1,
+      hq: [12, 9, 3.2], // the target's building
+      barracks: [18, 8, 3],
+      mess: [13, 9, 3],
+      storage: [13, 10, 4.4],
+      radio: [6, 5, 2.8], // the radio room; its mast stands beside it
+      mast: 14,
+      shed: [5, 4, 2.6], // the generator's shed: a roof on posts
+      lights: [3, 5], // light poles around the yard, on the generator's circuit
+      alarms: [2, 3], // alarm boxes, on the generator's circuit
+      cover: [5, 9], // clusters of containers, crates and sandbags
+      corridorCover: [3, 5], // low cover along the way in from the breach
+    },
+
     // The camp's rhythm: how its guards walk their routines (sim/generation/routine.ts). Part of the
     // camp, like its layout: lab D validates the timing windows these make.
     routines: {

@@ -634,7 +634,7 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
     - Each camp face is a cliff band broken by one or two walkable gullies. The creek crosses the open side, passes the camp and leaves between spines, with banks too steep to climb except at its fords.
     - The checks: every placed ridge overlooks the camp, overwatch covers at most half the horizon, the open side is at least 120°, the camp is reachable from at least 3 of 8 directions, and two ways out share no chokepoint. A valley that fails is re-rolled, up to 8 times.
     - 60 of 60 valleys passed at the first attempt; the bench pins 6 of 6 held-out ones, overlooked over at most 157° with an open side of at least 164°.
-- [ ] D4 · `CampSpec` and the compound, laid out in plots and parcels from handmade modules.
+- [x] D4 · `CampSpec` and the compound, laid out in plots and parcels from handmade modules.
   - The skeleton goes down first: a perch line, a low-exposure corridor, a reachable sabotage node, two exfil corridors and the escape route.
   - Then the parcels:
     - the gate and perimeter;
@@ -644,6 +644,13 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
     - the generator, the radio mast and alarm boxes;
     - vehicles, including the escape vehicle.
   - Doors and vehicles are entity kinds with a `solid`.
+  - **Built** (`generation/compound.ts`, `game/camp.ts`).
+    - The skeleton goes first: a breach on the side facing a ridge (whose gully comes down toward it), a corridor with low cover to the target's back door, the generator's shed beside it, the breach and the gate as two ways out, and the escape route (building, vehicle, gate, road).
+    - Then the plot: a fence 88–104 m a side with its gate toward the road, two to four corner towers with ladders (away from the breach first), a clear lane for patrols, and the road to an open yard.
+    - Then seven parcels from modules: the target's building (two doors), barracks, mess, storage, the radio room and its mast, the generator's shed, and the motor pool (the escape jeep and a truck). Buildings are hollow: walls with 1.5 m doorways (narrower ones don't pass the 0.5 m grid at every angle), lintels, roofs. Light poles, alarm boxes and cover clusters follow.
+    - Doors (open, swung into the room) and vehicles spawn as entities after the guards, each with a solid. Their data is in `camp.doors` and `camp.vehicles`, and tower ladders are in `camp.ladders` for lab C.
+    - Tested on five seeds: the corridor reaches the target, the generator is reachable, both ways out and the escape route are walkable, every doorway passes on the grid, nothing overlaps, the camp moves with its site, and a minute of the person-like bot breaks no promise of the motor's.
+    - Its guards are a placeholder until D6.
 - [ ] D5 · Systems: the generator powers the lights, the alarm boxes and the radio; the objective.
 - [ ] D6 · Staffing.
   - All seven roles, bought with points under the 16-guard cap.

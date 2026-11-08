@@ -6,13 +6,14 @@ import { ColliderSet } from '../kernel/world/colliders';
 import { buildGrid } from '../kernel/world/grid';
 import type { World } from '../kernel/world/world';
 import type { TerrainReport } from './analysis';
-import { buildTestCamp } from './camp';
 import { campSpecProblems } from './campSpec';
+import { buildCompound } from './compound';
 import { generateLandform } from './landform';
 import { checkValley, type Overwatch } from './overwatch';
 import { scatterProps } from './props';
 import { siteBounds } from './site';
 import { chooseSpawn } from './spawn';
+import { staffPlaceholder } from './staffing';
 import type { TerrainResult } from './terrain';
 
 /**
@@ -22,8 +23,8 @@ import type { TerrainResult } from './terrain';
  *
  * Every stage draws from its own root stream (`valley`, `camp`, `routines`, `props`), so a
  * re-rolled valley leaves the camp's own draws as they were, and the props scatter by cell
- * whatever the valley did (scatter.ts). Until D4 the camp is Phase 0's test camp, placed
- * on the new pad.
+ * whatever the valley did (scatter.ts). The camp is laid out from its archetype
+ * (compound.ts), then staffed (staffing.ts).
  */
 export function generateCampWorld(spec: MissionSpec, tuning: Tuning, clock?: () => number): World {
   const problems = campSpecProblems(spec.camp);
@@ -43,7 +44,8 @@ export function generateCampWorld(spec: MissionSpec, tuning: Tuning, clock?: () 
     attempt++;
   }
   const colliders = new ColliderSet(G.world.size);
-  const camp = buildTestCamp(new Rng(seed, 'camp'), terrain.heightfield, terrain.features, colliders, G, new Rng(seed, 'routines'));
+  const camp = buildCompound(new Rng(seed, 'camp'), terrain.heightfield, terrain.features, colliders, G, spec.camp!);
+  staffPlaceholder(camp, terrain.heightfield, G, new Rng(seed, 'staff'), new Rng(seed, 'routines'));
   const props = scatterProps(new Rng(seed, 'props'), terrain.heightfield, terrain.features, colliders, G);
   colliders.build();
   const report = reportOf(valley);
