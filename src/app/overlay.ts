@@ -45,10 +45,13 @@ export class Overlay {
       [['sprint'], 'sprint'],
       [['crouch'], 'crouch'],
       [['prone'], 'prone'],
+      [['fire'], 'fire'],
       [['zoom'], 'scope'],
+      [['scopeToggle'], 'scope on or off'],
       [['binoculars'], 'binoculars'],
       [['zeroUp', 'zeroDown'], 'zero'],
       [['suppressor'], 'suppressor'],
+      [['throw'], 'throw a stone'],
       [['assists'], 'instruments'],
       [['debugView'], 'debug view'],
     ];
