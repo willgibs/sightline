@@ -1,4 +1,4 @@
-import { crackAt, glint, vec3, viewLine, type Crack, type Flight } from '../ballistics';
+import { crackAt, flightEnd, glint, vec3, viewLine, type Crack, type Flight } from '../ballistics';
 import { bodyShape, hasBody, type BodyEntity, type BodyState } from '../body';
 import { dcos, dsin } from '../kernel/core/detmath';
 import type { DebugDraw } from '../kernel/debugDraw';
@@ -256,13 +256,15 @@ function deliverCrack(ctx: TickContext, e: Extract<SimEvent, { type: 'shot' }>):
   flight.wz = e.wz;
   const maker = ctx.index.get(e.source);
   const side = maker ? maker.faction : Faction.None;
+  // The path ends where the bullet meets the world; there's no crack past that.
+  const until = flightEnd(flight, e.t + T.ballistics.maxFlight, 1 / T.sim.tickHz, ctx.query());
   for (const g of ctx.index.of('guard')) {
     const s = g.senses;
     if (!s || g.id === e.source || side === g.faction) continue;
     listener.x = g.body.x;
     listener.y = g.body.y + g.body.eyeHeight;
     listener.z = g.body.z;
-    const crack = crackAt(flight, e.t + T.ballistics.maxFlight, listener, c, crackOut);
+    const crack = crackAt(flight, until, listener, c, crackOut);
     if (!crack || crack.distance > T.ballistics.sound.crack) continue;
     const radius = H.blur.min + H.blur.distance * crack.distance;
     const [ox, oz] = ctx.draw(g.id, 'hearing', (rng) => {

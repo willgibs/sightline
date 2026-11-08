@@ -19,6 +19,11 @@ import type { Simulation } from './sim';
  *   cue came. A trial is **borderline** when one step of one factor, toward the other
  *   outcome, flips it; every factor that does is recorded, for item analysis. Each of the
  *   four cells (seen or not, clear or borderline) holds a quarter of the scored trials.
+ * - **The freeze doesn't tell.** Every seen trial reaches the cue, and few not-seen ones
+ *   do, so left to chance a cue freeze would mean "yes" and a start freeze "no". Each
+ *   not-seen cell therefore gathers trials that reach the cue, and each freeze kind holds
+ *   the same share of seen and not seen, within clear and borderline; the two kinds are
+ *   scored apart as well (only the cue-frozen ones test reading the cues).
  * - **The borderline trials are split evenly** between those the rules-only predictor
  *   (below) gets right and those it gets wrong, so reading the sight table alone scores
  *   half of them at best (7 of 15), and the bar of 21 of 30 can only be met by reading
@@ -80,6 +85,8 @@ export interface SittingOptions {
   maxCandidates: number;
   /** How many candidates each cell gathers, as a multiple of what it needs, for the sitting to pick from. */
   pool: number;
+  /** Whether the freeze kinds are balanced by outcome. The bench switches it off to measure what that's worth. */
+  balanceFreeze: boolean;
   /** Seconds each trial runs. */
   seconds: number;
   /** A cue-frozen trial stops this long after the first cue: long enough for his head to start turning. */
@@ -95,7 +102,7 @@ export interface SittingOptions {
   seeThrough: number;
 }
 
-export const SITTING: SittingOptions = { warmups: 5, scored: 30, maxCandidates: 1600, pool: 3, seconds: 8, cueHoldSeconds: 0.3, headPixels: 2, seeThrough: 0.15 };
+export const SITTING: SittingOptions = { warmups: 5, scored: 30, maxCandidates: 1600, pool: 3, balanceFreeze: true, seconds: 8, cueHoldSeconds: 0.3, headPixels: 2, seeThrough: 0.15 };
 
 interface Outcome {
   seen: boolean;
@@ -161,7 +168,7 @@ function headInView(sim: Simulation, opts: SittingOptions): boolean {
 const STANCES: readonly SightParams['stance'][] = ['prone', 'crouch', 'stand'];
 const MOVES: readonly SightParams['move'][] = ['still', 'walk', 'sprint'];
 /** How far each spot's ground lets a guard stand from it with a clear line (sightScenario's geometry). */
-const SPOT_MAX: Readonly<Record<SightParams['spot'], number>> = { open: 390, shade: 95, bush: 70, wall: 60, crest: 230 };
+const SPOT_MAX: Readonly<Record<SightParams['spot'], number>> = { open: 390, shade: 50, bush: 70, wall: 60, crest: 230 };
 
 /** One step of one factor, toward more exposure (`up`) or less; null if it has no step that way here. */
 export function stepFactor(p: SightParams, f: Factor, up: boolean): SightParams | null {
@@ -270,6 +277,35 @@ export function cellQuotas(scored: number): number[] {
   const [sr, sw] = half(outer[1]!, true);
   const [ur, uw] = half(outer[3]!, true);
   return [outer[0]!, sr, sw, outer[2]!, ur, uw];
+}
+
+/**
+ * The cells a sitting gathers from: the six above, with each not-seen one split by whether
+ * the trial reaches the first cue, so a cue freeze can be not-seen as often as seen.
+ * (Cells 0–2, the seen ones, always reach it.) In order: seen ×3, then each not-seen cell
+ * as reaching the cue, then not.
+ */
+function subCellOf(t: Pick<Trial, 'seen' | 'borderline' | 'rules' | 'cueAt'>): number {
+  const c = cellOf(t);
+  return c < 3 ? c : 3 + 2 * (c - 3) + (t.cueAt >= 0 ? 0 : 1);
+}
+
+/**
+ * How many each gathered cell holds. Not-seen cells reach the cue about half the time,
+ * rounding so the cue-frozen not-seen trials come to 7 of 30, as the seen ones' to 8.
+ */
+function subQuotas(scored: number): number[] {
+  const q = cellQuotas(scored);
+  const reach = (n: number, up: boolean): number => (up ? Math.ceil(n / 2) : Math.floor(n / 2));
+  const [nc, nr, nw] = [q[3]!, q[4]!, q[5]!];
+  const [cc, cr, cw] = [reach(nc, true), reach(nr, false), reach(nw, false)];
+  return [q[0]!, q[1]!, q[2]!, cc, nc - cc, cr, nr - cr, cw, nw - cw];
+}
+
+/** The freeze of the `i`th trial of a gathered cell: a seen cell's first half at the cue, and each not-seen cell by whether it reaches it. */
+function freezeOf(c: number, i: number, quota: number): Trial['freeze'] {
+  if (c < 3) return i < Math.ceil(quota / 2) ? 'cue' : 'start';
+  return (c - 3) % 2 === 0 ? 'cue' : 'start';
 }
 
 /** The cells' names, for reports. */
@@ -383,7 +419,9 @@ export function generateSitting(seed: string, tuning: Tuning, opts: SittingOptio
  */
 export function* sittingSteps(seed: string, tuning: Tuning, opts: SittingOptions = SITTING): Generator<number, Trial[]> {
   const rng = new Rng(seed, 'trials');
-  const quotas = cellQuotas(opts.scored);
+  // Without balanced freezes (the bench's seed), the six cells alone, as trials come.
+  const cellIndex = opts.balanceFreeze ? subCellOf : cellOf;
+  const quotas = opts.balanceFreeze ? subQuotas(opts.scored) : cellQuotas(opts.scored);
   const capacity = quotas.map((q) => q * opts.pool);
   const gathered: Trial[][] = quotas.map(() => []);
   const drawn: Trial[] = [];
@@ -399,8 +437,8 @@ export function* sittingSteps(seed: string, tuning: Tuning, opts: SittingOptions
     seen.add(params);
     const o = outcomeOf(params, tuning, opts);
     const rules = rulesPredict(p, tuning);
-    const borderlineCell = cellOf({ seen: o.seen, borderline: true, rules });
-    const clearCell = cellOf({ seen: o.seen, borderline: false, rules });
+    const borderlineCell = cellIndex({ seen: o.seen, borderline: true, rules, cueAt: o.cueAt });
+    const clearCell = cellIndex({ seen: o.seen, borderline: false, rules, cueAt: o.cueAt });
     // A candidate no cell can take, once there are enough for the warm-ups, isn't worth its flips.
     if (drawn.length >= enough && gathered[borderlineCell]!.length >= capacity[borderlineCell]! && gathered[clearCell]!.length >= capacity[clearCell]!) continue;
     // Borderline: one factor's step toward the other outcome flips it. Every factor that does.
@@ -425,33 +463,46 @@ export function* sittingSteps(seed: string, tuning: Tuning, opts: SittingOptions
     };
     clears.set(t, o.clear);
     drawn.push(t);
-    const c = cellOf(t);
+    const c = cellIndex(t);
     if (gathered[c]!.length < capacity[c]!) gathered[c]!.push(t);
   }
   const cells = spread(gathered, quotas);
-  // The warm-ups: what's left, in the order drawn, turn about seen and not, so they show both.
+  // The warm-ups: what's left, in the order drawn, showing all four of seen or not, at the cue or the start.
   const picked = new Set(cells.flat());
   const rest = drawn.filter((t) => !picked.has(t));
   const warmups: Trial[] = [];
-  for (let wantSeen = true; warmups.length < opts.warmups && rest.length > 0; wantSeen = !wantSeen) {
-    const at = Math.max(0, rest.findIndex((t) => t.seen === wantSeen));
+  const shapes: ReadonlyArray<{ seen: boolean; cue: boolean }> = [
+    { seen: true, cue: true },
+    { seen: false, cue: true },
+    { seen: true, cue: false },
+    { seen: false, cue: false },
+    { seen: true, cue: true },
+  ];
+  for (let k = 0; k < opts.warmups && rest.length > 0; k++) {
+    const want = shapes[k % shapes.length]!;
+    const fits = (t: Trial): boolean => t.seen === want.seen && (!want.cue || t.cueAt >= 0);
+    const at = Math.max(0, rest.findIndex(fits));
     const t = rest.splice(at, 1)[0]!;
-    const w = { ...t, warmup: true };
+    const w: Trial = { ...t, warmup: true, freeze: want.cue && t.cueAt >= 0 ? 'cue' : 'start' };
     clears.set(w, clears.get(t)!);
     warmups.push(w);
   }
-  // Half the scored trials frozen at their first cue, taken from the cells in turn (a
-  // trial that never reaches the cue can only be judged from the situation).
+  // Half the scored trials frozen at their first cue. Balanced, each kind of freeze holds the
+  // same share of seen and not seen (freezeOf); the bench's seed takes cues as they come.
   const scored: Trial[] = [];
   for (const cell of cells) scored.push(...cell);
-  const most = Math.max(...quotas);
-  let cues = 0;
-  for (let i = 0; i < most && cues < opts.scored / 2; i++) {
-    for (const cell of cells) {
-      const t = cell[i];
-      if (t && t.cueAt >= 0 && cues < opts.scored / 2) {
-        t.freeze = 'cue';
-        cues++;
+  if (opts.balanceFreeze) {
+    cells.forEach((cell, c) => cell.forEach((t, i) => (t.freeze = freezeOf(c, i, quotas[c]!))));
+  } else {
+    const most = Math.max(...quotas);
+    let cues = 0;
+    for (let i = 0; i < most && cues < opts.scored / 2; i++) {
+      for (const cell of cells) {
+        const t = cell[i];
+        if (t && t.cueAt >= 0 && cues < opts.scored / 2) {
+          t.freeze = 'cue';
+          cues++;
+        }
       }
     }
   }
@@ -462,7 +513,6 @@ export function* sittingSteps(seed: string, tuning: Tuning, opts: SittingOptions
     scored[i] = scored[j]!;
     scored[j] = a;
   }
-  warmups.forEach((t, i) => (t.freeze = i % 2 === 1 && t.cueAt >= 0 ? 'cue' : 'start'));
   const all = [...warmups, ...scored];
   all.forEach((t, k) => {
     t.k = k;
@@ -486,17 +536,20 @@ export interface Score {
   rulesBorderlineRight: number;
   /** Among the borderline trials each factor flips (item analysis): how many, right, and the rules-only predictor's right. */
   byFactor: Partial<Record<Factor, { right: number; of: number; rules: number }>>;
+  /** Each kind of freeze apart: only the first-cue ones test reading the cues (docs/research/notes/foundations/playtesting_and_user_research.md). */
+  byFreeze: Record<Trial['freeze'], { balanced: number; right: number; of: number }>;
 }
 
 /** Scores answers ("he'll see me": true) to a sitting's scored trials; warm-ups don't count. */
 export function scoreSitting(trials: readonly Trial[], answers: ReadonlyMap<number, boolean>): Score {
-  const s: Score = { answers: 0, right: 0, balanced: 0, borderline: 0, borderlineRight: 0, rulesBalanced: 0, rulesBorderlineRight: 0, byFactor: {} };
+  const s: Score = { answers: 0, right: 0, balanced: 0, borderline: 0, borderlineRight: 0, rulesBalanced: 0, rulesBorderlineRight: 0, byFactor: {}, byFreeze: { start: { balanced: 0, right: 0, of: 0 }, cue: { balanced: 0, right: 0, of: 0 } } };
   let seenRight = 0;
   let seenOf = 0;
   let unseenRight = 0;
   let unseenOf = 0;
   let rulesSeen = 0;
   let rulesUnseen = 0;
+  const kinds = { start: { seenRight: 0, seenOf: 0, unseenRight: 0, unseenOf: 0 }, cue: { seenRight: 0, seenOf: 0, unseenRight: 0, unseenOf: 0 } };
   for (const t of trials) {
     if (t.warmup) continue;
     const a = answers.get(t.k);
@@ -504,6 +557,16 @@ export function scoreSitting(trials: readonly Trial[], answers: ReadonlyMap<numb
     const ok = a === t.seen;
     s.answers++;
     if (ok) s.right++;
+    const kind = kinds[t.freeze];
+    if (t.seen) {
+      kind.seenOf++;
+      if (ok) kind.seenRight++;
+    } else {
+      kind.unseenOf++;
+      if (ok) kind.unseenRight++;
+    }
+    s.byFreeze[t.freeze].of++;
+    if (ok) s.byFreeze[t.freeze].right++;
     if (t.seen) {
       seenOf++;
       if (ok) seenRight++;
@@ -527,6 +590,7 @@ export function scoreSitting(trials: readonly Trial[], answers: ReadonlyMap<numb
   }
   const share = (r: number, of: number): number => (of > 0 ? r / of : 0);
   s.balanced = (share(seenRight, seenOf) + share(unseenRight, unseenOf)) / 2;
+  for (const k of ['start', 'cue'] as const) s.byFreeze[k].balanced = (share(kinds[k].seenRight, kinds[k].seenOf) + share(kinds[k].unseenRight, kinds[k].unseenOf)) / 2;
   s.rulesBalanced = (share(rulesSeen, seenOf) + share(rulesUnseen, unseenOf)) / 2;
   return s;
 }

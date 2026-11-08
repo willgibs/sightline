@@ -232,12 +232,15 @@ function perceptionMetrics(): Record<string, number> {
 function trialMetrics(): Record<string, number> {
   const m: Record<string, number> = {};
   let candidates = 0;
-  const sittings = ['BENCH-A-1', 'BENCH-A-2'].map((seed) => generateSitting(seed, defaultTuning, undefined, () => candidates++));
+  const seeds = ['BENCH-A-1', 'BENCH-A-2'];
+  const sittings = seeds.map((seed) => generateSitting(seed, defaultTuning, undefined, () => candidates++));
+  // The seed: trials taken as they come, freezes wherever there's a cue.
+  const firstCome = seeds.map((seed) => generateSitting(seed, defaultTuning, { ...SITTING, pool: 1, balanceFreeze: false }));
   const scored = sittings.flatMap((ts) => ts.filter((t) => !t.warmup));
   m['trials: candidates run for two sittings'] = candidates;
   m['trials: scored trials in two sittings'] = scored.length;
   m['trials: pairs of factor levels the first sitting covers'] = pairsCovered(sittings[0]!);
-  m['seed · trials: pairs of factor levels covered, taken first come'] = pairsCovered(generateSitting('BENCH-A-1', defaultTuning, { ...SITTING, pool: 1 }));
+  m['seed · trials: pairs of factor levels covered, taken first come'] = pairsCovered(firstCome[0]!);
   const key = (ts: readonly Trial[], f: (t: Trial) => boolean): Map<number, boolean> => new Map(ts.map((t) => [t.k, f(t)]));
   const rules = sittings.map((ts) => scoreSitting(ts, key(ts, (t) => t.rules)));
   m['trials: borderline right by the sight table alone (of 30)'] = rules[0]!.borderlineRight + rules[1]!.borderlineRight;
@@ -245,6 +248,27 @@ function trialMetrics(): Record<string, number> {
   m['trials: frozen at the first cue (of 60)'] = scored.filter((t) => t.freeze === 'cue').length;
   m['trials: cue-frozen trials where his head can be read'] = scored.filter((t) => t.freeze === 'cue' && t.legible.head).length;
   for (const f of FACTORS) m[`trials: borderline trials ${f} flips`] = scored.filter((t) => t.flips.includes(f)).length;
+  // What the freeze gives away: the share seen in each kind, and readers who go by it.
+  const seenShare = (ts: readonly Trial[], kind: Trial['freeze']): number => {
+    const of = ts.filter((t) => !t.warmup && t.freeze === kind);
+    return round((100 * of.filter((t) => t.seen).length) / Math.max(1, of.length));
+  };
+  for (const [tag, set] of [
+    ['', sittings],
+    ['seed · ', firstCome],
+  ] as const) {
+    const all = set.flat();
+    m[`${tag}trials: seen among those frozen at the first cue (%)`] = seenShare(all, 'cue');
+    m[`${tag}trials: seen among those frozen at the start (%)`] = seenShare(all, 'start');
+    const read = (name: string, f: (t: Trial) => boolean): void => {
+      const [x, y] = set as [Trial[], Trial[]];
+      const v = verdict({ trials: x, answers: key(x, f) }, { trials: y, answers: key(y, f) });
+      m[`${tag}trials: ${name}: balanced over both (%)`] = round(v.balanced * 100);
+      m[`${tag}trials: ${name}: passes (0 or 1)`] = v.pass ? 1 : 0;
+    };
+    read('a reader who says yes only at a first-cue freeze', (t) => t.freeze === 'cue');
+    read('a reader by the first cue\'s time, and the table otherwise', (t) => (t.freeze === 'cue' ? t.cueAt <= 2.4 : t.rules));
+  }
   // Readers of known skill, 4000 pairs of sittings each.
   const rng = new Rng('BENCH-A', 'readers');
   const [a, b] = sittings as [Trial[], Trial[]];

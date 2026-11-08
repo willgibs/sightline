@@ -31,8 +31,9 @@ const p = vec3();
 /**
  * The crack a listener hears from a bullet's flight, flown until mission time `until` (its
  * strike, or the longest it flies): written to `out`, or null when none reaches it: the
- * bullet was never supersonic where the cone would come from, or the listener is behind
- * the muzzle, where the report arrives first and the cone never does.
+ * bullet was never supersonic where the cone would come from, the listener is behind the
+ * muzzle, where the report arrives first and the cone never does, or beyond where the
+ * flight ended, where the point that would send it was never reached.
  */
 export function crackAt(f: Flight, until: number, listener: Vec3, speedOfSound: number, out: Crack): Crack | null {
   if (!(f.v0 > speedOfSound) || until <= f.t) return null;
@@ -68,6 +69,8 @@ export function crackAt(f: Flight, until: number, listener: Vec3, speedOfSound: 
   const emitted = (a + b) / 2;
   // At the muzzle: the cone never reaches this listener ahead of the report.
   if (emitted - f.t < 1e-4) return null;
+  // At the end of the flight: the bullet stopped short of where the cone would leave for this listener.
+  if (until - emitted < 1e-4) return null;
   if (airspeedAt(f, emitted) <= speedOfSound) return null;
   out.t = arrival(emitted);
   out.emitted = emitted;

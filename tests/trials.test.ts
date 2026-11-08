@@ -76,6 +76,25 @@ describe('a sitting', () => {
     expect(warmups.map((t) => t.seen)).toEqual([true, false, true, false, true]);
   });
 
+  it('gives each freeze kind the same share of seen and not seen, within clear and borderline', () => {
+    for (const kind of ['start', 'cue'] as const) {
+      const of = scored.filter((t) => t.freeze === kind);
+      expect(of).toHaveLength(15);
+      expect(of.filter((t) => t.seen)).toHaveLength(8);
+      for (const borderline of [false, true]) {
+        const part = of.filter((t) => t.borderline === borderline);
+        const seen = part.filter((t) => t.seen).length;
+        expect(Math.abs(seen - (part.length - seen))).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it('so a reader who goes by the freeze alone scores 50%, and fails', () => {
+    const s = scoreSitting(trials, new Map(trials.map((t) => [t.k, t.freeze === 'cue'])));
+    expect(s.balanced).toBeCloseTo(0.5, 6);
+    expect(s.byFreeze.cue.of + s.byFreeze.start.of).toBe(30);
+  });
+
   it('freezes about half at their first cue, and only where there is one', () => {
     const cue = scored.filter((t) => t.freeze === 'cue');
     expect(cue.length).toBeGreaterThanOrEqual(12);
@@ -107,6 +126,8 @@ describe('scoring', () => {
     expect(scoreSitting(trials, answer(() => false)).balanced).toBeCloseTo(0.5, 12);
     const perfect = scoreSitting(trials, answer((t) => t.seen));
     expect(perfect.balanced).toBe(1);
+    expect(perfect.byFreeze.cue.balanced).toBe(1);
+    expect(perfect.byFreeze.start.balanced).toBe(1);
     expect(perfect.answers).toBe(30);
     expect(perfect.borderlineRight).toBe(perfect.borderline);
   });

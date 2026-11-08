@@ -162,6 +162,9 @@ export class PlaytestCapture {
   private readonly pending = new Map<Run, string>();
   /** The last save's outcome, for the debug panel. */
   status = 'nothing saved yet';
+  /** The last run's name, and how many runs in a row have had it (begun in the same second). */
+  private lastName = '';
+  private sameName = 0;
   /**
    * Runs shorter than this aren't kept. Trial mode (A12) keeps every trial, however short:
    * each holds an answer. A review of its misses after the results keeps none (Infinity).
@@ -177,8 +180,12 @@ export class PlaytestCapture {
   startRun(sim: Simulation, recorder: Recorder, label: string, scene: string | null): void {
     if (this.run) this.save('new run');
     const now = new Date();
+    const base = `${stamp(now)}-${(scene ? `scene-${scene}` : label).replace(/[^A-Za-z0-9-]+/g, '-')}`;
+    // Two runs begun in the same second keep their names apart (trial mode can start several).
+    this.sameName = base === this.lastName ? this.sameName + 1 : 1;
+    this.lastName = base;
     this.run = {
-      name: `${stamp(now)}-${(scene ? `scene-${scene}` : label).replace(/[^A-Za-z0-9-]+/g, '-')}`,
+      name: this.sameName === 1 ? base : `${base}-${this.sameName}`,
       label,
       scene,
       startedAt: now.toISOString(),

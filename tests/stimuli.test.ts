@@ -5,6 +5,7 @@ import { Optic, neutralInput, type TickInput } from '../src/sim/kernel/input';
 import { Faction } from '../src/sim/kernel/state';
 import { withSystem, type System, type TickContext } from '../src/sim/kernel/systems';
 import { Surface } from '../src/sim/kernel/world/surfaces';
+import { Blocks } from '../src/sim/kernel/world/colliders';
 import { sunDirection } from '../src/sim/kernel/env';
 import { PERCEPTION, giveSenses } from '../src/sim/game/perception';
 import { placePlayer } from '../src/sim/game/setup';
@@ -23,11 +24,12 @@ import { testGuard, testWorld } from './fixtures';
  */
 const hz = T.sim.tickHz;
 
-function setup(act: (ctx: TickContext) => void, emits: System['emits'], writes: System['writes'] = [], face: readonly [number, number] = [0, -1]): Simulation {
+function setup(act: (ctx: TickContext) => void, emits: System['emits'], writes: System['writes'] = [], face: readonly [number, number] = [0, -1], colliders: NonNullable<Parameters<typeof testWorld>[0]>['colliders'] = []): Simulation {
   const world = testWorld({
     size: 120,
     cell: 1,
     spawn: { x: 50, z: 0 },
+    colliders,
     camp: {
       structures: [],
       guards: [testGuard({ id: 0, role: 'sentry', x: 0, y: 0, z: 0, faceX: face[0], faceZ: face[1], elevated: false, route: null, routeStart: 0, scanPhase: 0, scanScale: 0 })],
@@ -161,6 +163,19 @@ describe('the crack', () => {
     expect(heard.z).toBeGreaterThan(-60);
     expect(Math.abs(heard.x - 8)).toBeLessThan(6);
     expect(r.states).toContain('searching');
+  });
+});
+
+describe('a bullet stopped by a wall', () => {
+  it('cracks at nobody beyond the wall', () => {
+    // A wall 6 m ahead of the muzzle; a sentry 50 m down the line.
+    const wall = { kind: 'box' as const, x: 8, z: -44, y0: -1, y1: 5, hx: 3, hz: 0.3, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Rock };
+    const shoot = (ctx: TickContext) => {
+      if (ctx.tick !== hz) return;
+      ctx.emit({ type: 'shot', source: 1, x: 8, y: 1.7, z: -50, dx: 0, dy: 0, dz: 1, speed: 790, drag: 0.00065, wx: 0, wz: 0 });
+    };
+    const r = run(setup(shoot, ['shot'], [], [0, -1], [wall]), 3);
+    expect(r.events.filter((e) => e.type === 'heard')).toHaveLength(0);
   });
 });
 

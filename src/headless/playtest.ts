@@ -175,13 +175,14 @@ function summarize(file: string): boolean {
     if (closest.guard >= 0) console.log(`  guards    closest ${closest.d.toFixed(1)} m (guard ${closest.guard}, at ${t(closest.tick)})`);
     shotLog.forEach((s, k) => console.log(`  shot ${String(k + 1).padEnd(4)} ${t(Math.round(s.report.t * hz))} ${describeShot(s.report, s.result, s.hit)}`));
     for (const m of moments) console.log(`  moment    ${m}`);
-    // A trial of a sitting (A12): its answer, and what happened.
-    const events = rec.readEvents();
-    for (const a of answersIn(basename(file), rec.annotations(), events, h.tuning)) {
-      kept.push(a);
-      const seenAt = events.find((e) => e.type === 'detected')?.t;
-      console.log(`  trial     ${a.warmup ? 'warm-up' : 'scored'} trial ${a.k} of sitting ${a.sitting} · answered ${a.answer ? 'yes' : 'no'} · ${a.seen ? `seen at ${seenAt!.toFixed(1)} s` : 'not seen'}`);
-    }
+  }
+  // A trial of a sitting (A12): its answer, and what happened. Read straight from the file, so
+  // a recording this build can no longer re-simulate still counts.
+  const events = rec.readEvents();
+  for (const a of answersIn(basename(file), rec.annotations(), events, h.tuning, h.createdAt)) {
+    kept.push(a);
+    const seenAt = events.find((e) => e.type === 'detected')?.t;
+    console.log(`  trial     ${a.warmup ? 'warm-up' : 'scored'} trial ${a.k} of sitting ${a.sitting} · answered ${a.answer ? 'yes' : 'no'} · ${a.seen ? `seen at ${seenAt!.toFixed(1)} s` : 'not seen'}`);
   }
   if (telemetry?.frames) {
     const f = telemetry.frames;

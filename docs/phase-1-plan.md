@@ -442,6 +442,7 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - `?trials=<seed>` plays a sitting; `npm run playtest` scores it from its recordings or its saved file; `npm run trials -- <seed> --shots` prints it and draws its freeze frames for the pre-screen.
   - Each borderline cell is split evenly between trials the sight table gets right and wrong, so the table alone scores 7 of 15 there, and the comparison with it is on the borderline trials (`docs/decisions.md`, A12).
   - The trials are spread over the factors by a greedy pairwise covering; a one-tap probe asks what told you; R on the results plays back the misses (the research's list for before the first sitting).
+  - The freeze kind says nothing about the outcome: each kind holds the same share of seen and not seen, and they're scored apart. Answers survive a reload, and each carries its key, so later builds can still score the sitting.
 - [ ] A13 · Perception joins the valley (`SYSTEMS`), announced, with the version bump.
 - [ ] Exit test, the bench numbers, a note, a playable link.
 
