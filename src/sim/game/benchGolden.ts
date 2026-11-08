@@ -22,8 +22,6 @@ export const BENCH_GOLDEN: PinnedBench = {
   },
   "generation": {
     "metrics": {
-      "valid at the first attempt (of 6)": 6,
-      "least margin under the attempt budget": 5,
       "lab D valleys valid at the first attempt (of 6)": 6,
       "lab D least margin under the valley budget": 7,
       "lab D widest overwatched horizon (°)": 157,
@@ -48,22 +46,22 @@ export const BENCH_GOLDEN: PinnedBench = {
   },
   "body": {
     "metrics": {
-      "body-ticks checked": 57600,
+      "body-ticks checked": 82800,
       "runs with a broken promise (of 4)": 0,
       "bodies under the terrain": 0,
       "bodies inside something solid": 0,
-      "worst overlap (m)": 0.00009741367780091714,
-      "worst rise in a tick (m)": 0.05733444956180733,
+      "worst overlap (m)": 0.00009984134594931415,
+      "worst rise in a tick (m)": 0.05593978758175666,
       "worst gain on steep ground (m)": 0,
       "lean: eye-to-head lines that differ by direction (of 2000)": 0,
       "lean: pairs in view (of 2000)": 1496,
       "seed · lean: pairs where the camera sees a guard who has no line to the head (of 2000)": 18,
       "mantle: ticks inside someone walking across the landing": 0,
       "seed · mantle checked once: ticks inside him": 15,
-      "prone: fuzzing bot on the course and in two valleys, lying poses checked": 16869,
+      "prone: fuzzing bot on the course and in two valleys, lying poses checked": 16573,
       "prone: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 548,
-      "seed · single circle: fuzzing bot on the course and in two valleys, lying poses checked": 16869,
-      "seed · single circle: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 3258,
+      "seed · single circle: fuzzing bot on the course and in two valleys, lying poses checked": 16573,
+      "seed · single circle: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 3854,
       "prone: turning between walls a metre apart, poses with a part inside something solid": 0,
       "seed · single circle: turning between walls a metre apart, poses with a part inside something solid": 259,
       "prone: deepest any part goes into something solid (m)": 0.15625,
@@ -209,18 +207,17 @@ export const BENCH_GOLDEN: PinnedBench = {
     "runs": {
       "TAL-4471 wander": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 14400 },
-          "perception-sight": { "rays": 234, "nodes": 0, "bodies": 0 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 21600 }
         }
       },
       "MUD-9031 wander": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 14400 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 19800 }
         }
       },
       "TAL-4471 chaos": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 14400 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 21600 }
         }
       }
     }

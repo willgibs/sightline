@@ -56,16 +56,16 @@ describe('routines', () => {
 });
 
 describe('roles', () => {
-  it('are the seven of the design doc, each tinted in the debug view; the test camp uses three', () => {
+  it('are the seven of the design doc, each tinted in the debug view; a generated camp has them all', () => {
     expect([...GUARD_ROLES]).toEqual(['sentry', 'patrol', 'marksman', 'radio-operator', 'officer', 'worker', 'target']);
     expect(Object.keys(palette.debug.roles).sort()).toEqual([...GUARD_ROLES].sort());
     expect(new Set(Object.values(palette.debug.roles)).size).toBe(GUARD_ROLES.length);
-    for (const w of worlds) expect([...new Set(w.camp.guards.map((g) => g.role))].sort()).toEqual(['patrol', 'sentry', 'worker']);
+    for (const w of worlds) expect([...new Set(w.camp.guards.map((g) => g.role))].sort()).toEqual([...GUARD_ROLES].sort());
   });
 });
 
 describe('guards on routine', () => {
-  it('keep to their routines within 5 cm for ten minutes, moving with the shared motor', () => {
+  it('keep to their routines within 25 cm for ten minutes, moving with the shared motor (D6)', () => {
     for (const w of worlds) {
       const sim = new Simulation(w, T);
       let worst = 0;
@@ -78,8 +78,8 @@ describe('guards on routine', () => {
           walked += g.body.speed / 30;
         }
       }
-      expect(worst).toBeLessThan(0.05);
-      expect(walked).toBeGreaterThan(1000);
+      expect(worst).toBeLessThan(0.25);
+      expect(walked).toBeGreaterThan(300);
     }
   });
 

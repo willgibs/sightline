@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { campMission, campSpecProblems, generateWorld, worldFingerprint } from '../src/sim/generation';
+import { campMission, campSpecProblems, defaultCampSpec, generateWorld, worldFingerprint } from '../src/sim/generation';
 import { generateLandform } from '../src/sim/generation/landform';
 import { checkValley } from '../src/sim/generation/overwatch';
 import { closestOnPolyline, pointAt, type PathHit } from '../src/sim/generation/paths';
@@ -157,12 +157,14 @@ describe('terrain with teeth', () => {
 });
 
 describe('a mission that asks for a camp', () => {
-  it("gets lab D's valley, while one that doesn't keeps Phase 0's", () => {
+  it("gets lab D's valley, and a mission that names no camp gets the default compound, and says so", () => {
     const plain = missionSpec('TAL-4471');
     expect('camp' in plain).toBe(false);
     expect(world.features.ridges).toBeDefined();
     expect(world.report.valley?.ok).toBe(true);
-    expect(worldFingerprint(world)).not.toBe(worldFingerprint(generateWorld(plain, T)));
+    const named = generateWorld(plain, T);
+    expect(named.spec.camp).toEqual(defaultCampSpec());
+    expect(worldFingerprint(named)).toBe(worldFingerprint(world));
     expect(worldFingerprint(generateWorld(campMission('TAL-4471'), T))).toBe(worldFingerprint(world));
   });
 

@@ -106,8 +106,10 @@ const there = { x: -world.spawn.x * 0.9, z: -world.spawn.z * 0.9 };
  */
 const S = T.perception.sight;
 const reach = S.far.range * T.visibility.skyline + S.edgeMax;
-const far1 = { x: world.playHalf * 0.95, z: world.playHalf * 0.95 };
-const far2 = { x: -world.playHalf * 0.95, z: -world.playHalf * 0.95 };
+const site = world.camp.site;
+const [far1, far2] = [1, -1]
+  .flatMap((sx) => [1, -1].map((sz) => ({ x: sx * world.playHalf * 0.99, z: sz * world.playHalf * 0.99 })))
+  .sort((a, b) => Math.hypot(b.x - site.x, b.z - site.z) - Math.hypot(a.x - site.x, a.z - site.z) || a.x - b.x || a.z - b.z) as [{ x: number; z: number }, { x: number; z: number }];
 
 describe('the perception boundary', () => {
   it('holds for guards who see and hear: the same minds decide the same, wherever the unsensed player is', () => {

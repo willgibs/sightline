@@ -79,17 +79,9 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
   },
   generation: {
     about:
-      "Lab D: of a held-out series, Phase 0's valleys and lab D's valid at their first attempt, the least margin left under each budget, how much of the horizon lab D's ridges overlook, and the analysis of lab D's camps: valid at the first attempt, repaired, rules left broken, ways in and out, unsolved clusters, the busiest search, and safe intervals against the plain search.",
+      "Lab D: of a held-out series, the valleys valid at their first attempt, the least margin left under the budget, how much of the horizon lab D's ridges overlook, and the analysis of lab D's camps: valid at the first attempt, repaired, rules left broken, ways in and out, unsolved clusters, the busiest search, and safe intervals against the plain search.",
     metrics() {
-      let first = 0;
-      let margin = Infinity;
-      const budget = defaultTuning.gen.world.maxGenAttempts;
-      for (const seed of GENERATION_SEEDS) {
-        const w = generateWorld(missionSpec(seed), defaultTuning);
-        if (w.attempt === 0 && w.report.ok) first++;
-        margin = Math.min(margin, budget - (w.attempt + 1));
-      }
-      // Lab D's valleys (D3), until D9 makes them the default.
+      // Lab D's valleys (D3).
       let campFirst = 0;
       let campMargin = Infinity;
       let widest = 0;
@@ -141,8 +133,6 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
         plain = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, undefined, spaceTimeSearch).analysis.infiltration.expanded;
       }
       return {
-        [`valid at the first attempt (of ${GENERATION_SEEDS.length})`]: first,
-        'least margin under the attempt budget': margin,
         [`lab D valleys valid at the first attempt (of ${GENERATION_SEEDS.length})`]: campFirst,
         'lab D least margin under the valley budget': campMargin,
         'lab D widest overwatched horizon (°)': widest,

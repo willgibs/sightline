@@ -1,18 +1,15 @@
 import type { Tuning } from '../../config/tuning';
 import type { MissionSpec } from '../kernel/mission';
 import { Hasher, hashValue } from '../kernel/core/hash';
-import { Rng } from '../kernel/core/rng';
-import { ColliderSet } from '../kernel/world/colliders';
 import type { World } from '../kernel/world/world';
-import { analyzeTerrain, type TerrainReport } from './analysis';
-import { buildTestCamp, type Camp } from './camp';
+import type { TerrainReport } from './analysis';
+import type { Camp } from './camp';
+import { defaultCampSpec } from './campSpec';
 import { siteBounds } from './site';
-import { chooseSpawn, type Spawn } from './spawn';
+import type { Spawn } from './spawn';
 import { generateCampWorld } from './campWorld';
-import { scatterProps, type Props } from './props';
-import { generateTerrain, type Backdrop, type TerrainFeatures } from './terrain';
-import { assertTuning } from '../../config/validate';
-import { buildGrid } from '../kernel/world/grid';
+import type { Props } from './props';
+import type { Backdrop, TerrainFeatures } from './terrain';
 
 declare module '../kernel/world/world' {
   /**
@@ -118,42 +115,7 @@ function hashGenerated(h: Hasher, v: unknown, path: string): void {
 
 export function generateWorld(spec: MissionSpec, tuning: Tuning, clock?: () => number): World {
   if (spec.terrain.kind !== 'procedural') throw new Error(`The world '${spec.terrain.name}' is built by hand; its scene builds it (kernel/scene.ts)`);
-  // A mission that asks for a camp gets lab D's generator; until D9, one that doesn't gets Phase 0's valley.
-  if (spec.camp) return generateCampWorld(spec, tuning, clock);
-  // Bounds on sizes, spacings and attempts, so bad tuning fails here instead of hanging.
-  assertTuning(tuning);
-  const started = clock ? clock() : 0;
-  const G = tuning.gen;
-  const seed = spec.seed;
-  const attempts = Math.max(1, G.world.maxGenAttempts);
-  for (let attempt = 0; ; attempt++) {
-    const rng = new Rng(seed, attempt === 0 ? 'world' : `world#${attempt}`);
-    const terrain = generateTerrain(rng.fork('terrain'), G);
-    const colliders = new ColliderSet(G.world.size);
-    const camp = buildTestCamp(rng.fork('camp'), terrain.heightfield, terrain.features, colliders, G, rng.fork('routines'));
-    const props = scatterProps(rng.fork('props'), terrain.heightfield, terrain.features, colliders, G);
-    colliders.build();
-    const report = analyzeTerrain(terrain.heightfield, colliders, G, camp.site);
-    if (!report.ok && attempt < attempts - 1) continue;
-    const playHalf = terrain.heightfield.size / 2 - G.world.playMargin;
-    const spawn = chooseSpawn(spec.insertion, terrain.heightfield, terrain.features, colliders, report, playHalf, camp.site);
-    const grid = buildGrid(terrain.heightfield, colliders, siteBounds(camp, colliders, G.grid.siteMargin), G);
-    return {
-      grid,
-      spec,
-      seed,
-      attempt,
-      terrain: terrain.heightfield,
-      features: terrain.features,
-      backdrop: terrain.backdrop,
-      colliders,
-      props,
-      camp,
-      report,
-      spawn,
-      playHalf,
-      genMs: clock ? clock() - started : 0,
-    };
-  }
+  // A mission that names no camp gets the default compound, and its spec says so from here
+  // on (world.spec), so a recording names the camp it was played in.
+  return generateCampWorld(spec.camp ? spec : { ...spec, camp: defaultCampSpec() }, tuning, clock);
 }
-

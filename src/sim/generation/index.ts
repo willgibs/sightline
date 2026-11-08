@@ -12,11 +12,11 @@ export { ARCHETYPES, campMission, campSpecProblems, defaultCampSpec, type CampAr
 export type { Ford, Ridge } from './landform';
 export type { Overwatch } from './overwatch';
 export type { BuildingSpec, CampLayout, DeviceKind, DeviceSpec, DoorSpec, LadderSpec, ModuleName, ObjectiveSpec, Opening, Parcel, Side, Skeleton, SlotName, VehicleSpec } from './compound';
-export { buildTestCamp, GUARD_ROLES, type Camp, type GuardRole, type GuardSpawn, type Structure, type StructureKind } from './camp';
+export { GUARD_ROLES, type Camp, type GuardRole, type GuardSpawn, type Structure, type StructureKind } from './camp';
 export { buildRoutine, routinePose, type Leg, type Routine, type RoutinePose } from './routine';
 export type { Bush, Props, Rock, Tree } from './props';
 export type { Backdrop, TerrainFeatures } from './terrain';
-export { analyzeTerrain, type Perch, type TerrainReport } from './analysis';
+export type { Perch, TerrainReport } from './analysis';
 export { closestOnPolyline, makePolyline, pointAt, type PathHit, type Point2, type Polyline } from './paths';
 export { ambientSources, CREEK_SPACING, type AmbientKind, type AmbientSource } from './ambient';
 export { surveyWorld, type Survey, type SurveyAnalysis, type SurveyGuard, type SurveyPerch, type SurveyStructure, type SurveyTerrain } from './survey';

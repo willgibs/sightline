@@ -45,7 +45,7 @@ const BOUNDS: ReadonlyArray<readonly [path: string, min: number, max: number, in
   ['gen.world.size', 64, 4096],
   ['gen.world.cellSize', 0.5, 20],
   ['gen.world.playMargin', 0, 1000],
-  ['gen.world.maxGenAttempts', 1, 32, true],
+  ['gen.landform.attempts', 1, 32, true],
   ['gen.props.treeSpacing', 1, 1000],
   ['gen.props.rockSpacing', 1, 1000],
   ['gen.props.bushSpacing', 1, 1000],

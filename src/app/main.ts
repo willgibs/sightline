@@ -25,8 +25,7 @@ import './styles.css';
  *                    flips a coin between 30 and 60, for a blind comparison (the debug panel says which)
  *   ?explore         the seed explorer instead of the game: a grid of camps and their validation
  *                    (&series=<name> &count=<n>; explore.ts)
- *   ?camp            a generated camp (lab D) instead of Phase 0's valley, until D9 makes it the
- *                    default (&difficulty=0.5)
+ *   ?difficulty=0.5  how hard the generated camp is, 0 to 1
  */
 const params = new URLSearchParams(window.location.search);
 const canvas = document.querySelector<HTMLCanvasElement>('#view')!;
@@ -96,7 +95,7 @@ function startGame(): void {
       trials: params.has('trials') ? (movementTrials ? MOVEMENT_SITTING : '') + normalizeSeed(params.get('trials') || randomSeed()) : null,
       trialsFresh: params.has('fresh'),
       replayUrl: params.get('replay'),
-      camp: params.has('camp') ? campFromParams(params) : null,
+      camp: campFromParams(params),
     });
   } catch (e) {
     // Without WebGL 2 there is nothing to draw with: say so, rather than leave a blank page.
@@ -118,7 +117,7 @@ function startGame(): void {
   }
 }
 
-/** The camp a URL asks for: the compound, at the difficulty given (0 to 1). */
+/** The camp a URL asks for: the compound, at the difficulty given (0 to 1), or the default's. */
 function campFromParams(p: URLSearchParams): CampSpec {
   const d = Number(p.get('difficulty') ?? defaultCampSpec().difficulty);
   return { ...defaultCampSpec(), difficulty: Number.isFinite(d) ? Math.min(1, Math.max(0, d)) : defaultCampSpec().difficulty };

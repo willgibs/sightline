@@ -2,6 +2,16 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · The valley is lab D's (D9)
+
+**Decision:** every generated world now has lab D's valley and compound. A mission that names no camp gets the default one, and its spec says so (`world.spec.camp`), so a recording names the camp it was played in. Phase 0's terrain, test camp and terrain analysis are gone, with the ten `gen.world` values only they read. `?camp` still loads and does nothing; `&difficulty=` still sets how hard the camp is.
+
+**Why:** the labs needed a stable valley while they were built. Keeping two generators now would mean every later system had to work on a camp nobody plays.
+
+**What moved:** `GEN_VERSION` 5. `TAL-4471`'s fingerprint is `6493586d720c2b68`. Both fingerprints of the three pinned plays moved, the golden recording is rewritten, and the generation bench no longer counts Phase 0's valleys. No scene moved: `SIM_VERSION` stays 9. On a fresh held-out series (`lab-d-exit-4`), 96 of 100 camps pass at the first attempt, 4 are repaired or rebuilt within budget, and none is invalid.
+
+**The tests that assumed the old camp** now say what they meant: guards keep to their routines within lab D's 25 cm, a recording's size allows for 16 guards' state, and the perception boundary's far places are the corners farthest from wherever the camp stands. Thin walls stop sound by their own flag, because 20 cm can fall between grid cell centres. The site test went: `tests/compound.test.ts` already holds the compound to rule 15.
+
 ## 2026-11-08 · After the labs
 
 The night's review point, checked against the code the next afternoon.

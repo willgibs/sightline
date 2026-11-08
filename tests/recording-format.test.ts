@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning } from '../src/config/tuning';
 import { WanderBot } from '../src/sim/game/bots/wander';
+import { defaultCampSpec } from '../src/sim/generation';
 import { generateWorld } from '../src/sim/generation/world';
 import type { World } from '../src/sim/kernel/world/world';
 import { neutralInput } from '../src/sim/kernel/input';
@@ -59,7 +60,8 @@ describe('the recording file', () => {
     const { rec } = play(30);
     const h = rec.header;
     expect(h.build).toBe('test-build');
-    expect(h.mission).toEqual(missionSpec('VEX-0042'));
+    expect(h.mission).toEqual(world.spec);
+    expect(h.mission.camp).toEqual(defaultCampSpec());
     expect(h.worldFingerprint).toMatch(/^[0-9a-f]{16}$/);
     expect(h.startHash).toBe(new Simulation(world, defaultTuning).hash());
   });

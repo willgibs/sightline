@@ -14,8 +14,8 @@ import { Surface } from '../kernel/world/surfaces';
  *
  * Nothing changes them yet. Lab E's guards open and shut doors and drive the escape
  * vehicle at lockdown; lab C's use action opens doors. They are kinds of their own, so
- * those labs add state to them rather than inventing their own. Phase 0's test camp has
- * neither, so its runs spawn nothing here.
+ * those labs add state to them rather than inventing their own. A handmade scene's camp
+ * may have neither, and then spawns nothing here.
  */
 export interface DoorEntity extends EntityBase {
   kind: 'door';

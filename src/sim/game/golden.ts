@@ -19,12 +19,12 @@ export const GOLDEN = {
   /** Bits of every deterministic math function over 4,000 inputs each. */
   detmath: '8d55144e8e74968f',
   /** Everything generation decides for TAL-4471 (also pinned in tests/world.test.ts). */
-  world: 'f555512c33daea22',
+  world: '6493586d720c2b68',
   /** 60 s of play: the person-like bot in two valleys, the fuzzing bot in one. */
   play: {
-    'TAL-4471 wander': { behaviour: '688ae4eddeadae3a', state: '0e17f37971ff8d08' },
-    'MUD-9031 wander': { behaviour: '67964675cb39477e', state: '0445d796e8329c2f' },
-    'TAL-4471 chaos': { behaviour: 'f3bd13f84383adec', state: 'fb1d905d4f13c32f' },
+    'TAL-4471 wander': { behaviour: 'ffd78fc1f9b38272', state: '48daeb46deca31f8' },
+    'MUD-9031 wander': { behaviour: '44a18cdfb5287bb2', state: '453543d3010cbcb6' },
+    'TAL-4471 chaos': { behaviour: '3548229093f12334', state: '1caa8666f600d248' },
   },
   /**
    * Scenes run by their own drivers, each pinning its lane (benches.ts): the movement
