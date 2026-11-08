@@ -46,7 +46,28 @@ export const BENCH_GOLDEN: PinnedBench = {
     }
   },
   "perception": {
-    "metrics": {},
+    "metrics": {
+      "grid pairs checked": 2739816,
+      "grid pairs filling slower with more exposure": 0,
+      "standing, walking, in the open: seen to (m)": 155.75,
+      "still, prone, in cover: seen to (m)": 46.75,
+      "crouched, walking, in shade, 30 m: seconds": 5.33333333,
+      "a marksman's far zone: seen to (m)": 405.75,
+      "least seconds from the first cue to 100%, outside contact": 1.5,
+      "steepest edge: rate change per metre": 0.122196796,
+      "steepest edge: rate change per degree": 0.113636364,
+      "seed · grid pairs checked": 2739816,
+      "seed · grid pairs filling slower with more exposure": 0,
+      "seed · standing, walking, in the open: seen to (m)": 150,
+      "seed · still, prone, in cover: seen to (m)": 150,
+      "seed · crouched, walking, in shade, 30 m: seconds": 8.88888889,
+      "seed · a marksman's far zone: seen to (m)": 400,
+      "seed · least seconds from the first cue to 100%, outside contact": 0.468416667,
+      "seed · steepest edge: rate change per metre": 0.301129235,
+      "seed · steepest edge: rate change per degree": 0.954545455,
+      "sight scenarios as expected (of 14)": 14,
+      "foliage: pairs that differ by direction (of 2000)": 0
+    },
     "runs": {
       "perception-lab": {
         "work": {

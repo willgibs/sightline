@@ -396,7 +396,7 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - Exposure is computed for any observer, so the player can be one in Phase 2.
   - Rates per second (rule 17), in `tuning.perception`.
   - Its debug overlay: zones at their real ranges, rays to the three parts, and the factors.
-- [ ] A3 · The scenario runner (see The three tools).
+- [x] A3 · The scenario runner (see The three tools).
   - Scenes take no parameters today, and a recording's header names its scene by exactly `{name, version}` (`kernel/record/recording.ts`). Parameters therefore join the scene's identity.
   - Its first table sweeps the design doc's ranges over the factor grid, asserting monotonicity and the minimum interval from cue to detection.
 - [ ] A4 · Shade and foliage, drawn as simulated.

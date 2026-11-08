@@ -1,9 +1,12 @@
 /**
  * Runs scenes headless: each with its own driver, checking its expectations, then
- * re-simulating its recording bit for bit.
+ * re-simulating its recording bit for bit. A scene with parameters (a scenario) runs once
+ * for each row of its table (scenes/index.ts, SCENARIOS), or with the parameters given.
  *
- *   npm run scene                          every scene
+ *   npm run scene                          every scene, and every scenario's table
  *   npm run scene -- movement-course       one scene
+ *   npm run scene -- sight                 one scenario's table
+ *   npm run scene -- sight --params 'spot=shade&d=30&stance=crouch&move=walk&expect=3-6'
  *   npm run scene -- --list                what scenes there are
  *   npm run scene -- movement-course --out course.slrec
  */
@@ -11,7 +14,7 @@ import { writeFileSync } from 'node:fs';
 import { defaultTuning } from '../config/tuning';
 import { resimulate } from '../sim/kernel/record/resim';
 import { runScene } from '../sim/kernel/scene';
-import { SCENES } from '../sim/game/scenes';
+import { SCENARIOS, SCENES } from '../sim/game/scenes';
 import { fmt, parseArgs } from './args';
 import { buildStamp } from './build';
 
@@ -34,9 +37,19 @@ if (unknown.length) {
   process.exit(2);
 }
 
-let failed = 0;
+/** Every run asked for: a scene, or a scenario with each row of its table (or the parameters given). */
+const runs: Array<{ name: string; params?: string }> = [];
 for (const name of names.length ? names : Object.keys(SCENES)) {
-  const scene = SCENES[name]!();
+  const given = args.get('params');
+  const table = SCENARIOS[name];
+  if (given !== undefined) runs.push({ name, params: given });
+  else if (table) for (const params of table) runs.push({ name, params });
+  else runs.push({ name });
+}
+
+let failed = 0;
+for (const { name, params } of runs) {
+  const scene = SCENES[name]!(params);
   const t0 = now();
   const run = runScene(scene, defaultTuning, { build: buildStamp(), seconds: args.has('seconds') ? Number(args.get('seconds')) : undefined });
   const ms = now() - t0;
@@ -44,7 +57,7 @@ for (const name of names.length ? names : Object.keys(SCENES)) {
   const ok = run.failures.length === 0 && re.ok;
   if (!ok) failed++;
   const p = run.sim.player;
-  console.log(`\n${ok ? '✓' : '✗'} ${scene.title} (${name} v${scene.version}) · ${fmt.int(run.sim.tick)} ticks (${fmt.clock(run.sim.tick / defaultTuning.sim.tickHz)}) in ${fmt.ms(ms)}`);
+  console.log(`\n${ok ? '✓' : '✗'} ${scene.title} (${name} v${scene.version}${scene.params ? ` · ${scene.params}` : ''}) · ${fmt.int(run.sim.tick)} ticks (${fmt.clock(run.sim.tick / defaultTuning.sim.tickHz)}) in ${fmt.ms(ms)}`);
   console.log(`  player ends at ${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)} · ${p.stance}`);
   for (const f of run.failures) console.log(`  ✗ ${f}`);
   for (const e of scene.expect ?? []) if (!run.failures.some((f) => f.startsWith(`${e.name}:`))) console.log(`  ✓ ${e.name}`);

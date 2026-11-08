@@ -416,8 +416,11 @@ export class Game {
       if (this.scene) {
         url.searchParams.delete('seed');
         url.searchParams.set('scene', this.scene.name);
+        if (this.scene.params) url.searchParams.set('params', this.scene.params);
+        else url.searchParams.delete('params');
       } else {
         url.searchParams.delete('scene');
+        url.searchParams.delete('params');
         url.searchParams.set('seed', seed);
       }
       window.history.replaceState(null, '', url);
@@ -1039,6 +1042,7 @@ export class Game {
     if (!url.searchParams.has('replay')) {
       url.searchParams.delete('seed');
       url.searchParams.delete('scene');
+      url.searchParams.delete('params');
       window.history.replaceState(null, '', url);
     }
     this.hud.toast(`Replay · ${this.input.map.describe('replayPlay')} plays or pauses, ← → jump 5 s, N flies`);

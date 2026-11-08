@@ -24,6 +24,8 @@ export {
   edgeWidth,
   emptyExposure,
   exposure,
+  exposureRate,
+  minClear,
   fillSeconds,
   rangeRamp,
   telegraphCap,
@@ -36,3 +38,5 @@ export {
 export { stepMeter, type MeterStep } from './meter';
 export { groundLight, lightName } from './light';
 export { Foliage, coneChord, cylinderChord, foliageOf, type FoliageVolume } from './foliage';
+export { SIGHT_LAW, sweepSight, type RateLaw, type SweepReport } from './sweep';
+export { SEED_LAW } from './seed';

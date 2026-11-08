@@ -6,6 +6,19 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
 
+### The scenario runner: scenes with parameters, and the factor-grid sweep (A3)
+
+**Decision:**
+- **Parameters join a scene's identity.** A scene can be made from parameters (`SCENES[name](params)`); a recording's header names them (`scene: { name, version, params }`, format 11), and re-simulating makes the scene again with them, refusing a scene made with others. `?scene=sight&params=...` plays one in the browser.
+- **The sight scenario** (`game/scenes/sightScenario.ts`): one guard with a fixed gaze and the player in the lab, at a spot (open, shade, bush, wall, crest), a distance, an angle off the gaze, a stance and a movement, with the outcome it should have. The player circles the spot, so speed and distance hold. Its first table (`SIGHT_TABLE`) is the design doc's ranges and their neighbours either side of each edge: 14 rows, all as expected. `npm run scene` runs every table; `npm run scene -- sight --params ...` one row.
+- **The factor-grid sweep** (`perception/sweep.ts`) runs the rate law, split from the geometry as `exposureRate`, over every combination of distance, angle, stance, movement, light, cover, sky, zones and sharpness: 2.7 million neighbouring pairs, none filling slower with more exposure. It reports the design's fixed points, the least time from cue to 100%, and the steepest edge per metre and per degree.
+- **The seed is a rate law too** (`perception/seed.ts`): Blacklist's zones with hard ranges and the table as one product of rates. The bench sweeps it on the same grid.
+- **Movement ramps with speed:** from still at rest to moving at 1 m/s, then from moving at the body's walk to sprinting at its sprint. It was a step at 0.2 m/s, a cliff the table runs found when a pacing player slowed to turn.
+
+**The bench (perception lane), ours against the seed:** standing and walking, seen to 155.75 m (seed 150); still, prone, in cover, 46.75 m (seed 150); crouched and walking in shade at 30 m, 5.33 s (seed 8.89); a marksman's far zone, 405.75 m (seed 400); least time from the first cue to 100%, 1.5 s (seed 0.47); steepest edge 0.12 per metre and 0.11 per degree (seed 0.30 and 0.95, its cliffs measured at 1 m and 0.5° steps); monotonicity violations 0 of 2.7 million (seed 0).
+
+**What moved:** `RECORDING_VERSION` 11, so the golden recording is rewritten. The perception lab's behaviour fingerprint (`ec5e3044c2701e84`), from the movement ramp; nothing in the valley.
+
 ### Sight: zones, caps and rates, with ramped edges (A2)
 
 **Decision:**

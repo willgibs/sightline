@@ -183,6 +183,7 @@ export const defaultTuning = {
       minClear: { stand: 1, crouch: 1, prone: 1 },
       // Close enough to touch: noticed in any direction, and quickly. Drawn in the debug view.
       contact: { range: 2.5, ramp: 0.5, seconds: 0.8 },
+      movingAt: 1, // m/s: the movement factor ramps from still at rest to moving at this speed
       cue: 0.3, // below this nothing shows (design doc)
       minCueSeconds: 1.5, // outside contact, the first cue comes at least this long before 100%
       hold: 1.5, // seconds the meter holds after the body leaves view,

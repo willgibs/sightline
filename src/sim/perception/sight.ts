@@ -287,12 +287,36 @@ export function exposure(at: QueryView, env: EnvSpec, t: number, tuning: Tuning,
   out.cover = seen;
   // The share of what's in view that stands against the sky (for explaining; each part's range uses its own).
   out.skyline = seen > 0 ? 1 + (V.skyline - 1) * (sky / seen) : 1;
-  if (out.clear < minClear(target, tuning) || seen <= 0) return out;
+  return exposureRate(out, eye.far, eye.sharp, minClear(target, tuning), tuning);
+}
 
+/**
+ * The rate law alone: from what exposure measured (distance, angle, stance, light,
+ * movement, and each ray's clearance, foliage and sky, in `x`), the zone, the range and
+ * how fast the meter fills, written into `x`. Pure arithmetic, so the factor-grid sweep
+ * (sweep.ts) can run it over every combination of the design's factors.
+ */
+export function exposureRate(x: Exposure, far: boolean, sharp: number, minClearRays: number, tuning: Tuning): Exposure {
+  const S = tuning.perception.sight;
+  const V = tuning.visibility;
+  x.zone = 'none';
+  x.cone = 0;
+  x.range = 0;
+  x.edge = 0;
+  x.seconds = 0;
+  x.rate = 0;
+  x.capped = false;
+  if (x.clear < minClearRays || x.cover <= 0) return x;
+  const d = x.distance;
+  const rays = x.rays;
+  const W = weights;
+  W[0] = S.parts.head;
+  W[1] = S.parts.chest;
+  W[2] = S.parts.feet;
   // The zone that fills fastest here sets the rate. Each part in view adds its share, at its
   // own range: a part against the sky is seen farther. Summing parts (rather than scaling
   // by the sky's share) keeps it monotone: more of you in view never fills more slowly.
-  const caps = out.stance * out.light;
+  const caps = x.stance * x.light;
   let best = 0;
   const consider = (zone: Zone, cone: number, reference: number): void => {
     if (cone <= 0) return;
@@ -310,36 +334,37 @@ export function exposure(at: QueryView, env: EnvSpec, t: number, tuning: Tuning,
     }
     if (rate > best) {
       best = rate;
-      out.zone = zone;
-      out.cone = cone;
-      out.range = range;
-      out.edge = edge;
-      out.seconds = fillSeconds(d, range, S);
+      x.zone = zone;
+      x.cone = cone;
+      x.range = range;
+      x.edge = edge;
+      x.seconds = fillSeconds(d, range, S);
     }
   };
-  consider('core', core, S.core.range);
-  consider('peripheral', wide, S.peripheral.range);
-  consider('far', far, S.far.range);
-  let rate = best * out.movement * eye.sharp;
+  consider('core', coneRamp(x.angleDeg, S.core.halfDeg, S.edgeDeg), S.core.range);
+  consider('peripheral', coneRamp(x.angleDeg, S.peripheral.halfDeg, S.edgeDeg), S.peripheral.range);
+  if (far) consider('far', coneRamp(x.angleDeg, S.far.halfDeg, S.edgeDeg), S.far.range);
+  let rate = best * x.movement * sharp;
   const cap = telegraphCap(S);
   if (rate > cap) {
     rate = cap;
-    out.capped = true;
+    x.capped = true;
   }
   // Close enough to touch, in any direction.
+  const contact = S.contact.range + S.contact.ramp;
   const touch = d < contact ? (d <= S.contact.range ? 1 : (contact - d) / S.contact.ramp) : 0;
-  const near = (touch * out.movement * out.cover) / S.contact.seconds;
+  const near = (touch * x.movement * x.cover) / S.contact.seconds;
   if (near > rate) {
     rate = near;
-    out.zone = 'contact';
-    out.cone = 1;
-    out.capped = false;
-    out.range = S.contact.range;
-    out.edge = touch;
-    out.seconds = S.contact.seconds;
+    x.zone = 'contact';
+    x.cone = 1;
+    x.capped = false;
+    x.range = S.contact.range;
+    x.edge = touch;
+    x.seconds = S.contact.seconds;
   }
-  out.rate = rate;
-  return out;
+  x.rate = rate;
+  return x;
 }
 
 /**
@@ -363,7 +388,7 @@ function skyBehind(r: SightRay, ux: number, uy: number, uz: number, foliage: Ret
 }
 
 /** Rays that must be clear before the meter moves, for the body's stance now. */
-function minClear(target: SightTarget, tuning: Tuning): number {
+export function minClear(target: SightTarget, tuning: Tuning): number {
   const m = tuning.perception.sight.minClear;
   const E = target.spec.eyeHeight;
   const e = target.body.eyeHeight;

@@ -17,7 +17,7 @@ describe('scenes', () => {
       const run = runScene(scene, T);
       expect(run.failures).toEqual([]);
       const rec = Recording.fromBytes(run.recording.toBytes());
-      expect(rec.header.scene).toEqual({ name, version: scene.version });
+      expect(rec.header.scene).toEqual({ name, version: scene.version, params: scene.params ?? '' });
       expect(sceneOf(rec.header)?.name).toBe(name);
       const re = resimulate(rec, { scene: make() });
       expect(re.ok, re.problem ?? `diverged at ${re.firstDivergence}`).toBe(true);
