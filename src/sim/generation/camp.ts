@@ -29,6 +29,8 @@ export type StructureKind =
   | 'pole'
   | 'mast'
   | 'vehicle'
+  /** A pole flying a flag that streams with the mission's wind: a cue to read it by (design doc · Wind). */
+  | 'flag'
   /** A piece of hand-built geometry (handmade.ts): stairs, a ceiling, a wall in a scene. */
   | 'block'
   /** Generated camps (compound.ts): a tower's ladder, the generator's shed, a light pole, an alarm box. */

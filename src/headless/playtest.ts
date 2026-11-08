@@ -16,6 +16,7 @@ import { sceneOf } from '../sim/game/scenes';
 import { SIGHTLINE, type Simulation } from '../sim/game/sim';
 import { surfaceName } from '../sim/kernel/world/surfaces';
 import { fmt } from './args';
+import { analyzeShot, describeShot, type ShotReport } from '../sim/game/telemetry';
 
 const target = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'playtests';
 if (!existsSync(target)) {
@@ -69,6 +70,8 @@ function summarize(file: string): boolean {
   let shots = 0;
   const stanceTicks = { stand: 0, crouch: 0, prone: 0 };
   let closest = { d: Infinity, guard: -1, tick: 0 };
+  // Every rifle shot, broken down into what decided it (game/telemetry.ts), and what it struck.
+  const shotLog: Array<{ report: ShotReport; result: string; impact: number; hit: boolean }> = [];
   let x0 = 0;
   let z0 = 0;
   const re = resimulate(rec, {
@@ -96,7 +99,23 @@ function summarize(file: string): boolean {
             if (e.radius > loudest.radius) loudest = { radius: e.radius, what: `${e.gait} on ${s}` };
           } else if (e.type === 'land') hardestLanding = Math.max(hardestLanding, e.speed);
           else if (e.type === 'stance') stances++;
-          else if (e.type === 'shot') shots++;
+          else if (e.type === 'shot') {
+            shots++;
+            const fire = sim.lastInput.commands.find((c) => c.kind === 'fire');
+            if (e.speed > 0 && fire?.kind === 'fire') shotLog.push({ report: analyzeShot(sim, e, fire), result: 'no strike', impact: -1, hit: false });
+          } else if (e.type === 'impact') {
+            const s = shotLog.find((x) => x.report.shot === e.cause);
+            if (s) {
+              s.impact = e.id;
+              s.result = e.what === 'body' ? `struck the ${e.part}` : e.what === 'collider' && surfaceName(e.surface) === 'metal' ? 'rang the steel' : `missed, into the ${e.what === 'terrain' ? surfaceName(e.surface) : 'cover'}`;
+            }
+          } else if (e.type === 'death') {
+            const s = shotLog.find((x) => x.impact === e.cause);
+            if (s) {
+              s.result = `${e.part}, down`;
+              s.hit = s.report.target?.id === e.victim;
+            }
+          }
         }
         for (const g of sim.guards) {
           const d = Math.hypot(g.body.x - p.x, g.body.y - p.y, g.body.z - p.z);
@@ -138,6 +157,7 @@ function summarize(file: string): boolean {
       `            ${stances} stance change${stances === 1 ? '' : 's'} · crouched ${t(stanceTicks.crouch)} · prone ${t(stanceTicks.prone)} · ${shots} shot${shots === 1 ? '' : 's'}`,
     );
     if (closest.guard >= 0) console.log(`  guards    closest ${closest.d.toFixed(1)} m (guard ${closest.guard}, at ${t(closest.tick)})`);
+    shotLog.forEach((s, k) => console.log(`  shot ${String(k + 1).padEnd(4)} ${t(Math.round(s.report.t * hz))} ${describeShot(s.report, s.result, s.hit)}`));
     for (const m of moments) console.log(`  moment    ${m}`);
   }
   if (telemetry?.frames) {

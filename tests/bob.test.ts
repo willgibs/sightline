@@ -5,6 +5,8 @@ import { neutralInput, quantizeInput } from '../src/sim/kernel/input';
 import { bobDepth, headBob } from '../src/sim/body/bob';
 import { Simulation } from '../src/sim/game/sim';
 import { EAST, testWorld } from './fixtures';
+import { decisionSensitivity } from '../src/sim/game/ballisticsBench';
+import { opticFov, pixelsPerMil, scopeDiameter } from '../src/app/scope';
 
 /**
  * Head bob (sim/body/bob.ts): the camera dips as each foot comes down, as deep as the
@@ -68,5 +70,35 @@ describe('head bob', () => {
       prev = curr;
     }
     expect(checked).toBeGreaterThan(20);
+  });
+});
+
+/**
+ * Lab B's B5, decided by measuring at 300 m: walking bodies don't bob in the simulation,
+ * and a shot leaves from the simulation's eye. These are the measurements it rests on;
+ * if a change makes any of them fail, the decision needs revisiting (docs/decisions.md, B5).
+ */
+describe('bob, measured at 300 m (B5)', () => {
+  const G = T.bodies.guard;
+  const mil = (m: number, range: number): number => (m / range) * 1000;
+  const decisions = decisionSensitivity(T);
+
+  it("a walking guard's head bob is a small part of a head and of every decision a 300 m shot needs", () => {
+    const dip = bobDepth(G.speed.walk, G, D);
+    expect(dip).toBeCloseTo(D.walk, 12);
+    // 2.6 cm at 300 m: 0.087 mil, under a quarter of the head's radius.
+    expect(mil(dip, 300)).toBeLessThan(decisions.head / 4);
+    for (const k of ['drop', 'lead', 'wind', 'ranging'] as const) expect(mil(dip, 300) * 5).toBeLessThan(decisions[k]);
+    // Through the scope on a 1080-line screen it moves the head by under a pixel and a half.
+    const fov = opticFov(T.ballistics.scope.fieldDeg, scopeDiameter(1920, 1080), 1080);
+    expect(mil(dip, 300) * pixelsPerMil(fov, 1080)).toBeLessThan(1.5);
+  });
+
+  it("the shooter's own bob is gone when it could matter: the camera stops bobbing as the scope comes up, and unscoped the barrel's own error dwarfs it", () => {
+    // The camera's bob is scaled by how far the scope is down (app/game.ts, bodyPose).
+    const scopedBob = headBob(0, P.speed.walk, P, D) * T.view.headBob * (1 - 1);
+    expect(scopedBob === 0).toBe(true);
+    // Unscoped, a shot points within 25 mil of the view, against a sprint's 5 cm dip at 300 m.
+    expect(mil(D.sprint, 300) * 100).toBeLessThan(T.ballistics.rifle.unaimedMil);
   });
 });

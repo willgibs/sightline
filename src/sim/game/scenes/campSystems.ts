@@ -30,6 +30,7 @@ export function campSystems(): Scene {
   const cut: System = {
     name: 'cut-the-generator',
     phase: 'commands',
+    after: ['rifle'],
     reads: [],
     writes: ['generator.generator.running'],
     emits: [],
@@ -41,6 +42,7 @@ export function campSystems(): Scene {
   const take: System = {
     name: 'take-the-target',
     phase: 'commands',
+    after: ['rifle'],
     reads: ['objective.objective'],
     writes: ['entities'],
     emits: [],

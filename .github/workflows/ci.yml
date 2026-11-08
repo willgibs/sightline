@@ -60,7 +60,7 @@ jobs:
           if git merge-base --is-ancestor "origin/${{ github.base_ref }}" HEAD; then
             echo "Up to date with ${{ github.base_ref }} ($(git rev-parse --short origin/${{ github.base_ref }}))."
           else
-            echo "This branch is behind ${{ github.base_ref }}: rebase it onto origin/${{ github.base_ref }}, regenerate its goldens (npm run golden, npm run bench -- --write and golden.ts), and push." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "This branch is behind ${{ github.base_ref }}: merge origin/${{ github.base_ref }} into it (or use Update branch), regenerate its goldens (npm run golden, npm run bench -- --write and golden.ts), and push." | tee -a "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
 
