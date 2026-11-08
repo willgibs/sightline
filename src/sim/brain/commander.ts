@@ -95,7 +95,8 @@ function noteShot(camp: CampState, r: Report, tick: number, tuning: Tuning): voi
   const dz = r.z - r.fromZ;
   const d = Math.sqrt(dx * dx + dz * dz);
   if (d < 1) return; // he heard it on top of himself: no bearing to speak of
-  const sigma = Math.min((S.maxSigmaDeg * Math.PI) / 180, Math.max((S.minSigmaDeg * Math.PI) / 180, r.radius / (2 * d)));
+  const stated = r.sigma ?? r.radius / (2 * d);
+  const sigma = Math.min((S.maxSigmaDeg * Math.PI) / 180, Math.max((S.minSigmaDeg * Math.PI) / 180, stated));
   const shots = camp.shots;
   shots.bearings.push({ x: r.fromX, z: r.fromZ, ux: dx / d, uz: dz / d, sigma, tick });
   // Keep the newest, within its window.

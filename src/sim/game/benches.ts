@@ -19,6 +19,15 @@ import { runScene, sceneOver, sceneTicks, startScene } from '../kernel/scene';
 import { emptyEstimate, fuseBearings, inEllipse, type Bearing, type FuseGrid } from '../brain';
 import { POLICIES, pursuit } from './baselines';
 import { campScenario } from './scenes/campScenario';
+import type { Tuning } from '../../config/tuning';
+import { withSystem, type System } from '../kernel/systems';
+import { Surface } from '../kernel/world/surfaces';
+import { giveBrains } from './brains';
+import { campCommander, commsVoice, giveCommander } from './comms';
+import { PERCEPTION, giveSenses } from './perception';
+import { placePlayer } from './setup';
+import { SYSTEMS } from './systems';
+import { campHeight, campWorld } from './scenes/campBrain';
 import { labWorld } from './scenes/perceptionLab';
 import { SIGHT_TABLE, sightScenario } from './scenes/sightScenario';
 import { SWAY_RUNGS, decisionSensitivity, swayRadius, sweepCases, sweepWorst } from './ballisticsBench';
@@ -193,6 +202,11 @@ function brainMetrics(): Record<string, number> {
   }
   m['ellipse: contains the shooter at 1 sigma (%)'] = round((100 * in1) / N);
   m['ellipse: contains the shooter at 2 sigma (%)'] = round((100 * in2) / N);
+  // The same, in the world: guards hear real shots and radio their bearings, the commander fuses them.
+  const world = inWorldCalibration(T, 100);
+  m['ellipse in the world: contains the perch at 1 sigma (%)'] = world.one;
+  m['ellipse in the world: contains the perch at 2 sigma (%)'] = world.two;
+  m['ellipse in the world: mean bearings fused per shot'] = world.bearings;
   // Competence against the baselines: re-finding an intruder who has broken contact.
   const horizon = 25;
   const seeds = 8;
@@ -234,6 +248,53 @@ function brainMetrics(): Record<string, number> {
   m['reactions (in the scripted scenarios)'] = reactions;
   m['reactions unexplained'] = unexplained;
   return m;
+}
+
+/**
+ * The ellipse in the world (E8's exit metric): scripted shots from random perches around the
+ * lab's camp, heard by its guards through perception, radioed in, fused by the commander.
+ */
+function inWorldCalibration(T: Tuning, shots: number): { one: number; two: number; bearings: number } {
+  const rng = new Rng('BENCH-E', 'perches');
+  let in1 = 0;
+  let in2 = 0;
+  let have = 0;
+  let bearings = 0;
+  const F = T.brain.sniper.fusion;
+  for (let k = 0; k < shots; k++) {
+    const a = rng.range(0, 2 * Math.PI);
+    const r = Math.sqrt(rng.next() * (F.rangeMax * F.rangeMax - F.rangeMin * F.rangeMin) + F.rangeMin * F.rangeMin);
+    const px = r * dcos(a);
+    const pz = r * dsin(a);
+    const shot: System = {
+      name: 'bench-shot',
+      phase: 'commands',
+      after: ['player-commands', 'rifle'],
+      reads: [],
+      writes: [],
+      emits: ['report'],
+      run(ctx) {
+        if (ctx.tick === 30) ctx.emit({ type: 'report', source: 1, x: px, y: campHeight(px, pz) + 1.6, z: pz, surface: Surface.Grass, loudness: 2400 / ctx.tuning.noise.radiusPerUnit, radius: 2400, suppressed: 0 });
+      },
+    };
+    let systems = SYSTEMS;
+    for (const s of [...PERCEPTION, commsVoice, campCommander, shot]) systems = withSystem(systems, s);
+    const sim = new Simulation(campWorld(T), T, systems);
+    placePlayer(sim, 372, 372);
+    giveSenses(sim);
+    giveBrains(sim);
+    giveCommander(sim);
+    const raw = neutralInput();
+    for (let i = 0; i < 14 * 30; i++) sim.step(raw);
+    const camp = sim.index.of('commander')[0]!.camp;
+    if (camp.shots.estimate) {
+      have++;
+      bearings += camp.shots.bearings.length;
+      if (inEllipse(camp.shots.estimate, px, pz, 1)) in1++;
+      if (inEllipse(camp.shots.estimate, px, pz, 2)) in2++;
+    }
+  }
+  return { one: round((100 * in1) / Math.max(1, have)), two: round((100 * in2) / Math.max(1, have)), bearings: round(bearings / Math.max(1, have)) };
 }
 
 /** What a chain of causes can end in: something sensed (a sound or a sighting), or an order from what was sensed. */

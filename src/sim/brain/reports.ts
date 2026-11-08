@@ -26,6 +26,8 @@ export interface Report {
   fromZ: number;
   /** The event behind it: the percept the speaker acted on. */
   cause: number;
+  /** A shot's bearing: how sure he is of the direction, radians at one standard deviation (E8). */
+  sigma?: number;
 }
 
 /** How a report reached someone. */

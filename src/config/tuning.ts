@@ -303,10 +303,12 @@ export const defaultTuning = {
     },
     // Counter-sniper (E8): triangulating shots from bearings (triangulate.ts) and hunting the shooter.
     sniper: {
-      fusion: { half: 720, cells: 120, rangeMin: 80, rangeMax: 650 }, // the commander's grid around the camp, metres, and its ring of plausible perches
+      fusion: { half: 640, cells: 128, rangeMin: 120, rangeMax: 560 }, // the commander's grid around the camp, metres, and its ring of plausible perches
       keep: 90, // seconds of bearings it fuses
       maxBearings: 16, // bearings it keeps
-      minSigmaDeg: 3, // nobody's ear is sharper than this
+      earSigmaDeg: 4, // the error of a bearing taken by ear, from the guard's own stream, on top of where it seemed to be
+      statedScale: 0.85, // the error he states, as a share of his real error, calibrated so the camp's ellipse contains the shooter at its stated rates (bench)
+      minSigmaDeg: 1.5, // nobody's ear is sharper than this
       maxSigmaDeg: 25, // a bearing worse than this is said to be no bearing at all
       sweepSeconds: 8, // how long a marksman sweeps a believed perch
     },

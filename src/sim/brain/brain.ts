@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import { DEG, dcos, dsin } from '../kernel/core/detmath';
+import { DEG, dcos, dlog, dsin } from '../kernel/core/detmath';
 import { turnTowards, wrapAngle, yawFromDirection } from '../kernel/core/math';
 import type { AwarenessName } from '../kernel/events';
 import { routinePose, type RoutinePose } from '../generation';
@@ -9,6 +9,7 @@ import type { GuardMind } from './mind';
 import { emptyRoute, emptySteering, followRoute, navigatorOf, type Route, type Steering } from './nav';
 import type { Order } from './orders';
 import { keepRoutine } from './routine';
+import type { Percept } from '../perception';
 import type { Report, ReportKind, Told } from './reports';
 import { choose, response, type Option } from './utility';
 
@@ -360,7 +361,7 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       out.push({ act: 'hold', rank: 4, weight: 0.2 });
       if (!elevated && own) {
         out.push({ act: 'investigate', rank: 4, weight: role.investigate * near * fresh * cool('investigate') * claimed(m, focus) });
-        out.push({ act: 'search', rank: 4, weight: role.search * (0.25 + 0.75 * fresh) * cool('search') });
+        out.push({ act: 'search', rank: 4, weight: role.search * (0.25 + 0.75 * fresh) * near * cool('search') });
       }
       break;
     case 'combat': {
@@ -598,17 +599,52 @@ function performReport(m: GuardMind, out: Order): void {
 function currentReport(m: GuardMind): Report {
   const a = m.awareness;
   const C = m.tuning.brain.comms;
+  // What he has sensed himself, best first; a voice he's only heard says the least. A
+  // report says where HIS senses put it, not where someone else told him it was.
   let kind: ReportKind = 'heard';
-  let tick = -1;
+  let rank = -1;
+  let own: Percept | null = null;
   for (const p of m.percepts) {
-    if (p.tick < tick) continue;
-    tick = p.tick;
-    kind = p.kind === 'sight' ? 'contact' : p.kind === 'shot' ? 'shot' : p.kind === 'voice' ? 'heard' : 'heard';
+    const r = p.kind === 'shot' ? 3 : p.kind === 'sight' ? 2 : p.kind === 'sound' ? 1 : 0;
+    if (r <= rank) continue;
+    rank = r;
+    own = p;
+    kind = p.kind === 'sight' ? 'contact' : p.kind === 'shot' ? 'shot' : 'heard';
   }
-  const f = focusOf(m);
-  const y = m.belief ? m.belief.y : a.focus ? a.fy : m.self.y;
-  const base = m.belief ? m.belief.radius : C.radius[kind];
-  return { kind, x: f.x, y, z: f.z, radius: Math.max(base, C.radius[kind]), tick: m.tick, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: perceptCause(m) };
+  const f = own && rank > 0 ? own : focusOf(m);
+  const y = own && rank > 0 ? own.y : m.belief ? m.belief.y : a.focus ? a.fy : m.self.y;
+  const base = own && rank > 0 ? own.radius : m.belief ? m.belief.radius : C.radius[kind];
+  const radius = Math.max(base, C.radius[kind]);
+  const out: Report = { kind, x: f.x, y, z: f.z, radius, tick: m.tick, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: own?.cause ?? perceptCause(m) };
+  if (kind === 'shot') bearingError(m, out);
+  return out;
+}
+
+/**
+ * A bearing by ear (E8): where it seemed to come from, turned by an error drawn from
+ * his own stream, and the error he states: both the ear's and what he's unsure of.
+ */
+function bearingError(m: GuardMind, r: Report): void {
+  const S = m.tuning.brain.sniper;
+  const dx = r.x - r.fromX;
+  const dz = r.z - r.fromZ;
+  const d = Math.sqrt(dx * dx + dz * dz);
+  if (d < 1) return;
+  const ear = (S.earSigmaDeg * Math.PI) / 180;
+  const err = ear * gaussian(m.draw);
+  const c = dcos(err);
+  const s = dsin(err);
+  r.x = r.fromX + dx * c - dz * s;
+  r.z = r.fromZ + dx * s + dz * c;
+  const blur = r.radius / (2 * d);
+  r.sigma = Math.sqrt(ear * ear + blur * blur) * S.statedScale;
+}
+
+/** A standard normal draw from his own stream (Box–Muller, with exact math). */
+function gaussian(draw: () => number): number {
+  const u = Math.max(1e-12, draw());
+  const v = draw();
+  return Math.sqrt(-2 * dlog(u)) * dcos(2 * Math.PI * v);
 }
 
 /** An order from the commander: go there, look around, and call it clear. */
