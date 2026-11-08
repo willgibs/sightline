@@ -19,6 +19,7 @@ import { Rng } from '../kernel/core/rng';
 import { runScene } from '../kernel/scene';
 import { labWorld } from './scenes/perceptionLab';
 import { SIGHT_TABLE, sightScenario } from './scenes/sightScenario';
+import { FACTORS, generateSitting, scoreSitting, verdict, type Trial } from './trials';
 
 /**
  * A bench for every lane (docs/foundation-shape.md): where "better" is measured instead
@@ -197,6 +198,54 @@ function perceptionMetrics(): Record<string, number> {
   m['crack at 300 m: least degrees off the shooter'] = round(Math.min(...angles));
   m['crack at 300 m: most degrees off the shooter'] = round(Math.max(...angles));
   m['seed · crack at 300 m: degrees off the shooter'] = 0;
+  Object.assign(m, trialMetrics());
+  return m;
+}
+
+/**
+ * Trial mode (A12) on two pinned sittings: what the sittings hold, and how often the
+ * protocol passes readers of known skill, against the plan's first rule (seed: 48 of 60
+ * right). docs/research/foundations.md found the seed passes a reader who is right on every
+ * clear trial and guesses the borderline ones about 18% of the time, and a true 80% reader
+ * 57%.
+ */
+function trialMetrics(): Record<string, number> {
+  const m: Record<string, number> = {};
+  let candidates = 0;
+  const sittings = ['BENCH-A-1', 'BENCH-A-2'].map((seed) => generateSitting(seed, defaultTuning, undefined, () => candidates++));
+  const scored = sittings.flatMap((ts) => ts.filter((t) => !t.warmup));
+  m['trials: candidates run for two sittings'] = candidates;
+  m['trials: scored trials in two sittings'] = scored.length;
+  const key = (ts: readonly Trial[], f: (t: Trial) => boolean): Map<number, boolean> => new Map(ts.map((t) => [t.k, f(t)]));
+  const rules = sittings.map((ts) => scoreSitting(ts, key(ts, (t) => t.rules)));
+  m['trials: borderline right by the sight table alone (of 30)'] = rules[0]!.borderlineRight + rules[1]!.borderlineRight;
+  m["trials: the rules-only predictor's balanced accuracy, first sitting (%)"] = round(rules[0]!.balanced * 100);
+  m['trials: frozen at the first cue (of 60)'] = scored.filter((t) => t.freeze === 'cue').length;
+  m['trials: cue-frozen trials where his head can be read'] = scored.filter((t) => t.freeze === 'cue' && t.legible.head).length;
+  for (const f of FACTORS) m[`trials: borderline trials ${f} flips`] = scored.filter((t) => t.flips.includes(f)).length;
+  // Readers of known skill, 4000 pairs of sittings each.
+  const rng = new Rng('BENCH-A', 'readers');
+  const [a, b] = sittings as [Trial[], Trial[]];
+  const readers: Array<[string, (t: Trial) => number]> = [
+    ['right on every clear trial, guessing the borderline', (t) => (t.borderline ? 0.5 : 1)],
+    ['right 80% of the time', () => 0.8],
+    ['right 90% of the time', () => 0.9],
+  ];
+  for (const [who, p] of readers) {
+    let ours = 0;
+    let seed = 0;
+    const draws = 4000;
+    for (let k = 0; k < draws; k++) {
+      const answers = (ts: readonly Trial[]): Map<number, boolean> => new Map(ts.map((t) => [t.k, rng.chance(p(t)) ? t.seen : !t.seen]));
+      const A = answers(a);
+      const B = answers(b);
+      if (verdict({ trials: a, answers: A }, { trials: b, answers: B }).pass) ours++;
+      const right = (ts: readonly Trial[], ans: Map<number, boolean>): number => ts.filter((t) => !t.warmup && ans.get(t.k) === t.seen).length;
+      if (right(a, A) + right(b, B) >= 48) seed++;
+    }
+    m[`trials: a reader ${who}: passes (% of ${draws})`] = round((100 * ours) / draws);
+    m[`seed · trials: a reader ${who}: passes (% of ${draws})`] = round((100 * seed) / draws);
+  }
   return m;
 }
 

@@ -72,7 +72,26 @@ export const BENCH_GOLDEN: PinnedBench = {
       "shade: drawn as simulated within 1.5 m of a shadow, of 6000 points": 5810,
       "crack at 300 m: least degrees off the shooter": 55.438591,
       "crack at 300 m: most degrees off the shooter": 57.2126615,
-      "seed · crack at 300 m: degrees off the shooter": 0
+      "seed · crack at 300 m: degrees off the shooter": 0,
+      "trials: candidates run for two sittings": 415,
+      "trials: scored trials in two sittings": 60,
+      "trials: borderline right by the sight table alone (of 30)": 14,
+      "trials: the rules-only predictor's balanced accuracy, first sitting (%)": 62.5,
+      "trials: frozen at the first cue (of 60)": 30,
+      "trials: cue-frozen trials where his head can be read": 28,
+      "trials: borderline trials distance flips": 5,
+      "trials: borderline trials stance flips": 10,
+      "trials: borderline trials movement flips": 17,
+      "trials: borderline trials light flips": 6,
+      "trials: borderline trials cover flips": 5,
+      "trials: borderline trials sky flips": 3,
+      "trials: borderline trials gaze flips": 8,
+      "trials: a reader right on every clear trial, guessing the borderline: passes (% of 4000)": 1.975,
+      "seed · trials: a reader right on every clear trial, guessing the borderline: passes (% of 4000)": 17.4,
+      "trials: a reader right 80% of the time: passes (% of 4000)": 50.9,
+      "seed · trials: a reader right 80% of the time: passes (% of 4000)": 58.625,
+      "trials: a reader right 90% of the time: passes (% of 4000)": 99.025,
+      "seed · trials: a reader right 90% of the time: passes (% of 4000)": 99.475
     },
     "runs": {
       "perception-lab": {

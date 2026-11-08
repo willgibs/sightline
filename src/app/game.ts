@@ -6,6 +6,7 @@ import { headBob } from '../sim/body';
 import { BARKS, beliefRadius, explainChain, groundLight, lightName, movementVisibility, stanceVisibility } from '../sim/perception';
 import { EventLog } from '../sim/kernel/eventlog';
 import { Cues } from './cues';
+import { TrialSitting, type TrialHost } from './trials';
 import { generateWorld, simTuningKey, worldTuningKey } from '../sim/generation';
 import type { World } from '../sim/kernel/world/world';
 import { neutralInput } from '../sim/kernel/input';
@@ -60,6 +61,8 @@ export interface GameOptions {
   sceneName: string | null;
   /** A recording to watch (?replay=<url>), instead of a valley to play. */
   replayUrl: string | null;
+  /** Trial mode (A12): a sitting of the perception lab's exit test, from this seed; null for none. */
+  trials?: string | null;
 }
 
 const TIME_SCALES = [0.25, 0.5, 1, 2, 4, 8];
@@ -97,6 +100,8 @@ export class Game {
   private readonly cues: Cues;
   /** The run's events, kept for explaining what guards did (sim/kernel/eventlog.ts); not simulation state. */
   private readonly log = new EventLog();
+  /** A sitting of trial mode (A12), when the page was opened for one. */
+  private trial: TrialSitting | null = null;
   private readonly overlay: Overlay;
   private readonly sound: GameSound;
   /** Every run kept as it goes: in playtests/ in development, in this browser when deployed (playtest.ts). */
@@ -196,6 +201,11 @@ export class Game {
     );
     this.hud = new Hud(opts.hud, this.input.map);
     this.cues = new Cues(opts.hud, this.tuning.perception.sight.cue);
+    if (opts.trials) {
+      this.trial = new TrialSitting(opts.hud, this.trialHost(), opts.trials, this.tuning);
+      // Every trial's run is kept, however short: each holds an answer.
+      this.capture.minSeconds = 0;
+    }
     this.overlay = new Overlay(opts.overlay, {
       onResume: () => this.resume(),
       onGenerate: (seed) => {
@@ -439,11 +449,71 @@ export class Game {
       if (this.benchRequested) {
         this.benchRequested = false;
         this.startBench();
+      } else if (this.trial) {
+        // Trial mode: the lab behind the overlay while the sitting is prepared.
+        this.overlay.setStartTitle('Trial mode · the perception lab');
+        this.overlay.show('loading');
+        this.trial.prepare();
       } else {
         this.overlay.show('start');
         this.showKept();
       }
     }, 30);
+  }
+
+  /** What a sitting of trial mode needs from the game (app/trials.ts). */
+  private trialHost(): TrialHost {
+    const game = this;
+    return {
+      loadTrial: (scene) => {
+        const world = scene.world(this.tuning);
+        // Trials share the lab's ground and shade: its meshes are kept.
+        const same = this.world !== undefined && this.world.terrain === world.terrain;
+        this.scene = scene;
+        this.world = world;
+        if (!same) {
+          this.renderer.setWorld(world, this.tuning);
+          this.sound.setWorld(world);
+        }
+        this.restartRun();
+        // Looking at the guard's chest.
+        const g = this.sim.guards[0];
+        const p = this.sim.player;
+        if (g) {
+          const dx = g.body.x - p.x;
+          const dz = g.body.z - p.z;
+          this.input.yaw = Math.atan2(-dx, -dz);
+          this.input.pitch = Math.atan2(g.body.y + 1.2 - (p.y + p.eyeHeight), Math.max(1, Math.hypot(dx, dz)));
+        }
+      },
+      get sim() {
+        return game.sim;
+      },
+      annotate: (kind, text) => this.recorder?.annotate(kind, text),
+      runOut: (ticks, done) => {
+        for (let i = 0; i < ticks; i++) {
+          this.trial?.input(this.sim, this.raw);
+          const events = this.sim.step(this.raw);
+          this.recorder?.record(this.sim, events);
+          this.log.add(events);
+          if (done(events)) break;
+        }
+        this.prev = this.sim.snapshot();
+        this.curr = this.sim.snapshot();
+      },
+      status: (text) => this.overlay.setStatus(text),
+      ready: () => this.overlay.show('start'),
+      results: (text, save) => {
+        // The last trial's run, with the sitting's score in it.
+        this.capture.save('sitting');
+        this.input.releaseLock();
+        this.paused = true;
+        this.hud.setVisible(false);
+        this.retry = save;
+        this.overlay.showMessage('outcome', 'The sitting is done', text, 'Save the sitting');
+      },
+      download: (name, text) => this.download(new Blob([text], { type: 'application/json' }), name),
+    };
   }
 
   private restartRun(): void {
@@ -524,6 +594,7 @@ export class Game {
 
   private onLocked(): void {
     this.paused = false;
+    this.trial?.begin();
     if (this.pausedAt) this.capture.paused(performance.now() - this.pausedAt);
     this.pausedAt = 0;
     this.overlay.hide();
@@ -549,7 +620,8 @@ export class Game {
   private action(action: Action): void {
     switch (action) {
       case 'debugView':
-        this.setDebugView(!this.debug);
+        // A sitting is in the honest view only (the exit test's rule).
+        if (!this.trial) this.setDebugView(!this.debug);
         break;
       case 'colliders':
         this.colliders = !this.colliders;
@@ -723,7 +795,7 @@ export class Game {
     let frameTicks = 0;
     let frameTickMs = 0;
     if (this.replay) this.replayTicks(dt);
-    else if (!this.paused) {
+    else if (!this.paused && (!this.trial || this.trial.stepping)) {
       const scale = this.debug ? TIME_SCALES[this.timeScaleIndex]! : 1;
       const ticks = this.clock.advance(dt, scale);
       if (ticks > 0) {
@@ -797,6 +869,8 @@ export class Game {
   private tick(): void {
     const frozen = this.detached || this.bench !== null;
     this.input.sampleTick(this.raw, frozen, this.sim.tick);
+    // In trial mode the trial moves the player; the mouse only looks.
+    if (this.trial) this.trial.input(this.sim, this.raw);
     if (frozen) {
       this.raw.yaw = this.detached ? this.heldYaw : this.sim.player.yaw;
       this.raw.pitch = this.detached ? this.heldPitch : this.sim.player.pitch;
@@ -817,6 +891,7 @@ export class Game {
     this.curr = this.sim.snapshot(swap);
     for (const e of events) if (e.type === 'outcome') this.decided = true;
     this.log.add(events);
+    this.trial?.onTick(this.sim, events);
     if (events.length > 0) {
       this.renderer.addEvents(events, this.time);
       this.sound.play(events, this.sim.player.eyeHeight, this.soundTiming, !this.detached);
@@ -1269,7 +1344,14 @@ export class Game {
         this.overlay.hide();
         this.hud.setVisible(true);
         this.lastNow = 0;
+        this.trial?.begin();
       },
+      /** Trial mode (A12): where the sitting stands, or null outside one. */
+      trial: () => this.trial?.state() ?? null,
+      /** Where a world point is drawn, in CSS pixels, or null off screen (the agents' pre-screen, A12). */
+      onScreen: (x: number, y: number, z: number) => this.renderer.project(x, y, z, window.innerWidth, window.innerHeight),
+      /** Trial mode: answers the frozen trial, as Y or N does. */
+      answer: (yes: boolean) => this.trial?.press(yes ? 'KeyY' : 'KeyN'),
       pause: () => {
         this.paused = true;
       },
@@ -1358,11 +1440,18 @@ export class Game {
       },
       /** Where the replay is, or null outside one. */
       replayState: () => (this.replay ? { tick: this.sim.tick, ticks: this.replay.ticks, playing: this.replay.playing, speed: this.replay.speed } : null),
-      /** Each guard who perceives: his state on the awareness ladder, meter and belief (lab A). */
+      /** Each guard who perceives: his state on the awareness ladder, meter and belief, and where his eyes are (lab A). */
       perception: () =>
         this.sim.guards
           .filter((g) => g.senses)
-          .map((g) => ({ id: g.id, role: this.world.camp.guards[g.guard.spawn]?.role ?? null, state: g.senses!.awareness.state, meter: g.senses!.sight.meter, belief: g.senses!.belief ? { ...g.senses!.belief } : null })),
+          .map((g) => ({
+            id: g.id,
+            role: this.world.camp.guards[g.guard.spawn]?.role ?? null,
+            state: g.senses!.awareness.state,
+            meter: g.senses!.sight.meter,
+            belief: g.senses!.belief ? { ...g.senses!.belief } : null,
+            eye: { x: g.body.x, y: g.body.y + g.body.eyeHeight, z: g.body.z },
+          })),
       /** An event explained back to what caused it, in words (sim/perception/explain.ts); the latest change of awareness if no id. */
       explain: (id?: number) => {
         const target = id ?? [...this.log.all].reverse().find((e) => e.type === 'alert')?.id;

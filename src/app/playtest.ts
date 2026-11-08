@@ -23,7 +23,7 @@ export interface TelemetryReport {
   build: string;
   startedAt: string;
   savedAt: string;
-  /** Why this save happened: 'minute', 'pause', 'outcome', 'fault', 'hidden', 'new run'. */
+  /** Why this save happened: 'minute', 'pause', 'outcome', 'fault', 'hidden', 'new run', 'sitting'. */
   reason: string;
   world: { seed: string; scene: string | null };
   run: { ticks: number; tickHz: number; playedSeconds: number; pausedSeconds: number; pauses: number };
@@ -162,6 +162,11 @@ export class PlaytestCapture {
   private readonly pending = new Map<Run, string>();
   /** The last save's outcome, for the debug panel. */
   status = 'nothing saved yet';
+  /**
+   * Runs shorter than this aren't kept. Trial mode (A12) keeps every trial, however short:
+   * each holds an answer.
+   */
+  minSeconds = MIN_SECONDS;
 
   constructor(
     readonly store: PlaytestStore | null,
@@ -216,7 +221,7 @@ export class PlaytestCapture {
     if (!r || !this.store) return;
     // What the recorder holds, which after a failed tick includes that tick's input.
     const ticks = r.recorder.ticks;
-    if (ticks === r.savedTick || ticks / r.sim.tuning.sim.tickHz < MIN_SECONDS) return;
+    if (ticks === r.savedTick || ticks / r.sim.tuning.sim.tickHz < this.minSeconds) return;
     if (this.saving) {
       // One save at a time; the rest wait their turn, one per run.
       this.pending.set(r, reason);

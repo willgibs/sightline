@@ -187,6 +187,7 @@ The statistics behind these protocols are in `docs/research/foundations.md`. A p
   - At least 70% in each sitting.
   - At least 21 of the 30 borderline answers right. Guessing reaches that only 2% of the time.
   - Clearly better than a rules-only predictor scored on the same trials: distance and the sight table, with no cues. Beating it is the evidence that the cues are readable.
+    - (Nov 8, A12: on the borderline trials, by 3 of 30, as the research advises; the table proved strong, so the borderline cells are split evenly by whether it gets them right.)
 - **Item analysis:** accuracy is reported by the factor that flips each borderline outcome. A factor near chance needs a cue, or a simpler rule, before the second sitting.
 - **Blind** means the honest view only, no outcomes or parameters ahead of time, and fresh trials.
 - **Agents pre-screen** each trial set for cues the simulation shows to be missing, after passing a perception check against the simulation's own record. Today's vision-language agents are unreliable judges of timing and detail, so their findings never count toward the pass.
@@ -436,7 +437,9 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - open doors (D4).
 - [x] A10 · Sandbox mode: noise drops, and the time-scale hook.
 - [x] A11 · The budget: 16 guards perceiving within the frame budget, measured by work counts as well as `npm run sim -- --profile`, in Chromium, Firefox and WebKit. Fast paths come only if it needs them: a still body skips the motor, and a distant guard skips perception.
-- [ ] A12 · Trial mode, with the protocol in Exit tests, and the agents' pre-screen.
+- [x] A12 · Trial mode, with the protocol in Exit tests, and the agents' pre-screen.
+  - `?trials=<seed>` plays a sitting; `npm run playtest` scores it from its recordings or its saved file; `npm run trials -- <seed> --shots` prints it and draws its freeze frames for the pre-screen.
+  - Each borderline cell is split evenly between trials the sight table gets right and wrong, so the table alone scores 7 of 15 there, and the comparison with it is on the borderline trials (`docs/decisions.md`, A12).
 - [ ] A13 · Perception joins the valley (`SYSTEMS`), announced, with the version bump.
 - [ ] Exit test, the bench numbers, a note, a playable link.
 

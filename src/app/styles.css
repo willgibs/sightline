@@ -670,3 +670,30 @@ body {
     padding: 22px 18px 16px;
   }
 }
+
+/* Trial mode (A12, app/trials.ts): the trial, what you'll do, and the question. */
+/* Below the detection indicator's top, which marks a guard straight ahead just under the compass. */
+.trial-panel {
+  position: absolute;
+  left: 50%;
+  top: 92px;
+  transform: translateX(-50%);
+  max-width: min(640px, calc(100vw - 32px));
+  padding: 10px 14px;
+  background: rgba(20, 24, 28, 0.72);
+  color: #f2efe6;
+  font: 13px/1.45 var(--mono);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.trial-title {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.trial-prompt {
+  margin-top: 6px;
+  color: #ffe9b0;
+}

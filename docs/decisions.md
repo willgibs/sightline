@@ -6,6 +6,23 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
 
+### Trial mode: the exit test, built into the lab (A12)
+
+**Decision:**
+- **A sitting** (`?trials=<seed>`, `sim/game/trials.ts`, `app/trials.ts`) is the plan's protocol: 5 warm-ups whose outcome is shown, then 30 scored trials, none shown until the end. Each trial is a sight scenario: you, a guard who reacts as he would, 8 s, and a brief of what you'll do ("You crouch-walk behind the low wall, 60 m from a sentry"). It freezes at the start or at the first cue (his meter at 30%, plus 0.3 s for his head to start turning) and asks Y or N: will he see you? Every trial is a run of its own, recorded with the answer as an annotation; the results screen scores the sitting and saves it as a file.
+- **The key is the simulation's.** Each candidate is run: seen or not, when, its first cue. It is **borderline** when one step of one factor toward the other outcome flips it, and every factor that does is recorded, for item analysis by factor (counting only the first, in a fixed order, credited stance with 41% of the flips and the skyline with 0.3%; counting every flip, the skyline flips 3 of 30 borderline trials in the bench's two sittings, and movement 17).
+- **The borderline trials are split by the sight table.** The research's rules-only baseline (the table applied to distance, stance and light, with no cues) proved strong: on sittings drawn without the split it scored 71% balanced on average and up to 86%, and 67% of the borderline trials. So each borderline cell holds as many trials the table gets right as wrong, and the table alone gets 7 of 15; the bar of 21 of 30 then can't be met by knowing the table, only by reading movement, cover, the skyline and the cues. The comparison with the baseline is on the borderline trials (docs/research/foundations.md): 3 more right of the 30 than the table alone.
+- **The verdict** (`verdict`) is the plan's four conditions over two sittings. The bench measures it against readers of known skill, 4,000 pairs of sittings each, beside the plan's first rule (48 of 60 right): a reader right on every clear trial who guesses the borderline ones passes 2.0% of the time (the first rule: 17.4%, the research's 18%); a reader right 80% of the time passes 50.9% (58.6%, the research's 57%); one right 90% of the time, 99.0% (99.5%).
+- **`npm run playtest` scores sittings** from the answers their trials' recordings hold, generating each sitting again from its seed with the recording's own tuning and checking every recording against its trial; and from sitting files (`sitting-<seed>.json`, which carry their tuning), the record of a sitting played on a deployed build, which keeps only its last few runs. With two complete sittings it gives the verdict. In trial mode every trial's run is kept, however short.
+- **The agents' pre-screen** (`npm run trials -- <seed> --shots`): every trial's freeze frame as the honest view draws it, with a manifest of what the simulation recorded there (whether the indicator shows, where the guard's eyes are drawn, whether his head can be read: at least 2 pixels, nothing solid between, foliage letting through 15%). The first pre-screen, of sitting PRESCREEN-1, passed its perception check (the guard where the manifest puts him, and the indicator wherever it says, in the frames checked) and found two things:
+  - **The first cue's mark was invisible on a pale sky:** a cream arc at 40% opacity, luma 208 on a sky of 198–206. It now has a dark keyline and starts at 75% opacity (`app/cues.ts`).
+  - **The bush hid less than the record said.** From inside a bush the view draws the guard with 18% of his contrast, as the simulation's transmittance there (0.17–0.21) says, and he plainly reads; the record's threshold was 50%. It is now 15%.
+  Its findings change no trial: a trial is only ever dropped where the simulation shows a cue missing, and the generator already does that.
+
+**Why:** the exit test is the owner's, and it should measure readability, not knowledge of the table; a test of a test (the readers) is cheap here because the simulation is the key.
+
+**What moved:** the perception bench gains the trial metrics. No golden: trial mode runs only in its scenarios.
+
 ### The budget: sixteen guards perceiving (A11)
 
 **Decision:**

@@ -37,13 +37,15 @@ import { LAB, labWorld } from './perceptionLab';
  *   move    still, walk (in the stance's own gait) or sprint                   [still]
  *   secs    how long it runs                                                    [20]
  *   react   1: the guard reacts as his awareness rises (A7); 0: he holds his gaze  [0]
+ *   face    1: the player faces the guard and steps across his line (trial mode, A12),
+ *           so the view holds on him; 0: the player circles the spot           [0]
  *   expect  seconds to 100%, as a range ('3-6'), or 'never' within the run     [none]
  *
  * The guard keeps a fixed gaze (no head scan), and unless he reacts, holds it whatever he
- * notices, so the scenario measures sight alone. The player moves round a small circle
- * about the spot, so the speed and the distance hold. The guard stands where the spot's line runs clear:
- * west of the open field's far end, of the shade, the bush and the wall; south of the
- * crest.
+ * notices, so the scenario measures sight alone. He stands where the spot's line runs clear:
+ * west of the open field's far end and of the bush, east of the low wall, north of the
+ * shade, south of the crest. The player moves round a small circle about the spot, or
+ * steps across his line facing him, so the speed and the distance hold.
  */
 
 export interface SightParams {
@@ -56,11 +58,13 @@ export interface SightParams {
   secs: number;
   /** The guard reacts to what he notices (A7), or holds his gaze. */
   react: boolean;
+  /** The player faces the guard and side-steps across his line, rather than circling. */
+  face: boolean;
   /** Seconds to detection, [min, max]; or 'never'; or null for no expectation. */
   expect: readonly [number, number] | 'never' | null;
 }
 
-const DEFAULTS: SightParams = { guard: 'sentry', spot: 'open', d: 30, off: 0, stance: 'stand', move: 'still', secs: 20, react: false, expect: null };
+const DEFAULTS: SightParams = { guard: 'sentry', spot: 'open', d: 30, off: 0, stance: 'stand', move: 'still', secs: 20, react: false, face: false, expect: null };
 
 /** Reads a scenario's parameters, refusing anything it doesn't know. */
 export function parseSight(text: string | undefined): SightParams {
@@ -88,6 +92,7 @@ export function parseSight(text: string | undefined): SightParams {
     else if (key === 'move') p.move = one(key, v, ['still', 'walk', 'sprint']);
     else if (key === 'secs') p.secs = num(key, v, 1, 120);
     else if (key === 'react') p.react = num(key, v, 0, 1) === 1;
+    else if (key === 'face') p.face = num(key, v, 0, 1) === 1;
     else if (key === 'expect') {
       if (v === 'never') p.expect = 'never';
       else {
@@ -103,7 +108,7 @@ export function parseSight(text: string | undefined): SightParams {
 /** The canonical form of a scenario's parameters: every key, in a fixed order. */
 export function formatSight(p: SightParams): string {
   const e = p.expect === null ? '' : p.expect === 'never' ? '&expect=never' : `&expect=${p.expect[0]}-${p.expect[1]}`;
-  return `guard=${p.guard}&spot=${p.spot}&d=${p.d}&off=${p.off}&stance=${p.stance}&move=${p.move}&secs=${p.secs}${p.react ? '&react=1' : ''}${e}`;
+  return `guard=${p.guard}&spot=${p.spot}&d=${p.d}&off=${p.off}&stance=${p.stance}&move=${p.move}&secs=${p.secs}${p.react ? '&react=1' : ''}${p.face ? '&face=1' : ''}${e}`;
 }
 
 interface Spot {
@@ -134,7 +139,8 @@ function spotOf(p: SightParams, world: World, tuning: Tuning): Spot {
       for (let dz = 1; dz < 6; dz += 0.5) {
         const z = T.z - dz;
         if (groundLight(world, solids, world.spec.env, 0, T.x, world.terrain.heightAt(T.x, z), z, tuning) === tuning.visibility.light.shade) {
-          return { x: T.x, z: z - 0.5, ux: -1, uz: 0, pace: 1.5 };
+          // Seen from the north, across the open, the wall behind: moving, the player keeps along the shadow.
+          return { x: T.x, z: z - 0.5, ux: 0, uz: -1, pace: 1.5 };
         }
       }
       throw new Error('Sight scenario: no shade by the tall wall');
@@ -185,6 +191,8 @@ function scenarioWorld(p: SightParams, tuning: Tuning): World {
 class CircleDriver {
   private yaw: number | null = null;
   private spot: Spot | null = null;
+  /** Which way the player is stepping across the line, facing the guard: 1 to his right. */
+  private leg = 1;
 
   constructor(private readonly p: SightParams) {}
 
@@ -200,6 +208,17 @@ class CircleDriver {
     out.pitch = 0;
     if (this.yaw === null) this.yaw = b.yaw;
     out.yaw = this.yaw;
+    if (this.p.face) {
+      // Facing the guard (the spot's direction toward him), stepping across his line and back.
+      out.yaw = datan2(-s.ux, -s.uz);
+      if (this.p.move === 'still') return out;
+      const side = (b.x - s.x) * -s.uz + (b.z - s.z) * s.ux;
+      if (side > s.pace) this.leg = -1;
+      else if (side < -s.pace) this.leg = 1;
+      out.moveX = this.leg;
+      out.sprint = this.p.move === 'sprint';
+      return out;
+    }
     if (this.p.move === 'still') return out;
     // Head for the point a quarter-turn ahead on the circle: the walk curves round it.
     const a = datan2(b.z - s.z, b.x - s.x) + 0.6;

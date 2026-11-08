@@ -4,8 +4,12 @@
  * (sim/body/invariants.ts). The summary says what happened, from the recording, and how
  * it ran, from the telemetry report saved beside it (src/app/playtest.ts).
  *
- *   npm run playtest                        every session in playtests/
- *   npm run playtest -- <file.slrec|dir>    one recording, or a folder of them
+ * Sittings of trial mode (A12) are scored at the end, from the answers their trials'
+ * recordings hold and from any sitting file saved beside them (headless/sittings.ts).
+ *
+ *   npm run playtest                             every session in playtests/
+ *   npm run playtest -- <file.slrec|dir>         one recording, or a folder of them
+ *   npm run playtest -- <sitting-<seed>.json>    a sitting saved from its results screen
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -15,27 +19,38 @@ import { resimulate } from '../sim/kernel/record/resim';
 import { sceneOf } from '../sim/game/scenes';
 import { SIGHTLINE, type Simulation } from '../sim/game/sim';
 import { surfaceName } from '../sim/kernel/world/surfaces';
+import { defaultTuning } from '../config/tuning';
 import { fmt } from './args';
+import { answersIn, reportSittings, sittingFile, type KeptAnswer } from './sittings';
 
 const target = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'playtests';
 if (!existsSync(target)) {
   console.error(`\nNo ${target}: play the game in development (npm run dev) to fill playtests/, or name a recording.\n`);
   process.exit(2);
 }
-const files = statSync(target).isDirectory()
+const all = statSync(target).isDirectory()
   ? readdirSync(target)
-      .filter((f) => f.endsWith('.slrec'))
       .sort()
       .map((f) => join(target, f))
   : [target];
-if (files.length === 0) {
-  console.log(`\nNo recordings in ${target}.\n`);
+const files = all.filter((f) => f.endsWith('.slrec'));
+// Sitting files: JSON that says it is one (the telemetry reports beside the recordings aren't).
+const sittingFiles = all
+  .filter((f) => f.endsWith('.json'))
+  .map((f) => ({ name: basename(f), text: readFileSync(f, 'utf8') }))
+  .filter((f) => sittingFile(f.text) !== null);
+if (files.length === 0 && sittingFiles.length === 0) {
+  console.log(`\nNo recordings or sittings in ${target}.\n`);
   process.exit(0);
 }
 
+/** Trial answers found in the recordings, scored as sittings at the end. */
+const kept: KeptAnswer[] = [];
 let failures = 0;
 for (const file of files) failures += summarize(file) ? 0 : 1;
-console.log(files.length > 1 ? `${files.length} sessions · ${failures ? `${failures} with problems` : 'all replay and keep every promise'}\n` : '');
+if (files.length > 1) console.log(`${files.length} sessions · ${failures ? `${failures} with problems` : 'all replay and keep every promise'}`);
+if (!reportSittings(kept, sittingFiles, defaultTuning)) failures++;
+console.log('');
 process.exit(failures ? 1 : 0);
 
 /** Prints one session's summary; false if it doesn't replay or a promise broke. */
@@ -103,7 +118,8 @@ function summarize(file: string): boolean {
           if (d < closest.d) closest = { d, guard: g.id, tick: sim.tick };
         }
         for (const a of notes.get(sim.tick) ?? []) {
-          if (a.kind === 'pause') continue;
+          // Pauses aren't moments; a trial's answer has a line of its own.
+          if (a.kind === 'pause' || a.kind === 'trial-answer' || a.kind === 'trial-sitting') continue;
           moments.push(`${t(sim.tick)} ${a.kind}${a.text ? ` "${a.text}"` : ''} at ${p.x.toFixed(0)}, ${p.y.toFixed(0)}, ${p.z.toFixed(0)} · ${p.stance}, ${p.gait} on ${surfaceName(p.surface)}`);
         }
       },
@@ -139,6 +155,13 @@ function summarize(file: string): boolean {
     );
     if (closest.guard >= 0) console.log(`  guards    closest ${closest.d.toFixed(1)} m (guard ${closest.guard}, at ${t(closest.tick)})`);
     for (const m of moments) console.log(`  moment    ${m}`);
+    // A trial of a sitting (A12): its answer, and what happened.
+    const events = rec.readEvents();
+    for (const a of answersIn(basename(file), rec.annotations(), events, h.tuning)) {
+      kept.push(a);
+      const seenAt = events.find((e) => e.type === 'detected')?.t;
+      console.log(`  trial     ${a.warmup ? 'warm-up' : 'scored'} trial ${a.k} of sitting ${a.sitting} · answered ${a.answer ? 'yes' : 'no'} · ${a.seen ? `seen at ${seenAt!.toFixed(1)} s` : 'not seen'}`);
+    }
   }
   if (telemetry?.frames) {
     const f = telemetry.frames;

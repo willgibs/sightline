@@ -11,6 +11,9 @@ import { GUARD_FIELDS, type Snapshot } from '../sim/game/sim';
  *   the cue (30%) or above, a mark on an ellipse just inside the edge, toward him: wider,
  *   thicker and warmer as his meter fills and his awareness rises, solid red when he has
  *   seen you. Below the cue nothing shows (design doc: below 30% nothing visible happens).
+ *   It reads from its first frame on any ground: a dark keyline under the mark, and most
+ *   of its opacity from the start (the agents' pre-screen, A12, found the first cue's mark
+ *   at under 5% contrast against a pale sky).
  * - **What guards say, captioned as you hear it:** only lines that reach your ears by the
  *   law of sound (audio/hearing.ts), with an arrow toward where they came from.
  */
@@ -82,7 +85,7 @@ export class Cues {
       const dz = curr.guards[o + 2]! - view.z;
       const rel = wrapAngle(datan2(-dx, -dz) - view.yaw);
       const half = ((meter >= 1 ? 16 : 4 + 10 * fill) * Math.PI) / 180;
-      this.arc(-rel, half, meter >= 1 ? 9 : 3 + 5 * fill, RUNG_COLOURS[meter >= 1 ? 4 : rung] ?? RUNG_COLOURS[0]!, meter >= 1 ? 0.75 + 0.25 * Math.sin(now * 9) : 0.35 + 0.65 * fill);
+      this.arc(-rel, half, meter >= 1 ? 9 : 3 + 5 * fill, RUNG_COLOURS[meter >= 1 ? 4 : rung] ?? RUNG_COLOURS[0]!, meter >= 1 ? 0.75 + 0.25 * Math.sin(now * 9) : 0.75 + 0.25 * fill);
     }
     if (!any && this.drawn) ctx.clearRect(0, 0, w, h);
     this.drawn = any;
@@ -109,12 +112,7 @@ export class Cues {
     const rx = cx - side;
     const ry = cy - top;
     ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = colour;
-    ctx.lineWidth = width;
     ctx.lineCap = 'round';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-    ctx.shadowBlur = 4;
     ctx.beginPath();
     const steps = 12;
     for (let k = 0; k <= steps; k++) {
@@ -124,6 +122,16 @@ export class Cues {
       if (k === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
+    // The keyline: the mark's edge against a pale sky.
+    ctx.globalAlpha = 0.8 * alpha;
+    ctx.strokeStyle = '#1c1e20';
+    ctx.lineWidth = width + 3;
+    ctx.stroke();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = width;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 4;
     ctx.stroke();
     ctx.restore();
   }

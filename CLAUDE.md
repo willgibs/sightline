@@ -70,6 +70,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 - `npm run playtest`: every session in `playtests/` (the dev build saves each run there as it goes), re-simulated, checked and summarized with its telemetry. `-- <file|dir>` for others.
 - `npm run scene` (or `-- <name>`, `-- --list`): every scene in `src/sim/game/scenes` headless, by its own driver, checking its expectations and re-simulating its recording. `?scene=<name>` plays one in the browser. A regression test that needs more than one tick belongs in a scene.
 - `npm run sim -- --replay <file>`: re-simulate a recording saved in the browser; it says where a run diverged, or why it can't re-simulate in this build.
+- `npm run trials -- <seed>`: a sitting of trial mode (A12), trial by trial, with its key; `--shots` draws every freeze frame into `shots/trials/<seed>/` with what the simulation recorded there, for the agents' pre-screen. `npm run playtest` scores sittings from their recordings or saved files.
 - `npm run look`: the honest and debug views as pictures in `shots/`, from a headless browser. `-- --scene <name>`, `--seed`, `--look`, `--walk` and `--fly` choose what to look at (the header of `src/headless/look.ts`).
 - `window.sightline` exposes automation hooks for scripted screenshots and playtests. The full list is `automation()` in `src/app/game.ts`:
   - **Running:** `play()`, `pause()`.
@@ -80,6 +81,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
   - **World:** `generate(seed)`, `fog(density)`.
   - **Reading:** `state()`, `dump()`, `recording()`, `sound()`, `insides()`, `playtest()`, `perception()` (each perceiving guard's state, meter and belief), `explain(id)` (an event back to its causes, in words).
   - **Replays:** `replay(base64)`, `replayState()`, `seek(tick)`.
+  - **Trial mode** (`?trials=<seed>`, A12): `trial()` (where the sitting stands), `answer(yes)`, `onScreen(x, y, z)` (where a world point is drawn).
 - To drive the hooks from a script, use `openGame()` in `src/headless/browser.ts`. It starts its own server and browser and evaluates expressions with the hooks in scope.
 - `?replay=playtests/<name>.slrec` watches a kept session in the dev build.
 - Look at the result. Render the honest and debug views and judge them, rather than trusting that code which compiles also reads well. A headless browser draws at a few frames a second, so judge feel and frame rate on a real machine.
