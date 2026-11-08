@@ -1,6 +1,6 @@
 import { defaultTuning } from '../../config/tuning';
 import { InvariantWatch } from '../body';
-import { analyzeCamp, campMission, generateWorld, spaceTimeSearch } from '../generation';
+import { analyzeCamp, campMission, generateWorld, infiltrate, spaceTimeSearch } from '../generation';
 import type { LayerName } from '../lanes';
 import { LAYERS } from '../lanes';
 import { Hasher } from '../kernel/core/hash';
@@ -53,7 +53,7 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
   },
   generation: {
     about:
-      "Lab D: of a held-out series, Phase 0's valleys and lab D's valid at their first attempt, the least margin left under each budget, how much of the horizon lab D's ridges overlook, and the analysis of lab D's camps: ways in and out, unsolved clusters, the busiest search, and safe intervals against the plain search.",
+      "Lab D: of a held-out series, Phase 0's valleys and lab D's valid at their first attempt, the least margin left under each budget, how much of the horizon lab D's ridges overlook, and the analysis of lab D's camps: valid at the first attempt, repaired, rules left broken, ways in and out, unsolved clusters, the busiest search, and safe intervals against the plain search.",
     metrics() {
       let first = 0;
       let margin = Infinity;
@@ -83,6 +83,10 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
       let wayIn = 0;
       let unsolved = 0;
       let busiest = 0;
+      let firstTry = 0;
+      let repaired = 0;
+      let broken = 0;
+      let mostAttempts = 0;
       let sipp = 0;
       let plain = 0;
       for (const seed of GENERATION_SEEDS) {
@@ -90,9 +94,15 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
         const a = w.report.camp!;
         if (a.infiltration.found && a.exfil.found) wayIn++;
         unsolved += a.clusters.filter((c) => c.certified === 'unsolved').length;
-        busiest = Math.max(busiest, a.infiltration.expanded, a.sabotage.expanded, a.exfil.expanded);
+        busiest = Math.max(busiest, a.infiltration.expanded, a.sabotage.expanded, a.exfil.expanded, a.exfil2.expanded, a.vehicle.expanded);
+        const repairs = w.report.repairs ?? [];
+        if (w.report.validation!.ok && repairs.length === 0 && w.attempt === 0 && (w.report.campAttempt ?? 0) === 0) firstTry++;
+        else if (w.report.validation!.ok) repaired++;
+        broken += w.report.validation!.failed.length;
+        mostAttempts = Math.max(mostAttempts, w.report.repairAttempts ?? 0);
         if (seed === GENERATION_SEEDS[0]) {
-          sipp = a.infiltration.expanded;
+          // The exact search against the plain one (the analysis itself runs a greedy one first, which finds a way sooner still).
+          sipp = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, undefined, (S, E, M, Q) => infiltrate(S, E, M, { ...Q, weight: 1 })).analysis.infiltration.expanded;
           plain = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, undefined, spaceTimeSearch).analysis.infiltration.expanded;
         }
       }
@@ -103,6 +113,10 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
         'lab D least margin under the valley budget': campMargin,
         'lab D widest overwatched horizon (°)': widest,
         'lab D narrowest open horizon (°)': narrowestOpen,
+        [`lab D camps valid at the first attempt, no repair (of ${GENERATION_SEEDS.length})`]: firstTry,
+        'lab D camps repaired': repaired,
+        'lab D rules still broken': broken,
+        [`lab D most re-analyses in a repair (of ${defaultTuning.gen.validation.repairAttempts})`]: mostAttempts,
         [`lab D camps with a way in and out (of ${GENERATION_SEEDS.length})`]: wayIn,
         'lab D clusters left unsolved': unsolved,
         [`lab D busiest search (of ${defaultTuning.gen.analysis.maxExpansions} expansions)`]: busiest,

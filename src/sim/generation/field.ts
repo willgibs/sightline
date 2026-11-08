@@ -32,6 +32,8 @@ export interface GuardTrack {
   gb: Float32Array;
   /** A marksman, with binoculars: a narrow cone that sees far. */
   far: boolean;
+  /** On a tower's deck (the same spot all cycle): a perch sees him over the parapet, under the roof. */
+  onDeck: boolean;
 }
 
 export interface Timeline {
@@ -53,7 +55,7 @@ export function buildTimeline(camp: Camp, R: Raster, gen: GenTuning): Timeline {
 export function trackOf(routine: Routine, deck: number | null, R: Raster, gen: GenTuning, samples: number, dt: number, index = -1, far = false): GuardTrack {
   const S = gen.sight;
   const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
-  const t: GuardTrack = { index, x: new Float32Array(samples), z: new Float32Array(samples), eye: new Float32Array(samples), chest: new Float32Array(samples), ga: new Float32Array(samples), gb: new Float32Array(samples), far };
+  const t: GuardTrack = { index, x: new Float32Array(samples), z: new Float32Array(samples), eye: new Float32Array(samples), chest: new Float32Array(samples), ga: new Float32Array(samples), gb: new Float32Array(samples), far, onDeck: deck !== null };
   for (let k = 0; k < samples; k++) {
     routinePose(routine, k * dt, pose);
     const base = deck ?? groundAt(R, pose.x, pose.z);
@@ -85,11 +87,15 @@ export function seesDrop(R: Raster, A: GuardTrack, B: GuardTrack, k: number, gen
   return lineOfSight(R, A.x[k]!, A.eye[k]!, A.z[k]!, B.x[k]!, B.chest[k]!, B.z[k]!);
 }
 
-/** The share of the cycle guard a would see guard b drop. */
-export function dropDuty(R: Raster, A: GuardTrack, B: GuardTrack, samples: number, gen: GenTuning): number {
+/** The share of the cycle guard a would see guard b drop, from every `step`-th sample (staffing's estimate is coarser than the analysis's). */
+export function dropDuty(R: Raster, A: GuardTrack, B: GuardTrack, samples: number, gen: GenTuning, step = 1): number {
   let n = 0;
-  for (let k = 0; k < samples; k++) if (seesDrop(R, A, B, k, gen)) n++;
-  return n / samples;
+  let of = 0;
+  for (let k = 0; k < samples; k += step) {
+    of++;
+    if (seesDrop(R, A, B, k, gen)) n++;
+  }
+  return n / of;
 }
 
 function groundAt(R: Raster, x: number, z: number): number {

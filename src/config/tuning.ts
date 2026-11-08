@@ -121,8 +121,13 @@ export const defaultTuning = {
       barracks: [18, 8, 3],
       mess: [13, 9, 3],
       storage: [13, 10, 4.4],
-      radio: [6, 5, 2.8], // the radio room; its mast stands beside it
-      mast: 14,
+      radio: [6, 5, 2.8], // the radio room; its antenna, on its most hidden wall
+      mast: 2, // the antenna's height: a whip well below the roof line (radio room 2.8 m), so the building hides it
+      fixtureDoorGap: 2, // metres a wall fixture keeps from a door
+      escapeRun: [6, 22], // metres from the target's door to his vehicle, tried at this range
+      escapeClearance: 3, // metres his vehicle keeps off the skeleton's way in
+      overviewShare: 0.15, // a perch that sees this much of the camp's ground counts as an overview, which fixtures hide from first
+      alarmSpacing: 15, // metres between alarm boxes
       shed: [5, 4, 2.6], // the generator's shed: a roof on posts
       lights: [3, 5], // light poles around the yard, on the generator's circuit
       alarms: [2, 3], // alarm boxes, on the generator's circuit
@@ -142,8 +147,16 @@ export const defaultTuning = {
       chokeWidth: 10, // the widest passage a sentry is posted at, metres
       clearance: 1.0, // no two guards on routine come closer than this, metres
       offsetTries: 12, // start times tried for a walking guard before he's left out
-      clusterMax: 3, // guards who see each other drop, in any cluster but one
-      coreMax: 4, // and in the hard core
+      targetMargin: 0.02, // the target's walk out keeps this far under validation's limit on his time in view
+      targetOptions: 3, // he stops considering walks once this many fit and two overviews would see them (each is a grid search)
+      estimateStep: 3, // while staffing, sightlines are estimated from every this-many samples of the cycle (the analysis takes them all)
+      workerInside: 2.5, // metres inside a door that a worker's chores are done
+      targetFan: [6, 10, 14], // metres out from his door that the target's walks are tried, in a fan
+      coverageMargin: 0.02, // posts are moved while a perch comes this near validation's limit on guard time
+      coverageRounds: 6, // posts so moved, at most (rule 18)
+      witnessTries: 12, // walkers' phases tried to give every perch someone it can't see watching (rule 18)
+      clusterMax: [2, 3], // the largest sightline cluster, from the easiest camp to the hardest: all but one
+      coreMax: [3, 5], // and the hard core's
       corridorWatch: 0.2, // the most of the cycle one guard may watch the skeleton's way in
     },
 
@@ -170,18 +183,45 @@ export const defaultTuning = {
       proneEye: 0.5, // a shooter lying on a perch
     },
 
+    // What a camp must pass (D8; sim/generation/validate.ts): the design doc's rules (Maps and
+    // procedural camps · Validation rules), the plan's no-single-perch rule and its companions.
+    validation: {
+      seenSeconds: 15, // a perch sees a guard if he's in its view this long a cycle: the plan's minimum time in view
+      longRangePerches: 2, // perches that must each see half the guards and the target
+      targetSeconds: 10, // ...the target for at least this long a cycle
+      maxCoverage: 0.6, // no perch sees more than this share of guard time
+      maxTarget: 0.25, // nor the target for more than this share of the cycle
+      watchedDuty: 0.03, // a guard counts as watched if another would see him drop for this share of the cycle
+      manyGuards: 0.4, // a perch that sees this share of guard time keeps alarm boxes and the antenna out of its fire
+      counterRange: 450, // metres: a marksman post or a counter-perch overlooks a perch within this
+      counterRings: [60, 120, 200, 300, 400], // metres round a perch searched for ground the camp can reach that overlooks it
+      counterBearings: 24, // bearings tried on each ring
+      botPerches: 8, // the long-range bot (the exit test's) tries this many perches, the most-watching first
+      repairAttempts: 12, // re-analyses a repair may spend (rule 18)
+      campAttempts: 3, // camps built on one terrain before giving up: a camp repair can't save is rejected and built again
+      repairShifts: 8, // a patrol's phase is tried at this many even steps of its period
+      repairTurns: [30, -30, 60, -60, 90, -90], // degrees a post is tried turned
+      repairMoves: [3, -3, 6, -6], // metres a post is tried moved along its arc
+      hideReach: 14, // metres a post may be moved to get out of a perch's sight
+      runSpeed: 5.5, // metres per second: the target running from his door to his vehicle
+      interceptSeconds: 1.5, // a perch can stop the escape if it has him in view this long on that run
+    },
+
     // How lab D analyses a camp (D7; sim/generation/analysis files).
     analysis: {
       cell: 1, // metres: the analysis raster, two of the site layer's cells a side
-      dt: 0.5, // seconds between samples of the camp's cycle
+      dt: 5 / 9, // seconds between samples of the camp's cycle: a crouched step of a cell (1 m at 1.8 m/s), so the ways in are walkable
       margin: 30, // metres of ground around the fence that the intruder crosses
       meterLevels: 128, // the intruder's detection meter, in whole levels: full is detected
+      meterLimit: 0.85, // the share of the meter a certified way in may reach: a margin over lab A's own
       // How fast it falls while no guard sees him, of a full meter per second. A's falls at 0.12
       // after holding 1.5 s; half that rate with no hold covers any pause of 3 s or more.
       meterDecay: 0.0625,
       maxExpansions: 400000, // the infiltration search's budget (rule 18)
+      searchWeight: 40, // the greedy search tried first: arrival + this × distance, which finds a way far sooner, if not the earliest
       reaction: 1.5, // seconds from seeing a comrade drop to raising the camp (design doc)
       closeShot: 12, // metres: where infiltration ends, near enough to see the target indoors, with a clear line
+      exitApart: 40, // metres between where two ways out leave the raster
       shotInterval: 0.75, // seconds between two shots from one rifle
       relocate: 2, // metres per second a shooter moves between perches
       perches: 32, // the most perches analysed, after thinning

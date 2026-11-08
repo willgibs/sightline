@@ -65,6 +65,8 @@ export interface Search {
   /** Search no later than this time (samples from 0). */
   horizon: number;
   maxExpansions: number;
+  /** Greedier than A* when above 1: f = arrival + weight × distance. It still finds a way if one exists, just not the earliest; 1 (the default) is exact. */
+  weight?: number;
 }
 
 export interface Infiltration {
@@ -237,6 +239,7 @@ export function infiltrate(S: Space, E: Exposure, M: Meter, Q: Search): Infiltra
   const rim = Q.from ? [] : rimCells(S).filter((c) => h[c]! >= 0);
   const rimH = rim.length > 0 ? Math.min(...rim.map((c) => h[c]!)) : Infinity;
   const none = (expanded: number, exhausted: boolean): Infiltration => ({ found: false, time: -1, cells: [], start: -1, peak: 0, meter: 0, expanded, exhausted });
+  const weight = Q.weight ?? 1;
   // Per cell, made the first time the search reaches it: its intervals over [0, H] (starts,
   // ends inclusive, and rates: 0 for a safe run), and the first label of each interval's
   // list, with one slot past the intervals for a given start.
@@ -350,7 +353,7 @@ export function infiltrate(S: Space, E: Exposure, M: Meter, Q: Search): Infiltra
     lP[x] = from;
     lN[x] = list[s]!;
     list[s] = x;
-    heap.push(t + (c === OUT ? rimH + 1 : h[c]!), t, c, s, m, x);
+    heap.push(t + weight * (c === OUT ? rimH + 1 : h[c]!), t, c, s, m, x);
   };
   /** Whether another label in x's list has beaten it. */
   const beaten = (x: number, safe: boolean): boolean => {

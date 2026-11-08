@@ -38,7 +38,7 @@ export const GOLDEN = {
     'perception-lab': { behaviour: '0dfa42645814f21a', state: '6625deddfd28368b' },
     'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '2535df87754d14eb' },
     'kernel-alone': { behaviour: '0698e581024f5b35', state: 'b51b84477d71dbf1' },
-    'camp-systems': { behaviour: 'f38577ac4a34e3b6', state: '40446ee293103458' },
+    'camp-systems': { behaviour: '429b5b075acada44', state: '518be8aef50a6774' },
   },
 } as const;
 

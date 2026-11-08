@@ -3,7 +3,7 @@ import { defaultTuning as T } from '../src/config/tuning';
 import { campMission, generateWorld } from '../src/sim/generation';
 import { certify, clusters, killOrder, sightlines, takeApart, type PerchSight } from '../src/sim/generation/clusters';
 import { buildTimeline, heatmaps, type Witnesses } from '../src/sim/generation/field';
-import { findPerches, perchViewshed } from '../src/sim/generation/perches';
+import { findPerches, perchSeesDeck, perchViewshed } from '../src/sim/generation/perches';
 import { buildRaster, cellOf, lineOfSight, type Raster } from '../src/sim/generation/raster';
 import { Rng } from '../src/sim/kernel/core/rng';
 import { Blocks, type RayHit } from '../src/sim/kernel/world/colliders';
@@ -40,7 +40,7 @@ function exactSight(w: World, ax: number, ay: number, az: number, bx: number, by
 }
 
 describe("the analysis raster's lines of sight", () => {
-  it('agree with exact raycasts between points in the camp, erring toward blocking', () => {
+  it('agree with exact raycasts between points in the camp', () => {
     const r = new Rng('raster-check');
     let agree = 0;
     let looser = 0;
@@ -62,8 +62,8 @@ describe("the analysis raster's lines of sight", () => {
       if (exact === ours) agree++;
       else if (ours && !exact) looser++;
     }
-    // Walls fill whole cells, so the raster blocks a little more than the world does, and
-    // almost never less (a doorway carved a little wide, a prop's corner).
+    // Thin things fill a row of cells and wider ones the cells whose centres they cover, so
+    // the raster differs from the world along their edges, a little either way.
     expect(agree / n).toBeGreaterThan(0.85);
     expect(looser / n).toBeLessThan(0.04);
   });
@@ -109,6 +109,25 @@ function sight(guards: number, samples: number, seen: (g: number, k: number) => 
   for (let g = 0; g < guards; g++) for (let k = 0; k < samples; k++) if (seen(g, k)) s[g * samples + k] = 1;
   return { perches: 1, guards, samples, seen: s, distance: new Float32Array([0]) };
 }
+
+describe('a tower', () => {
+  it('is open under its roof: its guard sees out, and perches see him', () => {
+    const tower = world.camp.guards.find((g) => g.elevated)!;
+    expect(tower).toBeDefined();
+    const eye = tower.y + T.gen.sight.eye;
+    // Straight out from the tower, every way round, the line clears his own tower's parapet and roof.
+    let clear = 0;
+    for (let k = 0; k < 16; k++) {
+      const x = tower.x + Math.cos((k * Math.PI) / 8) * 25;
+      const z = tower.z + Math.sin((k * Math.PI) / 8) * 25;
+      if (lineOfSight(raster, tower.x, eye, tower.z, x, world.terrain.heightAt(x, z) + 1.05, z)) clear++;
+    }
+    expect(clear).toBeGreaterThan(8);
+    // And some perch sees his chest over the parapet.
+    const chest = tower.y + T.gen.sight.chest;
+    expect(findPerches(world.terrain, world.camp.site, T.gen).some((p) => perchSeesDeck(raster, world.terrain, p, tower.x, chest, tower.z))).toBe(true);
+  });
+});
 
 describe('clusters', () => {
   const duty = (W: Witnesses): Float32Array => {

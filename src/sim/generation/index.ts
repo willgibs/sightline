@@ -21,5 +21,8 @@ export { closestOnPolyline, makePolyline, pointAt, type PathHit, type Point2, ty
 export { ambientSources, CREEK_SPACING, type AmbientKind, type AmbientSource } from './ambient';
 export { surveyWorld, type Survey, type SurveyAnalysis, type SurveyGuard, type SurveyPerch, type SurveyStructure, type SurveyTerrain } from './survey';
 export { analyzeCamp, type CampAnalysis, type PathReport, type PerchReport } from './campAnalysis';
-export { spaceTimeSearch } from './infiltrate';
+export { infiltrate, spaceTimeSearch } from './infiltrate';
+export { buildRaster } from './raster';
+export { campPlans, planOn, sameSignature, sharedFields, type Approach, type Plan, type PlanSignature } from './plans';
+export type { AnalysisParts } from './campAnalysis';
 export type { Cluster } from './clusters';

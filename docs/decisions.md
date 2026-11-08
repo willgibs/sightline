@@ -107,6 +107,37 @@ Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Unt
 
 Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the generation lane.
 
+### Validation and repair: the rules, built in first (D8)
+
+**Decision:**
+- **Validation** (`generation/validate.ts`) reads the analysis and says how far each rule is from passing. Every perch rule is checked over the whole list of perches. Coverage counts the plan's way (a guard's time in view over the cycle), or a minimum time in view (15 s a cycle), never "ever in view".
+  - **Three approaches.** Long range: two perches that each see half the guards and the target for 10 s a cycle. Infiltration: a certified way to a close shot. Systems: an unseen way to the generator, which powers an alarm or the radio.
+  - **No unsolved cluster.**
+  - **No single perch.** At most 60% of guard time and 25% of the target's. And a shot from a perch that sees two guards or more must be witnessed by someone it can't see, unless it's timed. That one is resolved over time: at a moment the perch sees the guard, another guard would see him drop, and the perch can't see that other guard then, for at least 3% of the cycle. (Counted per guard over the whole cycle, as first written, a patrol who passes behind a building never counted as out of view, and 17 of 40 camps failed.)
+  - **Companions.** Every perch is overlooked by a marksman post, or a counter-perch, or by ground the camp can walk to with a clear line within 450 m (the research's reading: "a ground position a counter-sniper team can reach"). No alarm box or antenna in the fire of a perch that sees 40% of guard time. And the escape: **the best overview** is the perch that sees the most of the camp's ground, and it mustn't have the target in view for 1.5 s on his run from his door to his vehicle; another perch must, or his vehicle can be reached unseen and sabotaged (the design doc's "crosses a perch's sightline or passes a sabotage point").
+    - The run is what matters because the research's reason for the rule is Hitman's evacuation exploit: a camper triggers the escape and shoots the target on the run; the vehicle is "fast or armoured". Measuring the whole route had the best overview seeing 54–93% of it, in every camp.
+  - **Two ways out,** leaving the raster at least 40 m apart, from the shot with the intruder's meter at rest.
+  - **At most 16 guards,** by count.
+- **Solution first, again.** Perches come from the terrain alone, and viewsheds from the first raster, so the generator builds to the rules rather than repairing into them:
+  - **Fixtures** (`placeFixtures`, after a first raster and viewsheds): the antenna is a 2 m whip on the most hidden wall (of the radio room, else the nearest building, else indoors beside the set); alarm boxes go on hidden walls or, if none, just inside a door. "Hidden" is judged against the overviews first: perches that see at least 30% of the camp's ground.
+  - **The escape vehicle** is parked 6–22 m from a door of the target's building, on the spot that best hides his run from the best overview and shows it to another perch.
+  - **The target's walk** (`staffing.ts`) is chosen against the perches: the spot indoors the fewest perches see; his errand the first that keeps every perch within the limit and lets two overviews have him 10 s; re-chosen once every guard is placed if the perches seeing half the camp don't have him.
+  - **Workers' chores** are done a pace inside doors, and while a perch comes within 2 points of the coverage limit, the post it sees most moves to the nearest ground it can't see.
+- **Repair** (`repair.ts`) is the bounded greedy search the plan names: a fixed list of local operators (shift a patrol's phase, turn a post, move a post along its arc, move a post out of an offending perch's sight), each attempt on its own labelled fork, kept only if the camp comes closer to valid (fewer rules broken, then by how much), stopping after 12 re-analyses. Swapping a module and adding cover are left for when these prove too weak (they weren't needed); re-timing a light circuit changes nothing under D's daylight sight law.
+- **A camp repair can't save is rejected** and built again from fresh forks, up to 3 times (the design doc: "repaired or rejected"). `seeds --camps` reports first attempts, repairs, rebuilds and each seed's margin.
+- **Difficulty comes from clusters, too:** the largest sightline cluster runs from 2 to 3 and the hard core from 3 to 5 across the difficulty range (they were fixed at 3 and 4; the default, 0.5, is unchanged).
+- **Four corrections to D7's model, found by running ways in through the simulation** with lab A's real perception (`npm run plans -- --simulate`):
+  - A step of a cell now takes 5/9 s, a crouched pace of 1.8 m/s (it was 0.5 s, faster than a body can follow).
+  - A tower is open under its roof: its deck and parapet count as solid, only its roof as the overhead slab, and perches see a guard on a deck by the direct line. Before, a marksman's own tower blocked his sight and hid him from every perch.
+  - A thing in the raster fills the cells whose centres it covers, or, if thinner than a cell, the row its centre line runs through. Stamping every cell it touched hid the intruder behind things that only clipped a cell, which is the wrong way for a certificate of stealth to err.
+  - A certified way in may fill the meter only to 85%: the two models differ a little (a patrol's gaze as he walks, how fast a meter falls), and paths that peaked at 90–95% in D's model were sometimes completed in A's.
+  - With these, every way in of 20 camps run through the simulation held (no guard reached 100% before arrival), against 3 of 6 before them.
+- **A greedy search first.** Validation only needs to know a way exists, so the analysis runs the search with its distance estimate weighted 40 times, and falls back to exact A* only if that runs out of budget. (The exact search stays the tested one: on 400 small camps it agrees with brute force.) Exact searches ran out of their 400k expansions on camps where a way exists; the greedy ones find it in 10–100k. A camp's generation dropped from 4–30 s to about 2 s.
+
+**What moved:** nothing in Phase 0's valley. The `camp-systems` run moved with its staffing, the tuning gained `gen.validation`, so the golden recording is rewritten, and the generation bench gained D8's numbers. (RESULT NUMBERS FILLED IN AT LANDING.)
+
+**Why:** the plan's D8. Rules a camp must pass, built in first so most camps pass as built, with a bounded, labelled repair for the rest and a rebuild for what repair can't save.
+
 ### The camp's analysis: who sees whom, what each perch sees, and the ways in (D7)
 
 **Decision:**

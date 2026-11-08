@@ -99,8 +99,9 @@ export class Explorer {
     const s = reply.survey;
     this.surveys.set(reply.seed, s);
     this.ms.push(reply.ms);
-    card.classList.add(s.ok ? (s.attempt === 0 ? 'is-first' : 'is-repaired') : 'is-invalid');
-    status.textContent = s.ok ? (s.attempt === 0 ? 'valid at the first attempt' : `valid after ${s.attempt} re-roll${s.attempt === 1 ? '' : 's'}`) : 'fails validation';
+    const first = s.attempt === 0 && s.repairs === 0;
+    card.classList.add(s.ok ? (first ? 'is-first' : 'is-repaired') : 'is-invalid');
+    status.textContent = !s.ok ? 'fails validation' : first ? 'valid at the first attempt' : s.repairs > 0 ? `valid after ${s.repairs} repair${s.repairs === 1 ? '' : 's'}` : `valid after ${s.attempt} re-roll${s.attempt === 1 ? '' : 's'}`;
     const notes = card.querySelector('.explore-notes')!;
     const stats = Object.entries(s.stats)
       .map(([k, v]) => `<span><b>${v}</b> ${escapeHtml(k)}</span>`)
@@ -114,13 +115,13 @@ export class Explorer {
 
   private updateSummary(): void {
     const done = [...this.surveys.values()];
-    const first = done.filter((s) => s.ok && s.attempt === 0).length;
+    const first = done.filter((s) => s.ok && s.attempt === 0 && s.repairs === 0).length;
     const valid = done.filter((s) => s.ok).length;
     const pending = this.seeds.length - this.cards.size + [...this.cards.values()].filter((c) => c.classList.contains('is-pending')).length;
     const mean = this.ms.length ? this.ms.reduce((a, b) => a + b, 0) / this.ms.length : 0;
     this.summary.textContent =
       `Series “${this.series}”: ${done.length} of ${this.seeds.length} generated` +
-      (done.length ? ` · ${first} valid at the first attempt · ${valid - first} after re-rolls · ${done.length - valid} invalid · ${Math.round(mean)} ms each` : '') +
+      (done.length ? ` · ${first} valid at the first attempt · ${valid - first} after re-rolls or repairs · ${done.length - valid} invalid · ${Math.round(mean)} ms each` : '') +
       (pending > 0 ? '' : ` · all in ${((performance.now() - this.started) / 1000).toFixed(1)} s`);
   }
 }

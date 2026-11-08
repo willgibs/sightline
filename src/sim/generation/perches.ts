@@ -2,7 +2,7 @@ import type { GenTuning } from '../../config/tuning';
 import { circleDirections, datan2, dcos, dsin, dtanDeg } from '../kernel/core/detmath';
 import type { Heightfield } from '../kernel/world/heightfield';
 import type { Site } from './site';
-import { frameOf, type Raster } from './raster';
+import { frameOf, lineOfSight, type Raster } from './raster';
 
 /**
  * Perches (D7): the places a sniper might lie and look down into the camp, as a finite
@@ -134,4 +134,53 @@ export function perchViewshed(R: Raster, hf: Heightfield, p: PerchSpot): Float32
     }
   }
   return minVis;
+}
+
+/** The perches and each one's viewshed: what's known of a camp's overlooks before it has guards. */
+export interface PerchViews {
+  spots: PerchSpot[];
+  views: Float32Array[];
+}
+
+export function perchViews(R: Raster, hf: Heightfield, site: Site, gen: GenTuning): PerchViews {
+  const spots = findPerches(hf, site, gen);
+  return { spots, views: spots.map((p) => perchViewshed(R, hf, p)) };
+}
+
+/**
+ * Which perches are overviews: those that see at least `overviewShare` of the camp's ground
+ * inside the fence, at chest height. These are the perches that will see many guards, so
+ * the things a shooter shouldn't be able to reach, and the target's walk, are placed against
+ * them (compound.ts, staffing.ts).
+ */
+export function overviewPerches(R: Raster, views: readonly Float32Array[], halfA: number, halfB: number, gen: GenTuning): boolean[] {
+  const inside: number[] = [];
+  for (let c = 0; c < R.na * R.nb; c++) {
+    if (!R.walk[c]) continue;
+    const i = c % R.na;
+    const j = (c - i) / R.na;
+    const a = R.a0 + (i + 0.5) * R.cell;
+    const b = R.b0 + (j + 0.5) * R.cell;
+    if (Math.abs(a) <= halfA - 1 && Math.abs(b) <= halfB - 1) inside.push(c);
+  }
+  return views.map((v) => {
+    let n = 0;
+    for (const c of inside) if (R.ground[c]! + gen.sight.chest >= v[c]!) n++;
+    return inside.length > 0 && n >= gen.compound.overviewShare * inside.length;
+  });
+}
+
+/**
+ * Whether a perch sees a point on a tower's deck. The viewshed counts a roof as hiding what's
+ * under it, which is right for a building but not for a tower's open sides, so this takes
+ * the line itself: clear through the raster (its slabs and tops), and over the ground all
+ * the way from the perch.
+ */
+export function perchSeesDeck(R: Raster, hf: Heightfield, p: PerchSpot, x: number, y: number, z: number): boolean {
+  if (!lineOfSight(R, p.x, p.eye, p.z, x, y, z)) return false;
+  const dx = x - p.x;
+  const dy = y - p.eye;
+  const dz = z - p.z;
+  const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  return hf.raycast(p.x, p.eye, p.z, dx / d, dy / d, dz / d, d) >= d - 0.5;
 }

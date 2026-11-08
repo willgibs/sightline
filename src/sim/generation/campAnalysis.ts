@@ -7,7 +7,7 @@ import { sightlines, takeApart, type Cluster, type PerchSight, type Sightlines }
 import { buildTimeline, exposureField, heatmaps, witnessDuty, witnessEdges, type Field, type Timeline, type Witnesses } from './field';
 import { infiltrate, rimCells, type Exposure, type Infiltration, type Meter, type Search, type Space } from './infiltrate';
 import type { Point2 } from './paths';
-import { findPerches, perchViewshed, type PerchSpot } from './perches';
+import { findPerches, perchSeesDeck, perchViewshed, type PerchSpot } from './perches';
 import { buildRaster, cellOf, centreOf, frameOf, lineOfSight, type Raster } from './raster';
 
 /**
@@ -39,6 +39,10 @@ export interface CampAnalysis {
   infiltration: PathReport;
   sabotage: PathReport;
   exfil: PathReport;
+  /** A second way out, leaving the raster at least `exitApart` from the first. */
+  exfil2: PathReport;
+  /** An unseen way to his escape vehicle, to sabotage it. */
+  vehicle: PathReport;
 }
 
 export interface PerchReport {
@@ -56,8 +60,10 @@ export interface PerchReport {
   /** Alarm boxes in its line of fire, and whether the radio's antenna is. */
   alarms: number;
   antenna: boolean;
-  /** The share of the escape route (inside the raster) in its view. */
-  escape: number;
+  /** Seconds of the target's run from his door to his vehicle in its view: what it would have to shoot him in. */
+  run: number;
+  /** The share of the camp's ground (inside the fence, at chest height) in its view: what makes an overview. */
+  ground: number;
 }
 
 export interface PathReport {
@@ -114,18 +120,39 @@ export function analyzeCamp(
   const alarmBoxes = (camp.devices ?? []).filter((d) => d.kind === 'alarm');
   const mast = camp.structures.find((s) => s.kind === 'mast');
   const mastTop = mast ? colliders.list[mast.colliders[0]!]! : null;
-  const escapePts = sampleRoute(camp.layout?.skeleton.escape ?? [], 2).filter((p) => cellOf(R, p.x, p.z) >= 0);
+  const esc = camp.layout?.skeleton.escape ?? [];
+  const runLen = esc.length >= 3 ? Math.sqrt((esc[2]!.x - esc[1]!.x) * (esc[2]!.x - esc[1]!.x) + (esc[2]!.z - esc[1]!.z) * (esc[2]!.z - esc[1]!.z)) : 0;
+  const runPts = esc.length >= 3 ? sampleRoute([esc[1]!, esc[2]!], 1).filter((p) => cellOf(R, p.x, p.z) >= 0) : [];
+  const halfA = (camp.layout?.halfA ?? 0) - 1;
+  const halfB = (camp.layout?.halfB ?? 0) - 1;
+  const inside: number[] = [];
+  for (let c = 0; c < R.na * R.nb; c++) {
+    if (!R.walk[c]) continue;
+    const i = c % R.na;
+    const j = (c - i) / R.na;
+    const a = R.a0 + (i + 0.5) * R.cell;
+    const b = R.b0 + (j + 0.5) * R.cell;
+    if (Math.abs(a) <= halfA && Math.abs(b) <= halfB) inside.push(c);
+  }
   const perches: PerchReport[] = spots.map((spot, p) => {
     const view = perchViewshed(R, hf, spot);
     const share: number[] = [];
     for (let g = 0; g < n; g++) {
       const t = T.guards[g]!;
       let count = 0;
-      for (let k = 0; k < K; k++) {
-        const c = cellOf(R, t.x[k]!, t.z[k]!);
-        if (c >= 0 && t.chest[k]! >= view[c]!) {
-          seen[(p * n + g) * K + k] = 1;
-          count++;
+      if (t.onDeck) {
+        // He holds one spot all cycle, under an open-sided roof: one line says it.
+        if (perchSeesDeck(R, hf, spot, t.x[0]!, t.chest[0]!, t.z[0]!)) {
+          count = K;
+          seen.fill(1, (p * n + g) * K, (p * n + g) * K + K);
+        }
+      } else {
+        for (let k = 0; k < K; k++) {
+          const c = cellOf(R, t.x[k]!, t.z[k]!);
+          if (c >= 0 && t.chest[k]! >= view[c]!) {
+            seen[(p * n + g) * K + k] = 1;
+            count++;
+          }
         }
       }
       share.push(count / K);
@@ -145,7 +172,8 @@ export function analyzeCamp(
       target: target >= 0 ? share[target]! : 0,
       alarms: alarmBoxes.filter((d) => visibleAt(d.x, d.y, d.z)).length,
       antenna: mastTop ? visibleAt(mastTop.x, mastTop.y1, mastTop.z) : false,
-      escape: escapePts.length > 0 ? escapePts.filter((q) => visibleAt(q.x, hf.heightAt(q.x, q.z) + 1.5, q.z)).length / escapePts.length : 0,
+      run: runPts.length > 0 ? ((runPts.filter((q) => visibleAt(q.x, hf.heightAt(q.x, q.z) + gen.sight.chest, q.z)).length / runPts.length) * runLen) / gen.validation.runSpeed : 0,
+      ground: inside.length > 0 ? inside.filter((c) => R.ground[c]! + gen.sight.chest >= view[c]!).length / inside.length : 0,
     };
   });
   for (let p = 0; p < spots.length; p++) {
@@ -160,8 +188,14 @@ export function analyzeCamp(
   const certified = takeApart(W, duty, lines, gen);
 
   // --- Infiltration: to the target, to the generator, and back out. -------------------
-  const meter = { levels: A.meterLevels, decay: Math.max(1, Math.round(A.meterDecay * A.meterLevels * A.dt)), still: gen.sight.still };
+  // The ways in keep a margin: lab A's law isn't quite D's (a patrol's gaze, how fast a meter falls), so a certified way never fills the meter past `meterLimit`.
+  const meter = { levels: Math.round(A.meterLevels * A.meterLimit), decay: Math.max(1, Math.round(A.meterDecay * A.meterLevels * A.dt)), still: gen.sight.still };
   const horizon = 2 * K;
+  /** Is there a way? Validation asks only that, so a greedy search goes first; if it runs out of budget, the exact one. */
+  const find = (E: Exposure, Q: Search): Infiltration => {
+    const greedy = search(R, E, meter, { ...Q, weight: A.searchWeight });
+    return greedy.found || !greedy.exhausted ? greedy : search(R, E, meter, Q);
+  };
   /** Walkable cells whose middles lie within `radius` of any of the points. */
   const near = (points: Array<{ x: number; z: number }>, radius: number): number[] => {
     const set = new Set<number>();
@@ -194,7 +228,7 @@ export function analyzeCamp(
       const m = centreOf(R, c);
       return { x: m.x, z: m.z };
     }),
-    peak: r.peak / meter.levels,
+    peak: r.peak / A.meterLevels,
     expanded: r.expanded,
     exhausted: r.exhausted,
   });
@@ -213,26 +247,44 @@ export function analyzeCamp(
       if (d2 > close * close || d2 < touch * touch) return false;
       return lineOfSight(R, m.x, m.y + gen.sight.crouchHead, m.z, t.x[k]!, t.chest[k]!, t.z[k]!);
     };
-    infiltration = search(R, all, meter, { goal, goalCells, horizon, maxExpansions: A.maxExpansions });
+    infiltration = find(all, { goal, goalCells, horizon, maxExpansions: A.maxExpansions });
   }
   const gen0 = (camp.devices ?? []).find((d) => d.kind === 'generator');
   let sabotage: Infiltration = { found: false, time: -1, cells: [], start: -1, peak: 0, meter: 0, expanded: 0, exhausted: false };
   if (gen0) {
     const goalCells = near([gen0], 2.2);
     const set = new Set(goalCells);
-    sabotage = search(R, all, meter, { goal: (c) => set.has(c), goalCells, horizon, maxExpansions: A.maxExpansions });
+    sabotage = find(all, { goal: (c) => set.has(c), goalCells, horizon, maxExpansions: A.maxExpansions });
   }
+  // A way to the escape vehicle, to sabotage it: the other way to stop his escape.
+  const jeep = (camp.vehicles ?? []).find((v) => v.escape);
+  let vehicle: Infiltration = { found: false, time: -1, cells: [], start: -1, peak: 0, meter: 0, expanded: 0, exhausted: false };
+  if (jeep) {
+    const goalCells = near([jeep], 3.5);
+    const set = new Set(goalCells);
+    if (goalCells.length > 0) vehicle = find(all, { goal: (c) => set.has(c), goalCells, horizon, maxExpansions: A.maxExpansions });
+  }
+  // The ways out, from the shot: to the rim, then to the rim again at least `exitApart` from
+  // where the first left it, so one guarded side never traps him.
   let exfil: Infiltration = { found: false, time: -1, cells: [], start: -1, peak: 0, meter: 0, expanded: 0, exhausted: false };
+  let second: Infiltration = { ...exfil };
   if (infiltration.found) {
+    // From the shot, with his meter at rest: by the time he leaves it has fallen, or the camp knows anyway.
+    const from = { cell: infiltration.cells[infiltration.cells.length - 1]!, time: infiltration.time, meter: 0 };
+    const out = (rim: number[]): Infiltration => {
+      const set = new Set(rim);
+      return find(F, { from, goal: (c) => set.has(c), goalCells: rim, horizon: infiltration.time + horizon, maxExpansions: A.maxExpansions });
+    };
     const rim = rimCells(R);
-    const set = new Set(rim);
-    exfil = search(R, F, meter, {
-      from: { cell: infiltration.cells[infiltration.cells.length - 1]!, time: infiltration.time, meter: infiltration.meter },
-      goal: (c) => set.has(c),
-      goalCells: rim,
-      horizon: infiltration.time + horizon,
-      maxExpansions: A.maxExpansions,
-    });
+    exfil = out(rim);
+    if (exfil.found) {
+      const exit = centreOf(R, exfil.cells[exfil.cells.length - 1]!);
+      const apart = rim.filter((c) => {
+        const m = centreOf(R, c);
+        return (m.x - exit.x) * (m.x - exit.x) + (m.z - exit.z) * (m.z - exit.z) >= A.exitApart * A.exitApart;
+      });
+      second = out(apart);
+    }
   }
 
   const analysis: CampAnalysis = {
@@ -248,6 +300,8 @@ export function analyzeCamp(
     infiltration: report(infiltration),
     sabotage: report(sabotage),
     exfil: report(exfil),
+    exfil2: report(second),
+    vehicle: report(vehicle),
   };
   return { analysis, parts: { raster: R, timeline: T, field: F, witnesses: W, perches: spots, sight, lines } };
 }

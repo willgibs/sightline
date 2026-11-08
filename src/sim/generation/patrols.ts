@@ -89,7 +89,7 @@ export function walkPath(layer: GridLayer, search: GridSearch, from: Point2, to:
 export function clearLine(layer: GridLayer, p: Point2, q: Point2): boolean {
   const dx = q.x - p.x;
   const dz = q.z - p.z;
-  const n = Math.max(1, Math.ceil(Math.sqrt(dx * dx + dz * dz) / (layer.cell * 0.5)));
+  const n = Math.max(1, Math.ceil(Math.sqrt(dx * dx + dz * dz) / (layer.cell * 0.2)));
   for (let s = 0; s <= n; s++) {
     const c = cellIndex(layer, p.x + (dx * s) / n, p.z + (dz * s) / n);
     if (c < 0 || (layer.flags[c]! & Cell.Walkable) === 0) return false;

@@ -14,8 +14,10 @@ import type { Site } from './site';
  */
 export interface Survey {
   seed: string;
-  /** Whole-world re-rolls before the camp passed (Phase 0's valley); D counts camp attempts and repairs on top. */
+  /** Whole-world re-rolls before the camp passed: Phase 0's valley's, or the terrain's for lab D's. */
   attempt: number;
+  /** Generated camps: the repairs it took (none if the camp as first built passed validation). */
+  repairs: number;
   ok: boolean;
   problems: string[];
   /** Named numbers from validation, for the card and for sorting: overwatch sectors, access, and so on. */
@@ -138,6 +140,8 @@ export function surveyWorld(w: World, n = 160): Survey {
     stats['unsolved'] = c.clusters.filter((x) => x.certified === 'unsolved').length;
     stats['way in (s)'] = c.infiltration.found ? Math.round(c.infiltration.arrive) : -1;
     stats['cycle (s)'] = c.cycle;
+    if (r.validation) stats['rules failed'] = r.validation.failed.length;
+    if (r.repairs) stats['repairs'] = r.repairs.length;
   }
   const extra: Pick<Survey, 'ridges' | 'fords' | 'doors' | 'vehicles' | 'skeleton' | 'analysis'> = {};
   if (w.features.ridges) {
@@ -217,6 +221,7 @@ export function surveyWorld(w: World, n = 160): Survey {
     ...extra,
     seed: w.seed,
     attempt: w.attempt,
+    repairs: (r.repairs?.length ?? 0) + (r.campAttempt ?? 0),
     ok: r.ok,
     problems: [...r.problems],
     stats,

@@ -28,16 +28,20 @@ export const BENCH_GOLDEN: PinnedBench = {
       "lab D least margin under the valley budget": 7,
       "lab D widest overwatched horizon (°)": 157,
       "lab D narrowest open horizon (°)": 164,
-      "lab D camps with a way in and out (of 6)": 5,
+      "lab D camps valid at the first attempt, no repair (of 6)": 6,
+      "lab D camps repaired": 0,
+      "lab D rules still broken": 0,
+      "lab D most re-analyses in a repair (of 12)": 0,
+      "lab D camps with a way in and out (of 6)": 6,
       "lab D clusters left unsolved": 0,
-      "lab D busiest search (of 400000 expansions)": 400000,
-      "lab D way in, states expanded: safe intervals": 105852,
-      "lab D way in, states expanded: plain space-time search": 168493
+      "lab D busiest search (of 400000 expansions)": 91041,
+      "lab D way in, states expanded: safe intervals": 51,
+      "lab D way in, states expanded: plain space-time search": 50
     },
     "runs": {
       "camp-systems": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 2759 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 2279 }
         }
       }
     }

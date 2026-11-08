@@ -1,11 +1,15 @@
 import type { GenTuning } from '../../config/tuning';
+import { dcos, dsin } from '../kernel/core/detmath';
 import type { Rng } from '../kernel/core/rng';
 import { Blocks, type ColliderSet } from '../kernel/world/colliders';
+import { Cell, Edge, type SpatialGrid } from '../kernel/world/grid';
 import type { Heightfield } from '../kernel/world/heightfield';
 import { Surface } from '../kernel/world/surfaces';
 import type { Camp, Structure, StructureKind } from './camp';
 import type { CampSpec } from './campSpec';
-import type { Point2 } from './paths';
+import { segmentDistance, type Point2 } from './paths';
+import { overviewPerches, type PerchViews } from './perches';
+import { cellOf, type Raster } from './raster';
 import type { Site } from './site';
 import type { TerrainFeatures } from './terrain';
 
@@ -517,10 +521,6 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   const setW = { x: radioDoor.x + radioDoor.nx * (Math.min(radioLenA, radioLenB) - 1.2), z: radioDoor.z + radioDoor.nz * (Math.min(radioLenA, radioLenB) - 1.2) };
   const setF = toFrame(setW.x, setW.z);
   device('radio', setF.x, setF.z, ground(setF.x, setF.z) + 1.0, add('radio', [box(setF.x, setF.z, 0.8, 0.5, 1.0, Blocks.All, Surface.Metal)]));
-  const mastA = rf.lenA >= rf.lenB ? rf.a + rf.lenA / 2 - 1.5 : rf.a;
-  const mastB = rf.lenA >= rf.lenB ? rf.b : rf.b + rf.lenB / 2 - 1.5;
-  add('mast', [cyl(mastA, mastB, 0.2, C.mast, Blocks.Move | Blocks.Bullet, Surface.Metal)]);
-  occupied.push({ a0: mastA - 1.5, a1: mastA + 1.5, b0: mastB - 1.5, b1: mastB + 1.5 });
 
   // The generator's shed: a roof on four posts, the generator under it.
   const shedRng = rng.fork('shed');
@@ -573,17 +573,6 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   for (const p of frng.shuffle(lightSpots).slice(0, lightCount)) {
     device('light', p.x, p.z, padH + 6.9, add('light', [cyl(p.x, p.z, 0.12, 7, Blocks.Move | Blocks.Bullet, Surface.Metal), box(p.x, p.z, 0.8, 0.4, 0.25, Blocks.All, Surface.Metal, padH + 6.8)]));
     occupied.push({ a0: p.x - 1, a1: p.x + 1, b0: p.z - 1, b1: p.z + 1 });
-  }
-  const alarmSpots: Point2[] = [{ x: gate.a - L + 1.5, z: gate.b + gate.width / 2 + 2 }];
-  for (const bd of buildings) {
-    if (bd.module === 'hq' || bd.module === 'barracks') {
-      const d = doors[bd.doors[0]!]!;
-      alarmSpots.push(toFrame(d.x - d.nx * 1.6 + d.ux * 1.6, d.z - d.nz * 1.6 + d.uz * 1.6));
-    }
-  }
-  const alarmCount = Math.min(alarmSpots.length, frng.int(C.alarms[0]!, C.alarms[1]!));
-  for (const p of alarmSpots.slice(0, alarmCount)) {
-    device('alarm', p.x, p.z, padH + 1.4, add('alarm', [cyl(p.x, p.z, 0.06, 1.2, Blocks.Move | Blocks.Bullet, Surface.Metal), box(p.x, p.z, 0.35, 0.25, 0.45, Blocks.All, Surface.Metal, padH + 1.15)]));
   }
   function toFrame(x: number, z: number): Point2 {
     const dx = x - site.x;
@@ -679,6 +668,272 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   const generator = devices.findIndex((d) => d.kind === 'generator');
   for (const d of devices) d.feed = d.kind === 'generator' ? -1 : generator;
   return { site, structures, guards: [], fenceHalf: Math.max(HA, HB), layout, doors, vehicles, ladders, devices };
+}
+
+/**
+ * The fixtures validation asks about, placed by the perches' viewsheds once the raster knows
+ * where everything stands (D8). What a shooter on a perch can reach, he can silence, so the
+ * antenna and the alarm boxes go where the fewest overviews can see them: on the walls of
+ * buildings, clear of their doors, or indoors if no wall will do. They're too small to
+ * change what the grid and the raster say about the camp. And the target's vehicle is
+ * parked where his run to it is hidden from the best overview and shown to another perch.
+ */
+export function placeFixtures(camp: Camp, colliders: ColliderSet, hf: Heightfield, R: Raster, perches: PerchViews, gen: GenTuning, rng: Rng): void {
+  const C = gen.compound;
+  const hfHeight = (x: number, z: number): number => hf.heightAt(x, z);
+  const L = camp.layout!;
+  const padH = camp.site.height;
+  const doors = camp.doors ?? [];
+  const devices = camp.devices ?? (camp.devices = []);
+  const generator = devices.findIndex((d) => d.kind === 'generator');
+  /** How many perches (of `among`, or all) see height y at a point. */
+  const seenBy = (x: number, y: number, z: number, among: readonly Float32Array[] = perches.views): number => {
+    const c = cellOf(R, x, z);
+    if (c < 0) return among.length;
+    let n = 0;
+    for (const v of among) if (y >= v[c]!) n++;
+    return n;
+  };
+  // The perches that overlook most of the camp: a fixture hides from them first.
+  const overviews = overviewPerches(R, perches.views, L.halfA, L.halfB, gen);
+  const strong = perches.views.filter((_, i) => overviews[i]);
+  const inside: number[] = [];
+  for (let c = 0; c < R.na * R.nb; c++) {
+    if (!R.walk[c]) continue;
+    const i = c % R.na;
+    const j = (c - i) / R.na;
+    const a = R.a0 + (i + 0.5) * R.cell;
+    const b = R.b0 + (j + 0.5) * R.cell;
+    if (Math.abs(a) <= L.halfA - 1 && Math.abs(b) <= L.halfB - 1) inside.push(c);
+  }
+  interface WallSpot {
+    x: number;
+    z: number;
+    seen: number;
+    building: number;
+  }
+  /** Four spots along each of a building's walls, just off it and clear of its doors. */
+  const wallSpots = (index: number, height: number): WallSpot[] => {
+    const bd = L.buildings[index]!;
+    const out: WallSpot[] = [];
+    const vx = -bd.uz;
+    const vz = bd.ux;
+    const faces = [
+      { nx: bd.ux, nz: bd.uz, half: bd.length / 2, tx: vx, tz: vz, span: bd.depth },
+      { nx: -bd.ux, nz: -bd.uz, half: bd.length / 2, tx: vx, tz: vz, span: bd.depth },
+      { nx: vx, nz: vz, half: bd.depth / 2, tx: bd.ux, tz: bd.uz, span: bd.length },
+      { nx: -vx, nz: -vz, half: bd.depth / 2, tx: bd.ux, tz: bd.uz, span: bd.length },
+    ];
+    for (const f of faces) {
+      for (const along of [-3, -1, 1, 3].map((k) => (k * f.span) / 8)) {
+        const x = bd.x + f.nx * (f.half + 0.3) + f.tx * along;
+        const z = bd.z + f.nz * (f.half + 0.3) + f.tz * along;
+        if (doors.some((d) => (d.x - x) * (d.x - x) + (d.z - z) * (d.z - z) < C.fixtureDoorGap * C.fixtureDoorGap)) continue;
+        out.push({ x, z, seen: seenBy(x, height, z, strong) * perches.views.length + seenBy(x, height, z), building: index });
+      }
+    }
+    return out;
+  };
+  // The fewest perches first; among equals, the order the fork shuffles them into.
+  const hiddenFirst = (spots: WallSpot[], fork: Rng): WallSpot[] => {
+    const shuffled = fork.shuffle(spots).map((w, order) => ({ w, order }));
+    shuffled.sort((p, q) => p.w.seen - q.w.seen || p.order - q.order); // unique: each spot's place in the shuffle
+    return shuffled.map((p) => p.w);
+  };
+  // --- The escape (Hitman's exploit: a camper triggers the evacuation and shoots the target
+  // on the run). His vehicle waits near a door of his building, on a spot where his run to it
+  // is out of the best overview's sight and in another perch's. The run is what a perch must
+  // see to stop him: the vehicle is fast, and a bullet won't stop it.
+  {
+    const groundSeen = (v: Float32Array): number => {
+      let n = 0;
+      for (const c of inside) if (R.ground[c]! + gen.sight.chest >= v[c]!) n++;
+      return n;
+    };
+    // The best overview, and those within a whisker of it (the second raster can reorder near-equals).
+    const seenGround = perches.views.map(groundSeen);
+    const mostGround = Math.max(...seenGround);
+    const overview = seenGround.map((g, i) => (g >= mostGround * 0.97 ? i : -1)).filter((i) => i >= 0);
+    const hq = L.buildings.find((b) => b.module === 'hq');
+    const jeep = (camp.vehicles ?? []).find((ve) => ve.escape);
+    const skeleton = L.skeleton;
+    if (hq && jeep && perches.views.length > 0) {
+      const forward = { x: L.ux, z: L.uz };
+      const runSeconds = (view: Float32Array, a: Point2, b: Point2): number => {
+        const len = Math.sqrt((b.x - a.x) * (b.x - a.x) + (b.z - a.z) * (b.z - a.z));
+        const n = Math.max(1, Math.ceil(len));
+        let seen = 0;
+        for (let k = 0; k <= n; k++) {
+          const c = cellOf(R, a.x + ((b.x - a.x) * k) / n, a.z + ((b.z - a.z) * k) / n);
+          if (c >= 0 && R.ground[c]! + gen.sight.chest >= view[c]!) seen++;
+        }
+        return ((seen / (n + 1)) * len) / gen.validation.runSpeed;
+      };
+      const fits = (x: number, z: number, fx: number, fz: number): boolean => {
+        // The vehicle's footprint, and a half metre round it, all on open ground.
+        for (let a = -jeep.length / 2 - 0.5; a <= jeep.length / 2 + 0.5; a += 0.5) {
+          for (let b = -jeep.width / 2 - 0.5; b <= jeep.width / 2 + 0.5; b += 0.5) {
+            const c = cellOf(R, x + fx * a - fz * b, z + fz * a + fx * b);
+            if (c < 0 || !R.walk[c]) return false;
+          }
+        }
+        for (const other of camp.vehicles ?? []) {
+          if (other === jeep) continue;
+          if ((other.x - x) * (other.x - x) + (other.z - z) * (other.z - z) < 36) return false;
+        }
+        for (let k = 0; k + 1 < skeleton.corridor.length; k++) {
+          if (segmentDistance({ x, z }, skeleton.corridor[k]!, skeleton.corridor[k + 1]!) < C.escapeClearance) return false;
+        }
+        return true;
+      };
+      /** Whether he can run it: every metre of the straight line on open ground. */
+      const runnable = (a: Point2, b: Point2): boolean => {
+        const len = Math.sqrt((b.x - a.x) * (b.x - a.x) + (b.z - a.z) * (b.z - a.z));
+        for (let d = 0; d <= len; d += 0.5) {
+          const c = cellOf(R, a.x + ((b.x - a.x) * d) / len, a.z + ((b.z - a.z) * d) / len);
+          if (c < 0 || !R.walk[c]) return false;
+        }
+        return true;
+      };
+      let best: { x: number; z: number; step: Point2; fx: number; fz: number; short: number; dist: number } | null = null;
+      for (const di of hq.doors) {
+        const door = doors[di]!;
+        const step = { x: door.x - door.nx * 2, z: door.z - door.nz * 2 };
+        for (let dist = C.escapeRun[0]!; dist <= C.escapeRun[1]!; dist += 2) {
+          for (let k = 0; k < 24; k++) {
+            const angle = (k * Math.PI) / 12;
+            const dx = dcos(angle);
+            const dz = dsin(angle);
+            const x = step.x + dx * dist;
+            const z = step.z + dz * dist;
+            // Parked along the camp's axes, nose toward the gate or across the camp.
+            for (const [fx, fz] of [
+              [forward.x, forward.z],
+              [-forward.z, forward.x],
+            ] as const) {
+              if (!fits(x, z, fx, fz) || !runnable(step, { x, z })) continue;
+              const hidden = Math.max(...overview.map((i) => runSeconds(perches.views[i]!, step, { x, z })));
+              let other = 0;
+              perches.views.forEach((v, i) => {
+                if (!overview.includes(i)) other = Math.max(other, runSeconds(v, step, { x, z }));
+              });
+              // How far short it falls: hidden from the overview, in view of another perch (each with a margin).
+              const I = gen.validation.interceptSeconds;
+              const short = Math.max(0, hidden - (I - 0.3)) + Math.max(0, I + 0.3 - other);
+              if (!best || short < best.short - 1e-9 || (short < best.short + 1e-9 && dist < best.dist)) best = { x, z, step, fx, fz, short, dist };
+              break;
+            }
+          }
+        }
+      }
+      if (best) {
+        jeep.x = best.x;
+        jeep.z = best.z;
+        jeep.y = Math.min(hfHeight(best.x, best.z), padH);
+        jeep.fx = best.fx;
+        jeep.fz = best.fz;
+        skeleton.escape[1] = best.step;
+        skeleton.escape[2] = { x: best.x, z: best.z };
+      }
+    }
+  }
+  const addStructure = (kind: StructureKind, ids: number[]): number => camp.structures.push({ kind, colliders: ids }) - 1;
+  const post = (x: number, z: number, r: number, h: number, flags: number): number => colliders.add({ kind: 'cyl', x, z, y0: padH - 0.3, y1: padH + h, r, flags, surface: Surface.Metal });
+  // The radio's antenna: a short whip on the room's most hidden wall, below its roof line.
+  const radioRoom = L.buildings.findIndex((b) => b.module === 'radio');
+  if (radioRoom >= 0) {
+    // On its own walls if one is hidden from the overviews; if not, on the nearest building's that is.
+    const room = L.buildings[radioRoom]!;
+    const fork = rng.fork('antenna');
+    const own = hiddenFirst(wallSpots(radioRoom, padH + C.mast), fork)[0];
+    let whip = own;
+    if (!own || own.seen >= perches.views.length) {
+      const near = L.buildings
+        .map((b, i) => ({ b, i, d: (b.x - room.x) * (b.x - room.x) + (b.z - room.z) * (b.z - room.z) }))
+        .filter((e) => e.i !== radioRoom)
+        .sort((a, b) => a.d - b.d || a.i - b.i); // unique: building indices differ
+      for (const e of near) {
+        const spot = hiddenFirst(wallSpots(e.i, padH + C.mast), fork)[0];
+        if (spot && (!whip || spot.seen < whip.seen)) whip = spot;
+      }
+    }
+    if (whip && whip.seen >= perches.views.length) {
+      // No wall hides it from every overview: the antenna goes inside, beside the set, under the roof.
+      const set = devices.find((d) => d.kind === 'radio');
+      if (set) whip = { ...whip, x: set.x + 0.6 * room.ux, z: set.z + 0.6 * room.uz };
+    }
+    if (whip) addStructure('mast', [post(whip.x, whip.z, 0.08, C.mast, Blocks.Move | Blocks.Bullet)]);
+  }
+  // Alarm boxes: a few, well apart, on the buildings people use.
+  const count = rng.fork('alarm-count').int(C.alarms[0]!, C.alarms[1]!);
+  const candidates = L.buildings.flatMap((b, i) => (b.module === 'hq' || b.module === 'barracks' || b.module === 'mess' || b.module === 'storage' ? wallSpots(i, padH + 1.4) : []));
+  const chosen: WallSpot[] = [];
+  const pick = (spots: WallSpot[]): void => {
+    for (const spot of spots) {
+      if (chosen.length >= count) break;
+      if (chosen.some((c) => (c.x - spot.x) * (c.x - spot.x) + (c.z - spot.z) * (c.z - spot.z) < C.alarmSpacing * C.alarmSpacing)) continue;
+      chosen.push(spot);
+    }
+  };
+  // Out in the open if a wall hides it from the overviews; if not, just inside a door, under the roof.
+  const scale = perches.views.length;
+  pick(hiddenFirst(candidates, rng.fork('alarms')).filter((w) => w.seen < scale));
+  if (chosen.length < count) {
+    const indoors: WallSpot[] = [];
+    for (let i = 0; i < L.buildings.length; i++) {
+      const b = L.buildings[i]!;
+      if (b.module !== 'hq' && b.module !== 'barracks' && b.module !== 'mess' && b.module !== 'storage') continue;
+      for (const di of b.doors) {
+        const d = doors[di]!;
+        // Well to the side of the doorway and a pace inside (nx points into the room), so no
+        // line through the doorway reaches it.
+        const tx = -d.nz;
+        const tz = d.nx;
+        for (const side of [1, -1]) {
+          const x = d.x + d.nx * 1.2 + tx * side * (C.doorWidth / 2 + 1.5);
+          const z = d.z + d.nz * 1.2 + tz * side * (C.doorWidth / 2 + 1.5);
+          const c = cellOf(R, x, z);
+          if (c >= 0) indoors.push({ x, z, seen: seenBy(x, padH + 1.4, z, strong) * scale + seenBy(x, padH + 1.4, z), building: i });
+        }
+      }
+    }
+    pick(hiddenFirst(indoors, rng.fork('alarms-in')));
+  }
+  for (const w of chosen) {
+    const box = colliders.add({ kind: 'box', x: w.x, z: w.z, y0: padH + 1.15, y1: padH + 1.6, hx: 0.175, hz: 0.125, ux: L.ux, uz: L.uz, flags: Blocks.All, surface: Surface.Metal });
+    const structure = addStructure('alarm', [post(w.x, w.z, 0.06, 1.2, Blocks.Move | Blocks.Bullet), box]);
+    devices.push({ kind: 'alarm', x: w.x, y: padH + 1.4, z: w.z, structure, feed: generator });
+  }
+}
+
+/**
+ * Parked vehicles aren't colliders (they're entities, with solids), so the grid doesn't know
+ * them: their footprints, and a body's radius round them, are marked as ground a body can't
+ * use, so routes go round them.
+ */
+export function blockVehicles(camp: Camp, grid: SpatialGrid, gen: GenTuning): void {
+  const L = grid.site;
+  const r = gen.grid.bodyRadius;
+  const block = (k: number): void => {
+    L.flags[k] = L.flags[k]! & ~Cell.Walkable;
+    L.edges[k] = 0;
+    if (k >= 1 && k % L.nx !== 0) L.edges[k - 1] = L.edges[k - 1]! & ~Edge.East;
+    if (k >= L.nx) L.edges[k - L.nx] = L.edges[k - L.nx]! & ~Edge.North;
+  };
+  for (const v of camp.vehicles ?? []) {
+    const hl = v.length / 2 + r;
+    const hw = v.width / 2 + r;
+    const reach = Math.ceil(Math.sqrt(hl * hl + hw * hw) / L.cell) + 1;
+    const ci = Math.floor((v.x - L.x0) / L.cell);
+    const cj = Math.floor((v.z - L.z0) / L.cell);
+    for (let j = Math.max(0, cj - reach); j <= Math.min(L.nz - 1, cj + reach); j++) {
+      for (let i = Math.max(0, ci - reach); i <= Math.min(L.nx - 1, ci + reach); i++) {
+        const dx = L.x0 + (i + 0.5) * L.cell - v.x;
+        const dz = L.z0 + (j + 0.5) * L.cell - v.z;
+        if (Math.abs(dx * v.fx + dz * v.fz) <= hl && Math.abs(-dx * v.fz + dz * v.fx) <= hw) block(j * L.nx + i);
+      }
+    }
+  }
 }
 
 function overlaps(p: Rect, q: Rect): boolean {

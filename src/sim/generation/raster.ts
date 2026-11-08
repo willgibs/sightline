@@ -89,12 +89,20 @@ export function buildRaster(camp: Camp, hf: Heightfield, colliders: ColliderSet,
       R.top[j * na + i] = g;
     }
   }
-  // Everything that stops sight, by its footprint's extent in the camp's frame.
+  // Everything that stops sight, by its footprint's extent in the camp's frame. A certified
+  // way in must not lean on a cell's whole width where the thing only clips it, so a thing
+  // wider than a cell fills the cells whose centres it covers, and a thinner one (a wall)
+  // just the row of cells its centre line runs through.
+  const span = (lo: number, hi: number, min: number, count: number): [number, number] => {
+    if (hi - lo < cell) {
+      const c = Math.floor(((lo + hi) / 2 - min) / cell);
+      return [Math.max(0, c), Math.min(count - 1, c)];
+    }
+    return [Math.max(0, Math.ceil((lo - min) / cell - 0.5)), Math.min(count - 1, Math.floor((hi - min) / cell - 0.5))];
+  };
   const stamp = (a0: number, a1: number, b0: number, b1: number, y0: number, y1: number, overhead: boolean) => {
-    const i0 = Math.max(0, Math.floor((a0 - R.a0) / cell));
-    const i1 = Math.min(na - 1, Math.ceil((a1 - R.a0) / cell) - 1);
-    const j0 = Math.max(0, Math.floor((b0 - R.b0) / cell));
-    const j1 = Math.min(nb - 1, Math.ceil((b1 - R.b0) / cell) - 1);
+    const [i0, i1] = span(a0, a1, R.a0, na);
+    const [j0, j1] = span(b0, b1, R.b0, nb);
     for (let j = j0; j <= j1; j++) {
       for (let i = i0; i <= i1; i++) {
         const k = j * na + i;
@@ -110,6 +118,16 @@ export function buildRaster(camp: Camp, hf: Heightfield, colliders: ColliderSet,
   const maxA = R.a0 + na * cell;
   const minB = R.b0;
   const maxB = R.b0 + nb * cell;
+  // A tower is open under its roof: a guard on its deck sees out, and is seen, between the
+  // parapet and the roof. A cell holds one overhead slab, so its deck, legs and parapet count
+  // as solid from the ground up, and only its roof as the slab.
+  const towerRoof = new Map<number, number>();
+  for (const st of camp.structures) {
+    if (st.kind !== 'tower') continue;
+    let roof = -Infinity;
+    for (const id of st.colliders) roof = Math.max(roof, colliders.list[id]!.y1);
+    for (const id of st.colliders) towerRoof.set(id, roof);
+  }
   for (const c of colliders.list) {
     if ((c.flags & Blocks.Sight) === 0) continue;
     const f = frameOf(R, c.x, c.z);
@@ -126,7 +144,8 @@ export function buildRaster(camp: Camp, hf: Heightfield, colliders: ColliderSet,
       eb = Math.abs(dv) * c.hx + Math.abs(du) * c.hz;
     }
     if (f.a + ea < minA || f.a - ea > maxA || f.b + eb < minB || f.b - eb > maxB) continue;
-    stamp(f.a - ea, f.a + ea, f.b - eb, f.b + eb, c.y0, c.y1, false);
+    const roof = towerRoof.get(c.id);
+    stamp(f.a - ea, f.a + ea, f.b - eb, f.b + eb, roof !== undefined && c.y1 < roof - 0.5 ? -Infinity : c.y0, c.y1, false);
   }
   // Parked vehicles are entities, not colliders, but they stand there all mission.
   for (const v of camp.vehicles ?? []) {

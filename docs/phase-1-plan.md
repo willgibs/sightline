@@ -684,7 +684,7 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
     - Clusters are the strongly connected parts of the witness graph. They are certified watchers first by a bounded search: chains inside the 1.5 s reaction, waits for windows, relocation between perches, one distraction.
     - Staffing places each guard so the graph stays within limits (no part over 4, one over 3 at most) and the corridor stays a way in.
     - Over 16 camps: every one has a way in, to the generator and out, and no cluster is unsolved. The best perch sees 38–56% of guard time, but the target is in some perch's view for 10–37% of the cycle, which D8's rule (25%) will repair. A camp generates in about 2.3 s.
-- [ ] D8 · Validation and repair.
+- [x] D8 · Validation and repair.
   - The design doc's rules, plus **no single perch wins**, checked exhaustively over the finite list of perches.
   - Both perch rules count coverage the same way: the share of each guard's time in view over the cycle, or a minimum time in view. Never "ever in view", which would count every passing patrol.
   - Starting values, for any one perch:
@@ -697,6 +697,10 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
     - the escape route is interceptable only from perches other than the best overview.
   - Repair is a bounded greedy search over a fixed list of operators (move a sentry, shift a patrol's phase, swap a module, add cover, re-time a light circuit). Each attempt draws from its own labelled fork and stops after a fixed number of iterations (rule 18).
   - Difficulty comes from cluster count and size.
+  - **Built** (`generation/validate.ts`, `repair.ts`, `plans.ts`, and in `compound.ts` and `staffing.ts`). Every rule above, measured as `docs/decisions.md` says, with `seeds --camps` reporting first attempts, repairs, rebuilds and each seed's margin.
+    - The generator builds to the rules first: the antenna and alarm boxes hidden from the overviews (walls, else indoors), the target's walk and his vehicle chosen against the perches, chores indoors, posts moved off a dominant perch.
+    - Repair: shift a patrol's phase, turn or move a post, or move it out of an offending perch's sight, kept only if the camp comes closer to valid, within 12 re-analyses. A camp it can't save is rebuilt from fresh forks, up to 3 times.
+    - Running the ways in through the real simulation (`npm run plans -- --simulate`) corrected four things in D7's model: the crouched pace (a step takes 5/9 s), towers (open under the roof), how the raster stamps thin things (by cell centres, so a certificate of stealth errs the safe way), and a margin (a certified way may fill the meter only to 85%). With them, every way in tried held in the simulation.
 - [ ] D9 · The valley switches to the generator, and the test camp retires. It lands alone.
 - [ ] Exit test, the bench numbers, a note, a playable link.
 
