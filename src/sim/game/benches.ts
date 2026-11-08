@@ -11,7 +11,8 @@ import { ChaosBot } from './bots/chaos';
 import { WanderBot } from './bots/wander';
 import { PINNED_RUNS, behaviourInto } from './runs';
 import { Simulation } from './sim';
-import { Acoustics, SEED_LAW, SIGHT_LAW, crackHeard, emptyHeard, foliageOf, sweepSight, type CrackHeard, type FlightPoint } from '../perception';
+import { Acoustics, SEED_LAW, SIGHT_LAW, crackHeard, drawnLit, emptyHeard, foliageOf, groundLight, shadeMap, sweepSight, type CrackHeard, type FlightPoint } from '../perception';
+import { Solids } from '../kernel/world/solids';
 import { datan2, dexp } from '../kernel/core/detmath';
 import { air, defaultEnv } from '../kernel/env';
 import { Rng } from '../kernel/core/rng';
@@ -167,6 +168,29 @@ function perceptionMetrics(): Record<string, number> {
     if (!Object.is(a.clarity, b.clarity) || a.fromX !== b.fromX || a.fromZ !== b.fromZ || a.length !== b.length) differ++;
   }
   m['hearing: speakers and a guard at the same place differ (of 200)'] = differ;
+  // Shade drawn as simulated (A4): the drawn map against the simulation's light, over the area and at the edges.
+  const solids = new Solids(lab.colliders);
+  const area = lab.shadeArea!;
+  const map = shadeMap(lab, solids, lab.spec.env, 0, area, defaultTuning);
+  const simLit = (x: number, z: number): boolean =>
+    groundLight(lab, solids, lab.spec.env, 0, x, lab.terrain.heightAt(x, z), z, defaultTuning) === defaultTuning.visibility.light.lit;
+  let agree = 0;
+  for (let k = 0; k < 20000; k++) {
+    const x = rng.range(area.x0, area.x1);
+    const z = rng.range(area.z0, area.z1);
+    if (drawnLit(map, x, z) === simLit(x, z)) agree++;
+  }
+  m['shade: drawn as simulated, of 20000 points'] = agree;
+  const shaded: number[] = [];
+  for (let k = 0; k < map.lit.length; k++) if (map.lit[k] === 0) shaded.push(k);
+  let edges = 0;
+  for (let k = 0; k < 6000; k++) {
+    const c = shaded[rng.int(0, shaded.length - 1)]!;
+    const x = map.x0 + ((c % map.nx) + 0.5) * map.cell + rng.range(-1.5, 1.5);
+    const z = map.z0 + (Math.floor(c / map.nx) + 0.5) * map.cell + rng.range(-1.5, 1.5);
+    if (drawnLit(map, x, z) === simLit(x, z)) edges++;
+  }
+  m['shade: drawn as simulated within 1.5 m of a shadow, of 6000 points'] = edges;
   // The crack (A5): listeners 5–15 m from a bullet's path at 300 m, its speed falling as a
   // drag constant makes it (790 m/s at the muzzle, about 650 m/s there).
   const angles = crackBias();

@@ -68,6 +68,8 @@ export const BENCH_GOLDEN: PinnedBench = {
       "sight scenarios as expected (of 15)": 15,
       "foliage: pairs that differ by direction (of 2000)": 0,
       "hearing: speakers and a guard at the same place differ (of 200)": 0,
+      "shade: drawn as simulated, of 20000 points": 19982,
+      "shade: drawn as simulated within 1.5 m of a shadow, of 6000 points": 5810,
       "crack at 300 m: least degrees off the shooter": 55.438591,
       "crack at 300 m: most degrees off the shooter": 57.2126615,
       "seed · crack at 300 m: degrees off the shooter": 0

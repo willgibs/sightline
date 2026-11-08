@@ -13,6 +13,12 @@ interface GuardMesh {
   head: THREE.Group;
   body: THREE.Mesh;
   legs: THREE.Mesh;
+  /** The head sphere and the rifle, drawn in the guard's plain colour. */
+  plain: THREE.Mesh[];
+  visor: THREE.Mesh;
+  role: GuardRole;
+  /** In the sun as last drawn (A4). */
+  lit: boolean;
 }
 
 /**
@@ -35,6 +41,10 @@ export class GuardMeshes {
   private readonly honestMaterial: THREE.ShaderMaterial;
   private readonly roleMaterials: Record<GuardRole, THREE.ShaderMaterial>;
   private readonly visorMaterial: THREE.ShaderMaterial;
+  /** The same, in shade: a guard is drawn lit or shaded as the simulation finds the ground beneath him (A4). */
+  private readonly honestShaded: THREE.ShaderMaterial;
+  private readonly roleShaded: Record<GuardRole, THREE.ShaderMaterial>;
+  private readonly visorShaded: THREE.ShaderMaterial;
   private readonly bodyGeo: THREE.BufferGeometry;
   private readonly legsGeo: THREE.BufferGeometry;
   private readonly headGeo: THREE.BufferGeometry;
@@ -74,6 +84,9 @@ export class GuardMeshes {
     this.honestMaterial = createFlatMaterial(look, { color: palette.guard });
     this.roleMaterials = Object.fromEntries(GUARD_ROLES.map((role) => [role, createFlatMaterial(look, { color: palette.debug.roles[role] })])) as Record<GuardRole, THREE.ShaderMaterial>;
     this.visorMaterial = createFlatMaterial(look, { color: palette.guardVisor });
+    this.honestShaded = createFlatMaterial(look, { color: palette.guard, shaded: true });
+    this.roleShaded = Object.fromEntries(GUARD_ROLES.map((role) => [role, createFlatMaterial(look, { color: palette.debug.roles[role], shaded: true })])) as Record<GuardRole, THREE.ShaderMaterial>;
+    this.visorShaded = createFlatMaterial(look, { color: palette.guardVisor, shaded: true });
     // The body's radius covers its capsules; the camera's near plane (0.08 m) cuts into anything closer.
     this.reach = spec.radius + 0.12;
     this.height = spec.height.stand + 0.12;
@@ -81,30 +94,38 @@ export class GuardMeshes {
 
   private make(role: GuardRole): GuardMesh {
     const root = new THREE.Group();
-    const material = this.debugTint ? this.roleMaterials[role] : this.honestMaterial;
-    const body = new THREE.Mesh(this.bodyGeo, material);
+    const body = new THREE.Mesh(this.bodyGeo, this.honestMaterial);
     body.userData.role = role;
-    const legs = new THREE.Mesh(this.legsGeo, material);
+    const legs = new THREE.Mesh(this.legsGeo, this.honestMaterial);
     const head = new THREE.Group();
     head.position.set(0, this.headY, 0);
-    head.add(new THREE.Mesh(this.headGeo, this.honestMaterial), new THREE.Mesh(this.visorGeo, this.visorMaterial));
+    const skull = new THREE.Mesh(this.headGeo, this.honestMaterial);
+    const visor = new THREE.Mesh(this.visorGeo, this.visorMaterial);
+    head.add(skull, visor);
     const rifle = new THREE.Mesh(this.rifleGeo, this.honestMaterial);
     rifle.position.set(0.2, this.rifleY, -0.18);
     rifle.rotation.set(-0.35, 0.25, 0.2);
     root.add(legs, body, head, rifle);
     this.group.add(root);
-    return { root, head, body, legs };
+    const g: GuardMesh = { root, head, body, legs, plain: [skull, rifle], visor, role, lit: true };
+    this.paint(g);
+    return g;
+  }
+
+  /** Puts a guard's materials on: by role in the debug view, plain in the honest one; lit or in shade. */
+  private paint(g: GuardMesh): void {
+    const plain = g.lit ? this.honestMaterial : this.honestShaded;
+    g.body.material = this.debugTint ? (g.lit ? this.roleMaterials : this.roleShaded)[g.role] : plain;
+    g.legs.material = g.body.material;
+    for (const m of g.plain) m.material = plain;
+    g.visor.material = g.lit ? this.visorMaterial : this.visorShaded;
   }
 
   /** Debug view tints guards by role; the honest view keeps them uniform. */
   setDebugTint(on: boolean): void {
     if (on === this.debugTint) return;
     this.debugTint = on;
-    for (const g of this.guards.values()) {
-      const role = g.body.userData.role as GuardRole;
-      g.body.material = on ? this.roleMaterials[role] : this.honestMaterial;
-      g.legs.material = g.body.material;
-    }
+    for (const g of this.guards.values()) this.paint(g);
   }
 
   /**
@@ -134,6 +155,11 @@ export class GuardMeshes {
       g.root.position.set(x, y, z);
       g.root.rotation.y = yaw;
       g.head.rotation.y = head;
+      const lit = b[o + 6]! >= 1;
+      if (lit !== g.lit) {
+        g.lit = lit;
+        this.paint(g);
+      }
       const dx = eye.x - x;
       const dz = eye.z - z;
       g.root.visible = !(dx * dx + dz * dz < this.reach * this.reach && eye.y > y - 0.12 && eye.y < y + this.height);
@@ -158,7 +184,10 @@ export class GuardMeshes {
     for (const geo of [this.bodyGeo, this.legsGeo, this.headGeo, this.visorGeo, this.rifleGeo]) geo.dispose();
     this.honestMaterial.dispose();
     this.visorMaterial.dispose();
+    this.honestShaded.dispose();
+    this.visorShaded.dispose();
     for (const m of Object.values(this.roleMaterials)) m.dispose();
+    for (const m of Object.values(this.roleShaded)) m.dispose();
     this.guards.clear();
     void this.look;
   }

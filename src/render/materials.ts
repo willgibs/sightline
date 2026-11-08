@@ -5,7 +5,12 @@ import { palette } from './palette';
  * One lighting model for everything solid, matching the terrain shader: flat facets
  * (normals from screen-space derivatives, so no normals are needed and instancing just
  * works), a hemisphere ambient, a single sun, and the same exp² fog.
+ *
+ * Fog grows with distance from the eye, not depth along the view (A4): a guard's contrast
+ * against the haze is the same whichever way you turn your head. three.js's own fog is
+ * made to agree, for the edge lines and anything else drawn with its materials.
  */
+THREE.ShaderChunk.fog_vertex = THREE.ShaderChunk.fog_vertex.replace('vFogDepth = - mvPosition.z;', 'vFogDepth = length( mvPosition.xyz );');
 
 export interface LookUniforms {
   uSunDir: THREE.IUniform<THREE.Vector3>;
@@ -50,7 +55,7 @@ void main() {
   vColor *= instanceColor;
   #endif
   vec4 mv = viewMatrix * wp;
-  vDepth = -mv.z;
+  vDepth = length(mv.xyz);
   gl_Position = projectionMatrix * mv;
 }
 `;
@@ -58,6 +63,8 @@ void main() {
 const flatFragment = /* glsl */ `
 uniform vec3 uColor;
 uniform float uOpacity;
+/** 1 in the sun, 0 in shade: a body's lit state comes from the simulation (A4). */
+uniform float uSunlit;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 uniform vec3 uSkyAmbient;
@@ -71,7 +78,7 @@ void main() {
   vec3 n = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
   float sun = max(dot(n, uSunDir), 0.0);
   vec3 ambient = mix(uGroundAmbient, uSkyAmbient, n.y * 0.5 + 0.5);
-  vec3 col = uColor * vColor * (ambient * 0.76 + uSunColor * sun * 0.4);
+  vec3 col = uColor * vColor * (ambient * (0.76 - 0.12 * (1.0 - uSunlit)) + uSunColor * sun * 0.4 * uSunlit);
   float f = 1.0 - exp(-uFogDensity * uFogDensity * vDepth * vDepth);
   col = mix(col, uFogColor, clamp(f, 0.0, 1.0));
   gl_FragColor = vec4(col, uOpacity);
@@ -84,6 +91,8 @@ export interface FlatOptions {
   vertexTint?: boolean;
   opacity?: number;
   side?: THREE.Side;
+  /** In shade: no direct sun, a little less sky (A4). */
+  shaded?: boolean;
 }
 
 export function createFlatMaterial(look: LookUniforms, opts: FlatOptions): THREE.ShaderMaterial {
@@ -96,6 +105,7 @@ export function createFlatMaterial(look: LookUniforms, opts: FlatOptions): THREE
       ...look,
       uColor: { value: new THREE.Color(opts.color) },
       uOpacity: { value: opacity },
+      uSunlit: { value: opts.shaded ? 0 : 1 },
     },
     transparent: opacity < 1,
     side: opts.side ?? THREE.FrontSide,

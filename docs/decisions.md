@@ -6,6 +6,18 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
 
+### Shade and foliage, drawn as simulated (A4)
+
+**Decision:**
+- **The ground's shade is the simulation's.** A world that draws its shade names an area (`world.shadeArea`; the lab's camp, field and ridge at 0.5 m). The renderer fills a map of `groundLight` at each texel's centre (`perception/light.ts`, `shadeMap`, 0.7 s once per world) and the terrain shader reads it bilinearly, lit at half or more, dropping the direct sun in shade. `drawnLit` is that read on the CPU: at 20,000 points over the area the drawing agrees with the simulation at 19,982 (99.91%), and at 6,000 points within 1.5 m of a shadow at 5,810 (96.8%), where only a texel's reach can differ.
+- **Bodies are lit as the simulation finds them:** the snapshot carries the light beneath each guard and the player (computed where the world draws its shade), and each is drawn in sun or in shade.
+- **Foliage is drawn from the same volumes by the same law:** each bush and canopy, by its back faces, solves its chord along each pixel's line of sight and draws opacity 1 − exp(−density × chord). Lying in a bush you see out through as much bush as a guard sees in through. A body standing inside foliage is drawn undimmed (the drawing doesn't know what is in front of the back face), the one place it understates.
+- **Fog grows with distance from the eye**, in our shaders and in three.js's own chunk: a guard's contrast against the haze no longer changes as you turn.
+
+**Why:** shade multiplies detection by 0.6 and nothing drew it (the plan's gotcha); a light gem would tell the player what the world should show. A GPU shadow map would agree only up to its bias and resolution; drawing the simulation's own answer agrees by construction, up to a texel.
+
+**What moved:** nothing simulated. The snapshot gains three fields per guard (light, meter, awareness, the last two for A8) and the player's light. The lab's world gains its shade area, so its fingerprint moved (recordings of the lab from before refuse, by design).
+
 ### The awareness ladder and its minimal reactions (A7)
 
 **Decision:**

@@ -26,6 +26,7 @@ export function buildTerrain(world: World, look: LookUniforms): THREE.Group {
   const material = createTerrainMaterial(look, true);
   const group = new THREE.Group();
   group.name = 'terrain';
+  group.userData.material = material;
   const per = Math.ceil(cells / TILES);
   for (let tj = 0; tj < TILES; tj++) {
     for (let ti = 0; ti < TILES; ti++) {

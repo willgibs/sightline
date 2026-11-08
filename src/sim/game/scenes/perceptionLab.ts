@@ -215,6 +215,8 @@ export function labWorld(tuning: Tuning): World {
     tuning.gen,
   );
   world.foliage = labFoliage(tuning);
+  // The ground's shade is drawn where the guards' eyes can reach: the camp, the field and the ridge.
+  world.shadeArea = { x0: -215, z0: -110, x1: 215, z1: 70, cell: 0.5 };
   return world;
 }
 

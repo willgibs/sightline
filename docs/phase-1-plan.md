@@ -399,7 +399,7 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
 - [x] A3 · The scenario runner (see The three tools).
   - Scenes take no parameters today, and a recording's header names its scene by exactly `{name, version}` (`kernel/record/recording.ts`). Parameters therefore join the scene's identity.
   - Its first table sweeps the design doc's ranges over the factor grid, asserting monotonicity and the minimum interval from cue to detection.
-- [ ] A4 · Shade and foliage, drawn as simulated.
+- [x] A4 · Shade and foliage, drawn as simulated.
   - Each body's lit state comes from the simulation, in the snapshot.
   - World shade comes from one static shadow map over the play area, rendered once.
   - A test holds the drawing to `lightAt` at sampled points; 99.5% is the starting bar.
