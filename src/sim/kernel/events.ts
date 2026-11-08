@@ -93,7 +93,102 @@ export interface OutcomeEvent extends EventBase {
   status: 'succeeded' | 'failed';
 }
 
-export type SimEvent = FootstepEvent | LandEvent | StanceEvent | ShotEvent | OutcomeEvent;
+/** Where a body was in a guard's sight: the zone that set the rate (perception/sight.ts). */
+export type SightZone = 'core' | 'peripheral' | 'far' | 'contact' | 'none';
+/** The awareness ladder's states (perception/senses.ts). */
+export type AwarenessName = 'unaware' | 'curious' | 'suspicious' | 'searching' | 'combat';
+/** Why a guard's awareness changed (perception/awareness.ts). */
+export type AlertReason = 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm';
+/** What a heard sound sounded like (perception/hearing.ts). */
+export type HeardKind = 'sound' | 'shot' | 'voice';
+
+/**
+ * A guard's detection meter rose through the cue (30%): the first sign shows, at the
+ * screen's edge and in his head (perception, lab A). Source: the guard.
+ */
+export interface NoticedEvent extends EventBase {
+  type: 'noticed';
+  /** The body he is noticing. */
+  target: EntityId;
+  /** Where its chest was, and how far from his eye. */
+  x: number;
+  y: number;
+  z: number;
+  distance: number;
+  zone: SightZone;
+}
+
+/**
+ * The meter reached 100%: he has seen you. It carries every factor that filled it, so it
+ * explains itself (perception/explain.ts); its cause is the 'noticed' that came first.
+ */
+export interface DetectedEvent extends EventBase {
+  type: 'detected';
+  target: EntityId;
+  x: number;
+  y: number;
+  z: number;
+  distance: number;
+  /** Degrees off his gaze. */
+  angle: number;
+  zone: SightZone;
+  /** The caps: stance, light beneath the body, the sky behind it; and the range they made. */
+  stance: number;
+  light: number;
+  skyline: number;
+  range: number;
+  /** The rate factors: movement, and the share of the body in view. */
+  movement: number;
+  cover: number;
+  /** The fill rate at the moment, per second. */
+  rate: number;
+}
+
+/** A guard heard a sound: a guess at where it came from, not a fix. Its cause is the sound. */
+export interface HeardEvent extends EventBase {
+  type: 'heard';
+  kind: HeardKind;
+  /** Its level over his masked threshold: 1 at the edge of hearing. */
+  clarity: number;
+  /** Where it seemed to come from, and how unsure. */
+  x: number;
+  y: number;
+  z: number;
+  radius: number;
+}
+
+/** A guard's awareness changed state; its cause is the percept that did it (or 0 for calming down). */
+export interface AlertEvent extends EventBase {
+  type: 'alert';
+  from: AwarenessName;
+  to: AwarenessName;
+  reason: AlertReason;
+}
+
+/** A guard said something: a voice, which others hear (perception/barks.ts holds the lines). */
+export interface BarkEvent extends EventBase, SoundFields {
+  type: 'bark';
+  /** Which line (perception/barks.ts, BARKS). */
+  line: number;
+}
+
+/** A noise dropped into the run from the sandbox (A10): a sound anyone near hears. */
+export interface NoiseEvent extends EventBase, SoundFields {
+  type: 'noise';
+}
+
+export type SimEvent =
+  | FootstepEvent
+  | LandEvent
+  | StanceEvent
+  | ShotEvent
+  | OutcomeEvent
+  | NoticedEvent
+  | DetectedEvent
+  | HeardEvent
+  | AlertEvent
+  | BarkEvent
+  | NoiseEvent;
 export type EventType = SimEvent['type'];
 export type EventOf<K extends EventType> = Extract<SimEvent, { type: K }>;
 
@@ -121,6 +216,10 @@ export interface EventSpec<E> {
 }
 
 const GAITS = ['crawl', 'crouch', 'walk', 'sprint'] as const;
+const ZONES = ['core', 'peripheral', 'far', 'contact', 'none'] as const satisfies readonly SightZone[];
+const AWARE = ['unaware', 'curious', 'suspicious', 'searching', 'combat'] as const satisfies readonly AwarenessName[];
+const REASONS = ['seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm'] as const satisfies readonly AlertReason[];
+const HEARD = ['sound', 'shot', 'voice'] as const satisfies readonly HeardKind[];
 const STANCES = ['stand', 'crouch', 'prone'] as const satisfies readonly StanceName[];
 const SOUND = { x: 'f32', y: 'f32', z: 'f32', surface: 'u8', loudness: 'f32', radius: 'f32' } as const;
 
@@ -130,6 +229,32 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   land: { code: 3, range: 'foundation', sound: true, fields: { ...SOUND, speed: 'f32' } },
   shot: { code: 4, range: 'foundation', sound: false, fields: { x: 'f64', y: 'f64', z: 'f64', dx: 'f64', dy: 'f64', dz: 'f64' } },
   outcome: { code: 5, range: 'foundation', sound: false, fields: { status: { enum: ['succeeded', 'failed'] } } },
+  noticed: { code: 10, range: 'perception', sound: false, fields: { target: 'u32', x: 'f32', y: 'f32', z: 'f32', distance: 'f32', zone: { enum: ZONES } } },
+  detected: {
+    code: 11,
+    range: 'perception',
+    sound: false,
+    fields: {
+      target: 'u32',
+      x: 'f32',
+      y: 'f32',
+      z: 'f32',
+      distance: 'f32',
+      angle: 'f32',
+      zone: { enum: ZONES },
+      stance: 'f32',
+      light: 'f32',
+      skyline: 'f32',
+      range: 'f32',
+      movement: 'f32',
+      cover: 'f32',
+      rate: 'f32',
+    },
+  },
+  heard: { code: 12, range: 'perception', sound: false, fields: { kind: { enum: HEARD }, clarity: 'f32', x: 'f32', y: 'f32', z: 'f32', radius: 'f32' } },
+  alert: { code: 13, range: 'perception', sound: false, fields: { from: { enum: AWARE }, to: { enum: AWARE }, reason: { enum: REASONS } } },
+  bark: { code: 14, range: 'perception', sound: true, fields: { ...SOUND, line: 'u8' } },
+  noise: { code: 15, range: 'perception', sound: true, fields: { ...SOUND } },
 };
 
 export function isSound(e: SimEvent): e is Extract<SimEvent, SoundFields> {

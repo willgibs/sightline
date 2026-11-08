@@ -26,10 +26,17 @@ export function stanceVisibility(b: BodyState, spec: BodySpec, tuning: Tuning): 
   return S.prone;
 }
 
-/** The movement factor for how fast the body is actually moving: faster than its walk is sprinting. */
+/**
+ * The movement factor for how fast the body is actually moving. It ramps, so no speed is a
+ * cliff: from still at rest to moving at `movingAt` m/s, then from moving at the body's
+ * walk to sprinting at its sprint.
+ */
 export function movementVisibility(b: BodyState, spec: BodySpec, tuning: Tuning): number {
-  const V = tuning.visibility;
-  if (b.speed < 0.2) return V.movement.still;
-  if (b.speed > spec.speed.walk + 0.25) return V.movement.sprinting;
-  return V.movement.moving;
+  const V = tuning.visibility.movement;
+  const v = b.speed;
+  const at = tuning.perception.sight.movingAt;
+  if (v < at) return V.still + ((V.moving - V.still) * (v > 0 ? v : 0)) / at;
+  if (v <= spec.speed.walk) return V.moving;
+  if (v >= spec.speed.sprint) return V.sprinting;
+  return V.moving + ((V.sprinting - V.moving) * (v - spec.speed.walk)) / (spec.speed.sprint - spec.speed.walk);
 }

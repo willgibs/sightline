@@ -1,4 +1,5 @@
 import type { BodyState } from '../body';
+import type { Senses } from '../perception';
 import type { EntityBase, EntityId, EntityIndex } from '../kernel/state';
 import type { GuardState } from './guards';
 import type { PlayerControl } from './player';
@@ -25,6 +26,12 @@ export interface GuardEntity extends EntityBase {
   /** The physical body, moved by the shared motor. */
   body: BodyState;
   guard: GuardState;
+  /**
+   * What he sees, hears and believes (the perception lane), where perception runs: the
+   * perception lab and its scenarios until it joins the valley (A13). Without it he
+   * neither sees nor hears, and keeps to his routine.
+   */
+  senses?: Senses;
 }
 
 declare module '../kernel/state' {

@@ -11,6 +11,13 @@ import { ChaosBot } from './bots/chaos';
 import { WanderBot } from './bots/wander';
 import { PINNED_RUNS, behaviourInto } from './runs';
 import { Simulation } from './sim';
+import { Acoustics, SEED_LAW, SIGHT_LAW, crackHeard, emptyHeard, foliageOf, sweepSight, type CrackHeard, type FlightPoint } from '../perception';
+import { datan2, dexp } from '../kernel/core/detmath';
+import { air, defaultEnv } from '../kernel/env';
+import { Rng } from '../kernel/core/rng';
+import { runScene } from '../kernel/scene';
+import { labWorld } from './scenes/perceptionLab';
+import { SIGHT_TABLE, sightScenario } from './scenes/sightScenario';
 
 /**
  * A bench for every lane (docs/foundation-shape.md): where "better" is measured instead
@@ -94,11 +101,106 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
       return m;
     },
   },
-  perception: { about: "Lab A: detection times against the design doc's ranges, from A2 on.", metrics: () => ({}) },
+  perception: {
+    about:
+      "Lab A: the sight rate law swept over the factor grid against the design doc's ranges, beside the seed's (Blacklist's model with the table as rates); the sight scenarios run whole; foliage symmetric to the bit.",
+    metrics: perceptionMetrics,
+  },
   brain: { about: "Lab E: search cycle length, and the calibration of the camp's estimate of where a shot came from, from E5 on.", metrics: () => ({}) },
   ballistics: { about: 'Lab B: the reticle against the impact, within 1 cm, from B3 on.', metrics: () => ({}) },
   game: { about: "The valley's plays, which exercise every lane together: pinned by their fingerprints and work.", metrics: () => ({}) },
 };
+
+/** Lab A's bench (perception lane): docs/phase-1-plan.md, A · recorded before building, says what each should be. */
+function perceptionMetrics(): Record<string, number> {
+  const m: Record<string, number> = {};
+  for (const [who, law] of [
+    ['', SIGHT_LAW],
+    ['seed · ', SEED_LAW],
+  ] as const) {
+    const r = sweepSight(defaultTuning, law);
+    m[`${who}grid pairs checked`] = r.pairs;
+    m[`${who}grid pairs filling slower with more exposure`] = r.violations;
+    m[`${who}standing, walking, in the open: seen to (m)`] = r.standingReach;
+    m[`${who}still, prone, in cover: seen to (m)`] = r.proneCoverReach;
+    m[`${who}crouched, walking, in shade, 30 m: seconds`] = round(r.crouchShade30);
+    m[`${who}a marksman's far zone: seen to (m)`] = r.farReach;
+    m[`${who}least seconds from the first cue to 100%, outside contact`] = round(r.minCueSeconds);
+    m[`${who}steepest edge: rate change per metre`] = round(r.steepestMetre);
+    m[`${who}steepest edge: rate change per degree`] = round(r.steepestDegree);
+  }
+  let passed = 0;
+  for (const params of SIGHT_TABLE) if (runScene(sightScenario(params), defaultTuning).failures.length === 0) passed++;
+  m[`sight scenarios as expected (of ${SIGHT_TABLE.length})`] = passed;
+  // Foliage, both ways, through every volume of the lab.
+  const f = foliageOf(labWorld(defaultTuning));
+  const rng = new Rng('BENCH-A', 'foliage');
+  let asymmetric = 0;
+  for (let k = 0; k < 2000; k++) {
+    const v = f.volumes[k % f.volumes.length]!;
+    const ax = v.x + rng.range(-30, 30);
+    const ay = rng.range(0, 12);
+    const az = v.z + rng.range(-30, 30);
+    const bx = v.x + rng.range(-v.r, v.r);
+    const by = rng.range(v.y0, v.y1);
+    const bz = v.z + rng.range(-v.r, v.r);
+    if (!Object.is(f.transmittance(ax, ay, az, bx, by, bz), f.transmittance(bx, by, bz, ax, ay, az))) asymmetric++;
+  }
+  m['foliage: pairs that differ by direction (of 2000)'] = asymmetric;
+  // One law of sound: what the speakers hear and what a guard at the same place hears, bit for bit.
+  const lab = labWorld(defaultTuning);
+  const ears = new Acoustics(lab, defaultTuning);
+  const guards = new Acoustics(lab, defaultTuning);
+  const a = emptyHeard();
+  const b = emptyHeard();
+  let differ = 0;
+  for (let k = 0; k < 200; k++) {
+    const sx = -200 + rng.range(0, 80);
+    const sz = -30 + rng.range(0, 60);
+    const radius = rng.range(4, 40);
+    const lx = sx + rng.range(-30, 30);
+    const lz = sz + rng.range(-30, 30);
+    ears.spread({ x: sx, y: 0, z: sz, radius });
+    ears.hear(lx, 1.7, lz, a);
+    guards.spread({ x: sx, y: 0, z: sz, radius });
+    guards.hear(lx, 1.7, lz, b);
+    if (!Object.is(a.clarity, b.clarity) || a.fromX !== b.fromX || a.fromZ !== b.fromZ || a.length !== b.length) differ++;
+  }
+  m['hearing: speakers and a guard at the same place differ (of 200)'] = differ;
+  // The crack (A5): listeners 5–15 m from a bullet's path at 300 m, its speed falling as a
+  // drag constant makes it (790 m/s at the muzzle, about 650 m/s there).
+  const angles = crackBias();
+  m['crack at 300 m: least degrees off the shooter'] = round(Math.min(...angles));
+  m['crack at 300 m: most degrees off the shooter'] = round(Math.max(...angles));
+  m['seed · crack at 300 m: degrees off the shooter'] = 0;
+  return m;
+}
+
+/** Degrees between where the crack seems to come from and where the shooter is, for listeners near a path at 300 m. */
+export function crackBias(): number[] {
+  const v0 = 790;
+  const k = 0.00065;
+  const path: FlightPoint[] = [];
+  for (let s = 0; s <= 420; s += 5) path.push({ x: s, y: 1.5, z: 0, t: (dexp(k * s) - 1) / (k * v0) });
+  const out: CrackHeard = { x: 0, y: 0, z: 0, t: 0 };
+  const c = air(defaultEnv()).speedOfSound;
+  const angles: number[] = [];
+  for (const side of [5, 10, 15]) {
+    const L = { x: 300, y: 1.7, z: side };
+    if (!crackHeard(path, L.x, L.y, L.z, c, out)) continue;
+    const ax = out.x - L.x;
+    const az = out.z - L.z;
+    const bx = 0 - L.x;
+    const bz = 0 - L.z;
+    angles.push((datan2(Math.abs(ax * bz - az * bx), ax * bx + az * bz) * 180) / Math.PI);
+  }
+  return angles;
+}
+
+/** To 9 significant digits: metrics are pinned exactly, and their last bits are noise to a reader. */
+function round(v: number): number {
+  return Number.isFinite(v) ? Number(v.toPrecision(9)) : -1;
+}
 
 /** A pinned run as the bench sees it: its fingerprints, and the work each system did (systems that did none left out). */
 export interface RunReport {

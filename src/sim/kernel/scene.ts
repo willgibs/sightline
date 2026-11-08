@@ -39,13 +39,21 @@ export interface Expectation<S extends Simulation = Simulation> {
   after?(sim: S): string | void;
 }
 
-/** Names a scene and its version in recordings. */
+/**
+ * Names a scene in recordings: its name, its version, and its parameters. A scene made
+ * from a family with parameters (a scenario: the sight scenario at 30 m, crouched, in
+ * shade) is identified by them as well: a recording names them, and re-simulating it
+ * makes the scene again with them. '' for a scene without.
+ */
 export interface SceneId {
   name: string;
   version: number;
+  params: string;
 }
 
-export interface Scene<S extends Simulation = Simulation> extends SceneId {
+export interface Scene<S extends Simulation = Simulation> extends Omit<SceneId, 'params'> {
+  /** Its parameters, in the canonical form its factory writes them: '' or absent for none. */
+  params?: string;
   /** Shown on the start screen. */
   title: string;
   description: string;
@@ -89,7 +97,7 @@ export function sceneSystems<S extends Simulation>(scene: Scene<S>): readonly Sy
 /** A simulation of the scene at its first tick: world, systems and setup. Pass the world if it is already built. */
 export function startScene<S extends Simulation>(scene: Scene<S>, tuning: Tuning, world: World = scene.world(tuning)): S {
   const sim = scene.game.simulation(world, tuning, sceneSystems(scene));
-  sim.scene = { name: scene.name, version: scene.version };
+  sim.scene = { name: scene.name, version: scene.version, params: scene.params ?? '' };
   scene.setup?.(sim);
   return sim;
 }

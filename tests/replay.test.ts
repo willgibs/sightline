@@ -14,7 +14,7 @@ import type { SimEvent } from '../src/sim/kernel/events';
  */
 
 function recordCourse(seconds: number): { bytes: Uint8Array; events: SimEvent[][] } {
-  const scene = sceneOf({ scene: { name: 'movement-course' } })!;
+  const scene = sceneOf({ scene: { name: 'movement-course', params: '' } })!;
   const sim = startScene(scene, T);
   const recorder = new Recorder(sim, 'test');
   const events: SimEvent[][] = [];
@@ -61,7 +61,7 @@ describe('a replay', () => {
 
   it("says why it can't be watched in a build without its scene", () => {
     const rec = Recording.fromBytes(bytes);
-    (rec.header as { scene: { name: string; version: number } | null }).scene = { name: 'no-such-scene', version: 1 };
+    (rec.header as { scene: { name: string; version: number; params: string } | null }).scene = { name: 'no-such-scene', version: 1, params: '' };
     expect(() => new Replay(rec, 'test')).toThrow(/scene 'no-such-scene'/);
   });
 });
