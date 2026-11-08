@@ -11,7 +11,7 @@ import { Simulation } from '../src/sim/game/sim';
 import { SYSTEMS } from '../src/sim/game/systems';
 import { withSystem, type System } from '../src/sim/kernel/systems';
 import { player } from '../src/sim/game/entities';
-import { PERCEPTION, giveSenses } from '../src/sim/game/perception';
+import { giveSenses } from '../src/sim/game/perception';
 
 /**
  * The perception boundary (brain/mind.ts): a guard decides from his mind alone. Run the
@@ -58,7 +58,6 @@ function run(place: { x: number; z: number }, extra: System[] = [], senses = fal
   };
   // The probe goes last in its phase, after the brains it watches.
   let systems = SYSTEMS;
-  if (senses) for (const s of PERCEPTION) systems = withSystem(systems, s);
   for (const s of extra) systems = withSystem(systems, s);
   systems = withSystem(systems, probe);
   const sim = new Simulation(world, T, systems);

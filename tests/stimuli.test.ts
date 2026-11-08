@@ -6,7 +6,7 @@ import { Faction } from '../src/sim/kernel/state';
 import { withSystem, type System, type TickContext } from '../src/sim/kernel/systems';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { sunDirection } from '../src/sim/kernel/env';
-import { PERCEPTION, giveSenses } from '../src/sim/game/perception';
+import { giveSenses } from '../src/sim/game/perception';
 import { placePlayer } from '../src/sim/game/setup';
 import { arm } from '../src/sim/game/shooting';
 import { Simulation } from '../src/sim/game/sim';
@@ -36,7 +36,6 @@ function setup(act: (ctx: TickContext) => void, emits: System['emits'], writes: 
   });
   const drop: System = { name: 'test-stimulus', phase: 'commands', after: ['player-commands', 'rifle', 'sandbox-drops'], reads: [], writes, emits, run: act };
   let systems = withSystem(SYSTEMS, drop);
-  for (const s of PERCEPTION) systems = withSystem(systems, s);
   const sim = new Simulation(world, T, systems);
   placePlayer(sim, 50, 0);
   giveSenses(sim);

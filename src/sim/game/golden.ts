@@ -22,9 +22,9 @@ export const GOLDEN = {
   world: 'f555512c33daea22',
   /** 60 s of play: the person-like bot in two valleys, the fuzzing bot in one. */
   play: {
-    'TAL-4471 wander': { behaviour: '688ae4eddeadae3a', state: '4c04325e4eca45c6' },
-    'MUD-9031 wander': { behaviour: '67964675cb39477e', state: '4002c5b682b8bcc8' },
-    'TAL-4471 chaos': { behaviour: 'fe623d33389a2f21', state: 'e8037411190fc911' },
+    'TAL-4471 wander': { behaviour: '688ae4eddeadae3a', state: 'e35233d7c61171e1' },
+    'MUD-9031 wander': { behaviour: '67964675cb39477e', state: '998ac592eadae66d' },
+    'TAL-4471 chaos': { behaviour: 'fe623d33389a2f21', state: 'f344fa7bbfa9c29e' },
   },
   /**
    * Scenes run by their own drivers, each pinning its lane (benches.ts): the movement

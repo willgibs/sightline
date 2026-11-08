@@ -10,7 +10,7 @@ import { groundLight } from '../../perception';
 import { keepRoutine } from '../../brain';
 import type { System } from '../../kernel/systems';
 import { emptyMind, guardMind } from '../guards';
-import { PERCEPTION, giveSenses } from '../perception';
+import { giveSenses } from '../perception';
 import { placePlayer } from '../setup';
 import { SIGHTLINE, type Simulation } from '../sim';
 import type { Scene } from '.';
@@ -261,7 +261,7 @@ export function sightScenario(params?: string): Scene {
     description: `One ${p.guard} watching the player ${p.d} m away, ${p.stance} and ${p.move} in the ${p.spot}${p.expect === null ? '' : p.expect === 'never' ? ': never seen' : `: seen in ${p.expect[0]}–${p.expect[1]} s`}.`,
     game: SIGHTLINE,
     world: (tuning) => scenarioWorld(p, tuning),
-    systems: p.react ? PERCEPTION : [...PERCEPTION, hold],
+    systems: p.react ? [] : [hold],
     setup: (sim) => {
       seen.noticed = -1;
       seen.detected = -1;

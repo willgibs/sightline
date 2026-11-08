@@ -40,6 +40,15 @@ Built on its branch as `docs/phase-1-plan.md`, section B, plans it. Its seed, th
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
 
+### Perception joins the valley (A13)
+
+**Decision:**
+- **`SYSTEMS` now holds `PERCEPTION`**, in its phases, and the scenes stop listing it. A guard spawned in a generated valley gets his senses at spawn (`setup.ts`, by the world's mission spec: its terrain is procedural), so reinforcements will perceive too. Handmade scenes and test worlds stay as they were: a scene gives senses with `giveSenses` to whom it wants.
+- **`SIM_VERSION` 8.** Real play changes (guards notice the player, and turn, walk and search by A7's minimal reactions until lab E's brain), though no pinned run does: the bots never come near a camp in their minute, so only the valley's `state` fingerprints move (`e35233d7c61171e1`, `998ac592eadae66d`, `f344fa7bbfa9c29e`), for the guards' senses.
+- **Why it's ready:** a bot walking into five valleys' camps for 5 minutes each: every body promise held, guards rose through every state and stood down, and a median tick of 47–67 µs with the 99th percentile under 1 ms.
+
+**What moved:** `SIM_VERSION` 8; the valley's `state` fingerprints; `BEHAVIOUR`; the golden recording; each valley's perception work in the game lane's bench.
+
 ### The other stimuli: lab B's sounds, the crack, bodies and lens glint (A9)
 
 **Decision:**

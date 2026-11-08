@@ -9,6 +9,7 @@ import { Surface } from '../kernel/world/surfaces';
 import { player } from './entities';
 import { think } from './guards';
 import { playerIntent } from './player';
+import { PERCEPTION } from './perception';
 import { SHOOTING_SYSTEMS } from './shooting';
 
 /**
@@ -162,5 +163,7 @@ export const SYSTEMS: readonly System[] = [
   SHOOTING_SYSTEMS.bullets,
   SHOOTING_SYSTEMS.thrown,
   SHOOTING_SYSTEMS.aim,
+  // Perception (lab A, in the valley since A13): after everything has moved, before anyone decides.
+  ...PERCEPTION,
   guardBrains,
 ];
