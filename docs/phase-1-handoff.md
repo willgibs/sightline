@@ -8,7 +8,7 @@ Written on Nov 7, 2026, at the end of the session that ran the foundation pass, 
 
 - **Phase 0 passed its gate,** Engine runs, on Nov 7, 2026. The **foundation pass** that followed is done: `docs/foundation-plan.md` records each milestone (M1–M10), what was deliberately left to the labs, and the Horizons.
 - **One item waits on the owner:** checking the deployed build on his Mac with the screen in view. That means frame rate, sound, the runs the game keeps, and a replay. It doesn't block planning.
-- **Phase 1 is planned** (`docs/phase-1-plan.md`), and **Wave 0 is on `main`** (W0.2–W0.8). Wave 1 (labs A, B and D) can open; no lab has a branch yet.
+- **Phase 1 is planned** (`docs/phase-1-plan.md`), and **Wave 0 is on `main`** (W0.2–W0.8). Waves 1 and 2 are open (Nov 8): each lab works in its own session and branch, and the plan's checkboxes say what has landed.
   - `src/sim` is now the kernel, five lanes and the game, each lane behind its `index.ts` (`src/sim/lanes.ts` says who may import whom).
   - Systems declare what they read, write and emit; brains decide in 'decide' and steer through orders; systems query bodies and spawn inside a tick; one grid search serves every lab; each lane has a code range and a bench.
   - `npm run explain`, `npm run bench`, `npm run bisect`, `npm run fuzz -- --synctest` and `npm run land` make landing and determinism mechanical. `docs/decisions.md` (Wave 0) has the reasoning; the notes for wave 1 are in the plan's Wave 0 section.
@@ -16,12 +16,12 @@ Written on Nov 7, 2026, at the end of the session that ran the foundation pass, 
   - CI runs the check on Linux, macOS and Windows, and a 20-minute run gives the same hash on all three (`e9311dda2ac00379`).
   - A 40-hour fuzz run passed, and Chromium, Firefox, WebKit and Bun all give the golden values.
   - The build is deployed at sightline-willgibs.vercel.app.
-- **Versions:** `SIM_VERSION` 7 (Nov 8), `GEN_VERSION` 4 (D1, Nov 8), `STATE_SCHEMA` 7 (W0.3), recording format 10 (W0.7).
+- **Versions:** `SIM_VERSION` 7 (Nov 8), `GEN_VERSION` 4 (D1, Nov 8), `STATE_SCHEMA` 7 (W0.3), recording format 11 (A3, Nov 8).
 
 ## Getting going in a new session
 
 1. **Get the code.** Claude Code on the web clones the repository for you. A local copy needs a `git pull` before anything else.
-2. **Set up:** run `npm ci`, then `npx playwright install chromium` (skip it where Chromium is already installed), then `npm run check`. The check should pass with 30 test files and 213 tests. `npm run test:browser` runs the tests that need a real browser.
+2. **Set up:** run `npm ci`, then `npx playwright install chromium` (skip it where Chromium is already installed), then `npm run check`, which should pass. `npm run test:browser` runs the tests that need a real browser.
 3. **Open the design doc.** The live doc is the source of truth: [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), which only the owner's account can open. A session that can't open it, because it has no Claude Docs connector, works from the copy in `docs/design-doc.md` (revision 36).
 4. **Look at the game.** `npm run look` saves the honest and debug views to `shots/`. `npm run look -- --scene movement-course` shows the one scene there is so far. The header of `src/headless/look.ts` lists the options. A script that needs more than pictures can drive the game with `openGame()` from `src/headless/browser.ts`.
 
