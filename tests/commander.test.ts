@@ -8,8 +8,9 @@ import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
 import { SYSTEMS } from '../src/sim/game/systems';
 import { neutralInput } from '../src/sim/kernel/input';
+import { Hasher } from '../src/sim/kernel/core/hash';
 import type { SimEvent } from '../src/sim/kernel/events';
-import { withSystem } from '../src/sim/kernel/systems';
+import { withSystem, type System } from '../src/sim/kernel/systems';
 import type { World } from '../src/sim/kernel/world/world';
 import { campWorld } from '../src/sim/game/scenes/campBrain';
 import { testGuard, testWorld } from './fixtures';
@@ -195,3 +196,93 @@ describe('in the camp', () => {
   });
 });
 
+
+/**
+ * No omniscience, over the commander and the pacing layer (rule 13): the commander's whole
+ * memory is hashed before it decides, and what it decided after. Two runs with the player
+ * at two places no one can sense must give the same decisions from the same memory.
+ */
+describe('no omniscience, over the commander', () => {
+  type Trace = Array<{ before: string; after: string }>;
+
+  function hashCamp(camp: CampState): string {
+    return new Hasher().str(JSON.stringify(camp)).digest();
+  }
+
+  function run(place: { x: number; z: number }, extra: System[] = [], seconds = 25): Trace {
+    const trace: Trace = [];
+    const world = campWorld(T);
+    let before = '';
+    const probeBefore: System = {
+      name: 'test-camp-before',
+      phase: 'camp',
+      after: ['comms-voice'],
+      reads: ['commander.camp'],
+      writes: [],
+      emits: [],
+      run(ctx) {
+        const c = commanderOf(ctx);
+        before = c ? hashCamp(c.camp) : '';
+      },
+    };
+    const probeAfter: System = {
+      name: 'test-camp-after',
+      phase: 'camp',
+      after: ['camp-commander'],
+      reads: ['commander.camp'],
+      writes: [],
+      emits: [],
+      run(ctx) {
+        const c = commanderOf(ctx);
+        trace.push({ before, after: c ? hashCamp(c.camp) : '' });
+      },
+    };
+    const commander: System = { ...campCommander, after: ['comms-voice', 'test-camp-before', ...extra.map((s) => s.name)] };
+    let systems = SYSTEMS;
+    for (const s of [...PERCEPTION, commsVoice, probeBefore, ...extra, commander, probeAfter]) systems = withSystem(systems, s);
+    const sim = new Simulation(world, T, systems);
+    placePlayer(sim, place.x, place.z);
+    giveSenses(sim);
+    giveBrains(sim);
+    giveCommander(sim);
+    const raw = neutralInput();
+    for (let i = 0; i < seconds * 30; i++) sim.step(raw);
+    return trace;
+  }
+
+  const far1 = { x: 372, z: 372 };
+  const far2 = { x: -372, z: 372 };
+
+  it('the same memory decides the same, wherever the unsensed player is', () => {
+    const a = run(far1);
+    const b = run(far2);
+    expect(a.length).toBe(b.length);
+    a.forEach((x, k) => {
+      if (x.before === b[k]!.before) expect(x.after).toBe(b[k]!.after);
+    });
+  });
+
+  it('a commander that peeks at the player is caught', () => {
+    const peek: System = {
+      name: 'test-commander-peek',
+      phase: 'camp',
+      after: ['test-camp-before'],
+      reads: ['player.body', 'commander.camp'],
+      writes: ['commander.camp'],
+      emits: [],
+      run(ctx) {
+        const c = commanderOf(ctx);
+        const p = ctx.index.of('player')[0]!.body;
+        // A leak: the camp's search map learns where the player truly is.
+        if (c && ctx.tick === 30) c.camp.map.p[(Math.floor((p.x - c.camp.map.x0) / c.camp.map.cell) % c.camp.map.n + c.camp.map.n) % c.camp.map.n] = 0.5;
+      },
+    };
+    const a = run(far1, [peek]);
+    const b = run(far2, [peek]);
+    let caught = false;
+    a.forEach((x, k) => {
+      if (x.before === b[k]!.before && x.after !== b[k]!.after) caught = true;
+    });
+    expect(caught).toBe(true);
+  });
+});
