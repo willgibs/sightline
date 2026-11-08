@@ -623,7 +623,8 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
   - Range reduction for `dsin` and `dcos`, for |x| ≥ 10⁶ only. Both functions drive the simulation too, so a test shows that no simulation input reaches it and that the math golden doesn't move.
   - TAL-4471 gets a new golden.
   - It lands alone.
-- [ ] D2 · The seed explorer, first version: a grid of camps with their validation results.
+- [x] D2 · The seed explorer, first version: a grid of camps with their validation results.
+  - `?explore` (`&series=<name>&count=<n>`, the same seeds `npm run seeds -- --from <name>` reports on). Workers generate the camps; each card shows the valley and the camp from above, with the validation results, and opens the seed to play. The survey it draws (`generation/survey.ts`) is where each later milestone adds its layer.
 - [ ] D3 · Terrain with teeth.
   - Two or three ridge spines placed on chosen bearings 150–500 m out, before noise. They're verified by viewsheds computed with a radial sweep, so overwatch comes from a few sectors, not a ring.
   - Cliffs and chokepoints, so the choice of approach matters.

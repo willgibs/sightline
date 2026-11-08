@@ -107,6 +107,12 @@ Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Unt
 
 Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the generation lane.
 
+### The seed explorer (D2)
+
+**Decision:** `?explore` opens the seed explorer instead of the game (`app/explore.ts`): a grid of camps from a named series, the same seeds `npm run seeds -- --from <name>` reports on, each card drawing the valley and the camp from above with its validation results, and linking to the seed. Workers generate the camps (`app/exploreWorker.ts`), a few at a time, with the tuning the page was given, so the page never imports tuning of its own and hot reload keeps working. What a card draws is the world's survey (`generation/survey.ts`): plain data a worker can post, which each later milestone extends with its layer.
+
+**Why:** the plan's three Phase 1 tools give lab D the seed explorer (D2), and the generator's range is easier to judge from fifty camps side by side than from any number in a report.
+
 ### The one deliberate `GEN_VERSION` bump (D1)
 
 **Decision:**
