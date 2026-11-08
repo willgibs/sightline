@@ -70,7 +70,7 @@ export function spawnTick(): Scene {
   const arriveAfterMotor: System = {
     name: 'arrive-after-motor',
     phase: 'world',
-    after: ['carried'],
+    after: [],
     reads: [],
     writes: ['entities'],
     emits: [],

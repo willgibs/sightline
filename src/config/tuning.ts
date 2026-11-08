@@ -148,7 +148,7 @@ export const defaultTuning = {
       },
       // Carrying and dragging a body (sim/game/use.ts): standing it rides the shoulder; crouched it
       // drags behind. Slow, and dragging scrapes. The lab's own numbers.
-      carry: { reach: 1.7, speed: 1.6, dragSpeed: 0.9, shoulder: 1.15, trail: 1.1 },
+      carry: { reach: 1.7, speed: 1.6, dragSpeed: 0.9, shoulder: 1.15, trail: 1.1, facingCos: 0.5, underfoot: 0.4, hideBy: 1, hideBelow: 0.3 },
       // Lying down (sim/body/motor.ts): the turn the body's axis makes toward where it looks, rad/s,
       // by the largest step that keeps every part of it clear. No game publishes this; it's the lab's.
       prone: { turnRate: 2 },
@@ -200,7 +200,7 @@ export const defaultTuning = {
         pivot: 0.55,
         chainSpacing: 0.25,
       },
-      carry: { reach: 1.7, speed: 1.6, dragSpeed: 0.9, shoulder: 1.15, trail: 1.1 },
+      carry: { reach: 1.7, speed: 1.6, dragSpeed: 0.9, shoulder: 1.15, trail: 1.1, facingCos: 0.5, underfoot: 0.4, hideBy: 1, hideBelow: 0.3 },
       prone: { turnRate: 2 },
     },
   },

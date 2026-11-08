@@ -272,7 +272,7 @@ export function planMantleFrom(b: BodyState | null, x: number, y: number, z: num
   p.y = y;
   p.z = z;
   p.yaw = datan2(-fx, -fz);
-  p.eyeHeight = spec.eyeHeight.crouch;
+  p.eyeHeight = b ? b.eyeHeight : spec.eyeHeight.crouch; // it eases down to a crouch from wherever it is
   if (!plan(p, spec, ctx, planned)) return null;
   const m: MantleState = { ...planned, points: [...planned.points], legs: [...planned.legs], stand: false };
   if (backwards && b) {

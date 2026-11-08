@@ -133,6 +133,44 @@ describe('the use action', () => {
     expect(bodies.find((q) => q.id === body.id)).toBeUndefined();
   });
 
+  it('can pick a hidden body up again, and comes out of hiding', () => {
+    const bush: FoliageVolume = { kind: 'cyl', x: 0, z: 0, y0: -0.1, y1: 1.2, r: 1.2, density: 1.3 };
+    const { sim, body } = withBody(world(undefined, [bush]));
+    const input = neutralInput(sim.player.yaw);
+    for (const hidden of [false, true, false]) {
+      press(input, 'use');
+      sim.step(input);
+      input.commands = [];
+      sim.step(input);
+      expect(body.remains.carriedBy !== 0).toBe(!hidden);
+      if (hidden) expect(body.remains.hidden).toBe(true);
+    }
+  });
+
+  it('puts a body down on what the carrier stands on, not the terrain beneath it', () => {
+    const deck: ColliderInput = { kind: 'box', x: 0, z: 0, y0: -0.3, y1: 0.3, hx: 6, hz: 6, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Wood };
+    const { sim, body } = withBody(world(undefined, [], [deck]));
+    const input = neutralInput(sim.player.yaw);
+    press(input, 'use');
+    sim.step(input);
+    input.commands = [];
+    sim.step(input);
+    press(input, 'use');
+    sim.step(input);
+    expect(sim.player.y).toBeCloseTo(0.3, 3);
+    expect(body.remains.y).toBeCloseTo(0.3, 3);
+  });
+
+  it('keeps the hands free for it: nothing is picked up while lying down', () => {
+    const { sim, body } = withBody(world());
+    sim.player.stance = 'prone';
+    const input = neutralInput(sim.player.yaw);
+    press(input, 'use');
+    sim.step(input);
+    expect(body.remains.carriedBy).toBe(0);
+    expect(sim.playerControl.carrying).toBe(0);
+  });
+
   it('keeps the hands full: no mantling while carrying', () => {
     const wall: ColliderInput = { kind: 'box', x: 0, z: -2.5, y0: -0.3, y1: 1, hx: 3, hz: 0.15, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Rock };
     const { sim } = withBody(world(undefined, [], [wall]));

@@ -251,7 +251,7 @@ describe('declared data access', () => {
     // Declared, it spawns: the crate is in the index and the solids at once, and gone again when despawned.
     const seen: string[] = [];
     const maker: System = {
-      ...sys('maker', 'world', { writes: ['entities'], after: ['carried'] }),
+      ...sys('maker', 'world', { writes: ['entities'], after: [] }),
       run(ctx) {
         if (ctx.tick === 1) {
           const c = ctx.spawn(crate);

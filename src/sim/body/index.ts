@@ -11,6 +11,7 @@
 export {
   bodyHeight,
   createBody,
+  groundBelow,
   hasBody,
   poseAt,
   type BodyEntity,

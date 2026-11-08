@@ -51,7 +51,7 @@ if (mathProblems.length > 0) {
  */
 function tickRateChoice(tuning: Tuning, hz: string | null): Tuning {
   const n = hz === 'blind' ? (Math.random() < 0.5 ? 30 : 60) : Number(hz);
-  if (!hz || !Number.isFinite(n) || n < 15 || n > 240 || !Number.isInteger(n)) return tuning;
+  if (!hz || !Number.isFinite(n) || n < 15 || n > 240 || !Number.isInteger(n) || n % tuning.sim.recordHz !== 0) return tuning;
   const out = structuredClone(tuning);
   out.sim.tickHz = n;
   return out;

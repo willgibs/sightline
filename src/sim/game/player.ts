@@ -87,7 +87,7 @@ export function playerIntent(
   if (input.commands?.some((c) => c.kind === 'climb')) c.climbWait = spec.mantle.buffer;
   else if (c.climbWait > 0) c.climbWait = c.climbWait > ctx.dt ? c.climbWait - ctx.dt : 0;
   out.climb = b.motor !== 'mantle' && c.climbWait > 0 && !carrying; // hands full
-  if (b.motor === 'mantle') c.climbWait = 0;
+  if (b.motor === 'mantle' || b.motor === 'ladder') c.climbWait = 0; // spent: a press that let go mustn't grab again on landing
   out.load = carrying ? ctx.tuning.noise.carry : 1;
   out.scrape = carrying && b.stance !== 'stand';
   // On a ladder a press lets go, so it mustn't linger: only the press itself counts there.

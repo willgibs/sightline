@@ -47,6 +47,7 @@ Built on the `lab-c-movement` branch to `docs/phase-1-plan.md`, section C. Lean 
 - Carrying is slow and loud: a loaded step at carrying pace is as loud as walking (`noise.carry`); dragging also scrapes each step, by surface, loudest on gravel and metal (`noise.drag`), a new sound event (`drag`, code 51).
 - Put down inside foliage or by a container it's hidden: `gameBodies` leaves it out, so guards' eyes and bullets find nothing there. (Lab A's body-finding reads the same flag.)
 - Hands full: no mantling, ladders or lying down while carrying; crouching drags it.
+- A body is picked up standing or crouched, on the ground, and can be taken out of hiding again. Off the shoulder it comes down at the carrier's feet; dragged, it stays where it trails. Either way it lies on what's under it, not only the terrain.
 
 **Why:** The design doc's "slow, and noisy on gravel" is a choice the player makes when they pick the route; the numbers (no shipped game publishes them) are starting values for the sittings.
 
