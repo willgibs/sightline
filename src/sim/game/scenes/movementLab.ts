@@ -56,6 +56,9 @@ export const ARENA = {
   roof: { x: 0, z: -56, hx: 12, hz: 8, height: 3.4 },
 } as const;
 
+/** The bush the tour hides the body in. */
+export const BUSH = { x: 38, z: 20 } as const;
+
 /** Heights of the free-standing walls in the garden's row (x centres, 5 m wide). */
 export const WALLS: ReadonlyArray<{ x: number; height: number }> = [
   { x: -52, height: 0.6 },
@@ -296,6 +299,12 @@ function route(): Waypoint[] {
   const G = ARENA.garden;
   const south = G.z + G.thickness + 0.55; // where a body stands to mantle the row from the south
   const north = G.z - 1.2; // beyond it, the far side of the row
+  // The body: pick it up, carry it to the bush, put it down.
+  // Coming at it from the east, so the body is ahead on arriving.
+  points.push({ x: BODY.x + 6, z: BODY.z + 0.5, stance: 'stand' });
+  points.push({ x: BODY.x + 1, z: BODY.z + 0.2, stance: 'stand', use: true });
+  points.push({ x: BUSH.x, z: BUSH.z - 0.3, stance: 'stand' });
+  points.push({ x: BUSH.x, z: BUSH.z - 0.3, stance: 'stand', use: true });
   // Over the 0.9 m wall.
   points.push({ x: WALLS[1]!.x, z: south, stance: 'stand', climb: true });
   points.push({ x: WALLS[1]!.x, z: north, stance: 'stand' });
@@ -308,6 +317,13 @@ function route(): Waypoint[] {
   points.push({ x: gate, z: D.z + 3, stance: 'stand' });
   points.push({ x: gate, z: D.z - 4, stance: 'stand' });
   points.push({ x: 0, z: ARENA.roof.z + ARENA.roof.hz + 4, stance: 'stand' });
+  // Back through the gate, and up the tower's ladder to its deck.
+  const L = LADDER;
+  points.push({ x: gate, z: D.z - 4, stance: 'stand' });
+  points.push({ x: gate, z: D.z + 3, stance: 'stand' });
+  points.push({ x: L.x + 0.5, z: L.z + 2, stance: 'stand' });
+  points.push({ x: L.x, z: L.z + 0.55, stance: 'stand', ladder: true });
+  points.push({ x: L.x, z: L.z - 1, stance: 'stand' });
   return points;
 }
 
@@ -320,7 +336,7 @@ export function movementLab(): Scene {
   let seen = fresh();
   return {
     name: NAME,
-    version: 1,
+    version: 2,
     title: 'Movement lab',
     description: "A yard of every surface around a guard who listens, a garden of walls and windows, and a field under a guard who watches. Learn how loud and how visible you are.",
     game: SIGHTLINE,
@@ -340,7 +356,7 @@ export function movementLab(): Scene {
       );
     },
     driver: () => new WaypointDriver(route(), 1),
-    seconds: 180,
+    seconds: 240,
     playOn: true,
     expect: [
       {
@@ -373,12 +389,26 @@ export function movementLab(): Scene {
         },
       },
       {
-        name: 'the walker mantles a wall and goes through a window',
+        name: 'the walker carries the body to the bush, and it is hidden there',
+        after: (sim) => {
+          const r = sim.index.of('remains')[0]!.remains;
+          if (r.carriedBy !== 0) return 'still carrying the body';
+          if (!r.hidden) return `the body is at ${r.x.toFixed(1)}, ${r.z.toFixed(1)}, not hidden`;
+        },
+      },
+      {
+        name: 'the walker ends on the tower, up its ladder',
+        after: (sim) => {
+          if (Math.abs(sim.player.y - TOWER.deck) > 0.05) return `feet at ${sim.player.y.toFixed(2)}, not on the 5 m deck`;
+        },
+      },
+      {
+        name: 'the walker mantles a wall, a window and the deck of the tower',
         during: (sim, events) => {
           for (const e of events) if (e.type === 'mantle' && e.source === sim.playerId) seen.mantles++;
         },
         after: () => {
-          if (seen.mantles !== 2) return `${seen.mantles} mantles`;
+          if (seen.mantles !== 3) return `${seen.mantles} mantles`;
         },
       },
       {
