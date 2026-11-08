@@ -22,7 +22,7 @@ export class PlayerMesh {
   private readonly torso: CapsuleMesh;
   private readonly legs: CapsuleMesh;
   private readonly shape = emptyShape();
-  private readonly pose = { x: 0, y: 0, z: 0, yaw: 0, eyeHeight: 0 };
+  private readonly pose = { x: 0, y: 0, z: 0, yaw: 0, eyeHeight: 0, lean: 0 };
 
   constructor(
     look: LookUniforms,
@@ -49,6 +49,7 @@ export class PlayerMesh {
     p.z = lerp(prev.pz, curr.pz, alpha);
     p.yaw = curr.yaw;
     p.eyeHeight = lerp(prev.eye, curr.eye, alpha);
+    p.lean = lerp(prev.lean, curr.lean, alpha);
     const s = bodyShape(p as unknown as BodyState, this.spec, this.shape);
     // Inside its head or within a near plane of its body, the camera is the player's eyes.
     const dx = eye.x - p.x;

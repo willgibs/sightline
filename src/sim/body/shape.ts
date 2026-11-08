@@ -22,26 +22,67 @@ type Parts = BodySpec['parts'];
 const upright = emptyShape();
 const lying = emptyShape();
 
-/** The shape of a body as it stands now, written to `out`. */
-export function bodyShape(b: BodyState, spec: BodySpec, out: BodyShape): BodyShape {
+/** What a body's shape follows: where its feet are, its facing, its eye height and its lean (a body's state, or a pose from its history). */
+export type ShapePose = Pick<BodyState, 'x' | 'y' | 'z' | 'yaw' | 'eyeHeight' | 'lean'>;
+
+/** Upright, how high the hips are for an eye at height `e`: they follow the eye between crouching and standing. */
+export function hipHeight(e: number, spec: BodySpec): number {
+  const E = spec.eyeHeight;
+  const t = E.stand > E.crouch ? Math.min(1, (e - E.crouch) / (E.stand - E.crouch)) : 1;
+  return spec.parts.hip * (spec.height.crouch + (spec.height.stand - spec.height.crouch) * t);
+}
+
+/** The shape of a body as it stands now, or in any pose, written to `out`. */
+export function bodyShape(b: ShapePose, spec: BodySpec, out: BodyShape): BodyShape {
   const B = spec.parts;
   const E = spec.eyeHeight;
   const e = b.eyeHeight;
   if (e >= E.crouch) {
     // Upright, between crouching and standing: hips follow the eye.
-    const t = E.stand > E.crouch ? Math.min(1, (e - E.crouch) / (E.stand - E.crouch)) : 1;
-    const hip = B.hip * (spec.height.crouch + (spec.height.stand - spec.height.crouch) * t);
-    return uprightShape(b.x, b.y, b.z, e, hip, B, out);
+    uprightShape(b.x, b.y, b.z, e, hipHeight(e, spec), B, out);
+  } else {
+    // Between prone and crouching: from lying down to the crouch, by the eye.
+    const t = E.crouch > E.prone ? Math.max(0, (e - E.prone) / (E.crouch - E.prone)) : 0;
+    uprightShape(b.x, b.y, b.z, E.crouch, B.hip * spec.height.crouch, B, upright);
+    lyingShape(b, E.prone, B, lying);
+    mixSphere(lying.head, upright.head, t, out.head);
+    mixCapsule(lying.torso, upright.torso, t, out.torso);
+    mixCapsule(lying.legs, upright.legs, t, out.legs);
   }
-  // Between prone and crouching: from lying down to the crouch, by the eye.
-  const t = E.crouch > E.prone ? Math.max(0, (e - E.prone) / (E.crouch - E.prone)) : 0;
-  uprightShape(b.x, b.y, b.z, E.crouch, B.hip * spec.height.crouch, B, upright);
-  lyingShape(b, E.prone, B, lying);
-  mixSphere(lying.head, upright.head, t, out.head);
-  mixCapsule(lying.torso, upright.torso, t, out.torso);
-  mixCapsule(lying.legs, upright.legs, t, out.legs);
+  if (b.lean) applyLean(b, out);
   return out;
 }
+
+/**
+ * A lean rotates the spine about the hips: the head moves aside by exactly the lean, and
+ * down the arc that takes, and the shoulders follow part way. The eye is the centre of
+ * the head, wherever the head is: what you can see around a corner is what can see you.
+ */
+function applyLean(b: ShapePose, out: BodyShape): void {
+  const rx = dcos(b.yaw);
+  const rz = -dsin(b.yaw);
+  const t = out.torso;
+  const spine = out.head.y - t.ay;
+  const share = spine > 1e-6 ? (t.by - t.ay) / spine : 0;
+  const drop = spine > Math.abs(b.lean) ? spine - Math.sqrt(spine * spine - b.lean * b.lean) : 0;
+  out.head.x += rx * b.lean;
+  out.head.z += rz * b.lean;
+  out.head.y -= drop;
+  t.bx += rx * b.lean * share;
+  t.bz += rz * b.lean * share;
+  t.by -= drop * share;
+}
+
+/** Where a body's eye is: the centre of its head. */
+export function eyeOf(b: ShapePose, spec: BodySpec, out: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+  const s = bodyShape(b, spec, scratch);
+  out.x = s.head.x;
+  out.y = s.head.y;
+  out.z = s.head.z;
+  return out;
+}
+
+const scratch = emptyShape();
 
 function uprightShape(x: number, y: number, z: number, eye: number, hip: number, B: Parts, out: BodyShape): BodyShape {
   const shoulders = Math.max(hip, eye - B.neck);
@@ -54,7 +95,7 @@ function uprightShape(x: number, y: number, z: number, eye: number, hip: number,
   return out;
 }
 
-function lyingShape(b: BodyState, eye: number, B: Parts, out: BodyShape): BodyShape {
+function lyingShape(b: ShapePose, eye: number, B: Parts, out: BodyShape): BodyShape {
   // Along the facing, centred on the body: head at the front, heels at the back.
   const fx = -dsin(b.yaw);
   const fz = -dcos(b.yaw);

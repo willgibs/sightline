@@ -1,7 +1,7 @@
 import type { Tuning } from '../../config/tuning';
 import { dcos, dsin } from '../kernel/core/detmath';
 import type { World } from '../kernel/world/world';
-import type { InputFrame } from '../kernel/input';
+import { Optic, type InputFrame } from '../kernel/input';
 import { createBody, requestStance, type BodySpec, type BodyState, type Gait, type MotorContext, type MoveIntent } from '../body';
 import type { Solids } from '../kernel/world/solids';
 
@@ -15,6 +15,7 @@ import type { Solids } from '../kernel/world/solids';
  *   then release sprint first.
  * - Sprint needs standing, moving forward, and not being mid-way through a prone change.
  * - Walking backwards is slower, by up to backwardFactor.
+ * - A lean is held (body/lean.ts), and sprinting gives it up.
  *
  * Numbers come from the player's body, tuning.bodies.player (design doc · Player · Movement).
  */
@@ -72,6 +73,8 @@ export function playerIntent(
   out.gait = gait;
   out.yaw = input.yaw;
   out.pitch = input.pitch;
+  out.lean = gait === 'sprint' ? 0 : (input.lean ?? 0);
+  out.raised = input.optic !== undefined && input.optic !== Optic.None;
   return out;
 }
 

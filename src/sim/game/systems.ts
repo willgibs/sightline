@@ -1,4 +1,4 @@
-import { intentFor, motorSystem, poseAt, type PoseSample } from '../body';
+import { eyeOf, intentFor, motorSystem, poseAt, type PoseSample } from '../body';
 import { carryOut } from '../brain';
 import { dcos, dsin } from '../kernel/core/detmath';
 import { scheduleSystem, type ScheduleHandler, type System } from '../kernel/systems';
@@ -15,7 +15,8 @@ import { playerIntent } from './player';
 /** Handlers for scheduled entries. Empty until a lab schedules its first effect. */
 export const SCHEDULE_HANDLERS: Readonly<Record<string, ScheduleHandler>> = {};
 
-const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
+const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0, lean: 0 };
+const eye = { x: 0, y: 0, z: 0 };
 
 /** The player's commands, resolved against what was on screen when they were given. */
 const playerCommands: System = {
@@ -30,14 +31,16 @@ const playerCommands: System = {
       if (c.kind === 'fire') {
         // The moment the player saw: `lag` ticks before this tick's start state.
         poseAt(p.body, c.lag, pose);
+        pose.yaw = c.yaw; // a lean is to the side of the facing the player saw
+        eyeOf(pose, ctx.tuning.bodies.player, eye);
         const cp = dcos(c.pitch);
         ctx.emit({
           type: 'shot',
           source: p.id,
           t: (ctx.tick - 1 - c.lag) / ctx.tuning.sim.tickHz,
-          x: pose.x,
-          y: pose.y + pose.eyeHeight,
-          z: pose.z,
+          x: eye.x,
+          y: eye.y,
+          z: eye.z,
           dx: -dsin(c.yaw) * cp,
           dy: dsin(c.pitch),
           dz: -dcos(c.yaw) * cp,

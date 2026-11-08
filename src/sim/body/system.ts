@@ -20,7 +20,7 @@ export function intents(ctx: TickContext): Map<EntityId, MoveIntent> {
 export function intentFor(ctx: TickContext, id: EntityId): MoveIntent {
   const all = intents(ctx);
   let i = all.get(id);
-  if (!i) all.set(id, (i = { tick: 0, wishX: 0, wishZ: 0, gait: 'idle', yaw: 0, pitch: 0 }));
+  if (!i) all.set(id, (i = { tick: 0, wishX: 0, wishZ: 0, gait: 'idle', yaw: 0, pitch: 0, lean: 0, raised: false }));
   return i;
 }
 

@@ -35,7 +35,10 @@ export const BENCH_GOLDEN: PinnedBench = {
       "bodies inside something solid": 0,
       "worst overlap (m)": 2.2093438190040615e-14,
       "worst rise in a tick (m)": 0.28554800812780456,
-      "worst gain on steep ground (m)": 0
+      "worst gain on steep ground (m)": 0,
+      "lean: eye-to-head lines that differ by direction (of 2000)": 0,
+      "lean: pairs in view (of 2000)": 1496,
+      "seed · lean: pairs where the camera sees a guard who has no line to the head (of 2000)": 19
     },
     "runs": {
       "movement-course": {

@@ -568,7 +568,7 @@ Playable at `?scene=movement-lab`; the movement course stays as a regression tes
   - It turns by the largest yaw that keeps every part clear, found with a fixed number of bisections, pivoting near the chest.
   - It's pitched from the terrain under head and feet.
   - It moves every golden (the fuzzing bot goes prone, `game/bots/chaos.ts`), so it lands alone.
-- [ ] C3 · Lean.
+- [x] C3 · Lean.
   - The eye sits at the centre of the simulated head that guards target.
   - A peek exposes one eye; a lean with the weapon goes far enough to clear the corner (Ground Branch).
   - Rate-limited and swept against solids and bodies.

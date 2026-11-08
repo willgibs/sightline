@@ -23,7 +23,7 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * (Solid entities are a new kind, not a change of layout: existing states read the same.)
  * 6: the outcome. 7: guards keep the order their brain last gave.
  */
-export const STATE_SCHEMA = 7;
+export const STATE_SCHEMA = 8;
 
 export type EntityId = number;
 

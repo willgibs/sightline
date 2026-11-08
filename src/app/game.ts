@@ -156,7 +156,7 @@ export class Game {
   /** The scene being played, if any (sim/kernel/scene.ts): its world, systems and setup. */
   private scene: Scene | null;
   /** What the last drawn frame showed, so a paused screen isn't drawn again unchanged. */
-  private readonly drawnPose: CameraPose = { x: NaN, y: 0, z: 0, yaw: 0, pitch: 0, fov: 0 };
+  private readonly drawnPose: CameraPose = { x: NaN, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0, fov: 0 };
   private drawnKey = '';
   private redraws = 0;
 
@@ -829,12 +829,14 @@ export class Game {
     const V = this.tuning.view;
     const bob = headBob(phase, speed, this.sim.tuning.bodies.player, V.bob) * V.headBob * (1 - optic);
     return {
-      x: lerp(a.px, b.px, t),
-      y: lerp(a.py, b.py, t) + lerp(a.eye, b.eye, t) + bob,
-      z: lerp(a.pz, b.pz, t),
+      // The eye is the centre of the head (sim/body/shape.ts), wherever a lean has put it.
+      x: lerp(a.px + a.eyeX, b.px + b.eyeX, t),
+      y: lerp(a.py + a.eyeY, b.py + b.eyeY, t) + bob,
+      z: lerp(a.pz + a.eyeZ, b.pz + b.eyeZ, t),
       // A replay looks where the player looked.
       yaw: this.replay ? lerpAngle(a.yaw, b.yaw, t) : this.input.yaw,
       pitch: this.replay ? lerp(a.pitch, b.pitch, t) : this.input.pitch,
+      roll: -lerp(a.lean, b.lean, t) * V.leanRollDeg * (Math.PI / 180),
       fov,
     };
   }
@@ -854,7 +856,7 @@ export class Game {
     this.fly.z += (fz * ax.z + rz * ax.x) * speed;
     const ground = this.world.terrain.heightAt(this.fly.x, this.fly.z) + 0.3;
     if (this.fly.y < ground) this.fly.y = ground;
-    return { x: this.fly.x, y: this.fly.y, z: this.fly.z, yaw, pitch, fov };
+    return { x: this.fly.x, y: this.fly.y, z: this.fly.z, yaw, pitch, roll: 0, fov };
   }
 
   /** What systems drew in their last tick: lines in the world, labels in the HUD. */
@@ -1353,7 +1355,7 @@ export class Game {
     const d = target.clone().sub(p);
     const yaw = Math.atan2(-d.x, -d.z);
     const pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
-    return { x: p.x, y: p.y, z: p.z, yaw, pitch, fov };
+    return { x: p.x, y: p.y, z: p.z, yaw, pitch, roll: 0, fov };
   }
 
   private benchFrame(now: number, dt: number, cpu: number): void {
@@ -1446,7 +1448,7 @@ function keptLabel(r: StoredRun): string {
 }
 
 function samePose(a: CameraPose, b: CameraPose): boolean {
-  return a.x === b.x && a.y === b.y && a.z === b.z && a.yaw === b.yaw && a.pitch === b.pitch && a.fov === b.fov;
+  return a.x === b.x && a.y === b.y && a.z === b.z && a.yaw === b.yaw && a.pitch === b.pitch && a.roll === b.roll && a.fov === b.fov;
 }
 
 function clock(seconds: number): string {

@@ -1,5 +1,5 @@
 import { defaultTuning } from '../../config/tuning';
-import { InvariantWatch } from '../body';
+import { InvariantWatch, bodyShape, createBody, eyeOf } from '../body';
 import { generateWorld } from '../generation';
 import type { LayerName } from '../lanes';
 import { LAYERS } from '../lanes';
@@ -17,6 +17,11 @@ import { air, defaultEnv } from '../kernel/env';
 import { Rng } from '../kernel/core/rng';
 import { runScene } from '../kernel/scene';
 import { labWorld } from './scenes/perceptionLab';
+import { arenaWorld } from './scenes/movementLab';
+import { Blocks } from '../kernel/world/colliders';
+import { Solids } from '../kernel/world/solids';
+import { sightLine, type QueryView } from '../kernel/world/query';
+import { emptyShape } from '../kernel/world/shape';
 import { SIGHT_TABLE, sightScenario } from './scenes/sightScenario';
 
 /**
@@ -66,7 +71,8 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
     },
   },
   body: {
-    about: "Lab C: the motor's promises under the person-like and the fuzzing bot, a minute each in two valleys, and the closest calls.",
+    about:
+      "Lab C: the motor's promises under the person-like and the fuzzing bot, a minute each in two valleys, the closest calls, and the eye at the head: every lean's line of sight, both ways, beside the seed's camera-only lean.",
     metrics() {
       const m = {
         'body-ticks checked': 0,
@@ -98,7 +104,7 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
           m['worst gain on steep ground (m)'] = Math.max(m['worst gain on steep ground (m)'], r.steepGain);
         }
       }
-      return m;
+      return { ...m, ...eyeToHead() };
     },
   },
   perception: {
@@ -110,6 +116,49 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
   ballistics: { about: 'Lab B: the reticle against the impact, within 1 cm, from B3 on.', metrics: () => ({}) },
   game: { about: "The valley's plays, which exercise every lane together: pinned by their fingerprints and work.", metrics: () => ({}) },
 };
+
+/**
+ * Lean, and the eye at the head (C3): for 2,000 lean poses around the movement lab's walls
+ * and a guard somewhere beyond, the line from the eye to the guard's head and the line
+ * back. They are one segment, so they agree, bit for bit. Beside it the seed: a lean that
+ * moves the camera and leaves the body's shape where it was, Dishonored's hidden lean, and
+ * how often it sees a guard who has no line to the head he would aim at.
+ */
+function eyeToHead(): Record<string, number> {
+  const world = arenaWorld(defaultTuning);
+  const solids = new Solids(world.colliders);
+  const view: QueryView = { world, solids, bodies: [] };
+  const rng = new Rng('BENCH-C', 'lean');
+  const P = defaultTuning.bodies.player;
+  const G = defaultTuning.bodies.guard;
+  const shape = emptyShape();
+  const eye = { x: 0, y: 0, z: 0 };
+  let differ = 0;
+  let inView = 0;
+  let unseen = 0;
+  const pairs = 2000;
+  for (let k = 0; k < pairs; k++) {
+    const x = rng.range(-56, 56);
+    const z = rng.range(-5, 2);
+    const b = createBody(world, solids, P, x, z, 0, -1);
+    b.yaw = rng.range(-Math.PI, Math.PI);
+    b.lean = (rng.chance(0.5) ? 1 : -1) * rng.range(P.lean.peek * 0.5, P.lean.weapon);
+    const head = bodyShape(b, P, shape).head;
+    const g = createBody(world, solids, G, x + rng.range(-25, 25), z + rng.range(-20, 20), 0, 1);
+    eyeOf(g, G, eye);
+    const sees = sightLine(view, head.x, head.y, head.z, eye.x, eye.y, eye.z, Blocks.Sight);
+    const seen = sightLine(view, eye.x, eye.y, eye.z, head.x, head.y, head.z, Blocks.Sight);
+    if (sees !== seen) differ++;
+    if (sees) inView++;
+    // The seed: the camera moved aside, the head he aims at left over the feet.
+    if (sees && !sightLine(view, eye.x, eye.y, eye.z, b.x, b.y + b.eyeHeight, b.z, Blocks.Sight)) unseen++;
+  }
+  return {
+    [`lean: eye-to-head lines that differ by direction (of ${pairs})`]: differ,
+    [`lean: pairs in view (of ${pairs})`]: inView,
+    [`seed · lean: pairs where the camera sees a guard who has no line to the head (of ${pairs})`]: unseen,
+  };
+}
 
 /** Lab A's bench (perception lane): docs/phase-1-plan.md, A · recorded before building, says what each should be. */
 function perceptionMetrics(): Record<string, number> {

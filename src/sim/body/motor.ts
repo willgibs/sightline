@@ -9,6 +9,8 @@ import type { Solids } from '../kernel/world/solids';
 import { surfaceLoudness } from '../kernel/world/surfaces';
 import { bodyHeight, groundBelow, pushHistory, type BodySpec, type BodyState, type Gait, type MotorModeName, type Stance } from './body';
 import { footfall } from './footfall';
+import { stepLean } from './lean';
+import { eyeOf } from './shape';
 import type { DebugDraw } from '../kernel/debugDraw';
 
 /**
@@ -34,7 +36,9 @@ import type { DebugDraw } from '../kernel/debugDraw';
  *   shove it but never through a wall. Entities' shapes hold this only because whatever
  *   moves one never moves it into a body;
  * - on the ground, the body never gains height on ground steeper than maxSlopeDeg, from
- *   any angle of approach.
+ *   any angle of approach;
+ * - a lean (lean.ts) keeps the head and shoulders clear of anything solid, of the terrain and of
+ *   other bodies, and grows by no more than its rate. (The world can force it back faster.)
  * A new mode states its own invariants here and adds them to the invariant run.
  *
  * Ground steeper than maxSlopeDeg is not ground you can stand on: you can't climb it, and
@@ -54,6 +58,10 @@ export interface MoveIntent {
   /** Facing and view pitch to take. */
   yaw: number;
   pitch: number;
+  /** Leaning left (−1), right (1) or not at all (0). */
+  lean: number;
+  /** With a weapon or optic up, a lean goes all the way rather than peeking. */
+  raised: boolean;
 }
 
 export function idleIntent(b: BodyState, tick: number, out: MoveIntent): MoveIntent {
@@ -63,6 +71,8 @@ export function idleIntent(b: BodyState, tick: number, out: MoveIntent): MoveInt
   out.gait = 'idle';
   out.yaw = b.yaw;
   out.pitch = b.pitch;
+  out.lean = 0;
+  out.raised = false;
   return out;
 }
 
@@ -109,6 +119,7 @@ const ids: number[] = [];
 const push = { x: 0, z: 0 };
 const tmpPush = { x: 0, z: 0 };
 const dest = { x: 0, z: 0 };
+const leanEye = { x: 0, y: 0, z: 0 };
 
 /** Directions for testing the body's rim against the terrain: 12 around the circle. */
 const RIM = [
@@ -251,6 +262,7 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
     });
     b.stride = 0;
   }
+  stepLean(b, i, spec, ctx);
   if (ctx.draw) drawController(ctx.draw, b, spec, world, tanMax);
 }
 
@@ -273,7 +285,14 @@ function drawController(d: DebugDraw, b: BodyState, spec: BodySpec, world: World
   const slope = datan(b.slopeTan) / DEG;
   const tone = b.sliding ? 'bad' : b.slopeTan > tanMax * 0.8 ? 'warn' : 'muted';
   const on = b.standingOn >= 0 ? ' · on an object' : '';
-  d.label(b.x, b.y + bodyHeight(b, spec) + 0.35, b.z, `slope ${slope.toFixed(0)}° of ${spec.maxSlopeDeg}°${b.sliding ? ' · sliding' : ''}${on} · ${b.motor}`, tone);
+  const lean = b.lean !== 0 ? ` · lean ${b.lean > 0 ? 'right' : 'left'} ${Math.abs(b.lean).toFixed(2)} m` : '';
+  d.label(b.x, b.y + bodyHeight(b, spec) + 0.35, b.z, `slope ${slope.toFixed(0)}° of ${spec.maxSlopeDeg}°${b.sliding ? ' · sliding' : ''}${on} · ${b.motor}${lean}`, tone);
+  if (b.lean !== 0) {
+    // The eye, where the lean has put it: the head guards target.
+    const eye = eyeOf(b, spec, leanEye);
+    d.line(b.x, eye.y, b.z, eye.x, eye.y, eye.z, 'info');
+    d.circle(eye.x, eye.y, eye.z, spec.parts.headRadius, 'info');
+  }
 }
 
 /**

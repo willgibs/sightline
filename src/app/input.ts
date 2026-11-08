@@ -223,6 +223,7 @@ export class InputController {
     out.yaw = this.yaw;
     out.pitch = this.pitch;
     out.optic = !frozen && this.zoomHeld ? Optic.Binoculars : Optic.None;
+    out.lean = frozen ? 0 : (this.held('leanRight') ? 1 : 0) - (this.held('leanLeft') ? 1 : 0);
     if (frozen) {
       this.latch.clear();
       this.commands.length = 0;

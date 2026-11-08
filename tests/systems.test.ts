@@ -159,7 +159,7 @@ describe('the shared motor', () => {
       others: [],
       emit: (e) => events.push({ ...e, id: events.length + 1, tick: ctx.tick, t: ctx.tick / 30, cause: 0 } as SimEvent),
     };
-    const intent: MoveIntent = { tick: 0, wishX, wishZ: 0, gait: 'walk', yaw: b.yaw, pitch: 0 };
+    const intent: MoveIntent = { tick: 0, wishX, wishZ: 0, gait: 'walk', yaw: b.yaw, pitch: 0, lean: 0, raised: false };
     for (let t = 1; t <= seconds * 30; t++) {
       ctx.tick = intent.tick = t;
       stepMotor(b, intent, spec, ctx);

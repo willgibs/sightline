@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import { queryBodies, stridePhase, type BodyState, type Gait, type Stance } from '../body';
+import { bodyShape, queryBodies, stridePhase, type BodyState, type Gait, type Stance } from '../body';
 import { generateWorld, worldFingerprint } from '../generation';
 import type { Game } from '../kernel/game';
 import { neutralInput } from '../kernel/input';
@@ -8,6 +8,7 @@ import { Simulation as KernelSimulation } from '../kernel/sim';
 import type { EntityId, SimState } from '../kernel/state';
 import type { System } from '../kernel/systems';
 import type { Collider } from '../kernel/world/colliders';
+import { emptyShape } from '../kernel/world/shape';
 import type { World } from '../kernel/world/world';
 import { PLAYER_ID, player, type GuardEntity, type PlayerEntity } from './entities';
 import type { PlayerControl } from './player';
@@ -43,7 +44,13 @@ export interface Snapshot {
   px: number;
   py: number;
   pz: number;
+  /** The body's eye height (its stance), and where its eye actually is, from its feet: the centre of its head. */
   eye: number;
+  eyeX: number;
+  eyeY: number;
+  eyeZ: number;
+  /** How far it is leaned to the right, metres (body/lean.ts). */
+  lean: number;
   yaw: number;
   pitch: number;
   speed: number;
@@ -67,6 +74,8 @@ export interface Snapshot {
  * Every run has a player, always entity 1.
  */
 export class Simulation extends KernelSimulation {
+  private readonly shape = emptyShape();
+
   /** `systems` replaces the game's own list, for tests and scenes; recordings replay with the game's. */
   constructor(world: World, tuning: Tuning, systems: readonly System[] = SYSTEMS) {
     super(world, tuning, SIGHTLINE, systems);
@@ -124,6 +133,10 @@ export class Simulation extends KernelSimulation {
             py: 0,
             pz: 0,
             eye: 0,
+            eyeX: 0,
+            eyeY: 0,
+            eyeZ: 0,
+            lean: 0,
             yaw: 0,
             pitch: 0,
             speed: 0,
@@ -141,6 +154,11 @@ export class Simulation extends KernelSimulation {
     s.py = p.y;
     s.pz = p.z;
     s.eye = p.eyeHeight;
+    const shape = bodyShape(p, this.tuning.bodies.player, this.shape);
+    s.eyeX = shape.head.x - p.x;
+    s.eyeY = shape.head.y - p.y;
+    s.eyeZ = shape.head.z - p.z;
+    s.lean = p.lean;
     s.yaw = p.yaw;
     s.pitch = p.pitch;
     s.speed = p.speed;

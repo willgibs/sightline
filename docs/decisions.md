@@ -14,6 +14,22 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 **Why:** The owner wants people to be able to read the code and play the build, while the project stays the owner's own. MIT is the simplest, most familiar license for that. Art and sound, when they arrive, can carry their own terms.
 
+## 2026-11-08 · Lab C: movement and body
+
+Built on the `lab-c-movement` branch to `docs/phase-1-plan.md`, section C. Lean and the mantle use input the bots never give, so the valley's behaviour is untouched until the prone body (C2).
+
+### The lean (C3): the eye is the centre of the head that's hit
+
+**Decision:**
+- A lean moves the head aside about the hips, the shoulders part way with it, and the arc takes the head down a little: `peek` 0.18 m with nothing raised, `weapon` 0.40 m with an optic up (Ground Branch's distinction), `bend` 0.58 of the spine, so a crouch leans less than a stand, `prone` 0.12 m.
+- The eye is the centre of the head sphere in `bodyShape`, always, so the camera, a shot and a guard's rays all use the same point. A line from the eye to a guard's head and the line back are one segment and agree bit for bit.
+- It grows at 1.4 m/s (`rate`), and a blocked lean goes as far as stays clear, found with 8 bisections. The world can force it back at any speed (a wall the body walks into), but it can't grow faster: a flick of the mouse can't throw the head out, and nothing is hidden.
+- Sprinting gives it up. Turning carries the lean with the view; the weapon lean stays below `radius + headRadius`, so a head on a turning body can't pass through a wall the body is clear of.
+- Lean is a held input (`input.lean`, recorded since the input's first format): the bots never give it, so no behaviour fingerprint moves.
+- `STATE_SCHEMA` 8: bodies keep their lean. Every state golden moved; no behaviour golden did.
+
+**Why:** The lean's reported failures are all about where the eye is: Siege moved the camera to the centre of the head to stop lean-spam, Dishonored hides the lean. Putting the eye at the head that guards target makes every lean honest by construction; the rate limit closes the flick (Siege patched a melee-and-lean input that moved the head almost instantly).
+
 ## 2026-11-08 · Lab A: perception and awareness
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.

@@ -42,6 +42,7 @@ export interface PoseSample {
   yaw: number;
   pitch: number;
   eyeHeight: number;
+  lean: number;
 }
 
 export interface BodyState {
@@ -65,6 +66,8 @@ export interface BodyState {
   /** Eye height when the current stance change began. */
   eyeFrom: number;
   eyeHeight: number;
+  /** How far the head is leaned to the body's right (negative: left), metres (lean.ts). */
+  lean: number;
   motor: MotorModeName;
   /** On the ground but on terrain too steep to stand on: no traction, sliding down. */
   sliding: boolean;
@@ -112,7 +115,7 @@ export function createBody(world: World, solids: Solids, spec: BodySpec, x: numb
   const surface = ground.surface;
   const standingOn = ground.collider;
   const yaw = yawFromDirection(faceX, faceZ);
-  const pose = (): PoseSample => ({ x, y, z, yaw, pitch: 0, eyeHeight: spec.eyeHeight.stand });
+  const pose = (): PoseSample => ({ x, y, z, yaw, pitch: 0, eyeHeight: spec.eyeHeight.stand, lean: 0 });
   return {
     x,
     y,
@@ -128,6 +131,7 @@ export function createBody(world: World, solids: Solids, spec: BodySpec, x: numb
     proneTransition: false,
     eyeFrom: spec.eyeHeight.stand,
     eyeHeight: spec.eyeHeight.stand,
+    lean: 0,
     motor: 'ground',
     sliding: false,
     stride: 0,
@@ -150,12 +154,14 @@ export function pushHistory(b: BodyState): void {
   h1.yaw = h0.yaw;
   h1.pitch = h0.pitch;
   h1.eyeHeight = h0.eyeHeight;
+  h1.lean = h0.lean;
   h0.x = b.x;
   h0.y = b.y;
   h0.z = b.z;
   h0.yaw = b.yaw;
   h0.pitch = b.pitch;
   h0.eyeHeight = b.eyeHeight;
+  h0.lean = b.lean;
 }
 
 /**
@@ -176,6 +182,7 @@ export function poseAt(b: BodyState, lag: number, out: PoseSample): PoseSample {
   out.yaw = newer.yaw; // angles come from the command, not from history
   out.pitch = newer.pitch;
   out.eyeHeight = newer.eyeHeight + (older.eyeHeight - newer.eyeHeight) * t;
+  out.lean = newer.lean + (older.lean - newer.lean) * t;
   return out;
 }
 

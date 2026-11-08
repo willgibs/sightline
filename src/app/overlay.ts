@@ -45,6 +45,7 @@ export class Overlay {
       [['sprint'], 'sprint'],
       [['crouch'], 'crouch'],
       [['prone'], 'prone'],
+      [['leanLeft', 'leanRight'], 'lean'],
       [['zoom'], 'zoom'],
       [['debugView'], 'debug view'],
     ];

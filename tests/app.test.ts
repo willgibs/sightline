@@ -7,12 +7,20 @@ describe('the action map', () => {
   const map = new ActionMap();
   const all = new Set<Context>(['play', 'always', 'debug', 'fly']);
 
-  it('binds each key or button to one action, so no two can fire together', () => {
-    const seen = new Map<string, string>();
-    for (const [action, spec] of Object.entries(DEFAULT_ACTIONS)) {
-      for (const input of spec.inputs) {
-        expect(seen.get(input), `${input} is bound to ${seen.get(input)} and ${action}`).toBeUndefined();
-        seen.set(input, action);
+  it('binds each key or button to one action in each mode, so no two can fire together', () => {
+    // The fly camera's keys may reuse on-foot keys: flying freezes the body's input (input.ts, sampleTick).
+    for (const contexts of [
+      ['play', 'always', 'debug'],
+      ['fly', 'always', 'debug'],
+      ['replay', 'always', 'debug'],
+    ] as Context[][]) {
+      const seen = new Map<string, string>();
+      for (const [action, spec] of Object.entries(DEFAULT_ACTIONS)) {
+        if (!contexts.includes(spec.context)) continue;
+        for (const input of spec.inputs) {
+          expect(seen.get(input), `${input} is bound to ${seen.get(input)} and ${action}`).toBeUndefined();
+          seen.set(input, action);
+        }
       }
     }
   });

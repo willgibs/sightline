@@ -94,6 +94,15 @@ export const defaultTuning = {
       shoveMax: 0.08, // most another body shoves this one per resolve pass; small enough that walls always win
       groundSnap: 0.6, // stay glued to the ground walking downhill
       stride: { sprint: 1.7, walk: 1.25, crouch: 0.85, crawl: 0.6 }, // metres between footsteps
+      // Leaning around cover (sim/body/lean.ts): metres the eye moves aside, about the hips.
+      // No game publishes these; they are the lab's (docs/phase-1-plan.md, C3).
+      lean: {
+        peek: 0.18, // with nothing raised: an eye past the corner
+        weapon: 0.4, // with an optic up: far enough to clear it. Never past radius + headRadius, so turning can't swing the head through a wall the body is clear of
+        prone: 0.12, // lying down: rolling onto one shoulder
+        bend: 0.58, // upright: at most this share of the spine (hips to eye), so a crouch leans less than a stand
+        rate: 1.4, // m/s the eye moves aside at
+      },
       // Three parts for sight lines and hits: a head sphere at the eye, a torso capsule
       // from the hips to the shoulders, a legs capsule from the feet to the hips.
       // Heights come from the stance.
@@ -125,6 +134,7 @@ export const defaultTuning = {
       shoveMax: 0.08,
       groundSnap: 0.6,
       stride: { sprint: 1.7, walk: 0.75, crouch: 0.85, crawl: 0.6 },
+      lean: { peek: 0.18, weapon: 0.4, prone: 0.12, bend: 0.58, rate: 1.4 },
       parts: {
         headRadius: 0.115,
         torsoRadius: 0.22,
@@ -258,6 +268,7 @@ export const defaultTuning = {
     headBob: 1, // 0 turns camera bob off
     // How far the eye dips as each foot comes down, metres, at each gait's speed (sim/body/bob.ts).
     bob: { crawl: 0.01, crouch: 0.016, walk: 0.026, sprint: 0.05 },
+    leanRollDeg: 22, // degrees the view tilts per metre of lean: 4 at a peek, 9 at a full lean
     fogDensity: 0.0012, // exp² fog: about 30% at 500 m, 75% at 1 km
   },
 };
