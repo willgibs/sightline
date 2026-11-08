@@ -22,6 +22,8 @@ interface GuardMesh {
   lit: boolean;
   /** How his rifle is held (A8): 0 slung, 1 at the ready, 2 shouldered. */
   hold: number;
+  /** His scope's flash (E8): one point of constant size at his head, so it reads at any range and any zoom. */
+  flash: THREE.Points;
 }
 
 /**
@@ -55,6 +57,8 @@ export class GuardMeshes {
   private readonly rifleY: number;
   private readonly visorGeo: THREE.BufferGeometry;
   private readonly rifleGeo: THREE.BufferGeometry;
+  /** One point a little in front of the head, shared by every guard's scope flash. */
+  private readonly flashGeo = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, 0, -0.16], 3));
   private readonly prevIndex = new Map<number, number>();
   private debugTint = false;
   /** How near the body's axis, and its height, within which the camera is inside it. */
@@ -104,11 +108,13 @@ export class GuardMeshes {
     head.position.set(0, this.headY, 0);
     const skull = new THREE.Mesh(this.headGeo, this.honestMaterial);
     const visor = new THREE.Mesh(this.visorGeo, this.visorMaterial);
-    head.add(skull, visor);
+    const flash = new THREE.Points(this.flashGeo, new THREE.PointsMaterial({ color: 0xfff1cf, size: 3, sizeAttenuation: false, transparent: true, depthWrite: false }));
+    flash.visible = false;
+    head.add(skull, visor, flash);
     const rifle = new THREE.Mesh(this.rifleGeo, this.honestMaterial);
     root.add(legs, body, head, rifle);
     this.group.add(root);
-    const g: GuardMesh = { root, head, body, legs, plain: [skull, rifle], visor, rifle, role, lit: true, hold: -1 };
+    const g: GuardMesh = { root, head, body, legs, plain: [skull, rifle], visor, rifle, role, lit: true, hold: -1, flash };
     this.holdRifle(g, 0);
     this.paint(g);
     return g;
@@ -185,6 +191,7 @@ export class GuardMeshes {
       }
       const rung = b[o + 8]!;
       this.holdRifle(g, rung >= 4 ? 2 : rung >= 2 ? 1 : 0);
+      this.shine(g, b[o + 9]!);
       const dx = eye.x - x;
       const dz = eye.z - z;
       g.root.visible = !(dx * dx + dz * dz < this.reach * this.reach && eye.y > y - 0.12 && eye.y < y + this.height);
@@ -193,9 +200,19 @@ export class GuardMeshes {
       for (const [id, g] of this.guards) {
         if (curr.guardIds.includes(id)) continue;
         this.group.remove(g.root);
+        (g.flash.material as THREE.Material).dispose();
         this.guards.delete(id);
       }
     }
+  }
+
+  /** The scope's flash at its strength: it hides at nothing, and it's as bright as the glint says. */
+  private shine(g: GuardMesh, flash: number): void {
+    g.flash.visible = flash > 0.02;
+    if (!g.flash.visible) return;
+    const m = g.flash.material as THREE.PointsMaterial;
+    m.opacity = Math.min(1, 0.35 + 0.65 * flash);
+    m.size = 3 + 7 * flash;
   }
 
   /** How many guards are hidden because the camera is inside them (for tests). */
@@ -213,6 +230,8 @@ export class GuardMeshes {
     this.visorShaded.dispose();
     for (const m of Object.values(this.roleMaterials)) m.dispose();
     for (const m of Object.values(this.roleShaded)) m.dispose();
+    this.flashGeo.dispose();
+    for (const g of this.guards.values()) (g.flash.material as THREE.Material).dispose();
     this.guards.clear();
     void this.look;
   }

@@ -3,6 +3,7 @@ import type { Tuning } from '../config/tuning';
 import { FixedStepClock } from '../sim/kernel/core/clock';
 import { headingDegrees, lerp, moveTowards } from '../sim/kernel/core/math';
 import { headBob } from '../sim/body';
+import type { ReportCode } from '../sim/kernel/events';
 import { BARKS, beliefRadius, explainChain, groundLight, lightName, movementVisibility, stanceVisibility } from '../sim/perception';
 import { EventLog } from '../sim/kernel/eventlog';
 import { Cues } from './cues';
@@ -94,6 +95,17 @@ interface Bench {
   calls: number[];
   triangles: number[];
 }
+
+/** What a guard's radio or voice report says aloud (the captions you hear, by the law of sound). */
+const CALL_LINES: Readonly<Record<ReportCode, string>> = {
+  contact: 'Contact! Calling it in.',
+  heard: 'Heard something. Going to check.',
+  shot: 'Shots fired. Anybody see from where?',
+  body: 'Man down! Man down!',
+  missing: "Post isn't answering.",
+  clear: 'Clear here.',
+  claim: "I'll take a look.",
+};
 
 export class Game {
   private tuning: Tuning;
@@ -994,6 +1006,11 @@ export class Game {
     const ear = { x: p.x, y: p.y + p.eyeHeight, z: p.z };
     const view = { x: ear.x, z: ear.z, yaw: this.replay ? p.yaw : this.input.yaw };
     for (const e of events) {
+      if (e.type === 'call') {
+        if (this.sound.levelAt(e.x, e.y, e.z, e.radius, ear.x, ear.y, ear.z) < 1) continue;
+        this.cues.say(CALL_LINES[e.say], e.radio === 0, e.x, e.z, view, this.time);
+        continue;
+      }
       if (e.type !== 'bark') continue;
       const line = BARKS[e.line];
       if (!line || this.sound.levelAt(e.x, e.y, e.z, e.radius, ear.x, ear.y, ear.z) < 1) continue;
@@ -1238,6 +1255,7 @@ export class Game {
           : 'recording —',
       ``,
       ...this.perceptionLines(),
+      ...this.campLines(),
       `SOUND`,
       this.sound.report(),
       ``,
@@ -1264,6 +1282,35 @@ export class Game {
       lines.push(`${role} ${g.id} · ${s.awareness.state} · meter ${Math.round(s.sight.meter * 100)}% · ${believes}`);
     }
     const last = [...this.log.all].reverse().find((e) => e.type === 'alert');
+    if (last) for (const line of explainChain(this.log.explain(last.id), (id) => this.who(id))) lines.push(`  ${line}`);
+    return lines;
+  }
+
+  /**
+   * The debug panel's camp section (lab E): the camp's level and what it settles to, the
+   * search under way, its belief map and estimate of a shooter, its orders; each guard's
+   * act and why, and the last reaction explained back to what caused it.
+   */
+  private campLines(): string[] {
+    const commander = this.sim.index.of('commander')[0];
+    if (!commander) return [];
+    const T = this.tuning;
+    const hz = T.sim.tickHz;
+    const c = commander.camp;
+    const tick = this.sim.tick;
+    const quiet = c.lastPercept >= 0 ? (tick - c.lastPercept) / hz : -1;
+    const search = c.search ? ` · search, ${quiet.toFixed(0)} s since the last report (${T.brain.camp.search.minSeconds}–${T.brain.camp.search.maxSeconds} s)` : '';
+    const mass = c.map.p.reduce((a, b) => a + b, 0);
+    const lines = ['', `CAMP · ${c.level} (settles ${c.floor})${search} · belief ${(mass * 100).toFixed(0)}%`];
+    const est = c.shots.estimate;
+    if (est) lines.push(`shooter believed at ${est.x.toFixed(0)}, ${est.z.toFixed(0)} · ${c.shots.bearings.length} bearings${c.reinforceCalled >= 0 ? ` · reinforcements called ${((tick - c.reinforceCalled) / hz).toFixed(0)} s ago` : ''}`);
+    if (c.tasks.length) lines.push(`orders: ${c.tasks.map((t) => `${t.kind} (${t.assigned.length}/${t.capacity})`).join(', ')}`);
+    for (const g of this.sim.guards) {
+      if (!g.brain) continue;
+      const role = this.world.camp.guards[g.guard.spawn]?.role ?? 'guard';
+      lines.push(`${role} ${g.id} · ${g.brain.act}`);
+    }
+    const last = [...this.log.all].reverse().find((e) => e.type === 'act' && e.to !== 'routine' && e.to !== 'return');
     if (last) for (const line of explainChain(this.log.explain(last.id), (id) => this.who(id))) lines.push(`  ${line}`);
     return lines;
   }

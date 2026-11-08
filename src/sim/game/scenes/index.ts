@@ -1,6 +1,8 @@
 import type { Scene as KernelScene } from '../../kernel/scene';
 import type { Simulation } from '../sim';
 import { ladderTower } from './ladderTower';
+import { campBrain } from './campBrain';
+import { CAMP_SCENARIOS, campScenario } from './campScenario';
 import { movementCourse } from './movementCourse';
 import { movementLab } from './movementLab';
 import { perceptionCrowd, perceptionLab } from './perceptionLab';
@@ -19,6 +21,8 @@ export type Scene = KernelScene<Simulation>;
  */
 export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   'ladder-tower': ladderTower,
+  'camp-brain': campBrain,
+  'camp-scenario': campScenario,
   'movement-course': movementCourse,
   'movement-lab': movementLab,
   'perception-crowd': perceptionCrowd,
@@ -43,4 +47,5 @@ export function sceneOf(header: { scene: { name: string; params: string } | null
 export const SCENARIOS: Readonly<Record<string, readonly string[]>> = {
   noise: NOISE_TABLE,
   sight: SIGHT_TABLE,
+  'camp-scenario': CAMP_SCENARIOS,
 };

@@ -81,6 +81,16 @@ function events(): { sim: Simulation; all: SimEvent[]; valley: number; range: Si
     { type: 'noise', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, loudness: 2, radius: 24 },
     { type: 'mantle', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, surface: Surface.Rock, loudness: 0.735, radius: 8.82 },
     { type: 'drag', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, surface: Surface.Gravel, loudness: 1.55, radius: 18.6 },
+    { type: 'act', id: 0, tick, t: tick / 30, source: guard, cause: 1, from: 'routine', to: 'look', why: 'heard', x: 3, z: -4, weight: 0.65 },
+    { type: 'call', id: 0, tick, t: tick / 30, source: guard, cause: 1, ...voice, loudness: 14 / defaultTuning.noise.radiusPerUnit, radius: 14, radio: 1, say: 'contact' },
+    { type: 'radio', id: 0, tick, t: tick / 30, source: guard, cause: 1, kind: 'contact', x: 8, z: -2, radius: 6 },
+    { type: 'order', id: 0, tick, t: tick / 30, source: guard, cause: 1, to: guard, task: 'search', x: 1, z: -2 },
+    { type: 'level', id: 0, tick, t: tick / 30, source: guard, cause: 1, from: 'calm', to: 'uneasy' },
+    { type: 'checkin', id: 0, tick, t: tick / 30, source: guard, cause: 1, post: 2, stage: 'call' },
+    { type: 'hurt', id: 0, tick, t: tick / 30, source: guard, cause: 1, part: 'torso', hits: 1 },
+    { type: 'alarm', id: 0, tick, t: tick / 30, source: guard, cause: 1, box: 0, stage: 'raised' },
+    { type: 'reinforce', id: 0, tick, t: tick / 30, source: guard, cause: 1, count: 3, x: 300, z: 0 },
+    { type: 'siren', id: 0, tick, t: tick / 30, source: guard, cause: 1, ...voice, loudness: 900 / defaultTuning.noise.radiusPerUnit, radius: 900 },
   ];
   perceived.forEach((e) => all.push({ ...e, id: all.length + 1 }));
   const valley = all.length;

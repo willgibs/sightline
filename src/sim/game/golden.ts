@@ -29,8 +29,9 @@ export const GOLDEN = {
   /**
    * Scenes run by their own drivers, each pinning its lane (benches.ts): the movement
    * course covers stairs, drops, ramps, ceilings, crawling and surfaces; the perception
-   * lab, guards seeing and hearing a walker who ends in a bush; the shooting range, a
-   * marksman's shots from the click to the body on the ground; spawn timing,
+   * lab, guards seeing and hearing a walker who ends in a bush, and its crowd of sixteen (the
+   * budget); the shooting range, a marksman's shots from the click to the body on the
+   * ground; spawn timing,
    * bodies spawned inside a tick; the kernel alone, a run with every lane switched off.
    */
   scenes: {

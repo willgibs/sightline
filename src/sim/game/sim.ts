@@ -12,7 +12,9 @@ import type { System } from '../kernel/systems';
 import type { Collider } from '../kernel/world/colliders';
 import type { World } from '../kernel/world/world';
 import { PLAYER_ID, player, type GuardEntity, type PlayerEntity, type RemainsEntity } from './entities';
-import { glint, thrownAt, vec3, viewLine, type Flight } from '../ballistics';
+import type { GuardRole } from '../generation';
+import { glint, thrownAt, vec3, viewLine, type Flight, type Vec3 } from '../ballistics';
+import { dcos, dsin } from '../kernel/core/detmath';
 import { sunDirection } from '../kernel/env';
 import type { PlayerControl } from './player';
 import { writeSample } from './samples';
@@ -39,13 +41,41 @@ export const SIGHTLINE: Game<Simulation> = {
   sample: writeSample,
 };
 
+const lens: Vec3 = { x: 0, y: 0, z: 0 };
+const toPlayer: Vec3 = { x: 0, y: 0, z: 0 };
+
+/**
+ * How brightly a marksman's scope flashes at the player (E8): the same mirror as the
+ * player's own lens (ballistics/glint.ts), for a marksman sweeping a believed perch or
+ * shooting. It decides nothing in the simulation; it's what the player can see of him.
+ */
+function scopeFlash(g: GuardEntity, role: GuardRole | undefined, px: number, py: number, pz: number, sun: Vec3, T: Tuning): number {
+  const b = g.brain;
+  if (role !== 'marksman' || !b || !((b.act === 'task' && b.task?.kind === 'sweep') || b.act === 'engage')) return 0;
+  const body = g.body;
+  const heading = body.yaw + g.guard.headYaw;
+  lens.x = -dsin(heading);
+  lens.y = 0;
+  lens.z = -dcos(heading);
+  const dx = px - body.x;
+  const dy = py - (body.y + body.eyeHeight);
+  const dz = pz - body.z;
+  const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (d < 1e-6) return 0;
+  toPlayer.x = dx / d;
+  toPlayer.y = dy / d;
+  toPlayer.z = dz / d;
+  return glint(lens, 1, sun, toPlayer, T.ballistics.glint);
+}
+
 /**
  * Per-guard values in Snapshot.guards: x, y, z, yaw, headYaw, moving; the light beneath
  * him (A4: 1 in the sun, less in shade, as the simulation finds it); his detection meter
- * (A8: what the honest view shows from the cue up); and his rung on the awareness ladder
- * (0 unaware to 4 combat; A8: his posture and weapon).
+ * (A8: what the honest view shows from the cue up); his rung on the awareness ladder
+ * (0 unaware to 4 combat; A8: his posture and weapon); and how brightly his scope flashes
+ * at the player (E8: 0 unless he's a marksman glassing the ground; 0–1).
  */
-export const GUARD_FIELDS = 9;
+export const GUARD_FIELDS = 10;
 
 /** The slice of state the renderer needs, copied once per tick for interpolation. */
 export interface Snapshot {
@@ -246,6 +276,7 @@ export class Simulation extends KernelSimulation {
     const shade = this.world.shadeArea !== undefined;
     const t = this.tick / this.tuning.sim.tickHz;
     const env = this.world.spec.env;
+    const sun = sunDirection(env, t, this.sun);
     s.light = shade ? groundLight(this.world, this.solids, env, t, p.x, p.y, p.z, this.tuning) : 1;
     s.guardIds.length = n;
     s.guardSpawns.length = n;
@@ -264,6 +295,7 @@ export class Simulation extends KernelSimulation {
       s.guards[o + 6] = shade ? groundLight(this.world, this.solids, env, t, b.x, b.y, b.z, this.tuning) : 1;
       s.guards[o + 7] = e.senses ? e.senses.sight.meter : 0;
       s.guards[o + 8] = e.senses ? rung(e.senses.awareness.state) : 0;
+      s.guards[o + 9] = scopeFlash(e, this.world.camp.guards[e.guard.spawn]?.role, p.x, p.y + p.eyeHeight, p.z, sun, this.tuning);
     }
     const shapes = this.solids.shapes;
     s.solids.length = shapes.length;

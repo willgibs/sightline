@@ -1,4 +1,5 @@
 import type { BodyState, VitalsState } from '../body';
+import type { BrainState } from '../brain';
 import type { RifleState } from '../ballistics';
 import type { Senses } from '../perception';
 import type { EntityBase, EntityId, EntityIndex } from '../kernel/state';
@@ -28,6 +29,8 @@ export interface PlayerEntity extends EntityBase {
    */
   rifle?: RifleState;
   vitals?: VitalsState;
+  /** Hits taken, where the run gives the player health (E10): the player can die. */
+  health?: { hits: number };
 }
 
 export interface GuardEntity extends EntityBase {
@@ -41,6 +44,8 @@ export interface GuardEntity extends EntityBase {
    * neither sees nor hears, and keeps to his routine.
    */
   senses?: Senses;
+  /** His brain's memory (lab E), where the camp brain runs; without it he keeps to routine, or lab A's minimal reactions. */
+  brain?: BrainState;
 }
 
 /**

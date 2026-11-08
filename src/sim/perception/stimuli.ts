@@ -24,6 +24,8 @@ export const HEARD_AS: Readonly<Partial<Record<EventType, PendingSound['kind']>>
   clatter: 'sound',
   bark: 'voice',
   cry: 'voice',
+  call: 'voice',
+  siren: 'voice',
   report: 'shot',
   impact: 'shot',
   bolt: 'shot',

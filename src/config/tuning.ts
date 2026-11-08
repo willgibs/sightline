@@ -339,6 +339,181 @@ export const defaultTuning = {
     catchUp: 1.5, // how much faster than walking a guard may hurry back to his routine
   },
 
+  // The camp brain (lab E, src/sim/brain).
+  brain: {
+    // Navigation (E1): A* over the map and site layers of the spatial grid (nav.ts).
+    nav: {
+      siteExpansions: 40000, // site-layer cells one search may expand (rule 18)
+      mapExpansions: 20000, // map-layer cells one search may expand (rule 18)
+      searchesPerTick: 4, // routes searched in one tick, across every guard
+      snapRadius: 4, // metres: how far a blocked point looks for the nearest walkable cell
+      pullAhead: 200, // cells a straight segment may skip in string-pulling
+      sampleStep: 0.2, // metres between clearance samples along a pulled segment
+      arrive: 0.6, // metres: close enough to a waypoint to move on
+      slowDown: 1.2, // metres before the last waypoint where he eases off
+      minSpeed: 0.5, // m/s: never slower than this while walking a route
+      progress: 0.02, // metres he must gain on a waypoint to count as progress
+      stallSeconds: 0.9, // no progress for this long: something's in the way
+      stallsMax: 4, // stalls a route may take before the brain is told
+      sideSeconds: 0.7, // how long a sidestep around something in the way lasts
+    },
+    // A guard's brain (E3, brain.ts): awareness states, utility scoring inside each.
+    think: 0.4, // seconds between reconsiderings, at most (sooner when something changes)
+    pickShare: 0.7, // options within this share of the best weight are in the draw (rank-then-weight)
+    switchRatio: 1.4, // a running act is dropped only for one better by this factor
+    routeEvery: 1.5, // seconds a guard waits before re-searching a route to a goal that moved
+    goalMoved: 2.5, // metres a goal must move before it's worth a new route
+    backAt: 3, // metres from where his routine says he should be: close enough to walk straight there
+    routeRetry: 1.5, // seconds before trying again after no route was found
+    paces: { investigate: 1.35, search: 2, hurry: 2.4, run: 5 },
+    linger: { investigate: 4.5, search: 2.5 },
+    cooldown: { investigate: 2.5, search: 2 },
+    search: { points: 3, radius: 7, growth: 0.35 },
+    taskWeight: 0.9, // how strongly he weighs an order against what his own senses tell him
+    // Adaptation within a mission (E9): a ledger of repeated tricks and a memory of incidents.
+    adapt: {
+      cellSize: 8, // metres: stimuli within this of each other count as one spot
+      forget: 240, // seconds a spot stays in the ledger without a repeat
+      repeatCount: 3, // from this many repeats of one trick, two guards go and it is radioed in
+    },
+    // Alarms (E7): a guard runs for the alarm box when things turn real (design doc: 4–8 s away).
+    alarm: {
+      reach: 44, // metres: a run of about 8 s at his sprint; farther, he won't
+      use: 0.7, // seconds to throw the switch, standing at it
+      role: { sentry: 0.6, patrol: 0.5, marksman: 0, 'radio-operator': 0.3, officer: 0.5, worker: 1, target: 0 },
+      sirenRadius: 1200,
+      flee: { pace: 4.6, arrive: 1.2 }, // the target's run for the vehicle at lockdown (m/s, and how close counts as aboard)
+      retry: 10, // seconds before he'll try the alarm again, after a run that came to nothing
+      claimWithin: 3, // metres from the box for someone's shout to count as claiming it
+      sirenHeight: 3, // metres above the box's foot that the horn sounds from
+    },
+    // Reinforcements (E8): called at lockdown, arriving after a delay as a squad that hunts.
+    reinforce: {
+      delay: 90, // seconds from lockdown to their arrival
+      count: 3, // guards in the squad
+      spread: 3.5, // metres between them when they arrive
+      edgeMargin: 14, // metres inside the map's edge where they arrive, up the camp's road
+    },
+    // Counter-sniper (E8): triangulating shots from bearings (triangulate.ts) and hunting the shooter.
+    sniper: {
+      fusion: { half: 640, cells: 128, rangeMin: 120, rangeMax: 560 }, // the commander's grid around the camp, metres, and its ring of plausible perches
+      keep: 90, // seconds of bearings it fuses
+      maxBearings: 16, // bearings it keeps
+      earSigmaDeg: 4, // the error of a bearing taken by ear, from the guard's own stream, on top of where it seemed to be
+      minSigmaDeg: 1.5, // nobody's ear is sharper than this
+      maxSigmaDeg: 25, // a bearing worse than this is said to be no bearing at all
+      sweepSeconds: 8, // how long a marksman sweeps a believed perch
+      sweepHeadDeg: 20, // how far his head swings to either side of it
+    },
+    // Minimal combat (E10): guards engage, take cover and call support; the player can be hit and die.
+    combat: {
+      range: { sentry: 90, patrol: 90, marksman: 320, 'radio-operator': 60, officer: 80, worker: 0, target: 0 }, // metres he will shoot at what he sees
+      seenFor: 0.7, // seconds a sighting stays good enough to shoot at
+      react: 0.6, // seconds from seeing to the first shot
+      every: 1.1, // seconds between shots
+      spreadDeg: 1.1, // his aim's error radius, degrees, from his own stream
+      playerHits: 3, // hits the player can take
+      damage: { head: 2, torso: 1, legs: 1 }, // what each part counts as
+      coverRange: 12, // metres he looks for cover within
+      coverRings: 4, // rings of candidate spots, out to coverRange
+      coverPoints: 12, // spots per ring
+      coverAfter: 2.5, // seconds without a sight of the target before he looks for cover
+      holdAfter: 6, // seconds he holds cover without seeing anything before moving up
+      coverCloser: 2, // metres nearer the threat that a cover spot may be and still be worth taking
+      coverCloserCost: 4, // square metres of extra run it counts as, if it is nearer
+      underFireFor: 3, // seconds a nearby strike keeps him looking for cover
+      underFireWithin: 18, // metres: a strike this close counts as being shot at
+      flankLinger: 3, // seconds he stands and looks when he has worked round
+      flankDistance: 18, // metres to the side of the believed position he works toward, moving up
+      chest: 1.2, // height of the line he has to break
+    },
+    roles: {
+      // What each role is willing to do (0 never, 1 fully): the role column of the design doc's table.
+      sentry: { investigate: 0.65, search: 0.75, flank: 0.6, report: 0.8, fight: 0.8 },
+      patrol: { investigate: 1, search: 1, flank: 0.85, report: 0.8, fight: 1 },
+      marksman: { investigate: 0, search: 0, flank: 0, report: 1, fight: 1 },
+      'radio-operator': { investigate: 0.1, search: 0.1, flank: 0, report: 1, fight: 0.4 },
+      officer: { investigate: 0.7, search: 0.8, flank: 0.3, report: 1, fight: 0.7 },
+      worker: { investigate: 0.25, search: 0, flank: 0, report: 0.6, fight: 0 },
+      target: { investigate: 0, search: 0, flank: 0, report: 0, fight: 0 },
+    },
+    // Each option's weight multiplies these, each read through its response curve.
+    curves: {
+      near: { from: 4, to: 60, at0: 1, at1: 0.15 }, // how much a nearby spot pulls him
+      fresh: { from: 2, to: 25, at0: 1, at1: 0.05 }, // how fresh the belief is
+    },
+    lookWeight: 0.35, // the weight of standing to look, when it competes with going
+    // The weights of the options that don't come from a role or a curve (brain.ts).
+    weights: {
+      orderCurious: 0.9, // an order, to a guard who's only curious
+      reportSuspicious: 0.2, // stopping to call it in, while only suspicious
+      workerAlarm: 0.9, // a worker's run for the box, while searching
+      coverNoFight: 0.6, // getting under cover, for one who doesn't fight
+      holdSearching: 0.2, // standing his ground, while searching
+      holdCombat: 0.25, // standing his ground, in combat
+      searchStale: 0.25, // a search's pull once the belief has gone cold
+    },
+    // Reports (E4): what guards tell each other and the camp (reports.ts, game/comms.ts).
+    comms: {
+      talk: 1.6, // seconds a radio call lasts: long enough to be interrupted
+      netDelay: 1.5, // seconds from a finished call to its delivery across the net
+      talkRadius: 14, // metres his voice carries while he's on the radio
+      shoutRadius: 55, // metres a shout carries
+      keep: 25, // seconds a guard remembers what he's been told
+      maxTold: 8, // reports a guard's memory holds
+      reportEvery: 20, // seconds between his calls about the same thing
+      level: { contact: 0.8, heard: 0.32, shot: 0.8, body: 0.82, missing: 0.4, clear: 0, claim: 0 }, // what a report raises him to
+      radius: { contact: 4, heard: 18, shot: 22, body: 6, missing: 8, clear: 12, claim: 8 }, // metres of uncertainty each kind adds to the speaker's
+      clearRadius: 18, // metres a searcher's "clear" report wipes from the map
+      // Claims (Blacklist): "I've got it": one guard goes, those who hear him don't all pile in.
+      claimWithin: 14, // metres between a claim's spot and his own for it to count
+      claimFor: 15, // seconds a claim holds
+      claimedWeight: 0.15, // how much a claim by someone else leaves of his own wish to go
+      heardReach: 45, // metres: an unverified report only stirs guards this near what it's about; farther ones just know of it
+    },
+    // The camp's search map (E4, searchMap.ts): a window of cells around the camp.
+    searchMap: {
+      cells: 64,
+      cell: 5, // metres: the map reaches 160 m from the camp's centre, past where an intruder who broke contact has got to
+      spreadRate: 0.5, // share of a cell's belief that bleeds to its neighbours per second,
+      updateHz: 2, // applied this many times a second (rule 17)
+      seenStep: 1, // metres between the samples of a line of sight over the ground
+      seenHeight: 0.3, // height above the ground that has to be in view for a spot to count as seen
+      clearRays: 400, // cells one clearing may test
+      injectRadius: 8, // metres: the least a report can be spread over
+    },
+    // The camp (E5, commander.ts): alert levels, tasks, pacing and search cycles.
+    camp: {
+      planEvery: 0.5, // seconds between the commander's plans
+      keepOrder: 25, // seconds an order stays good if nothing renews it
+      noOfficerEvery: 3, // seconds between plans with no officer to run them: searches turn sloppy
+      // How many guards it may send: the pacing layer's role slots, by the camp's level.
+      coverSeconds: 25, // seconds a guard told to get under cover stays there, after a body turns up in the open
+      rolePenalty: 20, // metres of extra walk a wholly unsuited role counts as, when choosing who goes
+      rosterTrust: 20, // seconds the camp believes where it last heard a guard was, before falling back on his routine
+      slots: {
+        uneasy: { investigate: 1, search: 0 },
+        alert: { investigate: 1, search: 3 },
+        lockdown: { investigate: 1, search: 4 },
+      },
+      search: {
+        minSeconds: 30, // a search ends no sooner than this after the last report of anything suspicious,
+        maxSeconds: 45, // and no later than this after it
+        lowMass: 0.2, // the map holds less than this: looked at, and nothing there
+        wideArea: 1200, // square metres the belief has bled over: he could be anywhere
+        avoid: 12, // metres between the spots of two searchers
+      },
+      // Radio check-ins (E6): the operator calls each post in turn, every few minutes.
+      checkins: {
+        every: 150, // seconds between calls to each post, spread evenly across the posts,
+        uneasyEvery: 75, // and how often once the camp is uneasy
+        reply: { min: 1, max: 3 }, // seconds a post takes to answer, drawn from its own stream
+        deadline: 12, // seconds without an answer before the post counts as silent
+        retry: 5, // seconds before trying again when there's no set or no operator
+      },
+    },
+  },
+
   // The rifle, its ammunition and suppressor, the optics and the throwable (design doc ·
   // Weapons, tools and ballistics; the ballistics lane, sim/ballistics). Content as data
   // (rule 16): recordings embed it, and replay with the numbers they were made with.

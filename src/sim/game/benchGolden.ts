@@ -138,7 +138,26 @@ export const BENCH_GOLDEN: PinnedBench = {
     }
   },
   "brain": {
-    "metrics": {},
+    "metrics": {
+      "search map: numbers": 4096,
+      "search cycle: shortest (s)": 30.2666667,
+      "search cycle: longest (s)": 30.2666667,
+      "ellipse: contains the shooter at 1 sigma (%)": 38.75,
+      "ellipse: contains the shooter at 2 sigma (%)": 88.5,
+      "relocation: 26–30 m across the line of fire, outside 2 sigma (%)": 50.5,
+      "relocation: 26–30 m in any direction, outside 2 sigma (%)": 29.5,
+      "ellipse in the world: contains the perch at 1 sigma (%)": 41.2371134,
+      "ellipse in the world: contains the perch at 2 sigma (%)": 86.5979381,
+      "ellipse in the world: mean bearings fused per shot": 5.30927835,
+      "re-found within 60 s (of 16): honest": 15,
+      "re-found within 60 s (of 16): random": 2,
+      "re-found within 60 s (of 16): plain": 13,
+      "re-found within 60 s (of 16): staleness": 13,
+      "re-found within 60 s (of 16): omniscient": 16,
+      "re-found within 60 s (of 16): honest, unpaced": 16,
+      "reactions (in the scripted scenarios)": 62,
+      "reactions unexplained": 0
+    },
     "runs": {}
   },
   "ballistics": {
