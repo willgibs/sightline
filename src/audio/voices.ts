@@ -202,7 +202,9 @@ interface SurfaceVoice {
 export const SURFACE_VOICES: Readonly<Record<SurfaceName, SurfaceVoice>> = {
   grass: {
     heel: { freq: 70, decay: 0.035, gain: 0.25 },
-    body: { type: 'highpass', freq: 1800, q: 0.7, attack: 0.006, decay: 0.09, gain: 0.55 },
+    // A wide band-pass, not a high-pass: WebKit's high-pass passes 1–2 dB less than other
+    // engines', and the band-pass's Q means the same everywhere.
+    body: { type: 'bandpass', freq: 4200, q: 0.45, attack: 0.006, decay: 0.09, gain: 0.55 },
     grains: { type: 'bandpass', freq: 3200, q: 0.8, attack: 0.002, decay: 0.025, gain: 0.3, count: 3, spread: 0.06 },
   },
   dirt: {
@@ -242,14 +244,15 @@ export function gaitBand(gait: number): GaitBand {
 }
 
 /**
- * Loudness trims in dB, measured by tests/browser/audio-calibrate (K-weighted momentary
- * loudness, averaged over many renders). They make every surface and gait equally loud at
- * the same amplitude, so a footstep's level carries only the simulation's loudness and its
+ * Loudness trims in dB, measured by tests/browser/calibrate.test.ts (K-weighted momentary
+ * loudness, averaged over renders). They make every surface and gait equally loud at the
+ * same amplitude, so a footstep's level carries only the simulation's loudness and its
  * timbre carries the surface. Without them a crouch on grass measured louder than a walk on
- * dirt, which would teach players the wrong thing. Re-run the calibration after changing a voice.
+ * dirt, which would teach players the wrong thing. Re-run the calibration after changing a
+ * voice: VITE_CALIBRATE=1 npm run test:browser -- calibrate.
  */
 export const LOUDNESS_TRIM_DB: Readonly<Record<SurfaceName, Readonly<Record<GaitBand, number>>>> = {
-  grass: { crawl: -5.7, crouch: -7.5, walk: -6.8, sprint: -6.8 },
+  grass: { crawl: -4.2, crouch: -3.0, walk: -2.6, sprint: -3.2 },
   dirt: { crawl: -3.4, crouch: 2.9, walk: 0, sprint: -4.2 },
   gravel: { crawl: -4.4, crouch: -0.5, walk: -1.8, sprint: -3.6 },
   rock: { crawl: -3.4, crouch: 3.9, walk: 1.9, sprint: -1.9 },

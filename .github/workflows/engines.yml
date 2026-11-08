@@ -1,0 +1,47 @@
+name: Engines
+
+# A recording made in one browser has to replay in every other, so the simulation must
+# give the same bits in every JavaScript engine that might run it: V8 (Chrome, Edge,
+# Node), SpiderMonkey (Firefox) and JavaScriptCore (Safari, Bun). Every push runs the
+# browser tests (the self-test, and the sound engine's measurements) in all three
+# browsers' engines, and the self-test under Bun.
+on:
+  push:
+    branches: [main, 'ci/**']
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 7 * * 1'
+
+concurrency:
+  group: engines-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browsers:
+    name: Browsers (Chromium, Firefox, WebKit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run test:browser
+        env:
+          BROWSERS: chromium,firefox,webkit
+
+  bun:
+    name: Bun (JavaScriptCore)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      # The simulation has no dependencies, so nothing needs installing.
+      - run: bun src/headless/selftest.ts
