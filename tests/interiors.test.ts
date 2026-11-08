@@ -7,8 +7,8 @@ import type { Bush, Tree } from '../src/sim/generation/props';
  * the camera's near plane would cut into the shape, but not merely near it.
  */
 
-const tree: Tree = { x: 10, y: 5, z: -4, trunkR: 0.2, trunkH: 2, canopyR: 2, canopyH: 8, ux: 1, uz: 0 };
-const bush: Bush = { x: -3, y: 1, z: 2, r: 1, h: 1 };
+const tree: Tree = { cell: 0, x: 10, y: 5, z: -4, trunkR: 0.2, trunkH: 2, canopyR: 2, canopyH: 8, ux: 1, uz: 0 };
+const bush: Bush = { cell: 0, x: -3, y: 1, z: 2, r: 1, h: 1 };
 
 describe('foliage interiors', () => {
   it('know when the eye is in a canopy: the cone narrows to its tip', () => {

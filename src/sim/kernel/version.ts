@@ -8,9 +8,10 @@
 /**
  * What generation builds from a given MissionSpec. 2: guards' routines, generated with the
  * camp. 3: walls and buildings block sound (Blocks.Sound), and the fingerprint covers every
- * collider.
+ * collider. 4: scatter depends only on seed, label and cell; the fingerprint covers every
+ * field of the world; dsin and dcos reduce exactly from 10⁶ up (lab D, D1).
  */
-export const GEN_VERSION = 3;
+export const GEN_VERSION = 4;
 
 /**
  * How the simulation behaves for given inputs. 3: events carry ids, times, entity sources

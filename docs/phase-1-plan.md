@@ -581,8 +581,23 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
   - zero rule violations;
   - distinct plan signatures before review.
 
+**Recorded before building** (Nov 8):
+- **The seed, measured** on 100 held-out valleys with today's generator (`npm run seeds -- --count 100 --from lab-d-seed`):
+  - 100 of 100 valid at the first attempt, by rules that ask only for overwatch from 3 of 8 sectors and access from 4 of 16;
+  - overwatch from all 8 of 8 sectors in every valley: the ring the owner found too easy;
+  - access from all 16 of 16 sectors: no chokepoint, so no approach differs from another;
+  - one hand-made camp, mirrored, with 7 guards in 3 roles. Nothing analyses who sees whom, what a perch covers, or whether a way in exists.
+- **The targets, as numbers:**
+  - **camps:** at least 90 of 100 held-out seeds valid at their first camp attempt, the rest repaired within the iteration budget, each seed's margin reported;
+  - **terrain:** overwatch from the two or three placed ridges only (perches in at most 6 of 16 sectors, with an open gap of at least 90°), confirmed by radial-sweep viewsheds, and approaches through at least 3 corridors that share no chokepoint;
+  - **infiltration:** safe-interval search agrees with brute-force space-time search on every small test camp, on whether a path exists and on its cost;
+  - **rules:** no violation over the 100: no perch above 60% of guard time or 25% of the target's, and the three companion rules;
+  - **diversity:** the bots' best plans give 10 distinct signatures over 10 random camps before any review, and each camp's own plan does best on it in the regret matrix;
+  - **budgets:** at most 16 guards, by count; every search, repair and retry stops after a fixed number of iterations.
+- **Counting, pinned before D8,** as the research asked: a perch's coverage of a guard is the share of the camp's cycle that guard is in its view, sampled every half second. Both perch rules count this way.
+
 **Milestones:**
-- [ ] D1 · The one deliberate `GEN_VERSION` bump.
+- [x] D1 · The one deliberate `GEN_VERSION` bump.
   - Scatter that depends only on seed, label and cell, so generated objects keep stable ids and a repair touches only its own cells.
   - Range reduction for `dsin` and `dcos`, for |x| ≥ 10⁶ only. Both functions drive the simulation too, so a test shows that no simulation input reaches it and that the math golden doesn't move.
   - TAL-4471 gets a new golden.
