@@ -110,6 +110,8 @@ export class InvariantWatch {
     const rise = b.y - was.y;
     r.worstRise = Math.max(r.worstRise, rise);
     if (rise > spec.stepHeight + 1e-9) broke(`rose ${rise.toFixed(4)} m in a tick`);
+    // On a ladder, its own rate, up or down (a fall begins only by letting go).
+    if (b.motor === 'ladder' && Math.abs(rise) > spec.ladder.downRate * this.sim.dt + 1e-9) broke(`moved ${rise.toFixed(4)} m on a ladder in a tick`);
     if (was.onSteep && b.standingOn < 0) {
       r.steepGain = Math.max(r.steepGain, rise);
       if (rise >= STEEP_TOLERANCE) broke(`gained ${rise.toFixed(4)} m on ground too steep to stand on`);
