@@ -6,6 +6,14 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.
 
+### A sliding body's own speed never carries it uphill (Nov 8)
+
+**Decision:** on ground too steep to stand on, the motor now removes the uphill part of a body's velocity, as it already did for the wish. `SIM_VERSION` 7.
+
+**Why:** the first run of the weekly jobs on Wave 0's code (Nov 8) found the motor breaking its promise in a fresh valley, NEM-4083: crawling prone off a low rock onto terrain a hair steeper than the limit, the player started sliding but kept the uphill speed he arrived with, which carried him onto gentler ground 8 mm higher. The same run fails the same way on the commit before Wave 0, so the bug was the foundation pass's, waiting for a valley to find it. A test at a handmade seam between too-steep and walkable ground showed it was worse at speed: a body arriving at a sprint coasted up to 16 cm in one tick. Both cases are now tests (`tests/steep.test.ts`).
+
+**What moved:** no golden value: none of the pinned runs meets the case. The version still moves, because the motor now does something different for some inputs, and a recording that met the case would otherwise diverge on replay instead of being refused. The golden recording is rewritten for the new version.
+
 ### Determinism, hardened at the edges (W0.8)
 
 **Decision:**

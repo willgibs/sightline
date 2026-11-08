@@ -8,6 +8,9 @@ import { missionSpec } from '../src/sim/kernel/mission';
 import { Simulation } from '../src/sim/game/sim';
 import { Blocks, circleOverlaps } from '../src/sim/kernel/world/colliders';
 import { makeTerrainSample } from '../src/sim/kernel/world/heightfield';
+import { InvariantWatch, STEEP_TOLERANCE } from '../src/sim/body';
+import { ChaosBot } from '../src/sim/game/bots/chaos';
+import { testWorld } from './fixtures';
 
 /**
  * Ground too steep to stand on is a barrier from every angle, on real valleys. Before the
@@ -96,5 +99,59 @@ describe('steep ground on real valleys', () => {
     }
     expect(tried).toBeGreaterThan(80);
     expect(worst).toBeLessThan(0.05);
+  });
+});
+
+describe('momentum on steep ground', () => {
+  /**
+   * The fuzz run's NEM-4083 (Nov 8): crawling prone off a low rock onto terrain a hair
+   * steeper than the limit, the player slid, but kept the uphill speed he arrived with,
+   * and it carried him onto gentler ground 8 mm higher. On ground too steep to stand on,
+   * no part of the body's own speed may go uphill either.
+   */
+  const steep = tanMax * 1.01;
+  const gentle = tanMax * 0.98;
+  // Too steep below x = 0, walkable above it: a seam a body coasting uphill crosses.
+  const seam = testWorld({ cell: 0.5, height: (x) => (x < 0 ? x * steep : x * gentle), spawn: { x: -20, z: 0 } });
+
+  it('carries no body up across the seam to walkable ground, at any speed or angle', () => {
+    let worst = 0;
+    let tried = 0;
+    for (const speed of [0.5, 0.7, 1.4, 3, 5.5]) {
+      for (const offDeg of [0, 30, 60, 80]) {
+        for (const start of [0.005, 0.01, 0.03]) {
+          const sim = new Simulation(seam, T);
+          const p = sim.player;
+          p.x = -start;
+          p.z = 0;
+          p.y = seam.terrain.heightAt(p.x, p.z);
+          p.standingOn = -1;
+          p.motor = 'ground';
+          const a = (offDeg * Math.PI) / 180;
+          p.vx = speed * Math.cos(a);
+          p.vz = speed * Math.sin(a);
+          const y0 = p.y;
+          sim.step(neutralInput(p.yaw));
+          tried++;
+          worst = Math.max(worst, p.y - y0);
+        }
+      }
+    }
+    expect(tried).toBe(60);
+    expect(worst).toBeLessThan(STEEP_TOLERANCE);
+  });
+
+  it('holds in the valley where the fuzz run found it', () => {
+    const world = generateWorld(missionSpec('NEM-4083'), T);
+    const sim = new Simulation(world, T);
+    const watch = new InvariantWatch(sim);
+    const bot = new ChaosBot('NEM-4083');
+    const raw = neutralInput();
+    for (let i = 0; i < 68_100; i++) {
+      watch.beforeTick();
+      sim.step(bot.next(sim, raw));
+      watch.afterTick();
+    }
+    expect(watch.report.first).toBeNull();
   });
 });
