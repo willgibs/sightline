@@ -2,7 +2,8 @@ import type { Tuning } from '../../config/tuning';
 import { dcos, dsin } from '../kernel/core/detmath';
 import type { EntityIndex } from '../kernel/state';
 import type { System, TickContext } from '../kernel/systems';
-import { circleOverlaps } from '../kernel/world/colliders';
+import { Blocks, circleOverlaps, type RayHit } from '../kernel/world/colliders';
+import type { Solids } from '../kernel/world/solids';
 import { groundBelow } from '../body';
 import { foliageOf } from '../perception';
 import { player, type PlayerEntity, type RemainsEntity } from './entities';
@@ -18,8 +19,14 @@ import { player, type PlayerEntity, type RemainsEntity } from './entities';
  * see nothing there. Hands full: no mantling or ladders until it's put down.
  */
 
-/** The body a press would pick up: the nearest one within reach, in front of the player, if the hands are free to. */
-export function bodyInReach(p: PlayerEntity, index: EntityIndex, tuning: Tuning): RemainsEntity | null {
+const hit: RayHit = { dist: Infinity, id: -1 };
+
+/**
+ * The body a press would pick up: the nearest one within reach, in front of the player,
+ * on about the player's level, with nothing solid between the eye and it, if the hands are
+ * free to.
+ */
+export function bodyInReach(p: PlayerEntity, index: EntityIndex, tuning: Tuning, solids: Solids): RemainsEntity | null {
   const b = p.body;
   if (b.motor !== 'ground' || b.stance === 'prone' || b.proneTransition) return null;
   const C = tuning.bodies.player.carry;
@@ -36,6 +43,11 @@ export function bodyInReach(p: PlayerEntity, index: EntityIndex, tuning: Tuning)
     const d = Math.sqrt(dx * dx + dz * dz);
     if (d >= bestD) continue;
     if (d > C.underfoot && (fx * dx + fz * dz) / d < C.facingCos) continue; // behind, or off to the side
+    if (Math.abs(r.y - b.y) > C.reachHeight) continue; // on a deck overhead, or below
+    const dy = r.y + C.grabAt - (b.y + b.eyeHeight);
+    const line = Math.sqrt(d * d + dy * dy);
+    solids.raycast(b.x, b.y + b.eyeHeight, b.z, dx / line, dy / line, dz / line, line, Blocks.Move, hit);
+    if (hit.id >= 0) continue; // through a wall
     best = e;
     bestD = d;
   }
@@ -43,9 +55,9 @@ export function bodyInReach(p: PlayerEntity, index: EntityIndex, tuning: Tuning)
 }
 
 /** What a press of use would do now: the prompt. */
-export function usePrompt(p: PlayerEntity, index: EntityIndex, tuning: Tuning): '' | 'carry' | 'drop' {
+export function usePrompt(p: PlayerEntity, index: EntityIndex, tuning: Tuning, solids: Solids): '' | 'carry' | 'drop' {
   if (p.control.carrying !== 0) return 'drop';
-  return bodyInReach(p, index, tuning) ? 'carry' : '';
+  return bodyInReach(p, index, tuning, solids) ? 'carry' : '';
 }
 
 /** Is this spot somewhere a body stays hidden: inside foliage, or beside a container? */
@@ -101,7 +113,7 @@ export const useSystem: System = {
       r.hidden = hides(ctx, r.x, r.z);
       return;
     }
-    const target = bodyInReach(p, ctx.index, ctx.tuning);
+    const target = bodyInReach(p, ctx.index, ctx.tuning, ctx.solids);
     if (!target) return;
     target.remains.carriedBy = p.id;
     target.remains.hidden = false;
@@ -134,11 +146,13 @@ export const carriedSystem: System = {
       r.y = b.y + C.shoulder;
       r.z = b.z;
     } else {
-      // Dragged: trailing behind, along the ground.
+      // Dragged: trailing behind, along the ground, and no further than the first thing in the way.
       const fx = -dsin(b.yaw);
       const fz = -dcos(b.yaw);
-      r.x = b.x - fx * C.trail;
-      r.z = b.z - fz * C.trail;
+      ctx.solids.raycast(b.x, b.y + ctx.tuning.bodies.player.stepHeight, b.z, -fx, 0, -fz, C.trail, Blocks.Move, hit);
+      const trail = hit.id >= 0 ? Math.max(0, hit.dist - C.trailGap) : C.trail;
+      r.x = b.x - fx * trail;
+      r.z = b.z - fz * trail;
       r.y = groundAt(ctx, r.x, r.z, b.y);
     }
   },

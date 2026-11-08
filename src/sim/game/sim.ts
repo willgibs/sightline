@@ -221,7 +221,7 @@ export class Simulation extends KernelSimulation {
     s.eyeZ = eye.z - p.z;
     s.lean = p.lean;
     s.climb = climbPrompt(p, this.tuning.bodies.player, this.motorView());
-    s.use = usePrompt(this.playerEntity(), this.index, this.tuning);
+    s.use = usePrompt(this.playerEntity(), this.index, this.tuning, this.solids);
     s.axis = p.axis;
     s.lying = p.lying;
     s.riseHead = p.riseHead;

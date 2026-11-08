@@ -3,7 +3,7 @@ import { smoothstep } from '../kernel/core/math';
 import { makeTerrainSample } from '../kernel/world/heightfield';
 import { surfaceLoudness } from '../kernel/world/surfaces';
 import { bodyHeight, groundBelow, type BodySpec, type BodyState } from './body';
-import { canMantle, planMantleFrom, poseClear, type MantlePose } from './mantle';
+import { canMantle, keepOnGround, planMantleFrom, poseClear, type MantlePose } from './mantle';
 import { requestStance } from './stance';
 import type { MotorContext, MoveIntent } from './motor';
 import type { Solids } from '../kernel/world/solids';
@@ -114,7 +114,7 @@ export function ladderTop(l: Ladder, spec: BodySpec): number {
 export function ladderInReach(b: BodyState, spec: BodySpec, ctx: MotorContext): number {
   const ladders = ctx.world.ladders;
   if (!ladders || ladders.length === 0) return -1;
-  if (b.motor !== 'ground' || b.sliding || b.proneTransition || b.stance === 'prone') return -1;
+  if (b.motor !== 'ground' || b.sliding || b.proneTransition || b.stance === 'prone' || b.lying > 0) return -1;
   const fx = -dsin(b.yaw);
   const fz = -dcos(b.yaw);
   let best = -1;
@@ -187,8 +187,10 @@ export function stepLadder(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Mot
     pose.x = s.fromX + (line.x - s.fromX) * f;
     pose.z = s.fromZ + (line.z - s.fromZ) * f;
     pose.y = b.y;
+    keepOnGround(ctx.world, pose); // uneven ground under the reach stays under the feet
     if (poseClear(pose.x, pose.y, pose.z, bodyHeight(b, spec), spec, ctx)) {
       b.speed = Math.sqrt((pose.x - b.x) * (pose.x - b.x) + (pose.z - b.z) * (pose.z - b.z)) / dt;
+      b.y = pose.y;
       b.x = pose.x;
       b.z = pose.z;
     } else {
@@ -224,19 +226,25 @@ export function stepLadder(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Mot
     b.speed = 0;
     return;
   }
-  if (up < 0 && next <= l.y0) {
-    // At the bottom: stepping off onto whatever is there.
+  // The bottom is the ladder's foot, or the ground at its line if that's higher.
+  if (up < 0 && next <= Math.max(l.y0, groundBelow(ctx.world, ctx.solids, b.x, b.z, b.y, spec.radius).height)) {
+    // Stepping off onto whatever is there; from a foot that hangs above the ground, dropping to it.
     const g = groundBelow(ctx.world, ctx.solids, b.x, b.z, b.y + spec.stepHeight, spec.radius);
+    b.ladder = null;
+    b.speed = 0;
+    if (b.y - g.height > spec.groundSnap) {
+      b.motor = 'air';
+      return;
+    }
     b.y = g.height;
     b.surface = g.surface;
     b.standingOn = g.collider;
     b.slopeTan = g.collider >= 0 ? 0 : ctx.world.terrain.sample(b.x, b.z, sample).slopeTan;
-    b.ladder = null;
     b.motor = 'ground';
-    b.speed = 0;
     return;
   }
-  const y = Math.min(top, Math.max(l.y0, next));
+  // A body that took it from below its foot climbs from where it is, not from the foot in one tick.
+  const y = Math.min(top, Math.max(Math.min(b.y, l.y0), next));
   if (y !== b.y && poseClear(b.x, y, b.z, bodyHeight(b, spec), spec, ctx)) {
     const moved = Math.abs(y - b.y);
     b.y = y;

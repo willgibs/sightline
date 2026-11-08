@@ -241,6 +241,58 @@ describe('the prone chain', () => {
     expect(requestStance(b, 'crouch', spec, ctx)).toBe(true);
   });
 
+  it('takes a bank for a wall: no end of it lifts onto something waist-high', () => {
+    // Backing into a 0.8 m bank: its heels stop against it, on the ground.
+    const { b, ctx } = setup([box(-6, 6, -1.6, -1, -0.3, 0.8)], undefined, 0, 1);
+    b.yaw = Math.PI; // facing south, so its heels are toward the bank to the north
+    b.axis = b.yaw;
+    down(b, ctx);
+    let worst = 0;
+    for (let t = 31; t < 200; t++) {
+      step(b, ctx, t, 0, -0.7);
+      worst = Math.max(worst, b.riseFeet, b.riseHead);
+    }
+    expect(b.z).toBeLessThan(1);
+    expect(worst).toBeLessThan(1e-6);
+  });
+
+  it('takes no mantle until it has finished getting up', () => {
+    const wall = box(-5, 5, -1.3, -1, -0.3, 1);
+    for (let pressAt = 14; pressAt <= 26; pressAt++) {
+      const { b, ctx } = setup([wall], undefined, 0, -0.35);
+      const sim = new Simulation(ctx.world, T);
+      Object.assign(sim.player, b);
+      const watch = new InvariantWatch(sim);
+      const input = neutralInput(sim.player.yaw);
+      const tick = (over: Partial<typeof input>): void => {
+        watch.beforeTick();
+        sim.step({ ...input, ...over });
+        watch.afterTick();
+      };
+      tick({ prone: true });
+      for (let t = 0; t < 30; t++) tick({});
+      tick({ crouch: true });
+      for (let t = 0; t < 40; t++) {
+        tick(t === pressAt ? { commands: [{ kind: 'climb' }] } : {});
+        if (sim.player.motor === 'mantle') expect(sim.player.lying, `press ${pressAt}`).toBe(0);
+      }
+      expect(watch.report.first, `press ${pressAt}`).toBeNull();
+    }
+  });
+
+  it('raises no end of itself more than a step in a tick', () => {
+    // Crawling over a lip: the ground falls away, then a rock is under the heels.
+    const { b, ctx } = setup([box(-4, 4, -8, -2, -0.3, 0.44)], undefined, 0, 0);
+    down(b, ctx);
+    let prev = b.y + b.riseFeet;
+    for (let t = 31; t < 400; t++) {
+      step(b, ctx, t, 0, -0.7);
+      const now = b.y + b.riseFeet;
+      expect(now - prev).toBeLessThanOrEqual(spec.stepHeight + 1e-6);
+      prev = now;
+    }
+  });
+
   it('stands in the way of other bodies along its whole length', () => {
     const { b, ctx } = setup();
     down(b, ctx);

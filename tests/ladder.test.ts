@@ -116,6 +116,42 @@ describe('a ladder', () => {
     expect(watch.report.first).toBeNull();
   });
 
+  it('climbs from where the body is when the foot is above it, without a jump to the foot', () => {
+    const L: Ladder = { ...LADDER, y0: 0.5 };
+    const w = towerWorld();
+    w.ladders = [L];
+    const sim = new Simulation(w, T);
+    const watch = new InvariantWatch(sim);
+    step(sim, watch, 0, 0, true);
+    expect(sim.player.motor).toBe('ladder');
+    for (let t = 1; t < 16; t++) step(sim, watch, t, 0, false);
+    expect(sim.player.y).toBe(0);
+    expect(watch.report.first).toBeNull();
+  });
+
+  it('steps off where the ground at its line is, above its foot or not, and drops from a foot in the air', () => {
+    const rising = buildWorld({ name: 'ladder-rise', size: 40, cell: 0.5, height: (_x, z) => Math.max(0, z - 1.58) * 0.36, colliders: [box(-1.5, 1.5, -1.5, 1.5, 4.75, 5), box(-1.4, 1.4, 1.4, 1.5, -0.3, 4.75)], spawn: { x: 0, z: 2.2, faceX: 0, faceZ: -1 } }, T.gen);
+    rising.ladders = [LADDER];
+    const sim = new Simulation(rising, T);
+    const watch = new InvariantWatch(sim);
+    step(sim, watch, 0, 0, true);
+    for (let t = 1; t < 12; t++) step(sim, watch, t, 0, false);
+    for (let t = 12; t < 42; t++) step(sim, watch, t, 1, false);
+    expect(sim.player.motor).toBe('ladder');
+    for (let t = 42; t < 200 && sim.player.motor === 'ladder'; t++) step(sim, watch, t, -1, false);
+    expect(sim.player.motor).toBe('ground');
+    expect(watch.report.first).toBeNull();
+  });
+
+  it('climbs at a climbing gait, whatever the body came at', () => {
+    const { sim, watch } = run();
+    sim.player.gait = 'sprint';
+    step(sim, watch, 0, 0, true);
+    expect(sim.player.motor).toBe('ladder');
+    step(sim, watch, 1, 1, false);
+    expect(sim.player.gait).not.toBe('sprint');
+  });
+
   it('waits for what is in its way, and never goes into it', () => {
     // A low slab across the ladder's line at 2 m: the climber's head meets it.
     const { sim, watch } = run([box(-0.6, 0.6, 1.55, 2.6, 2.0, 2.2)]);

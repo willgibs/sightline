@@ -7,7 +7,7 @@ import { Blocks, pushOutCircle } from '../kernel/world/colliders';
 import { makeTerrainSample } from '../kernel/world/heightfield';
 import type { Solids } from '../kernel/world/solids';
 import { surfaceLoudness, surfaceName, type Surface } from '../kernel/world/surfaces';
-import { RIM, bodyHeight, groundBelow, pushHistory, rimExcess, type BodySpec, type BodyState, type Gait, type MotorModeName } from './body';
+import { RIM, bodyHeight, groundBelow, pushHistory, restBelow, rimExcess, type BodySpec, type BodyState, type Gait, type MotorModeName } from './body';
 import { footprint, restRadius, type FootCircle } from './chain';
 import { footfall } from './footfall';
 import { stepLean } from './lean';
@@ -47,6 +47,8 @@ import type { DebugDraw } from '../kernel/debugDraw';
  *   turns by the largest step that keeps every part clear, found with a fixed number of
  *   bisections. It gets up only with headroom along its whole length, and draws in only
  *   as far as it ends the tick clear, waiting (and able to crawl) where there's no room.
+ *   No end of it rises more than stepHeight in a tick, and only colliders within a step
+ *   of its feet or the terrain under it count as what it rests on (body.ts, restBelow).
  *   Its head, torso and legs are inside the chain, so they are clear too;
  * - in a mantle (mantle.ts) the body follows a path whose every pose is re-checked every
  *   tick: never inside anything solid, with no allowance for steps, and never inside
@@ -161,11 +163,13 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
   const timer = b.stanceTimer;
   const changing = b.proneTransition;
   easeStance(b, spec, ctx.dt);
-  if (i.climb && b.motor === 'ground') {
+  if (i.climb && b.motor === 'ground' && !(b.lying > 0)) {
     // A ladder in reach takes the press; otherwise whatever can be mantled.
     const ladder = ladderInReach(b, spec, ctx);
     if (ladder < 0 || !startLadder(b, spec, ctx, ladder)) startMantle(b, spec, ctx);
   }
+  // On a path of their own the legs are climbing, not running, whatever the body arrived at.
+  if (b.motor === 'mantle' || b.motor === 'ladder') b.gait = i.gait === 'sprint' ? 'walk' : i.gait;
   if (b.motor === 'mantle') stepMantle(b, spec, ctx);
   else if (b.motor === 'ladder') stepLadder(b, i, spec, ctx);
   else if (moveBody(b, i, spec, ctx, tanMax)) {
@@ -333,12 +337,12 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
   // when the fall goes on.
   if (b.lying > 0) {
     turnAxis(b, spec, ctx, tanMax);
-    lieAlongGround(b, spec, ctx);
+    lieAlongGround(b, spec, ctx, feet);
   }
   if ((b.lying > 0 || startLying > 0) && !chainEndClear(b, spec, ctx)) {
     if (b.lying < startLying) {
       b.lying = startLying;
-      lieAlongGround(b, spec, ctx);
+      lieAlongGround(b, spec, ctx, feet);
     }
     if (b.motor === 'ground' && !b.sliding && !chainEndClear(b, spec, ctx)) {
       b.x = startX;
@@ -352,7 +356,7 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
       b.surface = startSurface;
       b.standingOn = startOn;
       b.slopeTan = startSlope;
-      if (b.lying > 0) lieAlongGround(b, spec, ctx);
+      if (b.lying > 0) lieAlongGround(b, spec, ctx, feet);
     }
   }
   const L = tuning.noise.landing;
@@ -596,11 +600,12 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
     for (let k = 0; k < circles.length; k++) {
       const C = circles[k]!;
       const r = C.r;
-      const g = groundBelow(world, solids, nx + C.x, nz + C.z, low + C.allow + spec.stepHeight, r).height;
+      const g = restBelow(world, solids, nx + C.x, nz + C.z, low, C.allow, spec.stepHeight, r).height;
       const base = Math.max(low - C.allow, g);
       const reach = lying ? base : feet;
       // The band's top from as high as this tick can leave it, so what's overhead now still will be.
-      const head = (lying ? Math.max(highFeet(b, nx, nz, spec, ctx) - C.allow, groundBelow(world, solids, nx + C.x, nz + C.z, highFeet(b, nx, nz, spec, ctx) + C.allow + spec.stepHeight, r).height) : base) + height;
+      const top = lying ? highFeet(b, nx, nz, spec, ctx) : 0;
+      const head = (lying ? Math.max(top - C.allow, restBelow(world, solids, nx + C.x, nz + C.z, top, C.allow, spec.stepHeight, r).height) : base) + height;
       solids.query(nx + C.x - r - 0.1, nz + C.z - r - 0.1, nx + C.x + r + 0.1, nz + C.z + r + 0.1, ids);
       for (let q = 0; q < ids.length; q++) {
         const c = solids.get(ids[q]!);
@@ -713,11 +718,11 @@ function isClear(b: BodyState, x: number, z: number, spec: BodySpec, world: Worl
     // beside a face is already overlapping it with its rim; moving away or along is fine.)
     const allowed = strict ? 0 : Math.max(0, rimExcess(world, b.x + C.x, b.z + C.z, feet + C.allow, r, spec.stepHeight));
     if (rimExcess(world, cx, cz, feet + C.allow, r, spec.stepHeight) > allowed + 1e-3) return false;
-    const g = groundBelow(world, solids, cx, cz, low + C.allow + spec.stepHeight, r).height;
+    const g = restBelow(world, solids, cx, cz, low, C.allow, spec.stepHeight, r).height;
     const base = Math.max(low - C.allow, g);
     const reach = lying ? base : feet;
     const high = lying ? Math.max(feet, groundBelow(world, solids, x, z, feet + spec.stepHeight, spec.radius).height) : feet;
-    const head = (lying ? Math.max(high - C.allow, groundBelow(world, solids, cx, cz, high + C.allow + spec.stepHeight, r).height) : base) + height;
+    const head = (lying ? Math.max(high - C.allow, restBelow(world, solids, cx, cz, high, C.allow, spec.stepHeight, r).height) : base) + height;
     solids.query(cx - r, cz - r, cx + r, cz + r, ids);
     for (let q = 0; q < ids.length; q++) {
       const c = solids.get(ids[q]!);
@@ -815,7 +820,7 @@ function restFloor(b: BodyState, x: number, z: number, spec: BodySpec, ctx: Moto
   let floor = -Infinity;
   for (let k = 0; k < circles.length; k++) {
     const C = circles[k]!;
-    const g = groundBelow(ctx.world, ctx.solids, x + C.x, z + C.z, b.y + C.allow + spec.stepHeight, C.r).height;
+    const g = restBelow(ctx.world, ctx.solids, x + C.x, z + C.z, b.y, C.allow, spec.stepHeight, C.r).height;
     const needed = g - C.allow - spec.stepHeight;
     if (needed > floor) floor = needed;
   }
@@ -830,7 +835,7 @@ function chainEndClear(b: BodyState, spec: BodySpec, ctx: MotorContext): boolean
     const C = circles[k]!;
     const cx = b.x + C.x;
     const cz = b.z + C.z;
-    const base = Math.max(b.y - C.allow, groundBelow(ctx.world, ctx.solids, cx, cz, b.y + C.allow + spec.stepHeight, C.r).height);
+    const base = Math.max(b.y - C.allow, restBelow(ctx.world, ctx.solids, cx, cz, b.y, C.allow, spec.stepHeight, C.r).height);
     ctx.solids.query(cx - C.r, cz - C.r, cx + C.r, cz + C.r, ids);
     for (let q = 0; q < ids.length; q++) {
       const c = ctx.solids.get(ids[q]!);
@@ -841,8 +846,13 @@ function chainEndClear(b: BodyState, spec: BodySpec, ctx: MotorContext): boolean
   return true;
 }
 
-/** A lying body settles along the ground under its head and feet, within what its slope limit allows. */
-function lieAlongGround(b: BodyState, spec: BodySpec, ctx: MotorContext): void {
+/**
+ * A lying body settles along the ground under its head and feet, within what its slope
+ * limit allows, and no end of it rises more than a step in a tick from where it was
+ * (`feet`, the body's height at the tick's start): swinging from over a drop onto a rock,
+ * a leg gets there over a tick or two.
+ */
+function lieAlongGround(b: BodyState, spec: BodySpec, ctx: MotorContext, feet: number): void {
   const circles = footprint(b, spec, feetCircles);
   const first = circles[0]!;
   const last = circles[circles.length - 1]!;
@@ -851,13 +861,14 @@ function lieAlongGround(b: BodyState, spec: BodySpec, ctx: MotorContext): void {
   let pelvis = circles[0]!;
   for (let k = 1; k < circles.length; k++) if (Math.abs(circles[k]!.at - at * b.lying) < Math.abs(pelvis.at - at * b.lying)) pelvis = circles[k]!;
   const groundAt = (C: FootCircle): number => {
-    const g = groundBelow(ctx.world, ctx.solids, b.x + C.x, b.z + C.z, b.y + C.allow + spec.stepHeight, C.r).height - b.y;
+    const g = restBelow(ctx.world, ctx.solids, b.x + C.x, b.z + C.z, b.y, C.allow, spec.stepHeight, C.r).height - b.y;
     const up = C.allow + spec.stepHeight;
     return g > up ? up : g < -C.allow ? -C.allow : g;
   };
-  b.riseHead = groundAt(first);
-  b.risePelvis = groundAt(pelvis);
-  b.riseFeet = groundAt(last);
+  const rising = (was: number, to: number): number => Math.min(to, feet + was + spec.stepHeight - b.y);
+  b.riseHead = rising(b.riseHead, groundAt(first));
+  b.risePelvis = rising(b.risePelvis, groundAt(pelvis));
+  b.riseFeet = rising(b.riseFeet, groundAt(last));
 }
 
 /** Removes the part of the velocity pointing into a surface we were pushed out of. */

@@ -278,6 +278,17 @@ export function bodyHeight(b: BodyState, spec: BodySpec): number {
   return Math.max(spec.height[b.stance], b.eyeHeight + (spec.height[b.stance] - spec.eyeHeight[b.stance]));
 }
 
+/**
+ * What a circle of a lying body rests on, for feet at `feet`. As groundBelow, but a
+ * collider counts only within a step of the feet or of the terrain under that circle:
+ * `allow` stretches over ground that slopes, not up the side of a wall, so a heel doesn't
+ * take a waist-high bank for the ground and lift onto it in a tick.
+ */
+export function restBelow(world: World, solids: Solids, x: number, z: number, feet: number, allow: number, step: number, radius: number): Ground {
+  const t = world.terrain.heightAt(x, z);
+  return groundBelow(world, solids, x, z, Math.min(feet + allow + step, (t > feet ? t : feet) + step), radius);
+}
+
 /** True if a solid collider overlaps the vertical band [y0, y1) of a body at (x, z). */
 export function solidAround(solids: Solids, x: number, z: number, y0: number, y1: number, r: number): boolean {
   solids.query(x - r, z - r, x + r, z + r, ids);

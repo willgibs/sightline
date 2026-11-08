@@ -69,7 +69,9 @@ function leanClear(b: BodyState, lean: number, spec: BodySpec, ctx: MotorContext
   pose.riseFeet = b.riseFeet;
   const s = bodyShape(pose, spec, shape);
   const t = s.torso;
-  return sphereClear(s.head.x, s.head.y, s.head.z, s.head.r, ctx) && sphereClear(t.bx, t.by, t.bz, t.r, ctx);
+  // Below a crouch only the head moves (shape.ts, applyLean), and the shoulders' sphere rests
+  // exactly on the ground: asking whether it's clear would be decided by the last bit of a float.
+  return sphereClear(s.head.x, s.head.y, s.head.z, s.head.r, ctx) && (b.eyeHeight < spec.eyeHeight.crouch || sphereClear(t.bx, t.by, t.bz, t.r, ctx));
 }
 
 const BISECTIONS = 8;

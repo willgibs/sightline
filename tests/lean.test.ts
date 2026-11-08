@@ -224,3 +224,20 @@ describe('eye to head', () => {
     expect(cleared).toBeGreaterThan(20);
   });
 });
+
+describe('leaning while lying down', () => {
+  it('works wherever the body lies: the shoulders it does not move are not asked about', () => {
+    // An 8° plane, where the shoulders' sphere rests on the ground to within a float's last bit.
+    const tan = Math.tan((8 * Math.PI) / 180);
+    const w = buildWorld({ name: 'plane', size: 80, cell: 1, height: (x, z) => x * tan * 0.6 + z * tan * 0.8, spawn: { x: 0, z: 0, faceX: 0, faceZ: -1 } }, T.gen);
+    for (let i = 0; i < 40; i++) {
+      const sim = new Simulation(w, T);
+      Object.assign(sim.player, createBody(w, sim.solids, spec, -15 + i * 0.73, -12 + i * 0.61, 0, -1));
+      const input = neutralInput(sim.player.yaw);
+      sim.step({ ...input, prone: true });
+      for (let t = 0; t < 40; t++) sim.step(input);
+      for (let t = 0; t < 30; t++) sim.step({ ...input, lean: 1 });
+      expect(sim.player.lean, `spot ${i}`).toBeCloseTo(spec.lean.prone, 6);
+    }
+  });
+});
