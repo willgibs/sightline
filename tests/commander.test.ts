@@ -373,7 +373,7 @@ describe('counter-sniper (E8)', () => {
     return {
       name: 'test-shot',
       phase: 'commands',
-      after: ['player-commands', 'rifle'],
+      after: ['player-commands', 'rifle', 'sandbox-drops'],
       reads: [],
       writes: [],
       emits: ['report'],

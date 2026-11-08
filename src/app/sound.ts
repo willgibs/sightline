@@ -1,10 +1,11 @@
 import type { Tuning } from '../config/tuning';
 import { SoundEngine, type ListenerPose, type SoundTiming } from '../audio/engine';
-import { Ears } from '../audio/hearing';
+import { Ears, emptyRoute } from '../audio/hearing';
 import { air } from '../sim/kernel/env';
 import type { SimEvent } from '../sim/kernel/events';
 import type { World } from '../sim/kernel/world/world';
 import type { Simulation } from '../sim/game/sim';
+import { flightEnd, type Flight } from '../sim/ballistics';
 import { ambientSources } from '../sim/generation';
 
 /**
@@ -28,6 +29,9 @@ export class GameSound {
   private failure: string | null = null;
   /** The player's ears, by the guards' law of sound (audio/hearing.ts). */
   private readonly ears = new Ears();
+  /** The run being heard: what a bullet's flight meets. */
+  private sim: Simulation | null = null;
+  private readonly route = emptyRoute();
 
   constructor(private tuning: Tuning) {
     document.addEventListener('visibilitychange', () => this.visibility());
@@ -44,7 +48,7 @@ export class GameSound {
           return;
         }
         this.ctx = new Context({ latencyHint: 'interactive' });
-        this.engine = new SoundEngine(this.ctx, { tuning: this.tuning, route: this.ears.route, steady: this.ears.steady });
+        this.engine = new SoundEngine(this.ctx, { tuning: this.tuning, route: this.ears.route, steady: this.ears.steady, flightEnd: (f, until) => this.flightEnd(f, until) });
         this.engine.startAmbience();
         this.applyWorld();
         this.engine.setVolume(gainOf(this.volume));
@@ -74,6 +78,12 @@ export class GameSound {
   setSimulation(sim: Simulation): void {
     if (sim.world !== this.world) this.setWorld(sim.world);
     this.ears.setSolids(sim.solids);
+    this.sim = sim;
+  }
+
+  /** Where a bullet's flight meets the world (as the guards' hearing finds it): its crack ends there. */
+  private flightEnd(f: Flight, until: number): number {
+    return this.sim ? flightEnd(f, until, 1 / this.tuning.sim.tickHz, this.sim.queryView()) : until;
   }
 
   /** The volume setting, 0 to 1, heard on a square law: half way is a quarter of the power. */
@@ -106,6 +116,11 @@ export class GameSound {
     const e = this.engine;
     if (!e || events.length === 0 || this.ctx?.state !== 'running') return;
     this.guard(() => e.play(events, earToFeet, timing, inBody));
+  }
+
+  /** How loud a sound would be at the listener by the law of sound (audio/hearing.ts): 0 out of earshot. */
+  levelAt(x: number, y: number, z: number, radius: number, lx: number, ly: number, lz: number): number {
+    return this.ears.route(x, y, z, radius, lx, ly, lz, this.route)?.clarity ?? 0;
   }
 
   /** For the debug panel: two lines. */

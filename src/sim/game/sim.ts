@@ -2,6 +2,7 @@ import type { Tuning } from '../../config/tuning';
 import { stridePhase, type BodyState, type Gait, type Stance } from '../body';
 import { gameBodies } from './remains';
 import { generateWorld, worldFingerprint } from '../generation';
+import { groundLight, rung } from '../perception';
 import type { Game } from '../kernel/game';
 import { neutralInput } from '../kernel/input';
 import { missionSpec, type SpawnKind } from '../kernel/mission';
@@ -37,8 +38,13 @@ export const SIGHTLINE: Game<Simulation> = {
   sample: writeSample,
 };
 
-/** Per-guard values in Snapshot.guards. */
-export const GUARD_FIELDS = 6; // x, y, z, yaw, headYaw, moving
+/**
+ * Per-guard values in Snapshot.guards: x, y, z, yaw, headYaw, moving; the light beneath
+ * him (A4: 1 in the sun, less in shade, as the simulation finds it); his detection meter
+ * (A8: what the honest view shows from the cue up); and his rung on the awareness ladder
+ * (0 unaware to 4 combat; A8: his posture and weapon).
+ */
+export const GUARD_FIELDS = 9;
 
 /** The slice of state the renderer needs, copied once per tick for interpolation. */
 export interface Snapshot {
@@ -54,6 +60,8 @@ export interface Snapshot {
   step: number;
   stance: Stance;
   gait: Gait;
+  /** The light beneath the player, as the simulation finds it (A4): for the body drawn from outside. */
+  light: number;
   /** Guard entity ids, ascending; guards appear and disappear by id. */
   guardIds: number[];
   /** Each guard's camp spawn (world.camp.guards index), parallel to guardIds. */
@@ -166,6 +174,7 @@ export class Simulation extends KernelSimulation {
             step: 0,
             stance: 'stand',
             gait: 'idle',
+            light: 1,
             guardIds: [],
             guardSpawns: [],
             guards: new Float32Array(n * GUARD_FIELDS),
@@ -187,6 +196,11 @@ export class Simulation extends KernelSimulation {
     s.step = stridePhase(p, this.tuning.bodies.player, this.tuning.noise);
     s.stance = p.stance;
     s.gait = p.gait;
+    // Lit as the simulation finds it, where the world draws its shade (A4); in the sun elsewhere.
+    const shade = this.world.shadeArea !== undefined;
+    const t = this.tick / this.tuning.sim.tickHz;
+    const env = this.world.spec.env;
+    s.light = shade ? groundLight(this.world, this.solids, env, t, p.x, p.y, p.z, this.tuning) : 1;
     s.guardIds.length = n;
     s.guardSpawns.length = n;
     for (let i = 0; i < n; i++) {
@@ -201,6 +215,9 @@ export class Simulation extends KernelSimulation {
       s.guards[o + 3] = b.yaw;
       s.guards[o + 4] = e.guard.headYaw;
       s.guards[o + 5] = b.speed > 0.1 ? 1 : 0;
+      s.guards[o + 6] = shade ? groundLight(this.world, this.solids, env, t, b.x, b.y, b.z, this.tuning) : 1;
+      s.guards[o + 7] = e.senses ? e.senses.sight.meter : 0;
+      s.guards[o + 8] = e.senses ? rung(e.senses.awareness.state) : 0;
     }
     const shapes = this.solids.shapes;
     s.solids.length = shapes.length;

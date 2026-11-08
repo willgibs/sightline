@@ -8,6 +8,7 @@
  *   npm run scene -- sight                 one scenario's table
  *   npm run scene -- sight --params 'spot=shade&d=30&stance=crouch&move=walk&expect=3-6'
  *   npm run scene -- --list                what scenes there are
+ *   npm run scene -- perception-crowd --profile    and the time and work of each system, per tick
  *   npm run scene -- movement-course --out course.slrec
  */
 import { writeFileSync } from 'node:fs';
@@ -51,7 +52,12 @@ let failed = 0;
 for (const { name, params } of runs) {
   const scene = SCENES[name]!(params);
   const t0 = now();
-  const run = runScene(scene, defaultTuning, { build: buildStamp(), seconds: args.has('seconds') ? Number(args.get('seconds')) : undefined });
+  const spent = new Map<string, number>();
+  let started = 0;
+  const profiler = args.has('profile')
+    ? { begin: () => void (started = now()), end: (s: { name: string }) => void spent.set(s.name, (spent.get(s.name) ?? 0) + now() - started) }
+    : undefined;
+  const run = runScene(scene, defaultTuning, { build: buildStamp(), seconds: args.has('seconds') ? Number(args.get('seconds')) : undefined, profiler });
   const ms = now() - t0;
   const re = resimulate(run.recording, { scene, clock: now });
   const ok = run.failures.length === 0 && re.ok;
@@ -62,6 +68,16 @@ for (const { name, params } of runs) {
   for (const f of run.failures) console.log(`  ✗ ${f}`);
   for (const e of scene.expect ?? []) if (!run.failures.some((f) => f.startsWith(`${e.name}:`))) console.log(`  ✓ ${e.name}`);
   console.log(`  resim ${re.ok ? '✓ identical' : `✗ ${re.problem ?? 'DIVERGED'}`} · ${fmt.ms(re.ms)}`);
+  if (profiler) {
+    const ticks = Math.max(1, run.sim.tick);
+    console.log(`  per tick, ${ticks} ticks:`);
+    const work = new Map(run.sim.work().map((w) => [w.system, w]));
+    for (const [system, spentMs] of spent) {
+      const w = work.get(system);
+      const counts = w && w.rays + w.nodes + w.bodies > 0 ? ` · rays ${(w.rays / ticks).toFixed(1)} · nodes ${(w.nodes / ticks).toFixed(0)} · bodies ${(w.bodies / ticks).toFixed(1)}` : '';
+      console.log(`    ${system.padEnd(24)} ${((spentMs * 1000) / ticks).toFixed(1).padStart(7)} µs${counts}`);
+    }
+  }
   const out = args.get('out');
   if (out) {
     writeFileSync(out, run.recording.toBytes());

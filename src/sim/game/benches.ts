@@ -11,7 +11,8 @@ import { ChaosBot } from './bots/chaos';
 import { WanderBot } from './bots/wander';
 import { PINNED_RUNS, behaviourInto } from './runs';
 import { Simulation } from './sim';
-import { Acoustics, SEED_LAW, SIGHT_LAW, crackHeard, emptyHeard, foliageOf, sweepSight, type CrackHeard, type FlightPoint } from '../perception';
+import { Acoustics, SEED_LAW, SIGHT_LAW, crackHeard, drawnLit, emptyHeard, foliageOf, groundLight, shadeMap, sweepSight, type CrackHeard, type FlightPoint } from '../perception';
+import { Solids } from '../kernel/world/solids';
 import { datan2, dcos, dexp, dlog, dsin } from '../kernel/core/detmath';
 import { air, defaultEnv } from '../kernel/env';
 import { Rng } from '../kernel/core/rng';
@@ -30,6 +31,7 @@ import { SYSTEMS } from './systems';
 import { campHeight, campWorld } from './scenes/campBrain';
 import { labWorld } from './scenes/perceptionLab';
 import { SIGHT_TABLE, sightScenario } from './scenes/sightScenario';
+import { FACTORS, SITTING, generateSitting, pairsCovered, scoreSitting, verdict, type Trial } from './trials';
 import { SWAY_RUNGS, decisionSensitivity, swayRadius, sweepCases, sweepWorst } from './ballisticsBench';
 
 /** A metric to four decimals: enough to see a change, and the same bits everywhere it's computed. */
@@ -269,7 +271,7 @@ function inWorldCalibration(T: Tuning, shots: number): { one: number; two: numbe
     const shot: System = {
       name: 'bench-shot',
       phase: 'commands',
-      after: ['player-commands', 'rifle'],
+      after: ['player-commands', 'rifle', 'sandbox-drops'],
       reads: [],
       writes: [],
       emits: ['report'],
@@ -356,12 +358,109 @@ function perceptionMetrics(): Record<string, number> {
     if (!Object.is(a.clarity, b.clarity) || a.fromX !== b.fromX || a.fromZ !== b.fromZ || a.length !== b.length) differ++;
   }
   m['hearing: speakers and a guard at the same place differ (of 200)'] = differ;
+  // Shade drawn as simulated (A4): the drawn map against the simulation's light, over the area and at the edges.
+  const solids = new Solids(lab.colliders);
+  const area = lab.shadeArea!;
+  const map = shadeMap(lab, solids, lab.spec.env, 0, area, defaultTuning);
+  const simLit = (x: number, z: number): boolean =>
+    groundLight(lab, solids, lab.spec.env, 0, x, lab.terrain.heightAt(x, z), z, defaultTuning) === defaultTuning.visibility.light.lit;
+  let agree = 0;
+  for (let k = 0; k < 20000; k++) {
+    const x = rng.range(area.x0, area.x1);
+    const z = rng.range(area.z0, area.z1);
+    if (drawnLit(map, x, z) === simLit(x, z)) agree++;
+  }
+  m['shade: drawn as simulated, of 20000 points'] = agree;
+  const shaded: number[] = [];
+  for (let k = 0; k < map.lit.length; k++) if (map.lit[k] === 0) shaded.push(k);
+  let edges = 0;
+  for (let k = 0; k < 6000; k++) {
+    const c = shaded[rng.int(0, shaded.length - 1)]!;
+    const x = map.x0 + ((c % map.nx) + 0.5) * map.cell + rng.range(-1.5, 1.5);
+    const z = map.z0 + (Math.floor(c / map.nx) + 0.5) * map.cell + rng.range(-1.5, 1.5);
+    if (drawnLit(map, x, z) === simLit(x, z)) edges++;
+  }
+  m['shade: drawn as simulated within 1.5 m of a shadow, of 6000 points'] = edges;
   // The crack (A5): listeners 5–15 m from a bullet's path at 300 m, its speed falling as a
   // drag constant makes it (790 m/s at the muzzle, about 650 m/s there).
   const angles = crackBias();
   m['crack at 300 m: least degrees off the shooter'] = round(Math.min(...angles));
   m['crack at 300 m: most degrees off the shooter'] = round(Math.max(...angles));
   m['seed · crack at 300 m: degrees off the shooter'] = 0;
+  Object.assign(m, trialMetrics());
+  return m;
+}
+
+/**
+ * Trial mode (A12) on two pinned sittings: what the sittings hold, and how often the
+ * protocol passes readers of known skill, against the plan's first rule (seed: 48 of 60
+ * right). docs/research/foundations.md found the seed passes a reader who is right on every
+ * clear trial and guesses the borderline ones about 18% of the time, and a true 80% reader
+ * 57%.
+ */
+function trialMetrics(): Record<string, number> {
+  const m: Record<string, number> = {};
+  let candidates = 0;
+  const seeds = ['BENCH-A-1', 'BENCH-A-2'];
+  const sittings = seeds.map((seed) => generateSitting(seed, defaultTuning, undefined, () => candidates++));
+  // The seed: trials taken as they come, freezes wherever there's a cue.
+  const firstCome = seeds.map((seed) => generateSitting(seed, defaultTuning, { ...SITTING, pool: 1, balanceFreeze: false }));
+  const scored = sittings.flatMap((ts) => ts.filter((t) => !t.warmup));
+  m['trials: candidates run for two sittings'] = candidates;
+  m['trials: scored trials in two sittings'] = scored.length;
+  m['trials: pairs of factor levels the first sitting covers'] = pairsCovered(sittings[0]!);
+  m['seed · trials: pairs of factor levels covered, taken first come'] = pairsCovered(firstCome[0]!);
+  const key = (ts: readonly Trial[], f: (t: Trial) => boolean): Map<number, boolean> => new Map(ts.map((t) => [t.k, f(t)]));
+  const rules = sittings.map((ts) => scoreSitting(ts, key(ts, (t) => t.rules)));
+  m['trials: borderline right by the sight table alone (of 30)'] = rules[0]!.borderlineRight + rules[1]!.borderlineRight;
+  m["trials: the rules-only predictor's balanced accuracy, first sitting (%)"] = round(rules[0]!.balanced * 100);
+  m['trials: frozen at the first cue (of 60)'] = scored.filter((t) => t.freeze === 'cue').length;
+  m['trials: cue-frozen trials where his head can be read'] = scored.filter((t) => t.freeze === 'cue' && t.legible.head).length;
+  for (const f of FACTORS) m[`trials: borderline trials ${f} flips`] = scored.filter((t) => t.flips.includes(f)).length;
+  // What the freeze gives away: the share seen in each kind, and readers who go by it.
+  const seenShare = (ts: readonly Trial[], kind: Trial['freeze']): number => {
+    const of = ts.filter((t) => !t.warmup && t.freeze === kind);
+    return round((100 * of.filter((t) => t.seen).length) / Math.max(1, of.length));
+  };
+  for (const [tag, set] of [
+    ['', sittings],
+    ['seed · ', firstCome],
+  ] as const) {
+    const all = set.flat();
+    m[`${tag}trials: seen among those frozen at the first cue (%)`] = seenShare(all, 'cue');
+    m[`${tag}trials: seen among those frozen at the start (%)`] = seenShare(all, 'start');
+    const read = (name: string, f: (t: Trial) => boolean): void => {
+      const [x, y] = set as [Trial[], Trial[]];
+      const v = verdict({ trials: x, answers: key(x, f) }, { trials: y, answers: key(y, f) });
+      m[`${tag}trials: ${name}: balanced over both (%)`] = round(v.balanced * 100);
+      m[`${tag}trials: ${name}: passes (0 or 1)`] = v.pass ? 1 : 0;
+    };
+    read('a reader who says yes only at a first-cue freeze', (t) => t.freeze === 'cue');
+    read('a reader by the first cue\'s time, and the table otherwise', (t) => (t.freeze === 'cue' ? t.cueAt <= 2.4 : t.rules));
+  }
+  // Readers of known skill, 4000 pairs of sittings each.
+  const rng = new Rng('BENCH-A', 'readers');
+  const [a, b] = sittings as [Trial[], Trial[]];
+  const readers: Array<[string, (t: Trial) => number]> = [
+    ['right on every clear trial, guessing the borderline', (t) => (t.borderline ? 0.5 : 1)],
+    ['right 80% of the time', () => 0.8],
+    ['right 90% of the time', () => 0.9],
+  ];
+  for (const [who, p] of readers) {
+    let ours = 0;
+    let seed = 0;
+    const draws = 4000;
+    for (let k = 0; k < draws; k++) {
+      const answers = (ts: readonly Trial[]): Map<number, boolean> => new Map(ts.map((t) => [t.k, rng.chance(p(t)) ? t.seen : !t.seen]));
+      const A = answers(a);
+      const B = answers(b);
+      if (verdict({ trials: a, answers: A }, { trials: b, answers: B }).pass) ours++;
+      const right = (ts: readonly Trial[], ans: Map<number, boolean>): number => ts.filter((t) => !t.warmup && ans.get(t.k) === t.seen).length;
+      if (right(a, A) + right(b, B) >= 48) seed++;
+    }
+    m[`trials: a reader ${who}: passes (% of ${draws})`] = round((100 * ours) / draws);
+    m[`seed · trials: a reader ${who}: passes (% of ${draws})`] = round((100 * seed) / draws);
+  }
   return m;
 }
 

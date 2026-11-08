@@ -79,7 +79,7 @@ function noiseAt(tick: number, x: number, z: number, radius: number): System {
   return {
     name: 'scenario-noise',
     phase: 'commands',
-    after: ['player-commands', 'rifle'],
+    after: ['player-commands', 'rifle', 'sandbox-drops'],
     reads: [],
     writes: [],
     emits: ['noise'],

@@ -73,10 +73,10 @@ export function stateAt(level: number, A: Tuning['perception']['awareness']): Aw
 }
 
 /** The level a heard sound raises a guard to: faint at the edge of hearing, clear at clarity 4; a voice only its line's. */
-export function soundLevel(p: PendingSound, tuning: Tuning, voiceLevel = 0): number {
+export function soundLevel(p: PendingSound, tuning: Tuning): number {
   const A = tuning.perception.awareness;
   if (p.kind === 'shot') return A.shot;
-  if (p.kind === 'voice') return voiceLevel;
+  if (p.kind === 'voice') return p.voice;
   const t = (p.clarity - 1) / 3;
   return A.sound.faint + (A.sound.clear - A.sound.faint) * (t <= 0 ? 0 : t >= 1 ? 1 : t);
 }

@@ -31,7 +31,9 @@ import type { World } from '../kernel/world/world';
  * arrival waits for the speed of sound along the route.
  *
  * Costs are exact and bounded: integer path costs, a fixed neighbour order, and a budget
- * of expansions (rule 18). One flood per sound, whatever the number of listeners.
+ * of expansions (rule 18). One flood per sound, whatever the number of listeners, and no
+ * farther than `floodReach` along its path: round a compound's buildings, sound goes by the
+ * flood; beyond, by the straight line alone, which in the open is the same answer.
  */
 
 /** A sound as hearing takes it: where, how far it carries unmasked, and which kind. */
@@ -120,7 +122,7 @@ export class Acoustics {
     this.start = at;
     this.offset = this.cellDistance(at, s.x, s.z);
     const H = this.tuning.perception.hearing;
-    this.search.flood([at], { maxExpansions: H.maxExpansions, maxCost: Math.ceil(s.radius * COST_PER_METRE), work });
+    this.search.flood([at], { maxExpansions: H.maxExpansions, maxCost: Math.ceil(Math.min(s.radius, H.floodReach) * COST_PER_METRE), work });
   }
 
   /** What a listener with ears at (x, y, z) hears of the last sound spread, written to `out`. */
@@ -137,6 +139,11 @@ export class Acoustics {
     out.fromZ = s.z;
     if (out.route === 'around') this.apparent(x, y, z, out);
     return out;
+  }
+
+  /** Makes the steady sources' floods now, before any tick needs them (a scene's setup), so no tick pays for them. */
+  warm(): void {
+    this.steadySources();
   }
 
   /** How many steady sources the world has (generation/ambient.ts's list, in its order). */
@@ -321,9 +328,19 @@ export class Acoustics {
       let offset = 0;
       if (start >= 0) {
         offset = this.cellDistance(start, s.x, s.z);
-        this.search.flood([start], { maxExpansions: H.maxExpansions, maxCost: Math.ceil(s.radius * COST_PER_METRE) });
-        const n = this.layer.nx * this.layer.nz;
-        for (let c = 0; c < n; c++) if (this.search.cost[c]! >= 0) costs.set(c, this.search.cost[c]!);
+        const flood = Math.min(s.radius, H.floodReach);
+        this.search.flood([start], { maxExpansions: H.maxExpansions, maxCost: Math.ceil(flood * COST_PER_METRE) });
+        // Only cells within the flood's reach can have been reached: keep theirs.
+        const L = this.layer;
+        const reach = Math.ceil(flood / L.cell) + 1;
+        const si = start % L.nx;
+        const sj = (start - si) / L.nx;
+        for (let j = Math.max(0, sj - reach); j <= Math.min(L.nz - 1, sj + reach); j++) {
+          for (let i = Math.max(0, si - reach); i <= Math.min(L.nx - 1, si + reach); i++) {
+            const c = j * L.nx + i;
+            if (this.search.cost[c]! >= 0) costs.set(c, this.search.cost[c]!);
+          }
+        }
       }
       this.steady.push({ s, costs, start, offset });
     }
