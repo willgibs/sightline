@@ -29,7 +29,7 @@ It's early, and wireframe on purpose. The rule is to prove the core with plain s
 | D | Camp generator | 90 of 100 seeds pass validation on the first try |
 | E | Camp brain | Escalation can be caused, contained and interrupted |
 
-Labs A, B and D run first, each on its own branch and pull request. C and E follow once A's percepts land. [docs/phase-1-plan.md](docs/phase-1-plan.md) has every milestone and its status. Phase 2 then joins the labs into one core mission.
+Labs A, B and D run first, each on its own branch and pull request. C and E follow, building on A's percepts. [docs/phase-1-plan.md](docs/phase-1-plan.md) has every milestone and its status. Phase 2 then joins the labs into one core mission.
 
 ## Run it locally
 
@@ -148,7 +148,7 @@ src/sim/               the simulation: pure TypeScript, no rendering, no DOM, de
                        input, the environment and sound, the scene harness, the kernel alone
   generation/          lane: the valley, sites, the camp, routines, analysis and validation
   body/                lane: the shared motor every body moves with, body shapes, the head bob
-  perception/          lane: how visible a body is, and percepts
+  perception/          lane: sight, hearing, percepts and beliefs, the awareness ladder
   brain/               lane: brains, behind the perception boundary (a guard knows only his mind)
   ballistics/          lane: empty until lab B
   game/                Sightline: the player and guards, its systems, setup, scenes, bots, self-test
