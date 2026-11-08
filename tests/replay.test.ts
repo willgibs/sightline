@@ -45,9 +45,9 @@ describe('a replay', () => {
 
   it('knows when the optic was up, where the markers are, and its speeds', () => {
     const r = new Replay(Recording.fromBytes(bytes), 'test');
-    expect(r.opticAt(10)).toBe(false);
-    expect(r.opticAt(40)).toBe(true);
-    expect(r.opticAt(70)).toBe(false);
+    expect(r.opticAt(10)).toBe(Optic.None);
+    expect(r.opticAt(40)).not.toBe(Optic.None);
+    expect(r.opticAt(70)).toBe(Optic.None);
     expect(r.marks).toEqual([{ tick: 101, kind: 'marker', text: 'here' }]);
     expect(r.markFrom(0, 1)).toBe(101);
     expect(r.markFrom(101, 1)).toBeNull();

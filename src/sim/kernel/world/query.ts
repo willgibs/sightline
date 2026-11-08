@@ -99,15 +99,16 @@ export function raycast(
     out.id = colliderHit.id;
   }
   if ((mask & BODY_BLOCKS) !== 0) {
+    // Bodies count only within reach, like everything else.
     for (const b of bodies) {
       if (b.id === ignore) continue;
       const s = b.shape;
       let d = raySphere(s.head, ox, oy, oz, dx, dy, dz, n);
-      if (d >= 0 && d < out.dist) take(out, d, b.id, 'head');
+      if (d >= 0 && d <= maxDist && d < out.dist) take(out, d, b.id, 'head');
       d = rayCapsule(s.torso, ox, oy, oz, dx, dy, dz, n);
-      if (d >= 0 && d < out.dist) take(out, d, b.id, 'torso');
+      if (d >= 0 && d <= maxDist && d < out.dist) take(out, d, b.id, 'torso');
       d = rayCapsule(s.legs, ox, oy, oz, dx, dy, dz, n);
-      if (d >= 0 && d < out.dist) take(out, d, b.id, 'legs');
+      if (d >= 0 && d <= maxDist && d < out.dist) take(out, d, b.id, 'legs');
     }
   }
   if (out.what === 'none') return out;

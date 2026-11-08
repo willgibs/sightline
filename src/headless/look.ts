@@ -8,6 +8,9 @@
  *   npm run look -- --look 90,-6                  the body turned to a heading and pitch, in degrees
  *   npm run look -- --walk 3                      after 3 s of play walking forward
  *   npm run look -- --fly -20,28,26,160,-38       the debug view from the fly camera: x, y, z, heading, pitch
+ *   npm run look -- --scene shooting-range --optic scope --fire 1500
+ *                                                 through the rifle's scope (or --optic binoculars),
+ *                                                 then a shot (a range, with the binoculars) and pictures 1.5 s on
  *   npm run look -- --query 'spawn=edge&dpr=0.5'  anything else the URL takes
  *   npm run look -- --views honest --size 1280x720 --scale 2 --wait 2000 --out shots
  *
@@ -54,6 +57,10 @@ if (!(walk >= 0)) fail(`--walk takes seconds of play; got '${args.get('walk')}'`
 const lookAt = numbers('look', 2, '90,-6');
 const fly = numbers('fly', 5, '-20,28,26,160,-38');
 if (fly && !views.includes('debug')) fail(`--fly moves the debug view's camera, and the honest view is always from the body: add debug to --views`);
+const optic = args.get('optic');
+if (optic !== undefined && optic !== 'scope' && optic !== 'binoculars') fail(`--optic takes scope or binoculars; got '${optic}'`);
+const fire = args.get('fire') === undefined ? null : Number(args.get('fire'));
+if (fire !== null && !(fire >= 0)) fail(`--fire takes the milliseconds to wait after the shot; got '${args.get('fire')}'`);
 const out = path.resolve(args.get('out') ?? 'shots');
 
 const t0 = performance.now();
@@ -70,6 +77,14 @@ try {
     await game.run(`sightline.hold(['KeyW'])`);
     await game.until(`sightline.state().tick >= ${from + Math.round(walk * defaultTuning.sim.tickHz)}`, 120_000 + walk * 30_000);
     await game.run('sightline.hold([])');
+  }
+  // An optic up for the pictures: the scope (the right button) or the binoculars (F).
+  if (optic === 'scope') await game.run('sightline.zoom(true)');
+  if (optic === 'binoculars') await game.run(`sightline.hold(['KeyF'])`);
+  if (optic) await game.page.waitForTimeout(2500);
+  if (fire !== null) {
+    await game.run('sightline.click()');
+    await game.page.waitForTimeout(fire);
   }
   mkdirSync(out, { recursive: true });
   const shots: string[] = [];

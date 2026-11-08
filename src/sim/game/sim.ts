@@ -1,5 +1,6 @@
 import type { Tuning } from '../../config/tuning';
-import { queryBodies, stridePhase, type BodyState, type Gait, type Stance } from '../body';
+import { stridePhase, type BodyState, type Gait, type Stance } from '../body';
+import { gameBodies } from './remains';
 import { generateWorld, worldFingerprint } from '../generation';
 import type { Game } from '../kernel/game';
 import { neutralInput } from '../kernel/input';
@@ -9,7 +10,9 @@ import type { EntityId, SimState } from '../kernel/state';
 import type { System } from '../kernel/systems';
 import type { Collider } from '../kernel/world/colliders';
 import type { World } from '../kernel/world/world';
-import { PLAYER_ID, player, type GuardEntity, type PlayerEntity } from './entities';
+import { PLAYER_ID, player, type GuardEntity, type PlayerEntity, type RemainsEntity } from './entities';
+import { glint, thrownAt, vec3, viewLine, type Flight } from '../ballistics';
+import { sunDirection } from '../kernel/env';
 import type { PlayerControl } from './player';
 import { writeSample } from './samples';
 import { startRun } from './setup';
@@ -28,7 +31,7 @@ export const SIGHTLINE: Game<Simulation> = {
   simulation: (world, tuning, systems) => new Simulation(world, tuning, systems),
   start: startRun,
   still: (sim) => neutralInput(sim.player.yaw),
-  bodies: (state, tuning, out) => queryBodies(state.entities, tuning, out),
+  bodies: gameBodies,
   world: (spec, tuning) => generateWorld(spec, tuning),
   fingerprint: worldFingerprint,
   sample: writeSample,
@@ -59,6 +62,37 @@ export interface Snapshot {
   guards: Float32Array;
   /** Entities' solid shapes (copies), in entity order; their ids say whose (kernel/world/solids.ts). */
   solids: Collider[];
+  /** The player's rifle and vitals as the scope and the HUD draw them, or null without a rifle. */
+  rifle: RifleView | null;
+  /** The bodies killed guards left: where each fell, which way, and when (game/remains.ts draws them). */
+  remains: Array<RemainsEntity['remains'] & { id: number }>;
+  /** Bullets in flight: their launches, so a trace is drawn along the simulated path. */
+  bullets: Array<{ id: number; flight: Flight }>;
+  /** Thrown things, where each is at the tick's end. */
+  thrown: Array<{ id: number; x: number; y: number; z: number }>;
+}
+
+/** What the scope and the HUD show of the player's rifle and vitals, at a tick's end. */
+export interface RifleView {
+  /** The sway, mils, and how far the scope is up (rifle.ts, SwaySample): the camera shows `raise` of it. */
+  up: number;
+  right: number;
+  raise: number;
+  rest: number;
+  rounds: number;
+  zero: number;
+  bolt: number;
+  fitting: number;
+  suppressed: boolean;
+  load: string;
+  heartRate: number;
+  /** Seconds the breath has been held, and how much is left to hold. */
+  held: number;
+  air: number;
+  /** How bright the lens glints to someone straight ahead, 0 to 1 (ballistics/glint.ts): facing the sun. */
+  glint: number;
+  /** How settled after moving, 0 to 1. */
+  steady: number;
 }
 
 /**
@@ -67,6 +101,8 @@ export interface Snapshot {
  * Every run has a player, always entity 1.
  */
 export class Simulation extends KernelSimulation {
+  private readonly aimDir = vec3();
+  private readonly sun = { x: 0, y: 0, z: 0 };
   /** `systems` replaces the game's own list, for tests and scenes; recordings replay with the game's. */
   constructor(world: World, tuning: Tuning, systems: readonly System[] = SYSTEMS) {
     super(world, tuning, SIGHTLINE, systems);
@@ -134,6 +170,10 @@ export class Simulation extends KernelSimulation {
             guardSpawns: [],
             guards: new Float32Array(n * GUARD_FIELDS),
             solids: [],
+            rifle: null,
+            remains: [],
+            bullets: [],
+            thrown: [],
           };
     const p = this.player;
     s.tick = this.tick;
@@ -165,6 +205,48 @@ export class Simulation extends KernelSimulation {
     const shapes = this.solids.shapes;
     s.solids.length = shapes.length;
     for (let k = 0; k < shapes.length; k++) s.solids[k] = Object.assign(s.solids[k] ?? ({} as Collider), shapes[k]!);
+    const pe = this.index.of('player')[0]!;
+    const r = pe.rifle;
+    const v = pe.vitals;
+    if (r && v) {
+      const view = (s.rifle ??= { up: 0, right: 0, raise: 0, rest: 0, rounds: 0, zero: 0, bolt: 0, fitting: 0, suppressed: false, load: '', heartRate: 0, held: 0, air: 0, glint: 0, steady: 1 });
+      view.up = r.sway.up;
+      view.right = r.sway.right;
+      view.raise = r.sway.raise;
+      view.rest = r.rest;
+      view.rounds = r.rounds;
+      view.zero = r.zero;
+      view.bolt = r.bolt;
+      view.fitting = r.fitting;
+      view.suppressed = r.suppressed;
+      view.load = r.load;
+      view.heartRate = v.heartRate;
+      view.held = v.held;
+      view.air = v.air;
+      view.steady = r.steady;
+      const p = pe.body;
+      const aim = viewLine(p.yaw, p.pitch, r.sway, this.aimDir);
+      view.glint = glint(aim, r.raise, sunDirection(this.world.spec.env, this.tick / this.tuning.sim.tickHz, this.sun), aim, this.tuning.ballistics.glint);
+    } else {
+      s.rifle = null;
+    }
+    const remains = this.index.of('remains');
+    s.remains.length = remains.length;
+    for (let k = 0; k < remains.length; k++) s.remains[k] = Object.assign(s.remains[k] ?? ({} as Snapshot['remains'][number]), remains[k]!.remains, { id: remains[k]!.id });
+    const bullets = this.index.of('bullet');
+    s.bullets.length = bullets.length;
+    for (let k = 0; k < bullets.length; k++) {
+      const b = (s.bullets[k] ??= { id: 0, flight: { ...bullets[k]!.bullet.flight } });
+      b.id = bullets[k]!.id;
+      Object.assign(b.flight, bullets[k]!.bullet.flight);
+    }
+    const thrown = this.index.of('thrown');
+    s.thrown.length = thrown.length;
+    for (let k = 0; k < thrown.length; k++) {
+      const o = (s.thrown[k] ??= { id: 0, x: 0, y: 0, z: 0 });
+      o.id = thrown[k]!.id;
+      thrownAt(thrown[k]!.thrown, this.tuning.sim.gravity, this.tick / this.tuning.sim.tickHz, o);
+    }
     return s;
   }
 }
