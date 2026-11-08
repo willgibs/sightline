@@ -13,7 +13,7 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 | One perch, a shot every 5 s | 8.7 of 9.6 | 22 of 30 | 2 of 30 | 6 |
 | One perch, as fast as the bolt | 8.2 of 9.6 | 10 of 30 | 1 of 30 | 19 |
 
-The timed shot takes the target in 28 of 30, a median 138 s in. In the other two the shots were taken and didn't drop him.
+The timed shot takes the target in 28 of 30, a median 138 s in. In the other two the shots were taken and didn't drop him. Left on his perch for two more minutes, in those 28: the alarm went up in 20, a median 8 s after the kill; nobody saw him or hit him; the nearest any guard came was a median 223 m; and the camp's estimate of the perch was a median 83 m off. That is what the owner's ridge-shot call rests on.
 
 **What was tried and taken back:** ordering the whole camp to cover from the believed perch, having guards duck at the first shot they hear, and making cover hide the head, not the chest. Each made it worse. Guards ran across open ground to reach cover, and those who would have run for the alarm didn't, so the target stopped getting away. Cover within 12 m rarely hides a guard from a ridge in any case. Tuning this blind was the wrong tool, so the brain is as lab E left it and the question goes to the owner with the numbers.
 
