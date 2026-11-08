@@ -539,6 +539,24 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
   - The decision-sensitivity check, and the miss breakdown in the playtest summary.
   - A kill cam, if any, is only a slowed replay of the recording.
 - [ ] Taste call 3, the exit test, the bench numbers, a note, a playable link.
+  - **Ready for the owner's sitting** (Nov 8): B1–B10 landed. Open the range at `?scene=shooting-range` (the preview deploy, then production once landed), about 10 minutes and 15 rounds. What to try:
+    - Go prone (Z) on the mound: REST lights up in the scope. Hold the breath with Shift while scoped and press between heartbeats.
+    - Range a walker with the binoculars (F, then click), then dial the zero (↑ ↓) to the nearest 100 m and hold the rest, or keep 100 m and hold over with the dope card.
+    - Read the wind from the flags (from the west, a full crosswind) and hold into it; lead a walker about 1.8 mil at 300 m.
+    - Hear the strike come back about 1.3 s after the shot at 300 m; watch the dust on a miss and correct like a spotter.
+    - Press H to try the arcade and simulation instruments; the run's end lists what decided every shot.
+  - **The bench against the seed** (`npm run bench`, lane ballistics):
+
+    | Measure | The seed | Target | Measured |
+    | --- | --- | --- | --- |
+    | Drawn hold against simulated impact, 160 shots through the simulation | 18.5 cm at 500 m | under 1 cm; aim 0.2 | 0.136 cm worst |
+    | The model against a G7 solver, to 500 m | drop 22–29% short, or drift 6–9 times too much | drop within 1 cm, drift within 0.5 | 0.82 cm and 0.45 cm |
+    | The closed form against RK4, ±30° | — | under 0.06 cm (match), 0.12 (subsonic) | 0.053 cm and 0.11 cm |
+    | A skipped decision at 300 m, against the head's 0.38 mil | measured by no game | each off the head | drop 1.79, lead 1.84, wind 0.60, ranging 0.46 mil |
+    | Sway (95th percentile): standing, prone, rested, breath held | no numbers published | ≥ 1.5, 0.5–0.8, 0.25, ≤ 0.1 mil | 1.64, 0.69, 0.255, 0.046 mil |
+    | The strike heard back from 300 m | not timed by any game | flight and return, about 1.28 s | 1.24–1.33 s, rendered in Chromium |
+    | What decided each miss | a hidden score | every shot, in mils | `npm run playtest` and the run's end |
+  - **Two questions for the owner:** Is the 300 m walking shot earned and satisfying? And taste call 3: keep realistic-lite (the default: you make the four decisions with a rangefinder, a dope card and the flags), go more arcade (the instruments make them for you: the hold and the wind read out, the landing marked), or more simulation (no dope card: you learn the drops)? Each is only a layer of what the instruments show, over the one physics.
 
 ### C · Movement and body
 
