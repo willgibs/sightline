@@ -1,10 +1,11 @@
 name: CI
 
-# Every push and pull request runs the full check on Linux. Once a week (and on demand)
-# the same run repeats on macOS and Windows, and the final simulation hashes from all
-# three must match: a recording made anywhere has to replay identically everywhere. The
-# weekly run also plays fresh valleys for hours with bots, checking the motor's promises
-# every tick. (engines.yml runs the browsers' and Bun's engines on every push.)
+# Every push and pull request runs the full check on Linux, macOS and Windows, and the
+# final simulation hashes from all three must match: a recording made anywhere has to
+# replay identically everywhere. (The repository is public, so these minutes are free.)
+# Once a week, and on demand, bots also play fresh valleys for hours, checking the
+# motor's promises every tick, and the synctest saves, restores and re-steps for hours
+# more. (engines.yml runs the browsers' and Bun's engines on every push.)
 on:
   push:
     branches: [main]
@@ -85,7 +86,6 @@ jobs:
 
   platforms:
     name: Check (${{ matrix.os }})
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:

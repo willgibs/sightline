@@ -85,7 +85,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 
 ## Workflow
 
-- The repository is `willgibs/sightline` on GitHub. Keep `main` green: CI runs the full check on every push, and weekly on macOS and Windows with a cross-platform hash comparison.
+- The repository is `willgibs/sightline` on GitHub. Keep `main` green: CI runs the full check on every push and pull request, on Linux, macOS and Windows, with a cross-platform hash comparison; weekly, it adds hours of fuzzing and synctest. The repository is public, so Actions minutes are free.
 - Every push to `main` deploys to production on Vercel (sightline-willgibs.vercel.app, visible only to the owner's Vercel account); other branches get preview deploys.
 - Commit in small, verified steps, each with its tests passing.
 - Land a pull request with `npm run land -- <number>`: it merges only a branch that is up to date with `main` and green (`docs/phase-1-plan.md`, Landing on `main`).

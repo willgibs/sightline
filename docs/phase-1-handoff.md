@@ -136,7 +136,8 @@ These were settled when Phase 1 was planned, on Nov 7, 2026. `docs/phase-1-plan.
 
 - **Production.** `main` deploys to production at sightline-willgibs.vercel.app. Vercel Authentication is on, so only the owner's Vercel account can open it.
 - **Branches.** Every other branch gets a preview deploy. `ci.yml` checks pushes to `main` and pull requests, not other branches, so give a lab branch a pull request to have it checked. `engines.yml` runs on `main`, on `ci/**` and on pull requests.
-- **Weekly runs.** Every Monday, and on demand, `ci.yml` adds macOS and Windows with the hash comparison, plus the 40-hour fuzz run.
+- **Every change, every platform.** `ci.yml` runs the check on Linux, macOS and Windows for every push and pull request, and compares the 20-minute hash across the three. The repository is public (since Nov 8), so Actions minutes are free.
+- **Weekly runs.** Every Monday, and on demand, `ci.yml` adds the 40-hour fuzz run and the 10-hour synctest run.
 - **Dispatching `ci.yml` by hand** cancels a run on `main` that's in progress, because they share a concurrency group. Don't push to `main` while you're waiting on a dispatched run.
 
 ## Gotchas
