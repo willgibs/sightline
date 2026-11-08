@@ -6,7 +6,7 @@ import type { Ridge } from '../src/sim/generation/landform';
 import type { Site } from '../src/sim/generation/site';
 import type { TerrainFeatures } from '../src/sim/generation/terrain';
 import { Rng } from '../src/sim/kernel/core/rng';
-import { ColliderSet, footprintContains } from '../src/sim/kernel/world/colliders';
+import { Blocks, ColliderSet, footprintContains } from '../src/sim/kernel/world/colliders';
 import { Cell, cellIndex, type GridLayer } from '../src/sim/kernel/world/grid';
 import { GridSearch } from '../src/sim/kernel/world/search';
 import type { World } from '../src/sim/kernel/world/world';
@@ -68,6 +68,26 @@ describe('the compound', () => {
       expect(w.camp.ladders!.length).toBe(L.towers.length);
       expect(w.camp.vehicles!.filter((v) => v.escape).length).toBe(1);
       for (const kind of ['generator', 'mast', 'light', 'alarm', 'fence', 'tower'] as const) expect(w.camp.structures.some((s) => s.kind === kind)).toBe(true);
+    }
+  });
+
+  it('leaves a gap in the rail at the head of each ladder: a climber can\'t mantle the rail from the top of it', () => {
+    const gap = T.gen.compound.ladderGap;
+    for (const w of worlds) {
+      for (const l of w.camp.ladders!) {
+        // In the rail's plane, at rail height, `along` metres to one side of the ladder.
+        const y = l.y1 + 0.5;
+        const blocked = (along: number): boolean => {
+          const x = l.x - l.ox * 0.15 - l.oz * along;
+          const z = l.z - l.oz * 0.15 + l.ox * along;
+          return w.colliders.list.some((c) => (c.flags & Blocks.Move) !== 0 && y >= c.y0 && y <= c.y1 && footprintContains(c, x, z, 0));
+        };
+        expect(blocked(0)).toBe(false);
+        for (const side of [1, -1]) {
+          expect(blocked(side * (gap / 2 - 0.05))).toBe(false);
+          expect(blocked(side * (gap / 2 + 0.05))).toBe(true);
+        }
+      }
     }
   });
 

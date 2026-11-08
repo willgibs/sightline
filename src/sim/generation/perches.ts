@@ -1,6 +1,6 @@
 import type { GenTuning } from '../../config/tuning';
 import { circleDirections, datan2, dcos, dsin, dtanDeg } from '../kernel/core/detmath';
-import type { Heightfield } from '../kernel/world/heightfield';
+import { makeTerrainSample, type Heightfield } from '../kernel/world/heightfield';
 import type { Site } from './site';
 import { frameOf, lineOfSight, type Raster } from './raster';
 
@@ -34,6 +34,9 @@ export function findPerches(hf: Heightfield, site: Site, gen: GenTuning): PerchS
   const A = gen.analysis;
   const eyeY = site.height + 1.6;
   const minSlope = dtanDeg(O.perchAngleDeg);
+  // A body lies only where the motor will hold it.
+  const maxTan = dtanDeg(A.perchSlopeDeg);
+  const under = makeTerrainSample();
   const [near, far] = [O.perchRange[0]!, O.perchRange[1]!];
   const playHalf = hf.size / 2 - gen.world.playMargin;
   const rays = 720;
@@ -49,7 +52,7 @@ export function findPerches(hf: Heightfield, site: Site, gen: GenTuning): PerchS
       if (Math.abs(x) > playHalf || Math.abs(z) > playHalf) break;
       const ground = hf.heightAt(x, z);
       const toEye = (ground + gen.sight.proneEye - eyeY) / r;
-      if (r >= near && toEye >= horizon && toEye >= minSlope) {
+      if (r >= near && toEye >= horizon && toEye >= minSlope && hf.sample(x, z, under).slopeTan <= maxTan) {
         const key = Math.floor(x / bucketSize) * 4096 + Math.floor(z / bucketSize);
         const spot = { x, y: ground, z, eye: ground + gen.sight.proneEye, dist: r, heightAbovePad: ground - site.height };
         const old = buckets.get(key);

@@ -114,6 +114,7 @@ export const defaultTuning = {
       yard: 13, // half-size of the open yard at the centre
       towers: [2, 4], // watchtowers at the corners
       towerDeck: 6, // height of a tower's deck
+      ladderGap: 0.8, // the gap in a tower's rail at the top of its ladder, or a climber can't step onto the deck
       wallThickness: 0.2,
       doorWidth: 1.5, // wide enough for the 0.5 m grid to pass a body through at any angle
       doorHeight: 2.1,
@@ -180,7 +181,7 @@ export const defaultTuning = {
       chest: 1.35, // where a standing body is seen, and shot
       crouchHead: 1.05, // the crouched intruder's head and chest: what a guard sees of him
       crouchChest: 0.75,
-      proneEye: 0.5, // a shooter lying on a perch
+      proneEye: 0.32, // a shooter lying on a perch: the body's own prone eye (bodies.player.eyeHeight.prone)
     },
 
     // What a camp must pass (D8; sim/generation/validate.ts): the design doc's rules (Maps and
@@ -226,6 +227,7 @@ export const defaultTuning = {
       relocate: 2, // metres per second a shooter moves between perches
       perches: 32, // the most perches analysed, after thinning
       perchSpacing: 25, // metres between two perches kept
+      perchSlopeDeg: 40, // no perch on ground steeper than this: a body slides off it (the motor's maxSlopeDeg is 42)
       clusterDuty: 0.1, // share of the cycle a witness edge must hold to join two guards in a cluster
       clusterExpansions: 20000, // the cluster search's budget (rule 18)
     },

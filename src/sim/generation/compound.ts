@@ -340,8 +340,12 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     }
     ids.push(box(c.a, c.b, 3, 3, 0.25, Blocks.All, Surface.Wood, deckY));
     const wallY = deckY + 0.25;
-    ids.push(box(c.a + 1.45, c.b, 0.1, 3, 0.9, Blocks.All, Surface.Wood, wallY));
-    ids.push(box(c.a - 1.45, c.b, 0.1, 3, 0.9, Blocks.All, Surface.Wood, wallY));
+    // The rail on the ladder's side has a gap at the ladder's head, or a climber can't step
+    // onto the deck: the rail is too tall to mantle from the top of the ladder.
+    const toward = c.a > 0 ? -1 : 1;
+    const railPart = (3 - C.ladderGap) / 2;
+    for (const side of [1, -1]) ids.push(box(c.a + toward * 1.45, c.b + side * (C.ladderGap / 2 + railPart / 2), 0.1, railPart, 0.9, Blocks.All, Surface.Wood, wallY));
+    ids.push(box(c.a - toward * 1.45, c.b, 0.1, 3, 0.9, Blocks.All, Surface.Wood, wallY));
     ids.push(box(c.a, c.b + 1.45, 3, 0.1, 0.9, Blocks.All, Surface.Wood, wallY));
     ids.push(box(c.a, c.b - 1.45, 3, 0.1, 0.9, Blocks.All, Surface.Wood, wallY));
     for (const [da, db] of [
@@ -357,7 +361,6 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     const p = at(c.a, c.b);
     towers.push({ x: p.x, z: p.z, deck: deckY + 0.25, corner: c.name });
     // The ladder on the side toward the camp's middle, along the a axis.
-    const toward = c.a > 0 ? -1 : 1;
     const foot = at(c.a + toward * 1.6, c.b);
     const out = along(toward, 0);
     ladders.push({ x: foot.x, z: foot.z, y0: ground(c.a + toward * 1.6, c.b), y1: deckY + 0.25, ox: out.x, oz: out.z });

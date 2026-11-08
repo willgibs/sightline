@@ -40,7 +40,7 @@ export const GOLDEN = {
     'shooting-range': { behaviour: 'b1e8920883443ac0', state: '991969418ddbcee4' },
     'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '2535df87754d14eb' },
     'kernel-alone': { behaviour: '0698e581024f5b35', state: 'b51b84477d71dbf1' },
-    'camp-systems': { behaviour: 'f1c3cabd3c2f6ab7', state: '234887d847d060db' },
+    'camp-systems': { behaviour: 'e5c646c959574b12', state: 'd922e4245070fa08' },
   },
 } as const;
 
