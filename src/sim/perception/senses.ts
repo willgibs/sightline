@@ -114,6 +114,8 @@ export interface Senses {
   bodies: number[];
   /** What he caught sight of this tick, taken by the ladder ('perception-awareness'). */
   spotted: PendingSpot[];
+  /** Equipment and doors he has already noticed out of place (E7). Absent until the first. */
+  noticed?: number[];
   /** Whether a lens was flashing at him last tick: a flash is news when it starts. */
   flashed: boolean;
   awareness: Awareness;

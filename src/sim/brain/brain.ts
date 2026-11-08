@@ -33,7 +33,7 @@ export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold
 export type ActName = (typeof ACTS)[number];
 
 /** Why a guard changed what he's doing: A's reasons for a change of state, and the brain's own. */
-export const ACT_WHYS = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered', 'body', 'glint', 'siren'] as const;
+export const ACT_WHYS = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered', 'body', 'glint', 'siren', 'outage', 'door'] as const;
 export type ActWhy = (typeof ACT_WHYS)[number];
 
 /** A change of what a guard is doing, for its system to emit as an 'act' event. */
@@ -107,6 +107,8 @@ export interface BrainState {
   raise: number;
   /** The target (E7): he has reached his vehicle, for its system to take him off. */
   aboard: boolean;
+  /** The target reached a vehicle that wouldn't start, and has said so (E7). */
+  stranded?: boolean;
   /** The radio call he's in the middle of (E4): what he said when he picked up the handset, delivered as said. */
   calling: Report | null;
   /** The tick he first heard the siren, or −1: he knows the alarm is up (E7). */
@@ -296,7 +298,7 @@ function perceptWhy(m: GuardMind): ActWhy {
   for (const p of m.percepts) {
     if (p.tick < tick) continue;
     tick = p.tick;
-    why = p.kind === 'sight' ? 'seen' : p.kind === 'shot' ? 'shot' : p.kind === 'voice' ? 'voice' : p.kind === 'body' ? 'body' : p.kind === 'glint' ? 'glint' : 'heard';
+    why = p.kind === 'sight' ? 'seen' : p.kind === 'shot' ? 'shot' : p.kind === 'voice' ? 'voice' : p.kind === 'body' ? 'body' : p.kind === 'glint' ? 'glint' : p.kind === 'outage' ? 'outage' : p.kind === 'door' ? 'door' : 'heard';
   }
   return why;
 }
@@ -667,11 +669,11 @@ function currentReport(m: GuardMind): Report {
   let own: Percept | null = null;
   for (const p of m.percepts) {
     // A body beats a shot, a muzzle's report beats a crack or a strike, and a voice says the least.
-    const r = p.kind === 'body' ? 6 : p.kind === 'shot' ? (p.sound === 'report' ? 5 : p.sound === 'crack' ? 4 : 3) : p.kind === 'sight' ? 2 : p.kind === 'sound' || p.kind === 'glint' ? 1 : 0;
+    const r = p.kind === 'body' ? 6 : p.kind === 'outage' ? 2.5 : p.kind === 'shot' ? (p.sound === 'report' ? 5 : p.sound === 'crack' ? 4 : 3) : p.kind === 'sight' ? 2 : p.kind === 'sound' || p.kind === 'glint' ? 1 : 0;
     if (r <= rank) continue;
     rank = r;
     own = p;
-    kind = p.kind === 'body' ? 'body' : p.kind === 'sight' ? 'contact' : p.kind === 'shot' ? 'shot' : 'heard';
+    kind = p.kind === 'body' ? 'body' : p.kind === 'outage' ? 'outage' : p.kind === 'sight' ? 'contact' : p.kind === 'shot' ? 'shot' : 'heard';
   }
   const f = own && rank > 0 ? own : focusOf(m);
   const y = own && rank > 0 ? own.y : m.belief ? m.belief.y : a.focus ? a.fy : m.self.y;

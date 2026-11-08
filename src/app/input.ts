@@ -266,6 +266,7 @@ export class InputController {
     out.sprint = shift && out.optic !== Optic.Scope;
     if (out.sprint) this.scopeToggled = false;
     out.lean = frozen ? 0 : (this.held('leanRight') ? 1 : 0) - (this.held('leanLeft') ? 1 : 0);
+    out.use = !frozen && this.held('use');
     if (frozen) {
       this.latch.clear();
       this.simple.length = 0;

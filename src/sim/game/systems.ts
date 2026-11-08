@@ -15,6 +15,7 @@ import { think } from './guards';
 import { playerIntent } from './player';
 import { PERCEPTION } from './perception';
 import { SHOOTING_SYSTEMS } from './shooting';
+import { guardDoors } from './doors';
 import { carriedSystem, useSystem } from './use';
 
 /**
@@ -219,5 +220,6 @@ export const SYSTEMS: readonly System[] = [
   // Perception (lab A, in the valley since A13): after everything has moved, before anyone decides.
   ...PERCEPTION,
   guardBrains,
+  guardDoors,
   objectiveStatus,
 ];

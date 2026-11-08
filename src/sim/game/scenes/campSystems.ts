@@ -30,7 +30,7 @@ export function campSystems(): Scene {
   const cut: System = {
     name: 'cut-the-generator',
     phase: 'commands',
-    after: ['rifle', 'sandbox-drops'],
+    after: ['rifle', 'sandbox-drops', 'use'],
     reads: [],
     writes: ['generator.generator.running'],
     emits: [],

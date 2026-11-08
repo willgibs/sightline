@@ -18,7 +18,8 @@ import { dcos, dsin } from '../kernel/core/detmath';
 import { sunDirection } from '../kernel/env';
 import type { PlayerControl } from './player';
 import { writeSample } from './samples';
-import { usePrompt } from './use';
+import { sabotageProgress } from './sabotage';
+import { usePrompt, type UsePrompt } from './use';
 import { startRun } from './setup';
 import { BEHAVIOUR } from './golden';
 import { SYSTEMS } from './systems';
@@ -92,8 +93,12 @@ export interface Snapshot {
   lean: number;
   /** What a press of climb would do now: '' nothing, 'mantle', or 'ladder': the prompt (body/ladder.ts). */
   climb: '' | 'mantle' | 'ladder';
-  /** What a press of use would do now: '' nothing, 'carry', or 'drop' (game/use.ts). */
-  use: '' | 'carry' | 'drop';
+  /** What the use key would do now (game/use.ts): '' nothing, or the prompt's kind. */
+  use: UsePrompt;
+  /** How far along holding it has got, 0 to 1 (game/sabotage.ts). */
+  useProgress: number;
+  /** Whether the camp's generators are running: their hum, for the speakers. */
+  humming: boolean;
   /** Lying down: the body's long axis, how far along it it has grown, and how the ground runs under it (body/chain.ts). */
   axis: number;
   lying: number;
@@ -233,6 +238,8 @@ export class Simulation extends KernelSimulation {
             lean: 0,
             climb: '',
             use: '',
+            useProgress: 0,
+            humming: true,
             axis: 0,
             lying: 0,
             riseHead: 0,
@@ -267,7 +274,9 @@ export class Simulation extends KernelSimulation {
     s.eyeZ = eye.z - p.z;
     s.lean = p.lean;
     s.climb = climbPrompt(p, this.tuning.bodies.player, this.motorView());
-    s.use = usePrompt(this.playerEntity(), this.index, this.tuning, this.solids);
+    s.use = usePrompt(this.playerEntity(), this.index, this.world, this.tuning, this.solids);
+    s.useProgress = sabotageProgress(this.playerEntity(), this.index, this.tuning);
+    s.humming = this.index.of('generator').every((g) => g.generator.running);
     s.axis = p.axis;
     s.lying = p.lying;
     s.riseHead = p.riseHead;

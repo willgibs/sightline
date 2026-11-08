@@ -152,6 +152,14 @@ export const campCheckins: System = {
     if (ctx.tick < ch.next || ch.pending) return;
     if (!radioUp(ctx, c)) {
       ch.next = ctx.tick + Math.round(T.retry * hz);
+      // The operator needs the set and finds it dead (E7): once, until it's working again.
+      const operator = ctx.index.of('guard').find((g) => ctx.world.camp.guards[g.guard.spawn]?.role === 'radio-operator');
+      const device = (ctx.world.camp.devices ?? []).find((d) => d.kind === 'radio');
+      if (operator && device && !camp.netWorking && !ch.deadReported) {
+        ch.deadReported = true;
+        const event = ctx.emit({ type: 'checkin', source: operator.id, post: operator.guard.spawn, stage: 'dead' });
+        reportOutage(ctx, c, operator, device.x, device.y, device.z, event);
+      }
       return;
     }
     // Round-robin over the camp's posts, skipping anyone it has already given up on.
@@ -244,13 +252,32 @@ export const reinforceArrive: ScheduleHandler = (ctx, entry) => {
   }
 };
 
-/** The target reaches his vehicle at lockdown (E7): he's away, and the mission fails. A stand-in until the vehicle really drives (lab C and D). */
+/**
+ * The target reaches his vehicle at lockdown (E7). If it's been sabotaged he stays by it and
+ * says so; otherwise he's in the cab, it drives out (game/escape.ts), and once it's away the
+ * mission is lost. A camp with no vehicle entity (a handmade scene's) has him gone at once.
+ */
 export function targetEscapes(ctx: TickContext, g: GuardEntity): void {
   const c = commanderOf(ctx);
   if (!c?.camp.objective || c.camp.objective.target !== g.id) return;
-  c.camp.objective.status = 'escaped';
-  for (const o of ctx.index.of('objective')) if (o.objective.target === g.id) o.objective.status = 'escaped';
+  const vehicle = ctx.index.of('vehicle').find((v) => v.vehicle.escape);
+  if (vehicle?.vehicle.disabled) {
+    if (!g.brain!.stranded) {
+      g.brain!.stranded = true;
+      reportOutage(ctx, c, g, vehicle.solid.x, g.body.y, vehicle.solid.z);
+    }
+    return;
+  }
+  const status = vehicle ? 'escaping' : 'escaped';
+  c.camp.objective.status = status;
+  for (const o of ctx.index.of('objective')) if (o.objective.target === g.id) o.objective.status = status;
+  if (vehicle) vehicle.vehicle.driving = { leg: 0, waited: 0 };
   ctx.despawn(g.id);
+}
+
+/** Someone found the camp's equipment dead and says so: it reaches the camp whether or not the radio works, because the set is what's dead. */
+function reportOutage(ctx: TickContext, c: CommanderEntity, g: GuardEntity, x: number, y: number, z: number, cause = 0): void {
+  c.camp.inbox.push({ kind: 'outage', x, y, z, radius: ctx.tuning.brain.comms.radius.outage, tick: ctx.tick, from: g.id, fromX: g.body.x, fromZ: g.body.z, cause });
 }
 
 /** Gives the camp its devices, from where they stand: the lab's handmade camp; lab D's camps give them by world.camp.devices. */
@@ -336,7 +363,8 @@ export function raiseAlarm(ctx: TickContext, g: GuardEntity): void {
   if (!box) return;
   if (box.raised) return;
   if (!box.powered) {
-    ctx.emit({ type: 'alarm', source: g.id, cause: b.event, box: b.box, stage: 'dead' });
+    const dead = ctx.emit({ type: 'alarm', source: g.id, cause: b.event, box: b.box, stage: 'dead' });
+    reportOutage(ctx, c, g, box.x, g.body.y, box.z, dead);
     return;
   }
   box.raised = true;

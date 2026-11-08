@@ -37,6 +37,10 @@ export interface VehicleEntity extends EntityBase {
     index: number;
     /** The target's way out at lockdown (lab E). */
     escape: boolean;
+    /** Sabotaged (E7): it won't start. Absent until someone does it. */
+    disabled?: boolean;
+    /** On its way out (E7): which leg of the escape route, and how long it has been held up. Absent until it's moving. */
+    driving?: { leg: number; waited: number };
   };
   solid: Collider;
 }
@@ -127,7 +131,7 @@ export interface RadioEntity extends EntityBase {
   radio: { device: number; powered: boolean; working: boolean };
 }
 
-export type ObjectiveStatus = 'open' | 'done' | 'escaped';
+export type ObjectiveStatus = 'open' | 'done' | 'escaping' | 'escaped';
 
 export interface ObjectiveEntity extends EntityBase {
   kind: 'objective';
@@ -135,7 +139,7 @@ export interface ObjectiveEntity extends EntityBase {
     kind: 'eliminate';
     /** The target's entity. */
     target: number;
-    /** Open until the target is dead (done) or gone in his vehicle (escaped, lab E). */
+    /** Open until the target is dead (done), in his vehicle on the way out (escaping), or gone (escaped, lab E). */
     status: ObjectiveStatus;
   };
 }

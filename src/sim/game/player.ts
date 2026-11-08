@@ -31,6 +31,8 @@ export interface PlayerControl {
   climbWait: number;
   /** The body being carried or dragged (an entity id), or 0. Hands full: no climbing. */
   carrying: EntityId;
+  /** Something being done at arm's length with the use key held (E7): what, and for how long. Absent while nothing is. */
+  working?: { target: EntityId; held: number };
 }
 
 export function createPlayer(world: World, solids: Solids, tuning: Tuning): { body: BodyState; control: PlayerControl } {

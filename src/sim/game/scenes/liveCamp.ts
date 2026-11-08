@@ -3,6 +3,7 @@ import { giveBrains } from '../brains';
 import { campRules } from '../combat';
 import { campCheckins, campCommander, campDevices, commanderOf, commsVoice, giveCampDevices, giveCommander } from '../comms';
 import { player } from '../entities';
+import { vehicleDrive } from '../escape';
 import { arm } from '../shooting';
 import { SIGHTLINE } from '../sim';
 import type { Scene } from '.';
@@ -52,10 +53,10 @@ export function liveCamp(params?: string): Scene {
     version: 1,
     params: formatLiveCamp(p),
     title: `A live camp (${p.seed})`,
-    description: `A generated camp with the whole camp brain awake: guards who see, hear, talk and search, a commander, radio check-ins, alarm boxes and a target who runs for his vehicle at lockdown. You have the rifle.`,
+    description: `A generated camp with the whole camp brain awake: guards who see, hear, talk and search, a commander, radio check-ins, alarm boxes that can be cut off at the generator, and a target who runs for his vehicle at lockdown. You have the rifle.`,
     game: SIGHTLINE,
     world: (tuning) => generateWorld(campMission(p.seed, { ...defaultCampSpec(), difficulty: p.difficulty }), tuning),
-    systems: [commsVoice, campCommander, campCheckins, campRules, campDevices],
+    systems: [commsVoice, campCommander, campCheckins, campRules, campDevices, vehicleDrive],
     setup: (sim) => {
       giveBrains(sim);
       giveCommander(sim);

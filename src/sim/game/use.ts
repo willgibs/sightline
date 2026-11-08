@@ -6,12 +6,15 @@ import { Blocks, circleOverlaps, type RayHit } from '../kernel/world/colliders';
 import type { Solids } from '../kernel/world/solids';
 import { groundBelow } from '../body';
 import { foliageOf } from '../perception';
+import type { World } from '../kernel/world/world';
+import { doorInReach, workDoor } from './doors';
 import { player, type PlayerEntity, type RemainsEntity } from './entities';
+import { sabotagePrompt, workAtArmsLength, type SabotageKind } from './sabotage';
 
 /**
- * The use action (C6): the press that acts on what's in front of the player. Today it
- * picks up a body and puts it down (lab B's `remains`); lab E's sabotage and opening
- * doors will take their place on the same press.
+ * The use action (C6): the press that acts on what's in front of the player: it picks up a
+ * body and puts it down (lab B's `remains`), and opens or shuts a door (game/doors.ts).
+ * Holding it does the slower work (game/sabotage.ts).
  *
  * Carried standing, the body rides the shoulder; crouched, it is dragged along the ground
  * behind. Both are slow, and dragging scrapes, loudest on gravel and metal. Put down in
@@ -20,6 +23,8 @@ import { player, type PlayerEntity, type RemainsEntity } from './entities';
  */
 
 const hit: RayHit = { dist: Infinity, id: -1 };
+
+export type UsePrompt = '' | 'carry' | 'drop' | 'open' | 'shut' | SabotageKind;
 
 /**
  * The body a press would pick up: the nearest one within reach, in front of the player,
@@ -54,10 +59,13 @@ export function bodyInReach(p: PlayerEntity, index: EntityIndex, tuning: Tuning,
   return best;
 }
 
-/** What a press of use would do now: the prompt. */
-export function usePrompt(p: PlayerEntity, index: EntityIndex, tuning: Tuning, solids: Solids): '' | 'carry' | 'drop' {
+/** What the use key would do now: the prompt. A body comes first, then a door, then what takes holding it. */
+export function usePrompt(p: PlayerEntity, index: EntityIndex, world: World, tuning: Tuning, solids: Solids): UsePrompt {
   if (p.control.carrying !== 0) return 'drop';
-  return bodyInReach(p, index, tuning, solids) ? 'carry' : '';
+  if (bodyInReach(p, index, tuning, solids)) return 'carry';
+  const door = doorInReach(p, index, world, tuning);
+  if (door) return door.door.open ? 'shut' : 'open';
+  return sabotagePrompt(p, index, world, solids, tuning);
 }
 
 /** Is this spot somewhere a body stays hidden: inside foliage, or beside a container? */
@@ -89,12 +97,13 @@ export const useSystem: System = {
   name: 'use',
   phase: 'commands',
   after: ['rifle', 'sandbox-drops'],
-  reads: ['input', 'player.body', 'player.control', 'remains.remains', 'solid.solid'],
-  writes: ['player.control', 'remains.remains'],
-  emits: [],
+  reads: ['input', 'player.body', 'player.control', 'remains.remains', 'solid.solid', 'door.door', 'door.solid', 'guard.body', 'generator.generator', 'radio.radio', 'vehicle.vehicle', 'vehicle.solid'],
+  writes: ['player.control', 'remains.remains', 'door.door.open', 'door.solid', 'generator.generator.running', 'radio.radio.working', 'vehicle.vehicle.disabled'],
+  emits: ['door', 'sabotage'],
   run(ctx) {
-    if (!ctx.input.commands.some((c) => c.kind === 'use')) return;
     const p = player(ctx.index);
+    workAtArmsLength(ctx, p);
+    if (!ctx.input.commands.some((c) => c.kind === 'use')) return;
     const b = p.body;
     if (p.control.carrying !== 0) {
       const e = ctx.index.get(p.control.carrying);
@@ -114,7 +123,11 @@ export const useSystem: System = {
       return;
     }
     const target = bodyInReach(p, ctx.index, ctx.tuning, ctx.solids);
-    if (!target) return;
+    if (!target) {
+      const door = doorInReach(p, ctx.index, ctx.world, ctx.tuning);
+      if (door) workDoor(ctx, p, door);
+      return;
+    }
     target.remains.carriedBy = p.id;
     target.remains.hidden = false;
     p.control.carrying = target.id;

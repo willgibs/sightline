@@ -43,6 +43,11 @@ export const BARKS: readonly BarkLine[] = [
   { text: 'Is that... a body?', to: 'suspicious', reason: 'body', shout: false, level: 0 },
   { text: 'Man down! Man down!', to: 'searching', reason: 'body', shout: true, level: 0.8 },
   { text: 'Something flashed up there.', to: 'suspicious', reason: 'glint', shout: false, level: 0 },
+  // E7: equipment that has stopped, and a door not as it was left.
+  { text: "Why's that off?", to: 'curious', reason: 'outage', shout: false, level: 0 },
+  { text: 'Something cut this.', to: 'suspicious', reason: 'outage', shout: false, level: 0 },
+  { text: 'Who shut that?', to: 'curious', reason: 'door', shout: false, level: 0 },
+
 ];
 
 /**

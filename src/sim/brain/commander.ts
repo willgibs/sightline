@@ -70,13 +70,15 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   remember(camp, r, tick, tuning);
   if (r.kind === 'shot' && r.sigma !== undefined) noteShot(camp, r, tick, tuning);
   // A post gone quiet is a job for someone: walk over and see (E6).
-  if (r.kind === 'missing') {
+  if (r.kind === 'missing' || r.kind === 'outage') {
     const t = addTask(camp, 'check', r.x, r.z, 2, 1, tick);
     t.cause = r.cause;
-    const man = camp.roster.find((m) => m.id === r.from);
-    if (man) man.status = 'missing';
+    if (r.kind === 'missing') {
+      const man = camp.roster.find((m) => m.id === r.from);
+      if (man) man.status = 'missing';
+    }
   }
-  const wanted: AlertLevel = r.kind === 'heard' || r.kind === 'missing' ? 'uneasy' : 'alert';
+  const wanted: AlertLevel = r.kind === 'heard' || r.kind === 'missing' || r.kind === 'outage' ? 'uneasy' : 'alert';
   if (alertRung(wanted) > alertRung(camp.level)) raise(camp, wanted, tick);
   // A body in the open (E9): guards near it get off exposed ground.
   if (r.kind === 'body') addTask(camp, 'cover', r.x, r.z, 2, 3, tick);

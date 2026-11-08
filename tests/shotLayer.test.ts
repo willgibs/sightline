@@ -17,6 +17,8 @@ import { emptyShape } from '../src/sim/kernel/world/shape';
 function snapshot(tick: number, extra: Partial<Snapshot> = {}): Snapshot {
   return {
     tick,
+    useProgress: 0,
+    humming: true,
     light: 1,
     px: 0,
     py: 0,

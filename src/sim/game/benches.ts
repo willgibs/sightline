@@ -559,7 +559,7 @@ export function inWorldCalibration(T: Tuning, shots: number): { one: number; two
     const shot: System = {
       name: 'bench-shot',
       phase: 'commands',
-      after: ['player-commands', 'rifle', 'sandbox-drops'],
+      after: ['player-commands', 'rifle', 'sandbox-drops', 'use'],
       reads: [],
       writes: [],
       emits: ['report'],

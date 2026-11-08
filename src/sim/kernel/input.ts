@@ -27,6 +27,8 @@ export interface InputFrame {
   breath?: boolean;
   /** Leaning left (−1) or right (1). */
   lean?: number;
+  /** The use key is down: something that takes time to do at arm's length (E7). */
+  use?: boolean;
   /** Discrete actions this tick, usually none. */
   commands?: readonly Command[];
 }
@@ -36,6 +38,7 @@ export interface TickInput extends InputFrame {
   optic: Optic;
   breath: boolean;
   lean: -1 | 0 | 1;
+  use: boolean;
   commands: Command[];
 }
 
@@ -45,7 +48,7 @@ export type Optic = (typeof Optic)[keyof typeof Optic];
 export const InputFlag = { Sprint: 1, Crouch: 2, Prone: 4 } as const;
 
 export function neutralInput(yaw = 0, pitch = 0): TickInput {
-  return { moveX: 0, moveZ: 0, sprint: false, crouch: false, prone: false, yaw, pitch, optic: Optic.None, breath: false, lean: 0, commands: [] };
+  return { moveX: 0, moveZ: 0, sprint: false, crouch: false, prone: false, yaw, pitch, optic: Optic.None, breath: false, lean: 0, use: false, commands: [] };
 }
 
 /**
@@ -70,6 +73,7 @@ export function quantizeInput(f: InputFrame, out: TickInput = neutralInput()): T
   out.optic = f.optic === Optic.Scope || f.optic === Optic.Binoculars ? f.optic : Optic.None;
   out.breath = f.breath === true;
   out.lean = f.lean === -1 || f.lean === 1 ? f.lean : 0;
+  out.use = f.use === true;
   out.commands.length = 0;
   const commands = f.commands ?? [];
   for (let k = 0; k < commands.length && k < MAX_COMMANDS; k++) out.commands.push(quantizeCommand(commands[k]!));
@@ -80,9 +84,9 @@ export function inputFlags(f: InputFrame): number {
   return (f.sprint ? InputFlag.Sprint : 0) | (f.crouch ? InputFlag.Crouch : 0) | (f.prone ? InputFlag.Prone : 0);
 }
 
-/** The held states in one byte: optic in bits 0–1, breath in bit 2, lean in bits 3–4 (1 left, 2 right). */
+/** The held states in one byte: optic in bits 0–1, breath in bit 2, lean in bits 3–4 (1 left, 2 right), use in bit 5. */
 export function heldByte(f: TickInput): number {
-  return f.optic | (f.breath ? 4 : 0) | (f.lean === -1 ? 8 : f.lean === 1 ? 16 : 0);
+  return f.optic | (f.breath ? 4 : 0) | (f.lean === -1 ? 8 : f.lean === 1 ? 16 : 0) | (f.use ? 32 : 0);
 }
 
 export function fromHeldByte(b: number, out: TickInput): void {
@@ -90,4 +94,5 @@ export function fromHeldByte(b: number, out: TickInput): void {
   out.optic = optic === Optic.Scope || optic === Optic.Binoculars ? optic : Optic.None;
   out.breath = (b & 4) !== 0;
   out.lean = b & 8 ? -1 : b & 16 ? 1 : 0;
+  out.use = (b & 32) !== 0;
 }

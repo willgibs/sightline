@@ -16,7 +16,7 @@
  *   voice   someone's bark or shout (lab E spreads beliefs this way, E4)
  * Labs B, D and E add body, impact, object, glint and door as their sources land (A9).
  */
-export type PerceptKind = 'sight' | 'sound' | 'shot' | 'voice' | 'body' | 'impact' | 'object' | 'glint' | 'door';
+export type PerceptKind = 'sight' | 'sound' | 'shot' | 'voice' | 'body' | 'impact' | 'object' | 'glint' | 'door' | 'outage';
 
 export interface Percept {
   kind: PerceptKind;
