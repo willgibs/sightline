@@ -538,6 +538,25 @@ Playable at `?scene=movement-lab`; the movement course stays as a regression tes
   - a surface-tag audit;
   - trial accuracy by factor.
 
+**Recorded before building (Nov 8), so the exit note can be read against it:**
+- **The seed, as the bench runs it.** The body lane's bench (`src/sim/game/benches.ts`) keeps the seed beside the lab's work, as lab A's does:
+  - **Prone:** today's motor, a single 0.3 m circle standing in for a body lying 1.75 m along its facing.
+  - **Lean:** a camera moved beside the head while the shape that guards see stays where it was (Dishonored's hidden lean; Siege before 2019 had the eye at the far side of the head).
+  - **Mantle:** the endpoint validated once, as The Dark Mod's was (its bug 4509); the path runs on after that whatever walks into it.
+  - **Ladders:** Source's ladder with fixed dismount points, checked when placed.
+- **Where the seed falls short, in the bench's terms** (the prone figures are measured on `main` at `e92acd1`, with the fuzzing bot):
+  - **Prone clips.** The lying shape goes up to 0.17 m into solids in TAL-4471, 0.55 m in MUD-9031, and 0.58 m on the movement course (702 of 8,376 prone ticks).
+  - **Turning prone between walls 1 m apart** leaves 303 of 360 ticks with a body part inside a wall, up to 0.32 m deep.
+  - **The eye isn't where the head is:** a camera-only lean sees guards who can't see the player's head.
+  - **Mantles and dismounts** are checked once, so anything that moves in afterwards clips.
+- **The target, in the bench's metrics:**
+  - **Zero broken promises** over the weekly fuzz run (40 hours of play), with bots that lean into walls, mantle into moving guards and turn prone between walls. Every pose of every motor mode is checked every tick.
+  - **Prone:** zero pose-ticks with any part of the body's shape inside something solid, under the fuzzing bot and in a scripted turn between walls 1 m apart; the worst overlap stays under the watch's 0.1 mm.
+  - **Lean:** the eye is the centre of the head guards target, so a line from the player's eye to a guard's head and the line back agree, bit for bit, over 2,000 sampled lean poses at corners.
+  - **Mantle:** zero ticks inside a guard who walks into the landing, where the validated-once seed runs through him.
+  - **Surface tags:** zero cells whose tag differs from their drawn material.
+  - **Trials (C8):** A's protocol and pass mark, 80% balanced accuracy over two sittings, with accuracy reported by the factor that flips each outcome: surface, gait, distance, masking, light.
+
 **Milestones:**
 - [ ] C1 · The lab scene: the course grown into an arena with:
   - lit and shaded ground, and every surface;
