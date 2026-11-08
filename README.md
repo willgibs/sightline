@@ -4,7 +4,7 @@ A first-person stealth-sniper game for the browser. Each mission is a freshly ge
 
 It's early, and wireframe on purpose. The rule is to prove the core with plain shapes first: if a mission isn't tense with capsules and boxes, more content won't save it. Art comes after that.
 
-**[Play the latest build](https://sightline-brown.vercel.app)** in a desktop browser with a mouse and keyboard. It's whatever is on `main`: a walkable valley with a test camp and both views, not yet a mission.
+**[Play the latest build](https://sightline-brown.vercel.app)** in a desktop browser with a mouse and keyboard. It's whatever is on `main`: a walkable valley with a test camp and both views, not yet a mission. The labs are playable too: **[the shooting range](https://sightline-brown.vercel.app/?scene=shooting-range)** has 15 rounds and guards walking at 100–500 m.
 
 ![A valley overlook in the honest view, with the camp below](docs/images/overlook.png)
 
@@ -57,10 +57,22 @@ That's the typecheck and every test. The tests that need a real browser run with
 | C | Crouch (toggle) |
 | Z | Prone (toggle) |
 | Right mouse or F (hold) | Zoom |
-| Left mouse | A test shot, drawn in the debug view (the rifle comes with lab B) |
+| Left mouse | Fire the rifle on the shooting range. In the valley, a test shot drawn in the debug view (the rifle reaches the valley in Phase 2) |
 | M | Mark this moment (it shows on the replay's timeline) |
 | F3 or \` | Switch between the honest view and the debug view |
 | Esc | Pause; the pause screen holds the settings |
+
+On the shooting range:
+
+| Key | Action |
+| --- | --- |
+| Right mouse (hold) or V (toggle) | The scope |
+| F (hold), then left mouse | Binoculars: click to read the range |
+| ↑ ↓ | Dial the zero |
+| Shift, while scoped | Hold your breath |
+| T | Suppressor on or off |
+| X | Throw a stone |
+| H | Change what the instruments show: arcade, realistic-lite or simulation |
 
 In the debug view only:
 
@@ -72,6 +84,7 @@ In the debug view only:
 | N | Fly camera (Space or E up, Q down, Shift fast) |
 | [ and ] | Slow down or speed up time (0.25× to 8×) |
 | R | Restart the run |
+| J | Drop a shot where you look, rifle or not |
 
 While watching a replay:
 
@@ -147,10 +160,10 @@ src/sim/               the simulation: pure TypeScript, no rendering, no DOM, de
     *.ts               the state tree, the tick and its declared access, events and commands,
                        input, the environment and sound, the scene harness, the kernel alone
   generation/          lane: the valley, sites, the camp, routines, analysis and validation
-  body/                lane: the shared motor every body moves with, body shapes, the head bob
+  body/                lane: the shared motor every body moves with, body shapes, the head bob, vitals
   perception/          lane: sight, hearing, percepts and beliefs, the awareness ladder
   brain/               lane: brains, behind the perception boundary (a guard knows only his mind)
-  ballistics/          lane: empty until lab B
+  ballistics/          lane: one ballistic function, aim and holds, bullets, the rifle, sway, the thrown stone
   game/                Sightline: the player and guards, its systems, setup, scenes, bots, self-test
 src/render/            three.js wireframe renderer; reads snapshots, never writes
 src/audio/             the sound engine and its voices
