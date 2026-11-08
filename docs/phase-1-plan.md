@@ -808,9 +808,9 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - Floors on decay, so posture stays up.
   - Memory of incidents, such as a perch with casualties.
   - Bodies in the open push guards off exposed sightlines.
-- [ ] E10 · Minimal combat.
-  - Guards engage, take cover and call support.
-  - The player's health is two or three hits, and the player can die.
+- [x] E10 · Minimal combat (`game/combat.ts`, the `engage` and `cover` acts).
+  - Guards engage, take cover and call support, with lab B's bullets and sounds.
+  - The player's health is two or three hits (`tuning.brain.combat`), and the player can die (`game/combat.ts`, `campRules`).
   - Phase 2 only joins labs, so this is built here.
 - [ ] E11 · Sandbox body drops.
 - [ ] E12 · The scenarios and the baselines (see Exit tests).

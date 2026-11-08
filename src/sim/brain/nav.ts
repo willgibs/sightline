@@ -1,6 +1,8 @@
 import type { Tuning } from '../../config/tuning';
 import { Blocks, footprintContains, type Collider } from '../kernel/world/colliders';
 import { Cell, cellIndex, type GridLayer } from '../kernel/world/grid';
+import { sightLine, type QueryView } from '../kernel/world/query';
+import { Solids } from '../kernel/world/solids';
 import { COST_PER_METRE, GridSearch, type MoveCost, type SearchOptions } from '../kernel/world/search';
 import type { World } from '../kernel/world/world';
 
@@ -60,6 +62,8 @@ export class Navigator {
   private readonly mapCells: number[] = [];
   private readonly raw: number[] = [];
   private readonly ids: number[] = [];
+  /** The static world, as a view for sight lines: no bodies, no entities' shapes. */
+  private readonly view: QueryView;
 
   constructor(
     private readonly world: World,
@@ -67,6 +71,7 @@ export class Navigator {
   ) {
     this.site = new GridSearch(world.grid.site);
     this.map = new GridSearch(world.grid.map);
+    this.view = { world, solids: new Solids(world.colliders), bodies: [] };
   }
 
   setTuning(tuning: Tuning): void {
@@ -238,6 +243,22 @@ export class Navigator {
       if (best >= 0) return best;
     }
     return -1;
+  }
+
+  /** True if a body can stand at (x, z). */
+  standable(x: number, z: number): boolean {
+    const site = cellIndex(this.world.grid.site, x, z);
+    if (site >= 0) return (this.world.grid.site.flags[site]! & Cell.Walkable) !== 0;
+    const m = cellIndex(this.world.grid.map, x, z);
+    return m >= 0 && (this.world.grid.map.flags[m]! & Cell.Walkable) !== 0;
+  }
+
+  /** True if something solid breaks the line from (ax, az) to (bx, bz) at height `h` above the ground, at both ends. */
+  blockedFrom(ax: number, az: number, bx: number, bz: number, h: number): boolean {
+    const w = this.world;
+    const ay = w.terrain.heightAt(ax, az) + h;
+    const by = w.terrain.heightAt(bx, bz) + h;
+    return !sightLine(this.view, ax, ay, az, bx, by, bz, Blocks.Sight);
   }
 
   /**

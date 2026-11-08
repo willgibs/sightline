@@ -84,6 +84,7 @@ function events(): { sim: Simulation; all: SimEvent[]; valley: number; range: Si
     { type: 'order', id: 0, tick, t: tick / 30, source: guard, cause: 1, to: guard, task: 'search', x: 1, z: -2 },
     { type: 'level', id: 0, tick, t: tick / 30, source: guard, cause: 1, from: 'calm', to: 'uneasy' },
     { type: 'checkin', id: 0, tick, t: tick / 30, source: guard, cause: 1, post: 2, stage: 'call' },
+    { type: 'hurt', id: 0, tick, t: tick / 30, source: guard, cause: 1, part: 'torso', hits: 1 },
   ];
   perceived.forEach((e) => all.push({ ...e, id: all.length + 1 }));
   const valley = all.length;

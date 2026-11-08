@@ -4,6 +4,7 @@ import { dcos, dsin } from '../kernel/core/detmath';
 import { scheduleSystem, type Access, type ScheduleHandler, type System, type TickContext } from '../kernel/systems';
 import { player } from './entities';
 import { drawBrain } from './brains';
+import { guardFire } from './combat';
 import { checkinDeadline, checkinReply, orderDeliver, radioDeliver, speak } from './comms';
 import { think } from './guards';
 import { playerIntent } from './player';
@@ -101,8 +102,8 @@ const guardBrains: System = {
   name: 'guard-brains',
   phase: 'decide',
   reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.senses', 'guard.brain'],
-  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'schedule'],
-  emits: ['act', 'call'],
+  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'schedule', 'entities', 'bullet.bullet'],
+  emits: ['act', 'call', 'shot', 'report'],
   run(ctx) {
     const nav = navAllowance(ctx);
     for (const g of ctx.index.of('guard')) {
@@ -111,6 +112,10 @@ const guardBrains: System = {
         g.brain!.event = ctx.emit({ type: 'act', source: g.id, cause: change.cause, from: change.from, to: change.to, why: change.why, x: change.x, z: change.z, weight: change.weight });
       }
       if (g.brain) {
+        if (g.brain.fire) {
+          guardFire(ctx, g, g.brain.fire);
+          g.brain.fire = null;
+        }
         speak(ctx, g);
         ctx.debug((draw) => drawBrain(draw, ctx, g));
       }

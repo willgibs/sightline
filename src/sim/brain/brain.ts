@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import { DEG, dsin } from '../kernel/core/detmath';
+import { DEG, dcos, dsin } from '../kernel/core/detmath';
 import { turnTowards, wrapAngle, yawFromDirection } from '../kernel/core/math';
 import type { AwarenessName } from '../kernel/events';
 import { routinePose, type RoutinePose } from '../generation';
@@ -28,7 +28,7 @@ import { choose, response, type Option } from './utility';
  * percept, an awareness, a belief.
  */
 
-export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task'] as const;
+export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover'] as const;
 export type ActName = (typeof ACTS)[number];
 
 /** Why a guard changed what he's doing: A's reasons for a change of state, and the brain's own. */
@@ -93,6 +93,12 @@ export interface BrainState {
   toldHeard: number;
   /** The order he's been given (E5), once it has reached him. */
   task: Tasking | null;
+  /** Combat (E10): the next tick he may fire, his aim for this tick's shot if any, and the cover he's using. */
+  fireAt: number;
+  fire: { x: number; y: number; z: number } | null;
+  coverX: number;
+  coverZ: number;
+  covered: boolean;
 }
 
 /** An order as it reached a guard: what to do, where, when it was given, and the event behind it. */
@@ -132,6 +138,11 @@ export function createBrain(): BrainState {
     say: null,
     toldHeard: -1,
     task: null,
+    fireAt: -1,
+    fire: null,
+    coverX: 0,
+    coverZ: 0,
+    covered: false,
   };
 }
 
@@ -332,10 +343,14 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
         out.push({ act: 'search', rank: 4, weight: role.search * (0.25 + 0.75 * fresh) * cool('search') });
       }
       break;
-    case 'combat':
+    case 'combat': {
+      const sees = seesTarget(m);
       out.push({ act: 'report', rank: 5, weight: callable > 0 ? 1 : 0 });
-      out.push({ act: 'hold', rank: 5, weight: 0.5 });
+      out.push({ act: 'engage', rank: 5, weight: sees ? role.fight : 0 });
+      out.push({ act: 'cover', rank: 5, weight: sees || elevated ? 0 : role.fight });
+      out.push({ act: 'hold', rank: 5, weight: 0.25 });
       break;
+    }
   }
 }
 
@@ -374,6 +389,12 @@ function perform(m: GuardMind, out: Order): void {
       break;
     case 'task':
       performTask(m, out);
+      break;
+    case 'engage':
+      performEngage(m, out);
+      break;
+    case 'cover':
+      performCover(m, out);
       break;
   }
 }
@@ -530,6 +551,81 @@ function performTask(m: GuardMind, out: Order): void {
     b.done = true;
     stand(m, out, false);
   }
+}
+
+/** Whether he can see his target now: a sight percept fresh enough to shoot at. */
+function seesTarget(m: GuardMind): boolean {
+  const within = Math.round(m.tuning.brain.combat.seenFor * m.tuning.sim.tickHz);
+  for (const p of m.percepts) if (p.kind === 'sight' && m.tick - p.tick <= within) return true;
+  return false;
+}
+
+/** Stands and shoots at where he sees his target: a shot every little while. */
+function performEngage(m: GuardMind, out: Order): void {
+  const b = m.brain!;
+  const C = m.tuning.brain.combat;
+  const hz = m.tuning.sim.tickHz;
+  stand(m, out, false);
+  if (b.fireAt < 0) b.fireAt = m.tick + Math.round(C.react * hz);
+  if (m.tick >= b.fireAt && seesTarget(m)) {
+    const f = m.belief ?? focusOf3(m);
+    b.fire = { x: f.x, y: f.y, z: f.z };
+    b.fireAt = m.tick + Math.round(C.every * hz);
+  }
+}
+
+function focusOf3(m: GuardMind): { x: number; y: number; z: number } {
+  const a = m.awareness;
+  return { x: a.fx, y: a.fy, z: a.fz };
+}
+
+/** Moves to the nearest spot that breaks the line from the threat, and holds it, watching. */
+function performCover(m: GuardMind, out: Order): void {
+  const b = m.brain!;
+  const C = m.tuning.brain.combat;
+  if (!b.covered) {
+    const threat = focusOf(m);
+    const spot = findCover(m, threat.x, threat.z);
+    b.covered = true;
+    b.coverX = spot.x;
+    b.coverZ = spot.z;
+    b.routed = -1;
+  }
+  const w = walk(m, out, b.coverX, b.coverZ, m.tuning.brain.paces.run, 'sprint', b.x, b.z);
+  if (w === 'arrived' || w === 'stuck') {
+    stand(m, out, false);
+    if ((m.tick - b.since) / m.tuning.sim.tickHz > C.holdAfter) b.done = true;
+  }
+}
+
+/** The nearest spot around him where the line from the threat, at chest height, is broken by something solid. */
+function findCover(m: GuardMind, tx: number, tz: number): { x: number; z: number } {
+  const C = m.tuning.brain.combat;
+  const self = m.self;
+  const nav = navigatorOf(m.world, m.tuning);
+  let best = { x: self.x, z: self.z };
+  let bestD = Infinity;
+  for (let ring = 1; ring <= C.coverRings; ring++) {
+    const r = (C.coverRange * ring) / C.coverRings;
+    for (let k = 0; k < C.coverPoints; k++) {
+      const a = (2 * Math.PI * k) / C.coverPoints;
+      const x = self.x + r * dcos(a);
+      const z = self.z + r * dsin(a);
+      if (!nav.standable(x, z)) continue;
+      const toThreatX = tx - x;
+      const toThreatZ = tz - z;
+      // Further from the threat than where he stands, or not much closer.
+      const nearer = Math.sqrt(toThreatX * toThreatX + toThreatZ * toThreatZ) - Math.sqrt((tx - self.x) * (tx - self.x) + (tz - self.z) * (tz - self.z));
+      if (nearer < -2) continue;
+      if (!nav.blockedFrom(tx, tz, x, z, C.chest)) continue;
+      const d = (x - self.x) * (x - self.x) + (z - self.z) * (z - self.z) + (nearer < 0 ? 4 : 0);
+      if (d < bestD) {
+        bestD = d;
+        best = { x, z };
+      }
+    }
+  }
+  return best;
 }
 
 function performInvestigate(m: GuardMind, out: Order): void {

@@ -281,15 +281,30 @@ export const defaultTuning = {
     cooldown: { investigate: 2.5, search: 2 },
     search: { points: 3, radius: 7, growth: 0.35 },
     taskWeight: 0.9, // how strongly he weighs an order against what his own senses tell him
+    // Minimal combat (E10): guards engage, take cover and call support; the player can be hit and die.
+    combat: {
+      seenFor: 0.7, // seconds a sighting stays good enough to shoot at
+      react: 0.6, // seconds from seeing to the first shot
+      every: 1.1, // seconds between shots
+      spreadDeg: 1.1, // his aim's error radius, degrees, from his own stream
+      playerHits: 3, // hits the player can take
+      damage: { head: 2, torso: 1, legs: 1 }, // what each part counts as
+      coverRange: 12, // metres he looks for cover within
+      coverRings: 4, // rings of candidate spots, out to coverRange
+      coverPoints: 12, // spots per ring
+      coverAfter: 2.5, // seconds without a sight of the target before he looks for cover
+      holdAfter: 6, // seconds he holds cover without seeing anything before moving up
+      chest: 1.2, // height of the line he has to break
+    },
     roles: {
       // What each role is willing to do (0 never, 1 fully): the role column of the design doc's table.
-      sentry: { investigate: 0.65, search: 0.75, flank: 0.6, report: 0.8 },
-      patrol: { investigate: 1, search: 1, flank: 0.85, report: 0.8 },
-      marksman: { investigate: 0, search: 0, flank: 0, report: 1 },
-      'radio-operator': { investigate: 0.1, search: 0.1, flank: 0, report: 1 },
-      officer: { investigate: 0.7, search: 0.8, flank: 0.3, report: 1 },
-      worker: { investigate: 0.25, search: 0, flank: 0, report: 0.6 },
-      target: { investigate: 0, search: 0, flank: 0, report: 0 },
+      sentry: { investigate: 0.65, search: 0.75, flank: 0.6, report: 0.8, fight: 0.8 },
+      patrol: { investigate: 1, search: 1, flank: 0.85, report: 0.8, fight: 1 },
+      marksman: { investigate: 0, search: 0, flank: 0, report: 1, fight: 1 },
+      'radio-operator': { investigate: 0.1, search: 0.1, flank: 0, report: 1, fight: 0.4 },
+      officer: { investigate: 0.7, search: 0.8, flank: 0.3, report: 1, fight: 0.7 },
+      worker: { investigate: 0.25, search: 0, flank: 0, report: 0.6, fight: 0 },
+      target: { investigate: 0, search: 0, flank: 0, report: 0, fight: 0 },
     },
     // Each option's weight multiplies these, each read through its response curve.
     curves: {

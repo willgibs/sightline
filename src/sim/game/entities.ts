@@ -29,6 +29,8 @@ export interface PlayerEntity extends EntityBase {
    */
   rifle?: RifleState;
   vitals?: VitalsState;
+  /** Hits taken, where the run gives the player health (E10): the player can die. */
+  health?: { hits: number };
 }
 
 export interface GuardEntity extends EntityBase {
