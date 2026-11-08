@@ -20,9 +20,9 @@ Written on Nov 7, 2026, at the end of the session that ran the foundation pass, 
 
 ## Getting going in a new session
 
-1. **Get the code.** Claude Code on the web clones the repository for you. The owner's Mac has a copy at `/Users/gibby/local/ai/sightline`, which was still at the first commit when this was written, so run `git pull` there before anything else.
+1. **Get the code.** Claude Code on the web clones the repository for you. A local copy needs a `git pull` before anything else.
 2. **Set up:** run `npm ci`, then `npx playwright install chromium` (skip it where Chromium is already installed), then `npm run check`. The check should pass with 30 test files and 213 tests. `npm run test:browser` runs the tests that need a real browser.
-3. **Open the design doc.** The live doc is the source of truth: [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j). A session that can't open it, because it has no Claude Docs connector, works from the copy in `docs/design-doc.md` (revision 36).
+3. **Open the design doc.** The live doc is the source of truth: [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), which only the owner's account can open. A session that can't open it, because it has no Claude Docs connector, works from the copy in `docs/design-doc.md` (revision 36).
 4. **Look at the game.** `npm run look` saves the honest and debug views to `shots/`. `npm run look -- --scene movement-course` shows the one scene there is so far. The header of `src/headless/look.ts` lists the options. A script that needs more than pictures can drive the game with `openGame()` from `src/headless/browser.ts`.
 
 ## What Phase 1 is
@@ -134,7 +134,7 @@ These were settled when Phase 1 was planned, on Nov 7, 2026. `docs/phase-1-plan.
 
 ## How the repository works
 
-- **Production.** `main` deploys to production at sightline-willgibs.vercel.app. Vercel Authentication is on, so only the owner's Vercel account can open it.
+- **Production.** `main` deploys to production, publicly at sightline-brown.vercel.app, the repository's website link. Vercel Authentication covers sightline-willgibs.vercel.app and the preview deploys, so only the owner's Vercel account can open those.
 - **Branches.** Every other branch gets a preview deploy. `ci.yml` checks pushes to `main` and pull requests, not other branches, so give a lab branch a pull request to have it checked. `engines.yml` runs on `main`, on `ci/**` and on pull requests.
 - **Every change, every platform.** `ci.yml` runs the check on Linux, macOS and Windows for every push and pull request, and compares the 20-minute hash across the three. The repository is public (since Nov 8), so Actions minutes are free.
 - **Weekly runs.** Every Monday, and on demand, `ci.yml` adds the 40-hour fuzz run and the 10-hour synctest run.

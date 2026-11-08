@@ -2,6 +2,18 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · Public
+
+### The repository is public, under MIT
+
+**Decision:**
+- `willgibs/sightline` is public, under the MIT License (`LICENSE`, © 2026 Will Gibson). The license covers the code and the documents, and grants no rights to the name Sightline.
+- It stays the owner's project. `CONTRIBUTING.md` welcomes bug reports, best with a recording, and asks for an issue before any code. The README is written for people who find the repository.
+- Production is public at sightline-brown.vercel.app, the repository's website link, and the README links it. Vercel Authentication covers sightline-willgibs.vercel.app and the previews, not the production domain, so Phase 0's entry below (Version control, CI and a playable link) overstated it.
+- Nothing private is committed. The owner's local path is gone from the handoff, and a link only the owner can open, such as the live design doc, says so and points to the public copy.
+
+**Why:** The owner wants people to be able to read the code and play the build, while the project stays the owner's own. MIT is the simplest, most familiar license for that. Art and sound, when they arrive, can carry their own terms.
+
 ## 2026-11-08 · Lab A: perception and awareness
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
