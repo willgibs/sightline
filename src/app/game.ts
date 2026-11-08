@@ -43,7 +43,7 @@ import { air, windAt } from '../sim/kernel/env';
 import { Optic } from '../sim/kernel/input';
 import { player as playerOf } from '../sim/game/entities';
 import type { RifleView } from '../sim/game/sim';
-import { analyzeShot, describeShot, type ShotReport } from '../sim/game/telemetry';
+import { SHOT_COLUMNS, analyzeShot, shotRow, type ShotReport } from '../sim/game/telemetry';
 
 /**
  * The browser game loop: real time in, fixed simulation ticks out, interpolated frames
@@ -381,11 +381,11 @@ export class Game {
     };
     const when = clock(o.tick / this.tuning.sim.tickHz);
     // A run with rifle shots ends with what decided each (sim/game/telemetry.ts).
-    const shots = this.shotLog.map((s, k) => `${String(k + 1).padStart(2)}  ${describeShot(s.report, s.result, s.hit)}`);
+    const shots = this.shotLog.map((s, k) => shotRow(s.report, s.result, k + 1));
     this.overlay.showMessage(
       'outcome',
       o.status === 'succeeded' ? `Done · ${when}` : `Failed · ${when}`,
-      `${o.reason.charAt(0).toUpperCase()}${o.reason.slice(1)}.${shots.length ? `\n\nEach shot, in mils: what it got wrong, and what it needed.\n${shots.join('\n')}` : ''}`,
+      `${o.reason.charAt(0).toUpperCase()}${o.reason.slice(1)}.${shots.length ? `\n\nWhat decided each shot, in mils (+ is high or right):\n${SHOT_COLUMNS}\n${shots.join('\n')}` : ''}`,
       'Play again',
     );
     this.input.releaseLock();

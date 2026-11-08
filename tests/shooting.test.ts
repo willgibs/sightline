@@ -13,6 +13,7 @@ import { placePlayer } from '../src/sim/game/setup';
 import { arm } from '../src/sim/game/shooting';
 import { SCENES } from '../src/sim/game/scenes';
 import { Simulation } from '../src/sim/game/sim';
+import { SHOT_COLUMNS, describeShot, shotRow, type ShotReport } from '../src/sim/game/telemetry';
 import { sceneOver, sceneTicks, startScene } from '../src/sim/kernel/scene';
 import { SyncTest, describeSyncFailure } from '../src/sim/kernel/synctest';
 
@@ -203,6 +204,35 @@ describe('the throwable', () => {
     };
     throws(3);
     expect(sim.index.of('thrown')).toHaveLength(1);
+  });
+});
+
+describe('what decided each shot', () => {
+  const report = (range: number, rangeError: number, rangeM: number): ShotReport => ({
+    shot: 1,
+    t: 1,
+    target: { id: 4, post: 2, range, walking: true },
+    needed: { drop: 1.8, lead: 1.84, wind: -0.6 },
+    held: { up: 0, right: 0 },
+    sway: { up: 0, right: 0 },
+    errors: { range: rangeError, rangeM, lead: -1.84, wind: 0.04, sway: 0.16 },
+    skipped: 'lead',
+    miss: { up: -0.5, right: -1.8 },
+  });
+
+  it('fits a shot on one line, in the columns of the end screen', () => {
+    const row = shotRow(report(300, -0.42, -30), 'missed, into the grass', 3);
+    expect(row).toBe(' 3  300 m walker  into the grass    −0.42  −1.84  +0.04   0.16');
+    expect(row).toHaveLength(SHOT_COLUMNS.length);
+    const none = shotRow({ ...report(300, 0, 0), target: null }, 'no strike', 12);
+    expect(none).toHaveLength(SHOT_COLUMNS.length);
+    expect(none).toContain('no guard near');
+  });
+
+  it('says a range only where a hold can imply one', () => {
+    expect(describeShot(report(300, -0.42, -30), 'missed, into the grass', false)).toContain('(as if 270 m)');
+    // A hold far too low for the guard: under about 25 m, the drop can't say how far.
+    expect(describeShot(report(507, -6.36, -515), 'missed, into the grass', false)).toContain('(as if point-blank)');
   });
 });
 
