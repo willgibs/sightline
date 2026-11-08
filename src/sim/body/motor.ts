@@ -330,8 +330,18 @@ function driveGround(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorCont
 
   b.sliding = b.standingOn < 0 && sample.slopeTan > tanMax;
   if (b.sliding) {
-    // Gravity along the slope, projected onto the ground plane: g·sinθ·cosθ downhill.
     const s = sample.slopeTan;
+    // Nor may the speed the body arrived with carry it uphill: keep only what goes across
+    // the slope and down it. A body that arrives moving uphill (crawling off a rock onto
+    // ground a hair too steep, or sprinting onto a steep band) would otherwise coast up
+    // and over onto walkable ground; the fuzz run found it in NEM-4083.
+    const up = b.vx * sample.gx + b.vz * sample.gz;
+    if (up > 0) {
+      const k = up / (s * s);
+      b.vx -= sample.gx * k;
+      b.vz -= sample.gz * k;
+    }
+    // Gravity along the slope, projected onto the ground plane: g·sinθ·cosθ downhill.
     const a = (ctx.tuning.sim.gravity * s) / (1 + s * s);
     b.vx -= (sample.gx / s) * a * dt;
     b.vz -= (sample.gz / s) * a * dt;

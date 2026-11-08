@@ -16,7 +16,7 @@ Written on Nov 7, 2026, at the end of the session that ran the foundation pass, 
   - CI runs the check on Linux, macOS and Windows, and a 20-minute run gives the same hash on all three (`e9311dda2ac00379`).
   - A 40-hour fuzz run passed, and Chromium, Firefox, WebKit and Bun all give the golden values.
   - The build is deployed at sightline-willgibs.vercel.app.
-- **Versions:** `SIM_VERSION` 6, `GEN_VERSION` 3, `STATE_SCHEMA` 7 (W0.3), recording format 10 (W0.7).
+- **Versions:** `SIM_VERSION` 7 (Nov 8), `GEN_VERSION` 3, `STATE_SCHEMA` 7 (W0.3), recording format 10 (W0.7).
 
 ## Getting going in a new session
 
