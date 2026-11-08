@@ -14,6 +14,7 @@ import { withSystem, type System } from '../src/sim/kernel/systems';
 import type { World } from '../src/sim/kernel/world/world';
 import { campHeight, campWorld } from '../src/sim/game/scenes/campBrain';
 import { Surface } from '../src/sim/kernel/world/surfaces';
+import { Faction } from '../src/sim/kernel/state';
 import { testGuard, testWorld } from './fixtures';
 
 /**
@@ -429,5 +430,28 @@ describe('counter-sniper (E8)', () => {
     // Sound takes 0.9 s from 300 m; his reaction is telegraphed from then.
     expect(first).toBeGreaterThan(0);
     expect(first).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('bodies (E9)', () => {
+  it('a body a guard finds is reported, and the camp goes on alert', () => {
+    const world = campWorld(T);
+    let systems = SYSTEMS;
+    for (const s of [...PERCEPTION, commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
+    const sim = new Simulation(world, T, systems);
+    placePlayer(sim, 372, 372);
+    giveSenses(sim);
+    giveBrains(sim);
+    giveCommander(sim);
+    // A body lying in the open, in the gate sentry's view (post 0 at (28, 4.5), facing east).
+    sim.spawn((id) => ({ id, kind: 'remains' as const, faction: Faction.Camp, remains: { of: 0, post: -1, x: 40, y: 0, z: 5, yaw: 0, eye: T.bodies.guard.eyeHeight.prone, vx: 0, vz: 0, fell: -10, part: 'torso' as const } }));
+    const raw = neutralInput();
+    const events: SimEvent[] = [];
+    for (let i = 0; i < 30 * 30; i++) for (const e of sim.step(raw)) events.push({ ...e });
+    expect(events.some((e) => e.type === 'spotted' && e.what === 'body')).toBe(true);
+    expect(events.some((e) => e.type === 'radio' && e.kind === 'body')).toBe(true);
+    const camp = commanderOf(sim)!.camp;
+    expect(camp.incidents.some((i) => i.kind === 'body')).toBe(true);
+    expect(['alert', 'lockdown', 'uneasy']).toContain(camp.level);
   });
 });

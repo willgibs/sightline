@@ -64,7 +64,7 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   // The ledger of repeated tricks and the memory of incidents (E9): what the camp learns
   // only from what was reported to it.
   remember(camp, r, tick, tuning);
-  if (r.kind === 'shot') noteShot(camp, r, tick, tuning);
+  if (r.kind === 'shot' && r.sigma !== undefined) noteShot(camp, r, tick, tuning);
   // A post gone quiet is a job for someone: walk over and see (E6).
   if (r.kind === 'missing') {
     const t = addTask(camp, 'check', r.x, r.z, 2, 1, tick);

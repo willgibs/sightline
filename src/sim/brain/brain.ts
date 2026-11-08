@@ -33,7 +33,7 @@ export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold
 export type ActName = (typeof ACTS)[number];
 
 /** Why a guard changed what he's doing: A's reasons for a change of state, and the brain's own. */
-export const ACT_WHYS = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered'] as const;
+export const ACT_WHYS = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered', 'body', 'glint'] as const;
 export type ActWhy = (typeof ACT_WHYS)[number];
 
 /** A change of what a guard is doing, for its system to emit as an 'act' event. */
@@ -277,7 +277,7 @@ function perceptWhy(m: GuardMind): ActWhy {
   for (const p of m.percepts) {
     if (p.tick < tick) continue;
     tick = p.tick;
-    why = p.kind === 'sight' ? 'seen' : p.kind === 'shot' ? 'shot' : p.kind === 'voice' ? 'voice' : 'heard';
+    why = p.kind === 'sight' ? 'seen' : p.kind === 'shot' ? 'shot' : p.kind === 'voice' ? 'voice' : p.kind === 'body' ? 'body' : p.kind === 'glint' ? 'glint' : 'heard';
   }
   return why;
 }
@@ -613,18 +613,21 @@ function currentReport(m: GuardMind): Report {
   let rank = -1;
   let own: Percept | null = null;
   for (const p of m.percepts) {
-    const r = p.kind === 'shot' ? 3 : p.kind === 'sight' ? 2 : p.kind === 'sound' ? 1 : 0;
+    // A body beats a shot, a muzzle's report beats a crack or a strike, and a voice says the least.
+    const r = p.kind === 'body' ? 6 : p.kind === 'shot' ? (p.sound === 'report' ? 5 : p.sound === 'crack' ? 4 : 3) : p.kind === 'sight' ? 2 : p.kind === 'sound' || p.kind === 'glint' ? 1 : 0;
     if (r <= rank) continue;
     rank = r;
     own = p;
-    kind = p.kind === 'sight' ? 'contact' : p.kind === 'shot' ? 'shot' : 'heard';
+    kind = p.kind === 'body' ? 'body' : p.kind === 'sight' ? 'contact' : p.kind === 'shot' ? 'shot' : 'heard';
   }
   const f = own && rank > 0 ? own : focusOf(m);
   const y = own && rank > 0 ? own.y : m.belief ? m.belief.y : a.focus ? a.fy : m.self.y;
   const base = own && rank > 0 ? own.radius : m.belief ? m.belief.radius : C.radius[kind];
   const radius = Math.max(base, C.radius[kind]);
   const out: Report = { kind, x: f.x, y, z: f.z, radius, tick: m.tick, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: own?.cause ?? perceptCause(m) };
-  if (kind === 'shot') bearingError(m, out);
+  // A bearing comes from a report at the muzzle; a crack points the wrong way and says so.
+  if (kind === 'shot' && own?.sound === 'report') bearingError(m, out, false);
+  else if (kind === 'shot' && own?.sound === 'crack') bearingError(m, out, true);
   return out;
 }
 
@@ -632,12 +635,18 @@ function currentReport(m: GuardMind): Report {
  * A bearing by ear (E8): where it seemed to come from, turned by an error drawn from
  * his own stream, and the error he states: both the ear's and what he's unsure of.
  */
-function bearingError(m: GuardMind, r: Report): void {
+function bearingError(m: GuardMind, r: Report, crack: boolean): void {
   const S = m.tuning.brain.sniper;
   const dx = r.x - r.fromX;
   const dz = r.z - r.fromZ;
   const d = Math.sqrt(dx * dx + dz * dz);
   if (d < 1) return;
+  // A crack comes from where the shock left the bullet, not from the shooter: a guard says
+  // as much, by how unsure he is of it, and the commander weighs it accordingly.
+  if (crack) {
+    r.sigma = (S.maxSigmaDeg * Math.PI) / 180;
+    return;
+  }
   const ear = (S.earSigmaDeg * Math.PI) / 180;
   const err = ear * gaussian(m.draw);
   const c = dcos(err);
