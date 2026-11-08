@@ -2,7 +2,7 @@ import { Surface } from '../../kernel/world/surfaces';
 import type { System } from '../../kernel/systems';
 import { WaypointDriver, type Waypoint } from '../bots/waypoints';
 import { campRules } from '../combat';
-import { campCheckins, campCommander, commanderOf, commsVoice, giveCommander, giveDevices } from '../comms';
+import { campCheckins, campCommander, commanderOf, commsVoice, giveCommander, giveDevices, giveObjective } from '../comms';
 import { MarksmanDriver, type Step } from '../bots/marksman';
 import type { InputFrame } from '../../kernel/input';
 import { giveBrains } from '../brains';
@@ -25,13 +25,15 @@ import { CAMP, campWorld } from './campBrain';
  *                       searches and settles again, ended by belief, in 30–45 s.
  *           alarm       a sentry sees the player and runs for the alarm box; a scripted
  *                       marksman drops him on the way: the alarm never sounds.
+ *           escape      nobody stops him: the siren sounds, the target runs for his
+ *                       truck and gets there, and the mission is lost.
  *   seed    which variant of the script's place and timing (a small fixed table)
  *
  * The scenario "overlook" joins them with E12.
  */
 
 export interface CampScenarioParams {
-  script: 'suspicion' | 'search' | 'alarm';
+  script: 'suspicion' | 'search' | 'alarm' | 'escape';
   seed: number;
 }
 
@@ -46,7 +48,7 @@ export function parseCampScenario(text: string | undefined): CampScenarioParams 
     const key = at < 0 ? part : part.slice(0, at);
     const v = at < 0 ? '' : part.slice(at + 1);
     if (key === 'script') {
-      if (v !== 'suspicion' && v !== 'search' && v !== 'alarm') throw new Error(`Camp scenario: script must be suspicion, search or alarm; got '${v}'`);
+      if (v !== 'suspicion' && v !== 'search' && v !== 'alarm' && v !== 'escape') throw new Error(`Camp scenario: script must be suspicion, search, alarm or escape; got '${v}'`);
       p.script = v;
     } else if (key === 'seed') {
       const n = Number(v);
@@ -197,6 +199,58 @@ export function campScenario(params?: string): Scene {
       ],
     };
   }
+  if (p.script === 'escape') {
+    // The gate sentry, an operator and the target: this time nobody stops the sentry.
+    const seen = { sirenAt: -1, fledAt: -1 };
+    return {
+      name,
+      version: 1,
+      params: canonical,
+      title: 'Camp: the alarm sounds, and the target runs',
+      description: 'The gate sentry sees you and reaches the alarm box. The siren goes, the target runs for his truck, and if he gets there the mission is lost.',
+      game: SIGHTLINE,
+      world: (tuning) => {
+        const w = campWorld(tuning);
+        return { ...w, camp: { ...w.camp, guards: [w.camp.guards[0]!, w.camp.guards[5]!, w.camp.guards[8]!] } };
+      },
+      systems: tuningSystems,
+      setup: (sim) => {
+        placePlayer(sim, 62, 8, -1, 0);
+        giveSenses(sim);
+        giveBrains(sim);
+        giveCommander(sim);
+        giveDevices(sim, [CAMP.alarm], CAMP.escape);
+        giveObjective(sim, sim.guards.find((g) => sim.world.camp.guards[g.guard.spawn]!.role === 'target')!.id);
+        // Armed, but without health: this script is about the target, so the sentry's shots don't end it first.
+        arm(player(sim.index), sim.tuning);
+      },
+      driver: () => new WaypointDriver([]),
+      seconds: 45,
+      expect: [
+        {
+          name: 'the sentry reaches the box, and the siren sounds',
+          during: (_sim, events) => {
+            for (const e of events) if (e.type === 'siren') seen.sirenAt = e.t;
+          },
+          after: () => (seen.sirenAt < 0 ? 'the siren never sounded' : undefined),
+        },
+        {
+          name: 'the target hears it and runs for his truck',
+          during: (_sim, events) => {
+            for (const e of events) if (e.type === 'act' && e.to === 'flee') seen.fledAt = e.t;
+          },
+          after: () => (seen.fledAt < 0 ? 'he never ran' : seen.fledAt < seen.sirenAt ? 'he ran before the siren' : undefined),
+        },
+        {
+          name: 'he gets away, and the mission is lost',
+          after: (sim) => {
+            if (commanderOf(sim)!.camp.objective!.status !== 'escaped') return `the objective is ${commanderOf(sim)!.camp.objective!.status}`;
+            if (sim.state.outcome.status !== 'failed') return `the run is ${sim.state.outcome.status}`;
+          },
+        },
+      ],
+    };
+  }
   // A search, evaded.
   const hide = HIDES[p.seed % HIDES.length]!;
   const route: Waypoint[] = [
@@ -284,4 +338,4 @@ class InterruptDriver {
   }
 }
 
-export const CAMP_SCENARIOS: readonly string[] = ['script=suspicion&seed=0', 'script=suspicion&seed=1', 'script=search&seed=0', 'script=search&seed=1', 'script=alarm&seed=0'];
+export const CAMP_SCENARIOS: readonly string[] = ['script=suspicion&seed=0', 'script=suspicion&seed=1', 'script=search&seed=0', 'script=search&seed=1', 'script=alarm&seed=0', 'script=escape&seed=0'];

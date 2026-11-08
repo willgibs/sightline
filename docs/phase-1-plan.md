@@ -775,7 +775,7 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - A\*, with fixed tie-breaks and an iteration budget; paths string-pulled and followed through the motor.
   - Stepping around a cornered player: a stalled walk sidesteps by a fixed rule (own-body information only), comes back to its route, and tells the brain when it can't.
   - Ladder links (C5): waiting on lab C's ladders.
-- [x] E2 · The lab scene (`?scene=camp-brain`): 8 guards in the design doc's roles, an alarm box, a radio and a generator, in a handmade camp until D4–D6 are on `main`.
+- [x] E2 · The lab scene (`?scene=camp-brain`): 8 guards in the design doc's roles and the target, an alarm box, a radio, a generator and a truck, in a handmade camp until D4–D6 are on `main`.
 - [x] E3 · The brain (`brain/brain.ts`, `brain/utility.ts`, the `act` event).
   - A prioritized machine of awareness states.
   - Inside each state, actions (investigate, call it in, take cover, flank, search) are scored by multiplied 0–1 considerations through response curves, with cooldowns against dithering.
@@ -797,7 +797,7 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - Done (`game/comms.ts`, `brain/brain.ts`, stand-in boxes until D's devices land): after the reaction window, a guard runs 4–8 s to an alarm box, a journey through the motor; lockdown is set only by the box changing state; dropping him or cutting the power interrupts it.
   - The core's sabotage, by default: hold the use key at arm's length to switch off the generator or cut the radio. Whoever passes or needs it notices the outage. The sabotage kit is Phase 3's.
   - At lockdown, the target runs for the vehicle when he hears the siren (`flee`); reaching it loses the mission, and dropping him first wins it. The drive away needs bodies to ride moving solids (with C).
-- [ ] E8 · Counter-sniper and reinforcements. Done so far: triangulation with a calibrated ellipse (`brain/triangulate.ts`), marksmen sweeping the estimate, a visible reaction inside 2 s, reinforcements at lockdown (a squad on foot until D's trucks land). Still to wire with #8: real shot and crack percepts.
+- [ ] E8 · Counter-sniper and reinforcements. Done so far: triangulation from real shot and crack percepts, with a calibrated ellipse (`brain/triangulate.ts`), marksmen sweeping the estimate and following newer fixes, a visible reaction inside 2 s, guards under fire taking cover, reinforcements at lockdown (a squad on foot until D's trucks land). Still to come: marksmen moving to overlooking posts (D's perches).
   - **Honest triangulation:**
     - every guard who heard the report or the crack forms a bearing, with error from his own stream;
     - reports reach the commander by voice or radio;
@@ -818,7 +818,7 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - The player's health is two or three hits (`tuning.brain.combat`), and the player can die (`game/combat.ts`, `campRules`).
   - Phase 2 only joins labs, so this is built here.
 - [x] E11 · Sandbox body drops: L in the debug view drops a body where the player looks (lab A's A9/A10 sandbox); the camp finds it as it would any body (`tests/commander.test.ts`).
-- [ ] E12 · The scenarios and the baselines (see Exit tests). Done so far: the scenario family `camp-scenario` (suspicion, search, alarm), the search-cycle and calibration benches (the ellipse contains the perch 36% and 92% of the time in the world, against a 39/86 target), and the honest brain against Xu and Verbrugge's baselines (`game/baselines.ts`, pinned in the bench). "One overlook doesn't clear the camp" waits for lab D's validated camps.
+- [ ] E12 · The scenarios and the baselines (see Exit tests). Done so far: the scenario family `camp-scenario` (suspicion, search, alarm, escape), the search-cycle and calibration benches, the relocation metric, and the honest brain against Xu and Verbrugge's baselines (`game/baselines.ts`, pinned in the bench). "One overlook doesn't clear the camp" waits for lab D's validated camps.
 - [ ] Exit test, the bench numbers, a note, a playable link.
 
 ### Gate · Labs pass

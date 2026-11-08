@@ -32,6 +32,8 @@ export const POLICIES: readonly Policy[] = ['honest', 'random', 'plain', 'stalen
 /** Runs one pursuit: returns the tick the intruder was re-found, or −1 within `seconds`. */
 export function pursuit(policy: Policy, seed: number, tuning: Tuning, seconds = 60): number {
   const world = campWorld(tuning);
+  // Every guard's own streams start from the world's seed: a pursuit's seed varies those too.
+  world.seed = `${world.seed}/pursuit${seed}`;
   const rng = new Rng('pursuit', String(seed));
   // The last known position: 70 m or so out from the camp's east side.
   const lkp = { x: 70 + rng.range(0, 25), z: rng.range(-30, 30) };

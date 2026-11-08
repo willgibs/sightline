@@ -30,6 +30,24 @@ The camp brain is built on the plan's defaults (`docs/phase-1-plan.md`, E) and r
 
 **Why:** Least squares says nothing useful about a lone bearing and is badly overconfident for the long, banana-shaped posteriors a clustered camp makes at 300 m. The grid handles both, is exact in every engine, and its cost is the budget (rule 18). A seeded test holds it to the 39% and 86% rates for one to six listeners.
 
+### The in-world calibration bench was measuring one draw of each guard's ear
+
+**Decision:** Each bench shot, and each pursuit, runs with its own world seed, so every guard's streams, and his ear's error, start afresh. The fudge factor that had been tuned against the old measure (`statedScale`, 0.85) is gone: the ellipse states the error each guard really has.
+
+**Why:** Each guard's stream started from the same seed in all hundred shots, so an ear's error was one fixed draw per guard, and the bench's coverage swung from 36% to 61% at one sigma on a change that merely shifted a stream by one draw. Independent draws give 41% and 87% at one and two sigma, on target with no knob.
+
+### The search map reaches 160 m out
+
+**Decision:** The camp's map is still 64 by 64 cells, at 5 m a cell instead of 2.5 m.
+
+**Why:** At 2.5 m the map stopped 80 m from the centre: an intruder who broke contact at 90 m was off the map before the search began, so the hottest cell hugged its edge and searchers stopped short. Coarser cells cost nothing a search can use.
+
+### Competence is measured before pacing
+
+**Decision:** The bench reports the honest brain as it plays (paced, three search slots at alert) and the same brain with every guard free to go.
+
+**Why:** The plan's target is on the brain before the pacing layer throttles it ("Pacing then throttles it deliberately"), and the baselines aren't paced either. Paced, the brain re-finds at about the level of the staleness search, which is the point of pacing. Over 24 runs and 60 s: paced 21, unpaced 23, staleness 21, plain 19, random 5, omniscient 24.
+
 ### Lockdown doesn't lapse; a search below it does
 
 **Decision:** A search ends on belief, as planned, at every level below lockdown. A raised alarm stays raised, so a camp in lockdown keeps hunting and never stands down from it. A guard learns the alarm is up from the siren (`sirenAt` in his brain), and only the box's position is in his mind: he doesn't run for a box he has heard sounding, and the target runs for his vehicle only once he has heard it.

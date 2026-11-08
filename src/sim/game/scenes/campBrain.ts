@@ -8,7 +8,7 @@ import type { FoliageVolume } from '../../perception';
 import { WaypointDriver, type Waypoint } from '../bots/waypoints';
 import { PERCEPTION, giveSenses } from '../perception';
 import { giveBrains } from '../brains';
-import { campCheckins, campCommander, commsVoice, giveCommander, giveDevices } from '../comms';
+import { campCheckins, campCommander, commsVoice, giveCommander, giveDevices, giveObjective } from '../comms';
 import { campRules } from '../combat';
 import { arm } from '../shooting';
 import { player } from '../entities';
@@ -39,6 +39,8 @@ export const CAMP = {
   mast: { x: 20, z: -22 },
   tower: { x: -27, z: -27, deck: 6.25 },
   truck: { x: 19, z: 6 },
+  /** Where the target gets into the truck: beside its cab, on the camp's side. */
+  escape: { x: 19, z: 8.4 },
   spawn: { x: 120, z: 15 },
   /** A ridge to the east-north-east to shoot from, and its crest. */
   ridge: { x: 320, z: -140, height: 34, halfLength: 90, halfWidth: 46 },
@@ -204,7 +206,7 @@ function post(id: number, role: GuardRole, x: number, z: number, faceX: number, 
   return s;
 }
 
-/** The guards: the design doc's roles, eight of them. */
+/** The guards: the design doc's roles, eight of them, and the target, who walks the yard. */
 function guards(tuning: Tuning): GuardSpawn[] {
   const H = 24;
   const loop = [
@@ -223,6 +225,11 @@ function guards(tuning: Tuning): GuardSpawn[] {
     { x: 8, z: -7 },
     { x: -2, z: -6 },
   ];
+  const yard = [
+    { x: -15, z: 11 },
+    { x: -6, z: 20 },
+    { x: 5, z: 22 },
+  ];
   return [
     post(0, 'sentry', 28, 4.5, 1, 0, tuning, { scanPhase: 0.2 }),
     post(1, 'sentry', -1, -28, 0, -1, tuning, { scanPhase: 0.7 }),
@@ -232,6 +239,7 @@ function guards(tuning: Tuning): GuardSpawn[] {
     post(5, 'radio-operator', CAMP.radio.x, CAMP.radio.z, 0, 1, tuning, { scanScale: 0.3 }),
     post(6, 'officer', rounds[0]!.x, rounds[0]!.z, 1, 0, tuning, { route: rounds, routeStart: 1, scanPhase: 0.4 }),
     post(7, 'worker', chores[0]!.x, chores[0]!.z, 1, 0, tuning, { route: chores, routeStart: 1, scanScale: 0.4 }),
+    post(8, 'target', yard[0]!.x, yard[0]!.z, 1, 0, tuning, { route: yard, routeStart: 1, scanScale: 0.4, scanPhase: 0.15 }),
   ];
 }
 
@@ -267,7 +275,7 @@ export function campBrain(): Scene {
     name: NAME,
     version: 1,
     title: 'Camp brain',
-    description: 'A compound with eight guards in the design doc roles: sentries, a patrol pair, a marksman, a radio operator, an officer and a worker.',
+    description: 'A compound with the guards in the design doc roles: sentries, a patrol pair, a marksman, a radio operator, an officer and a worker, and a target to shoot. If the alarm sounds, he runs for the truck.',
     game: SIGHTLINE,
     world: campWorld,
     systems: [...PERCEPTION, commsVoice, campCommander, campCheckins, campRules],
@@ -275,7 +283,9 @@ export function campBrain(): Scene {
       giveSenses(sim);
       giveBrains(sim);
       giveCommander(sim);
-      giveDevices(sim, [CAMP.alarm]);
+      giveDevices(sim, [CAMP.alarm], CAMP.escape);
+      const target = sim.guards.find((g) => sim.world.camp.guards[g.guard.spawn]!.role === 'target');
+      if (target) giveObjective(sim, target.id);
       const p = player(sim.index);
       arm(p, sim.tuning);
       p.health = { hits: 0 };

@@ -204,19 +204,57 @@ function brainMetrics(): Record<string, number> {
   }
   m['ellipse: contains the shooter at 1 sigma (%)'] = round((100 * in1) / N);
   m['ellipse: contains the shooter at 2 sigma (%)'] = round((100 * in2) / N);
+  // Relocation emerges (E8): after a shot at 300 m heard at ±5°, how often a move of 26–30 m
+  // puts the shooter outside what the camp believes, with no meter anywhere.
+  const moved = new Rng('BENCH-E', 'relocation');
+  let across = 0;
+  let any = 0;
+  for (let k = 0; k < N; k++) {
+    const a = moved.range(0, 2 * Math.PI);
+    const sx = 300 * dcos(a);
+    const sz = 300 * dsin(a);
+    const bs: Bearing[] = [];
+    for (let i = 0; i < 2 + (k % 5); i++) {
+      const x = moved.range(-30, 30);
+      const z = moved.range(-30, 30);
+      const dx = sx - x;
+      const dz = sz - z;
+      const d = Math.sqrt(dx * dx + dz * dz);
+      const err = sigma * Math.sqrt(-2 * dlog(Math.max(1e-12, moved.next()))) * dcos(2 * Math.PI * moved.next());
+      const c = dcos(err);
+      const sn = dsin(err);
+      bs.push({ x, z, ux: (dx / d) * c - (dz / d) * sn, uz: (dx / d) * sn + (dz / d) * c, sigma });
+    }
+    fuseBearings(bs, grid, est);
+    const step = moved.range(26, 30);
+    const side = moved.next() < 0.5 ? 1 : -1;
+    // Across the line of fire, as someone moving off it would; and in any direction at all.
+    if (!inEllipse(est, sx - dsin(a) * step * side, sz + dcos(a) * step * side, 2)) across++;
+    const b = moved.range(0, 2 * Math.PI);
+    if (!inEllipse(est, sx + step * dcos(b), sz + step * dsin(b), 2)) any++;
+  }
+  m['relocation: 26–30 m across the line of fire, outside 2 sigma (%)'] = round((100 * across) / N);
+  m['relocation: 26–30 m in any direction, outside 2 sigma (%)'] = round((100 * any) / N);
   // The same, in the world: guards hear real shots and radio their bearings, the commander fuses them.
   const world = inWorldCalibration(T, 100);
   m['ellipse in the world: contains the perch at 1 sigma (%)'] = world.one;
   m['ellipse in the world: contains the perch at 2 sigma (%)'] = world.two;
   m['ellipse in the world: mean bearings fused per shot'] = world.bearings;
   // Competence against the baselines: re-finding an intruder who has broken contact.
-  const horizon = 25;
-  const seeds = 8;
+  // The window is pursuit's own: 60 s, about a search and the walk out to it.
+  const horizon = 60;
+  const seeds = 16;
   for (const policy of POLICIES) {
     let found = 0;
     for (let s = 0; s < seeds; s++) if (pursuit(policy, s, T, horizon) >= 0) found++;
     m[`re-found within ${horizon} s (of ${seeds}): ${policy}`] = found;
   }
+  // The plan's competence target is before pacing throttles it: the same brain with every guard free to go.
+  const unpaced = structuredClone(T);
+  unpaced.brain.camp.slots.alert.search = 6;
+  let freed = 0;
+  for (let s = 0; s < seeds; s++) if (pursuit('honest', s, unpaced, horizon) >= 0) freed++;
+  m[`re-found within ${horizon} s (of ${seeds}): honest, unpaced`] = freed;
   // Every reaction in the scripted scenarios has a chain of causes back to something sensed.
   let reactions = 0;
   let unexplained = 0;
@@ -256,7 +294,7 @@ function brainMetrics(): Record<string, number> {
  * The ellipse in the world (E8's exit metric): scripted shots from random perches around the
  * lab's camp, heard by its guards through perception, radioed in, fused by the commander.
  */
-function inWorldCalibration(T: Tuning, shots: number): { one: number; two: number; bearings: number } {
+export function inWorldCalibration(T: Tuning, shots: number): { one: number; two: number; bearings: number } {
   const rng = new Rng('BENCH-E', 'perches');
   let in1 = 0;
   let in2 = 0;
@@ -281,7 +319,10 @@ function inWorldCalibration(T: Tuning, shots: number): { one: number; two: numbe
     };
     let systems = SYSTEMS;
     for (const s of [...PERCEPTION, commsVoice, campCommander, shot]) systems = withSystem(systems, s);
-    const sim = new Simulation(campWorld(T), T, systems);
+    // Each shot in its own world seed: every guard's streams start from it, so his ear errs afresh.
+    const shotWorld = campWorld(T);
+    shotWorld.seed = `${shotWorld.seed}/shot${k}`;
+    const sim = new Simulation(shotWorld, T, systems);
     placePlayer(sim, 372, 372);
     giveSenses(sim);
     giveBrains(sim);

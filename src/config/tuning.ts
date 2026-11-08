@@ -324,7 +324,6 @@ export const defaultTuning = {
       keep: 90, // seconds of bearings it fuses
       maxBearings: 16, // bearings it keeps
       earSigmaDeg: 4, // the error of a bearing taken by ear, from the guard's own stream, on top of where it seemed to be
-      statedScale: 0.85, // the error he states, as a share of his real error, calibrated so the camp's ellipse contains the shooter at its stated rates (bench)
       minSigmaDeg: 1.5, // nobody's ear is sharper than this
       maxSigmaDeg: 25, // a bearing worse than this is said to be no bearing at all
       sweepSeconds: 8, // how long a marksman sweeps a believed perch
@@ -399,7 +398,7 @@ export const defaultTuning = {
     // The camp's search map (E4, searchMap.ts): a window of cells around the camp.
     searchMap: {
       cells: 64,
-      cell: 2.5,
+      cell: 5, // metres: the map reaches 160 m from the camp's centre, past where an intruder who broke contact has got to
       spreadRate: 0.5, // share of a cell's belief that bleeds to its neighbours per second,
       updateHz: 2, // applied this many times a second (rule 17)
       seenStep: 1, // metres between the samples of a line of sight over the ground

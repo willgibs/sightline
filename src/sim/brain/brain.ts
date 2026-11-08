@@ -707,7 +707,7 @@ function bearingError(m: GuardMind, r: Report, crack: boolean): void {
   r.x = r.fromX + dx * c - dz * s;
   r.z = r.fromZ + dx * s + dz * c;
   const blur = r.radius / (2 * d);
-  r.sigma = Math.sqrt(ear * ear + blur * blur) * S.statedScale;
+  r.sigma = Math.sqrt(ear * ear + blur * blur);
 }
 
 /** A standard normal draw from his own stream (Box–Muller, with exact math). */
