@@ -455,3 +455,29 @@ describe('bodies (E9)', () => {
     expect(['alert', 'lockdown', 'uneasy']).toContain(camp.level);
   });
 });
+
+describe('sandbox body drops (E11)', () => {
+  it('a body dropped where the player looks is found by the camp, as any body is', () => {
+    const world = campWorld(T);
+    let systems = SYSTEMS;
+    for (const s of [...PERCEPTION, commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
+    const sim = new Simulation(world, T, systems);
+    // The player looks west and down, from east of the gate: the ground 8 m ahead.
+    placePlayer(sim, 44, 6, -1, 0);
+    giveSenses(sim);
+    giveBrains(sim);
+    giveCommander(sim);
+    sim.step(neutralInput(sim.player.yaw));
+    const pitch = -Math.atan2(sim.player.eyeHeight, 8);
+    const input = neutralInput(sim.player.yaw);
+    input.commands = [{ kind: 'bodyDrop', lag: 0, yaw: sim.player.yaw, pitch }];
+    const ev: SimEvent[] = [...sim.step(input).map((e) => ({ ...e }))];
+    expect(sim.index.of('remains').length).toBe(1);
+    const raw = neutralInput(sim.player.yaw);
+    for (let i = 0; i < 40 * 30; i++) for (const e of sim.step(raw)) ev.push({ ...e });
+    expect(ev.some((e) => e.type === 'spotted' && e.what === 'body')).toBe(true);
+    expect(commanderOf(sim)!.camp.incidents.some((i) => i.kind === 'body')).toBe(true);
+    // It is a body like any other: a dropped one, found by a guard, in the reason.
+    expect(ev.some((e) => e.type === 'act' && e.why === 'body')).toBe(true);
+  });
+});
