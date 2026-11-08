@@ -199,7 +199,7 @@ function navAllowance(ctx: TickContext): NavAllowance {
 /** What the schedule's handlers touch beyond the schedule (kernel/systems.ts, scheduleSystem). */
 const SCHEDULED_ACCESS = {
   reads: ['commander.camp', 'guard', 'solid.solid'],
-  writes: ['commander.camp', 'guard.brain.told', 'guard.brain.task', 'guard.brain.thinkAt', 'guard.senses.awareness', 'guard.senses.belief', 'rng.awareness', 'entities', 'guard.body', 'vehicle.vehicle'],
+  writes: ['commander.camp', 'guard.brain', 'guard.senses.awareness', 'guard.senses.belief', 'rng.awareness', 'entities', 'guard.body', 'vehicle.vehicle'],
   emits: ['radio', 'checkin', 'reinforce'],
 } as const satisfies Access;
 

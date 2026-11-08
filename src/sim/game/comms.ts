@@ -349,8 +349,13 @@ export function giveObjective(sim: Simulation, target: number): void {
   if (c) c.camp.objective = { target, status: 'open' };
 }
 
-/** Cuts the camp's power (E7's sabotage, for now from a script): every alarm goes dead. */
+/** Cuts the camp's power, from a script: a generated camp's generator stops, and a handmade camp's alarm boxes go dead. */
 export function cutPower(sim: Simulation): void {
+  const generators = sim.index.of('generator');
+  if (generators.length > 0) {
+    for (const g of generators) g.generator.running = false;
+    return;
+  }
   const c = sim.index.of('commander')[0];
   if (!c) return;
   c.camp.devices.generatorRunning = false;

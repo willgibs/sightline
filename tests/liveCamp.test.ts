@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { MarksmanDriver, type Step } from '../src/sim/game/bots/marksman';
 import { commanderOf } from '../src/sim/game/comms';
 import { PERCEPT_ROOTS } from '../src/sim/game/benches';
 import { liveCamp } from '../src/sim/game/scenes/liveCamp';
-import { placePlayer } from '../src/sim/game/setup';
 import type { Simulation } from '../src/sim/game/sim';
-import { generateWorld, campMission } from '../src/sim/generation';
 import type { SimEvent } from '../src/sim/kernel/events';
-import { runScene, startScene, type Scene } from '../src/sim/kernel/scene';
+import { runScene, startScene } from '../src/sim/kernel/scene';
 import { resimulate } from '../src/sim/kernel/record/resim';
-import type { World } from '../src/sim/kernel/world/world';
+import { shooterScene } from './live';
 
 /**
  * The camp brain on generated camps (E13): everything lab E built, on the camps lab D
@@ -18,42 +15,9 @@ import type { World } from '../src/sim/kernel/world/world';
  */
 
 const SEEDS = ['LEB-2534', 'KUV-9210', 'HUM-0755'];
-const worlds = new Map<string, World>();
-function worldOf(seed: string): World {
-  let w = worlds.get(seed);
-  if (!w) worlds.set(seed, (w = generateWorld(campMission(seed), T)));
-  return w;
-}
-
-/** The scene with a marksman on the camp's best overview, firing every 6 s at what he sees best. */
-function shooter(seed: string, seconds: number): { scene: Scene<Simulation>; steps: Step[] } {
-  const world = worldOf(seed);
-  const a = world.report.camp!;
-  const perch = [...a.perches].sort((x, y) => y.coverage - x.coverage || x.x - y.x)[0]!;
-  const order = perch.guards
-    .map((v, i) => [v, i] as const)
-    .sort((p, q) => q[0] - p[0] || p[1] - q[1])
-    .filter(([v]) => v > 0.2)
-    .map(([, i]) => i);
-  const steps: Step[] = [{ at: 0.2, act: 'prone' }, { at: 3, act: 'scope' }];
-  order.slice(0, 8).forEach((post, i) => steps.push({ at: 8 + i * 6, act: 'fire', target: { post }, breath: 1.5 }));
-  const base = liveCamp(`seed=${seed}`) as Scene<Simulation>;
-  const scene: Scene<Simulation> = {
-    ...base,
-    world: () => world,
-    setup: (sim) => {
-      base.setup!(sim);
-      placePlayer(sim, perch.x, perch.z, world.camp.site.x - perch.x, world.camp.site.z - perch.z);
-    },
-    driver: () => new MarksmanDriver(steps),
-    seconds,
-    expect: [],
-  };
-  return { scene, steps };
-}
 
 function play(seed: string, seconds: number): { sim: Simulation; events: SimEvent[] } {
-  const { scene } = shooter(seed, seconds);
+  const scene = shooterScene(seed, seconds);
   const sim = startScene(scene, T);
   const driver = scene.driver!();
   const raw = scene.game.still(sim);
@@ -101,8 +65,8 @@ describe('a live camp (E13)', () => {
     expect(unexplained.map((e) => `${e.type} ${(e as { to?: string }).to} at ${e.tick}`)).toEqual([]);
   }, 180_000);
 
-  it('re-simulates bit for bit, at any seed', () => {
-    const { scene } = shooter(SEEDS[1]!, 40);
+  it('re-simulates bit for bit', () => {
+    const scene = shooterScene(SEEDS[1]!, 40);
     const run = runScene(scene, T);
     expect(run.failures).toEqual([]);
     const again = resimulate(run.recording, { scene });

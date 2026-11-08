@@ -22,6 +22,7 @@ import { runScene } from '../src/sim/kernel/scene';
 import { Blocks } from '../src/sim/kernel/world/colliders';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testWorld, tuningCopy } from './fixtures';
+import { shooterScene } from './live';
 
 const noop = (): void => {};
 /** A system's access when it touches nothing. */
@@ -321,7 +322,8 @@ describe('declared data access', () => {
     const p = path.split('.');
     if (w.length > p.length) return false;
     const isKind = (r: string): boolean => !['schedule', 'outcome', 'rng', 'entities', 'input', 'nextEventId', 'tick'].includes(r);
-    if (w[0] === 'entities') return isKind(p[0]!) || p[0] === 'entities';
+    // Spawning and despawning, not every field of every entity: a new entity shows up as itself, with no field named.
+    if (w[0] === 'entities') return p[0] === 'entities' || p.length === 1;
     if (w[0] !== p[0] && !(w[0] === '*' && isKind(p[0]!))) return false;
     return w.every((x, i) => i === 0 || x === p[i]);
   }
@@ -341,6 +343,14 @@ describe('declared data access', () => {
       },
     };
   }
+
+  it('lets every system write only what it declares, with the camp brain under fire', () => {
+    const found = new Set<string>();
+    const base = shooterScene('LEB-2534', 24, 2, 2);
+    const scene = { ...base, setup: (sim: Simulation) => (base.setup!(sim), watchWrites(sim, found)) };
+    runScene(scene, defaultTuning);
+    expect([...found]).toEqual([]);
+  }, 180_000);
 
   it('lets every system write only what it declares, in valleys and in every scene', () => {
     const found = new Set<string>();
