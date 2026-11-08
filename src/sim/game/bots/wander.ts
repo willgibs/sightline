@@ -32,6 +32,10 @@ export class WanderBot {
     const dt = sim.dt;
     const half = sim.world.playHalf;
     if (this.yaw === null) this.yaw = p.yaw;
+    // Whatever another bot left on a shared frame isn't this one's to send.
+    out.lean = 0;
+    out.optic = 0;
+    out.commands = [];
 
     if (!this.target) this.pickTarget(half);
     const t = this.target!;

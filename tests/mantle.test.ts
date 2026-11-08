@@ -35,7 +35,7 @@ function facing(colliders: ColliderInput[], height?: (x: number, z: number) => n
 }
 
 function intentOf(b: BodyState, tick: number, climb: boolean): MoveIntent {
-  return { tick, wishX: 0, wishZ: 0, gait: 'idle', yaw: b.yaw, pitch: 0, lean: 0, raised: false, climb };
+  return { tick, wishX: 0, wishZ: 0, gait: 'idle', yaw: b.yaw, pitch: 0, lean: 0, raised: false, climb, climbAxis: 0 };
 }
 
 /** Presses climb, then plays until the mantle's done (or `ticks` runs out). Returns every pose on the way. */

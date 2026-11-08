@@ -7,6 +7,7 @@ import { Blocks, circleOverlaps } from '../kernel/world/colliders';
 import { makeTerrainSample } from '../kernel/world/heightfield';
 import type { Solids } from '../kernel/world/solids';
 import { Surface } from '../kernel/world/surfaces';
+import type { LadderState } from './ladder';
 
 /**
  * A body: the physical state of anything that moves under its own power, walks, falls
@@ -29,7 +30,7 @@ export type Gait = 'idle' | StepGait;
  * invariants (see motor.ts): on the ground it walks, steps and slides; in the air it
  * falls; in a mantle it follows a path of its own. Later modes could swim or glide.
  */
-export type MotorModeName = 'ground' | 'air' | 'mantle';
+export type MotorModeName = 'ground' | 'air' | 'mantle' | 'ladder';
 
 /** A mantle under way (mantle.ts): its path, as plain data in the state tree. */
 export interface MantleState {
@@ -41,6 +42,10 @@ export interface MantleState {
   points: number[];
   /** Seconds each leg between waypoints takes: reach, pull, shift, push. */
   legs: number[];
+  /** Seconds along the path the hands take hold (the sound). */
+  grabAt: number;
+  /** The ladder (its index in the world's) this path ends on, or −1 for the ground. */
+  then: number;
   /** It began standing: stand up again at the end, if there's room. */
   stand: boolean;
   /** What the hands take hold of, and what the feet land on. */
@@ -97,6 +102,8 @@ export interface BodyState {
   motor: MotorModeName;
   /** The mantle under way, or null (mantle.ts). */
   mantle: MantleState | null;
+  /** The ladder it's on, or null (ladder.ts). */
+  ladder: LadderState | null;
   /** The long axis of a lying body: a yaw, following the view by the largest turn that keeps every part clear (motor.ts). */
   axis: number;
   /** How far along its length a lying body has grown: 0 standing (one circle), 1 fully down (chain.ts). */
@@ -186,6 +193,7 @@ export function createBody(world: World, solids: Solids, spec: BodySpec, x: numb
     lean: 0,
     motor: 'ground',
     mantle: null,
+    ladder: null,
     axis: yaw,
     lying: 0,
     riseHead: 0,

@@ -81,6 +81,8 @@ export const WINDOWS: readonly WindowSpec[] = [
 /** A platform to climb onto (1.2 m), 3 m deep, south of the row; a tower with a deck at 5 m beyond it. */
 export const PLATFORM = { x: 34, half: 2.5, height: 1.2, depth: 3 };
 export const TOWER = { x: 44, deck: 5 };
+/** The tower's ladder, on its open south side: its foot, the deck it reaches, and away from the tower. */
+export const LADDER = { x: TOWER.x, z: ARENA.garden.z + 3 + 0.08, y0: 0, y1: TOWER.deck, ox: 0, oz: 1 } as const;
 
 /** The ground: flat, with low hills round the edge so lines that leave the lab end on ground. */
 export function arenaHeight(x: number, z: number): number {
@@ -161,7 +163,7 @@ function layout(): Layout {
   // The platform, its north face on the row.
   const P = PLATFORM;
   add('block', [box(P.x - P.half, P.x + P.half, north, north + P.depth, -0.3, P.height, Surface.Wood)]);
-  // A tower with a deck: its ladder comes with C5.
+  // A tower with a deck, reached by its ladder (below).
   const T = TOWER;
   const deck = T.deck;
   const legs: ColliderInput[] = [];
@@ -179,6 +181,9 @@ function layout(): Layout {
   legs.push(box(T.x - 1.5, T.x - 1.4, north, north + 3, deck, deck + 0.9, Surface.Wood));
   legs.push(box(T.x + 1.4, T.x + 1.5, north, north + 3, deck, deck + 0.9, Surface.Wood));
   add('tower', legs);
+  // Its ladder, up the open south side. Thin, and the only way up without a body to stand on.
+  const L = LADDER;
+  add('block', [box(L.x - 0.3, L.x + 0.3, L.z - 0.08, L.z, -0.3, L.y1, Surface.Wood, Blocks.Move | Blocks.Bullet)]);
   // The divider, with its gate.
   const D = ARENA.divider;
   add('block', [box(-D.half, D.gate[0], D.z - 0.2, D.z + 0.2, -0.3, D.height, Surface.Rock)]);
@@ -266,6 +271,7 @@ export function arenaWorld(tuning: Tuning): World {
     tuning.gen,
   );
   world.foliage = arenaFoliage(tuning);
+  world.ladders = [LADDER];
   return world;
 }
 

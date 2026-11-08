@@ -28,7 +28,7 @@ function events(): { sim: Simulation; all: SimEvent[]; valley: number; range: Si
   const bot = new ChaosBot('TAL-4471');
   const raw = neutralInput();
   const all: SimEvent[] = [];
-  for (let i = 0; i < 60 * 30; i++) for (const e of sim.step(bot.next(sim, raw))) all.push({ ...e });
+  for (let i = 0; i < 120 * 30; i++) for (const e of sim.step(bot.next(sim, raw))) all.push({ ...e });
   const roof = { kind: 'box' as const, x: 0, z: 0, y0: -1, y1: 3, hx: 2, hz: 2, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Metal };
   const rules: System = {
     name: 'test-rules',
@@ -125,8 +125,18 @@ describe('events', () => {
   });
 
   it('say what the legs were doing when they make a step', () => {
-    const gaits = new Set(all.flatMap((e) => (e.type === 'footstep' && e.source === PLAYER_ID ? [e.gait] : [])));
-    for (const g of ['crawl', 'crouch', 'walk', 'sprint']) expect(gaits.has(g as never)).toBe(true);
+    // The player in every gait: a sprint, a walk, a crouch and a crawl, in turn.
+    const walker = new Simulation(testWorld(), defaultTuning);
+    const input = { ...neutralInput(), moveZ: 1, sprint: true };
+    const gaits = new Set<string>();
+    for (let i = 0; i < 240; i++) {
+      input.sprint = i < 60;
+      input.crouch = i === 60 || i === 120;
+      input.prone = i === 150;
+      if (i === 60) input.sprint = false;
+      for (const e of walker.step(input)) if (e.type === 'footstep' && e.source === PLAYER_ID) gaits.add(e.gait);
+    }
+    for (const g of ['crawl', 'crouch', 'walk', 'sprint']) expect(gaits.has(g)).toBe(true);
   });
 
   it('round-trip through the recording codec, every type', () => {

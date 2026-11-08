@@ -11,6 +11,7 @@ import { RIM, bodyHeight, groundBelow, pushHistory, rimExcess, type BodySpec, ty
 import { footprint, restRadius, type FootCircle } from './chain';
 import { footfall } from './footfall';
 import { stepLean } from './lean';
+import { ladderInReach, startLadder, stepLadder } from './ladder';
 import { drawMantle, startMantle, stepMantle } from './mantle';
 import { eyeOf } from './shape';
 import type { DebugDraw } from '../kernel/debugDraw';
@@ -48,7 +49,9 @@ import type { DebugDraw } from '../kernel/debugDraw';
  * - in a mantle (mantle.ts) the body follows a path whose every pose is re-checked every
  *   tick: never inside anything solid, with no allowance for steps, and never inside
  *   another body; it waits for what's in the way, and gives up if it stays. Only colliders can be
- *   mantled, never the terrain, and never onto ground too steep to stand on.
+ *   mantled, never the terrain, and never onto ground too steep to stand on;
+ * - on a ladder (ladder.ts) the same: every pose re-checked every tick, the rise no
+ *   faster than the ladder's rate, and getting off only by a way checked pose by pose.
  * A new mode states its own invariants here and adds them to the invariant run.
  *
  * Ground steeper than maxSlopeDeg is not ground you can stand on: you can't climb it, and
@@ -72,8 +75,10 @@ export interface MoveIntent {
   lean: number;
   /** With a weapon or optic up, a lean goes all the way rather than peeking. */
   raised: boolean;
-  /** Mantle what's in front, if anything can be mantled. */
+  /** Mantle what's in front or take a ladder, if there is one. */
   climb: boolean;
+  /** Up (1) or down (−1) a ladder, while on one. */
+  climbAxis: number;
 }
 
 export function idleIntent(b: BodyState, tick: number, out: MoveIntent): MoveIntent {
@@ -86,6 +91,7 @@ export function idleIntent(b: BodyState, tick: number, out: MoveIntent): MoveInt
   out.lean = 0;
   out.raised = false;
   out.climb = false;
+  out.climbAxis = 0;
   return out;
 }
 
@@ -122,7 +128,7 @@ interface MotorMode {
   drive(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext, tanMax: number): void;
 }
 
-const MODES: Record<Exclude<MotorModeName, 'mantle'>, MotorMode> = {
+const MODES: Record<Exclude<MotorModeName, 'mantle' | 'ladder'>, MotorMode> = {
   ground: { drive: driveGround },
   air: { drive: driveAir },
 };
@@ -144,8 +150,13 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
   b.yaw = i.yaw;
   b.pitch = clamp(i.pitch, -spec.pitchLimit, spec.pitchLimit);
   easeStance(b, spec, ctx.dt);
-  if (i.climb && b.motor === 'ground') startMantle(b, spec, ctx);
+  if (i.climb && b.motor === 'ground') {
+    // A ladder in reach takes the press; otherwise whatever can be mantled.
+    const ladder = ladderInReach(b, spec, ctx);
+    if (ladder < 0 || !startLadder(b, spec, ctx, ladder)) startMantle(b, spec, ctx);
+  }
   if (b.motor === 'mantle') stepMantle(b, spec, ctx);
+  else if (b.motor === 'ladder') stepLadder(b, i, spec, ctx);
   else moveBody(b, i, spec, ctx, tanMax);
   stepLean(b, i, spec, ctx);
   if (ctx.draw) {

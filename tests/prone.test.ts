@@ -42,7 +42,7 @@ function down(b: BodyState, ctx: MotorContext): void {
 
 function step(b: BodyState, ctx: MotorContext, t: number, wishX = 0, wishZ = 0, yaw = b.yaw): void {
   ctx.tick = t;
-  const i: MoveIntent = { tick: t, wishX, wishZ, gait: wishX || wishZ ? 'crawl' : 'idle', yaw, pitch: 0, lean: 0, raised: false, climb: false };
+  const i: MoveIntent = { tick: t, wishX, wishZ, gait: wishX || wishZ ? 'crawl' : 'idle', yaw, pitch: 0, lean: 0, raised: false, climb: false, climbAxis: 0 };
   stepMotor(b, i, spec, ctx);
 }
 

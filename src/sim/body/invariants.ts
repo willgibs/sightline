@@ -120,7 +120,7 @@ export class InvariantWatch {
     for (const cid of b.lying > 0 ? [] : this.ids) {
       const c = solids.get(cid);
       // On the ground a body may overlap what it could step onto; a mantle follows its own path, with no such allowance.
-      const low = b.motor === 'mantle' ? b.y + 1e-3 : b.y + spec.stepHeight;
+      const low = b.motor === 'mantle' || b.motor === 'ladder' ? b.y + 1e-3 : b.y + spec.stepHeight;
       if ((c.flags & Blocks.Move) === 0 || c.y1 <= low || c.y0 >= b.y + height) continue;
       if (!pushOutCircle(c, b.x, b.z, spec.radius, this.push)) continue;
       const depth = Math.sqrt(this.push.x * this.push.x + this.push.z * this.push.z);

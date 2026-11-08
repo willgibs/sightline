@@ -25,7 +25,7 @@ function snapshot(tick: number, extra: Partial<Snapshot> = {}): Snapshot {
     eyeY: 1.65,
     eyeZ: 0,
     lean: 0,
-    climb: false,
+    climb: '',
     axis: 0,
     lying: 0,
     riseHead: 0,

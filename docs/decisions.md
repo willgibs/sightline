@@ -40,6 +40,16 @@ Built on its branch as `docs/phase-1-plan.md`, section B, plans it. Its seed, th
 
 Built on the `lab-c-movement` branch to `docs/phase-1-plan.md`, section C. Lean and the mantle use input the bots never give, so the valley's behaviour is untouched until the prone body (C2).
 
+### Ladders (C5), and fuzz bots that go looking for trouble
+
+**Decision:**
+- A ladder is a motor mode (`body/ladder.ts`): the climb press takes it from its foot or its top, forward and back move up and down it (1.8 m/s up, 2.2 m/s down), and a press lets go. The world's ladders are data (`world.ladders`, same shape as lab D's `LadderSpec`); `ladderLinks()` gives navigation (lab E) the two places each one joins, and how long it takes.
+- Getting off the top is a mantle over the edge, checked pose by pose before it starts and every tick after (Half-Life 2's validated dismounts, without the fixed points); getting on from the top runs that same way backwards.
+- The fuzzing bot learned to lean hard into walls, press climb at walls and guards again and again, swing the body around while prone, and pump a ladder. The fuzz run also plays the movement lab (`movement-lab`), where the walls, windows, ladder and moving guards are.
+- The chaos bot's new behaviours move `TAL-4471 chaos` and the benches' fuzz numbers; lean, mantle and ladders stay out of every other golden.
+
+**Why:** "No motor mode gets an exception" only means something if the adversarial bots actually exercise each mode, every tick, for hours.
+
 ### The prone body (C2): a chain of circles, and the eye at the head
 
 **Decision:**

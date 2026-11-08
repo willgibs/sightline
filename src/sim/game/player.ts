@@ -82,12 +82,15 @@ export function playerIntent(
   else if (c.climbWait > 0) c.climbWait = c.climbWait > ctx.dt ? c.climbWait - ctx.dt : 0;
   out.climb = b.motor !== 'mantle' && c.climbWait > 0;
   if (b.motor === 'mantle') c.climbWait = 0;
+  // On a ladder a press lets go, so it mustn't linger: only the press itself counts there.
+  if (b.motor === 'ladder') out.climb = input.commands?.some((k) => k.kind === 'climb') ?? false;
+  out.climbAxis = len < 0.05 ? 0 : mz > 0 ? 1 : mz < 0 ? -1 : 0;
   return out;
 }
 
 function updateStance(b: BodyState, c: PlayerControl, input: InputFrame, spec: BodySpec, ctx: Pick<MotorContext, 'solids' | 'source' | 'emit'>): void {
   if (!input.sprint) c.sprintSuppressed = false;
-  if (b.motor === 'mantle') return; // the hands are busy
+  if (b.motor === 'mantle' || b.motor === 'ladder') return; // the hands are busy
   let request: 'crouch' | 'prone' | null = input.prone ? 'prone' : input.crouch ? 'crouch' : null;
   if (b.proneTransition) {
     if (request) c.queuedStance = request;

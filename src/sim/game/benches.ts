@@ -300,7 +300,7 @@ function mantleMeetsWalker(): Record<string, number> {
   for (let t = 1; t <= 90; t++) {
     ctx.tick = t;
     placed((t - 1) * dt);
-    stepMotor(body, { tick: t, wishX: 0, wishZ: 0, gait: 'idle', yaw: body.yaw, pitch: 0, lean: 0, raised: false, climb: t === 1 }, P, ctx);
+    stepMotor(body, { tick: t, wishX: 0, wishZ: 0, gait: 'idle', yaw: body.yaw, pitch: 0, lean: 0, raised: false, climb: t === 1, climbAxis: 0 }, P, ctx);
     plan ??= body.mantle ? { points: [...body.mantle.points], legs: [...body.mantle.legs] } : null;
     if (inside(body.x, body.y, body.z, bodyHeight(body, P))) ours++;
   }
@@ -312,7 +312,7 @@ function mantleMeetsWalker(): Record<string, number> {
     for (let t = 1; t <= 90; t++) {
       placed((t - 1) * dt);
       const when = Math.min(t * dt, total);
-      mantleAt({ ...plan, t: 0, waited: 0, stand: false, grip: Surface.Rock, feet: Surface.Grass, grabbed: false, dropped: 0 }, when, pose);
+      mantleAt({ ...plan, t: 0, waited: 0, stand: false, grip: Surface.Rock, feet: Surface.Grass, grabbed: false, dropped: 0, grabAt: 0, then: -1 }, when, pose);
       if (when < total && inside(pose.x, pose.y, pose.z, P.height.crouch)) seed++;
     }
   }

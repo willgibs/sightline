@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import { canMantle, eyeOf, stridePhase, type BodyState, type Gait, type MotorContext, type Stance } from '../body';
+import { climbPrompt, eyeOf, stridePhase, type BodyState, type Gait, type MotorContext, type Stance } from '../body';
 import { gameBodies } from './remains';
 import { generateWorld, worldFingerprint } from '../generation';
 import type { Game } from '../kernel/game';
@@ -53,8 +53,8 @@ export interface Snapshot {
   eyeZ: number;
   /** How far it is leaned to the right, metres (body/lean.ts). */
   lean: number;
-  /** A press of climb would mantle what's in front: the prompt (body/mantle.ts). */
-  climb: boolean;
+  /** What a press of climb would do now: '' nothing, 'mantle', or 'ladder': the prompt (body/ladder.ts). */
+  climb: '' | 'mantle' | 'ladder';
   /** Lying down: the body's long axis, how far along it it has grown, and how the ground runs under it (body/chain.ts). */
   axis: number;
   lying: number;
@@ -184,7 +184,7 @@ export class Simulation extends KernelSimulation {
             eyeY: 0,
             eyeZ: 0,
             lean: 0,
-            climb: false,
+            climb: '',
             axis: 0,
             lying: 0,
             riseHead: 0,
@@ -216,7 +216,7 @@ export class Simulation extends KernelSimulation {
     s.eyeY = eye.y - p.y;
     s.eyeZ = eye.z - p.z;
     s.lean = p.lean;
-    s.climb = canMantle(p, this.tuning.bodies.player, this.motorView());
+    s.climb = climbPrompt(p, this.tuning.bodies.player, this.motorView());
     s.axis = p.axis;
     s.lying = p.lying;
     s.riseHead = p.riseHead;

@@ -120,6 +120,19 @@ export const defaultTuning = {
         holdFor: 0.4, // seconds it waits for something in the way before it gives up
         buffer: 0.2, // a press stays good this long, so an early press still works
       },
+      // Ladders (sim/body/ladder.ts). Again the lab's own numbers; no game publishes these.
+      ladder: {
+        standoff: 0.05, // how far off a ladder's plane the body's edge stands
+        reach: 1.05, // how far from the ladder a press takes it, at its foot, metres
+        topReach: 2.2, // and on the deck at its top, where the rungs are further off
+        footing: 0.6, // how close to its foot or its top a body must be, vertically
+        facingCos: 0.5, // cosine of the widest angle off facing it a press works at (60°)
+        reachTime: 0.25, // seconds to get onto the rungs
+        upRate: 1.8, // m/s
+        downRate: 2.2, // m/s
+        rung: 0.3, // metres between rungs: a footstep each
+        topGap: 0.65, // how far below the top a body stops, feet: the mantle over the top does the rest
+      },
       // Three parts for sight lines and hits: a head sphere at the eye, a torso capsule
       // from the hips to the shoulders, a legs capsule from the feet to the hips.
       // Heights come from the stance.
@@ -173,6 +186,7 @@ export const defaultTuning = {
         holdFor: 0.4,
         buffer: 0.2,
       },
+      ladder: { standoff: 0.05, reach: 1.05, topReach: 2.2, footing: 0.6, facingCos: 0.5, reachTime: 0.25, upRate: 1.8, downRate: 2.2, rung: 0.3, topGap: 0.65 },
       parts: {
         headRadius: 0.115,
         torsoRadius: 0.22,
@@ -199,6 +213,7 @@ export const defaultTuning = {
     // A mantle (sim/body/mantle.ts): the hands taking hold, and being lowered down the far side
     // (loudness, times the surface; the drop's grows with how far, up to 1 m).
     mantle: { grip: 0.7, drop: 0.6, minDrop: 0.3 },
+    ladder: 0.45, // a rung under a step: loudness, times the surface
     // Steady sources, as heard radii. Phase 1 makes them mask other sounds for guards too.
     ambient: { creek: 38, generator: 70 },
   },

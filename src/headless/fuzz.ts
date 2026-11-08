@@ -23,6 +23,8 @@ import { generateWorld } from '../sim/generation';
 import { neutralInput } from '../sim/kernel/input';
 import { missionSpec } from '../sim/kernel/mission';
 import { Recorder } from '../sim/kernel/record/recording';
+import { startScene } from '../sim/kernel/scene';
+import { SCENES } from '../sim/game/scenes';
 import { Simulation } from '../sim/game/sim';
 import { SyncTest, describeSyncFailure } from '../sim/kernel/synctest';
 import { fmt, parseArgs } from './args';
@@ -39,6 +41,9 @@ const minutes = Number(args.get('minutes') ?? 10);
 const one = args.get('seed');
 // Fresh valleys every run, named so a failure can be run again.
 const seeds = one ? [normalizeSeed(one)] : Array.from({ length: Number(args.get('seeds') ?? 6) }, () => randomSeed());
+// The movement lab goes with them: its walls, windows, ladder and moving guards are where the
+// motor's modes are worked hardest (a fresh valley has few of them).
+const scenes = args.has('no-scenes') ? [] : ['movement-lab'];
 const bots = (args.get('bot') ?? 'wander,chaos').split(',').map((b) => b.trim());
 const outDir = args.get('out') ?? '.';
 const synctest = args.has('synctest') ? (args.get('synctest') === 'true' ? 30 : Number(args.get('synctest'))) : 0;
@@ -55,13 +60,14 @@ console.log(`seeds   ${seeds.join(' ')}\n`);
 let failed = 0;
 let totalTicks = 0;
 const t0 = performance.now();
-for (const seed of seeds) {
-  const world = generateWorld(missionSpec(seed), tuning);
+for (const seed of [...seeds, ...scenes.map((s) => `scene:${s}`)]) {
+  const scene = seed.startsWith('scene:') ? SCENES[seed.slice(6)]!() : null;
+  const world = scene ? scene.world(tuning) : generateWorld(missionSpec(seed), tuning);
   for (const name of bots) {
-    const sim = new Simulation(world, tuning);
+    const sim: Simulation = scene ? (startScene(scene, tuning, world) as Simulation) : new Simulation(world, tuning);
     const recorder = new Recorder(sim, build);
     const watch = new InvariantWatch(sim);
-    const sync = synctest ? new SyncTest(sim, new Simulation(world, tuning), synctest) : null;
+    const sync = synctest ? new SyncTest(sim, scene ? (startScene(scene, tuning, world) as Simulation) : new Simulation(world, tuning), synctest) : null;
     const bot = name === 'chaos' ? new ChaosBot(seed) : new WanderBot(seed);
     const raw = neutralInput();
     const ticks = Math.round(minutes * 60 * tuning.sim.tickHz);

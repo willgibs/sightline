@@ -624,7 +624,7 @@ Playable at `?scene=movement-lab`; the movement course stays as a regression tes
   - Three probes find the ledge: forward at several heights, down for the top, and an overlap at the landing pose.
   - Eased phases: hang, pull, shift, push.
   - Every pose is re-checked every tick. A 1.2 m mantle over 0.6 s rises 0.067 m per tick.
-- [ ] C5 · Ladders: a motor mode, with validated dismount poses, on D's towers, and with links for E's navigation. Each new mode states its invariants in the motor's header and joins the invariant run (rule 10). The fuzz bots learn to lean into walls, mantle into moving guards and turn prone between walls.
+- [x] C5 · Ladders: a motor mode, with validated dismount poses, on D's towers, and with links for E's navigation. Each new mode states its invariants in the motor's header and joins the invariant run (rule 10). The fuzz bots learn to lean into walls, mantle into moving guards and turn prone between walls.
 - [ ] C6 · The use action.
   - Carry or drag a body: slow, and noisy on gravel. The body reuses the prone chain.
   - Hide it in foliage or a container, where guards don't see it.

@@ -49,7 +49,7 @@ export function bodyShape(b: ShapePose, spec: BodySpec, out: BodyShape): BodySha
     mixCapsule(lying.torso, upright.torso, t, out.torso);
     mixCapsule(lying.legs, upright.legs, t, out.legs);
   }
-  if (b.lean) applyLean(b, out);
+  if (b.lean) applyLean(b, out, e >= E.crouch);
   return out;
 }
 
@@ -58,13 +58,15 @@ export function bodyShape(b: ShapePose, spec: BodySpec, out: BodyShape): BodySha
  * down the arc that takes, and the shoulders follow part way. The eye is the centre of
  * the head, wherever the head is: what you can see around a corner is what can see you.
  */
-function applyLean(b: ShapePose, out: BodyShape): void {
-  const rx = dcos(b.yaw);
-  const rz = -dsin(b.yaw);
+function applyLean(b: ShapePose, out: BodyShape, upright: boolean): void {
+  // Lying, the axis decides which way the head can roll, and the body stays on its chain.
+  const axis = upright ? b.yaw : (b.axis ?? b.yaw);
+  const rx = dcos(axis);
+  const rz = -dsin(axis);
   const t = out.torso;
   const spine = out.head.y - t.ay;
-  const share = spine > 1e-6 ? (t.by - t.ay) / spine : 0;
-  const drop = leanDrop(spine, b.lean);
+  const share = upright && spine > 1e-6 ? (t.by - t.ay) / spine : 0;
+  const drop = upright ? leanDrop(spine, b.lean) : 0;
   out.head.x += rx * b.lean;
   out.head.z += rz * b.lean;
   out.head.y -= drop;

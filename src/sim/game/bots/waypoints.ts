@@ -47,6 +47,8 @@ export class WaypointDriver {
     out.pitch = 0;
     if (this.yaw === null) this.yaw = p.yaw;
     out.commands = [];
+    out.lean = 0;
+    out.optic = 0;
     if (p.motor === 'mantle') {
       this.began = true;
       out.yaw = this.yaw;

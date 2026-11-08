@@ -1,4 +1,4 @@
-import { dcos, dsin, dtanDeg } from '../kernel/core/detmath';
+import { datan2, dcos, dsin, dtanDeg } from '../kernel/core/detmath';
 import { smoothstep } from '../kernel/core/math';
 import type { DebugDraw } from '../kernel/debugDraw';
 import { Blocks, circleOverlaps, footprintContains, type Collider } from '../kernel/world/colliders';
@@ -56,7 +56,7 @@ function faceNormal(c: Collider, x: number, z: number, out: { x: number; z: numb
 }
 
 /** True if a body of this height can stand at (x, y, z): nothing solid in the way (no step allowance), the ground under its feet, no other body. */
-function poseClear(x: number, y: number, z: number, height: number, spec: BodySpec, ctx: MotorContext): boolean {
+export function poseClear(x: number, y: number, z: number, height: number, spec: BodySpec, ctx: MotorContext): boolean {
   const r = spec.radius;
   const { world, solids } = ctx;
   if (world.terrain.heightAt(x, z) > y + 1e-3) return false;
@@ -79,7 +79,14 @@ function poseClear(x: number, y: number, z: number, height: number, spec: BodySp
 }
 
 /** Where a mantle is at `t` seconds along its path. */
-export function mantleAt(m: MantleState, t: number, out: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+/** A point along a path (mantle, ladder). */
+export interface MantlePose {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export function mantleAt(m: MantleState, t: number, out: MantlePose): MantlePose {
   let rest = t;
   let k = 0;
   while (k < m.legs.length - 1 && rest >= m.legs[k]!) {
@@ -102,14 +109,14 @@ function totalTime(m: MantleState): number {
   return s;
 }
 
-const planned: MantleState = { t: 0, waited: 0, points: [], legs: [], stand: false, grip: 0, feet: 0, grabbed: false, dropped: 0 };
+const planned: MantleState = { t: 0, waited: 0, points: [], legs: [], grabAt: 0, stand: false, grip: 0, feet: 0, grabbed: false, dropped: 0, then: -1 };
 
 /**
  * Finds a mantle from where the body stands, facing as it faces: `out` gets its path,
  * checked pose by pose against the world as it stands now. False if nothing can be
  * mantled here. Reads the world and writes only `out`.
  */
-function plan(b: BodyState, spec: BodySpec, ctx: MotorContext, out: MantleState): boolean {
+function plan(b: Pick<BodyState, 'x' | 'y' | 'z' | 'yaw' | 'motor' | 'sliding' | 'proneTransition' | 'stance' | 'eyeHeight'>, spec: BodySpec, ctx: MotorContext, out: MantleState): boolean {
   const M = spec.mantle;
   if (b.motor !== 'ground' || b.sliding || b.proneTransition || b.stance === 'prone') return false;
   const { world, solids } = ctx;
@@ -219,6 +226,8 @@ function plan(b: BodyState, spec: BodySpec, ctx: MotorContext, out: MantleState)
   out.legs.push(Math.max(M.minLeg, (up - y0) / M.pullSpeed));
   out.legs.push(Math.max(M.minLeg, Math.sqrt((landing.x - bx) * (landing.x - bx) + (landing.z - bz) * (landing.z - bz)) / M.shiftSpeed));
   out.legs.push(Math.max(M.minLeg * 0.5, (up - landing.y) / M.dropSpeed));
+  out.grabAt = out.legs[0]!;
+  out.then = -1;
   out.stand = b.stance === 'stand';
   out.grip = grip;
   out.feet = landing.surface;
@@ -241,6 +250,40 @@ function plan(b: BodyState, spec: BodySpec, ctx: MotorContext, out: MantleState)
     if (t >= total) break;
   }
   return true;
+}
+
+const scratchPose = { x: 0, y: 0, z: 0, yaw: 0, motor: 'ground' as const, sliding: false, proneTransition: false, stance: 'crouch' as const, eyeHeight: 0 };
+
+/**
+ * A mantle from a ladder's top pose: from (x, y, z), facing (fx, fz), or, for getting on
+ * from the top, that same way run backwards from where the body stands now, so the top of
+ * a ladder is got on and off by the same checked poses. Null if there is no way.
+ */
+export function planMantleFrom(b: BodyState | null, x: number, y: number, z: number, fx: number, fz: number, spec: BodySpec, ctx: MotorContext, backwards: boolean): MantleState | null {
+  const p = scratchPose;
+  p.x = x;
+  p.y = y;
+  p.z = z;
+  p.yaw = datan2(-fx, -fz);
+  p.eyeHeight = spec.eyeHeight.crouch;
+  if (!plan(p, spec, ctx, planned)) return null;
+  const m: MantleState = { ...planned, points: [...planned.points], legs: [...planned.legs], stand: false };
+  if (backwards && b) {
+    // Run the path the other way: from where the body is, up over the edge to the ladder.
+    const n = m.points.length / 3;
+    const pts: number[] = [];
+    for (let k = n - 1; k >= 0; k--) pts.push(m.points[k * 3]!, m.points[k * 3 + 1]!, m.points[k * 3 + 2]!);
+    m.legs.reverse();
+    // A first leg from where it stands to the path's start.
+    const legs = m.legs;
+    const dx = pts[0]! - b.x;
+    const dy = pts[1]! - b.y;
+    const dz = pts[2]! - b.z;
+    m.points = [b.x, b.y, b.z, ...pts];
+    m.legs = [Math.max(spec.mantle.minLeg, Math.sqrt(dx * dx + dy * dy + dz * dz) / spec.mantle.shiftSpeed), ...legs];
+    m.grabAt = 0;
+  }
+  return m;
 }
 
 /** Whether a press now would start a mantle: what the prompt shows. Reads the world and changes nothing. */
@@ -291,14 +334,20 @@ export function stepMantle(b: BodyState, spec: BodySpec, ctx: MotorContext): voi
   m.t = next;
   b.standingOn = -1;
   // The hands take hold as the pull begins: a sound, by what they take hold of.
-  if (!m.grabbed && m.t >= m.legs[0]!) {
+  if (!m.grabbed && m.t >= m.grabAt) {
     m.grabbed = true;
     const loudness = tuning.noise.mantle.grip * surfaceLoudness(m.grip, tuning);
     const i = 6; // the top of the pull
     ctx.emit({ type: 'mantle', source: ctx.source, x: m.points[i]!, y: m.points[i + 1]!, z: m.points[i + 2]!, surface: m.grip, loudness, radius: loudness * tuning.noise.radiusPerUnit });
   }
   if (m.t < total) return;
-  // --- Landed. ---
+  // --- Landed: on the ground, or on a ladder (getting on from the top). ---
+  if (m.then >= 0) {
+    b.ladder = { index: m.then, fromX: b.x, fromZ: b.z, t: spec.ladder.reachTime, stride: 0 };
+    b.mantle = null;
+    b.motor = 'ladder';
+    return;
+  }
   const stand = m.stand;
   const dropped = m.dropped;
   b.mantle = null;
