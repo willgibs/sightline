@@ -11,7 +11,7 @@ import { ChaosBot } from './bots/chaos';
 import { WanderBot } from './bots/wander';
 import { PINNED_RUNS, behaviourInto } from './runs';
 import { Simulation } from './sim';
-import { SEED_LAW, SIGHT_LAW, sweepSight } from '../perception';
+import { SEED_LAW, SIGHT_LAW, foliageOf, sweepSight } from '../perception';
 import { Rng } from '../kernel/core/rng';
 import { runScene } from '../kernel/scene';
 import { labWorld } from './scenes/perceptionLab';
@@ -131,7 +131,7 @@ function perceptionMetrics(): Record<string, number> {
   for (const params of SIGHT_TABLE) if (runScene(sightScenario(params), defaultTuning).failures.length === 0) passed++;
   m[`sight scenarios as expected (of ${SIGHT_TABLE.length})`] = passed;
   // Foliage, both ways, through every volume of the lab.
-  const f = labWorld(defaultTuning).foliage!;
+  const f = foliageOf(labWorld(defaultTuning));
   const rng = new Rng('BENCH-A', 'foliage');
   let asymmetric = 0;
   for (let k = 0; k < 2000; k++) {

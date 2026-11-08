@@ -10,6 +10,7 @@ import {
   emptyExposure,
   exposure,
   fillSeconds,
+  foliageOf,
   groundLight,
   rangeRamp,
   telegraphCap,
@@ -174,7 +175,7 @@ describe('sight: cover, foliage and the sky', () => {
   });
 
   it('is symmetric to the bit: what the foliage lets through from a to b equals b to a', () => {
-    const f = world.foliage!;
+    const f = foliageOf(world);
     const rng = new Rng('SIGHT-0001', 'pairs');
     let crossed = 0;
     for (let k = 0; k < 4000; k++) {

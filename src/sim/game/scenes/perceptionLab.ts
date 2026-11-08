@@ -4,7 +4,7 @@ import { Rng } from '../../kernel/core/rng';
 import { Blocks, type ColliderInput } from '../../kernel/world/colliders';
 import { Surface } from '../../kernel/world/surfaces';
 import type { World } from '../../kernel/world/world';
-import { Foliage, type FoliageVolume } from '../../perception';
+import type { FoliageVolume } from '../../perception';
 import { WaypointDriver, type Waypoint } from '../bots/waypoints';
 import { PERCEPTION, giveSenses } from '../perception';
 import { SIGHTLINE } from '../sim';
@@ -214,7 +214,7 @@ export function labWorld(tuning: Tuning): World {
     },
     tuning.gen,
   );
-  world.foliage = new Foliage(labFoliage(tuning));
+  world.foliage = labFoliage(tuning);
   return world;
 }
 

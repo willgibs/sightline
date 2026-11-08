@@ -13,7 +13,8 @@ import type { World } from '../kernel/world/world';
  * runs the same arithmetic whichever end is the eye. A test holds it to that.
  *
  * Volumes are static parts of a world, by module augmentation (as generation adds the
- * camp). A world without them has no foliage: the procedural valley's bushes are still
+ * camp), kept as plain data so the world's fingerprint covers them. A world without them
+ * has no foliage: the procedural valley's bushes are still
  * opaque sight colliders, until perception joins the valley (A13) and generation hands
  * its props over as volumes.
  */
@@ -35,8 +36,11 @@ export interface FoliageVolume {
 
 declare module '../kernel/world/world' {
   interface World {
-    /** Foliage that dims sight (perception/foliage.ts); none if absent. */
-    foliage?: Foliage;
+    /**
+     * Foliage that dims sight (perception/foliage.ts), as plain data so the world's
+     * fingerprint covers it; none if absent. `foliageOf` gives it indexed.
+     */
+    foliage?: readonly FoliageVolume[];
   }
 }
 
@@ -173,12 +177,20 @@ export class Foliage {
   }
 }
 
-/** A world's foliage, or none. */
-export function foliageOf(world: World): Foliage {
-  return world.foliage ?? EMPTY;
-}
-
 const EMPTY = new Foliage([]);
+const indexed = new WeakMap<readonly FoliageVolume[], Foliage>();
+
+/**
+ * A world's foliage, indexed: built the first time it's asked for and kept with the
+ * world's list (a cache of static data, never state). None if the world has none.
+ */
+export function foliageOf(world: World): Foliage {
+  const list = world.foliage;
+  if (!list || list.length === 0) return EMPTY;
+  let f = indexed.get(list);
+  if (!f) indexed.set(list, (f = new Foliage(list)));
+  return f;
+}
 
 /** Where a line's parameter t lies inside [y0, y1]: the slab of heights a volume spans. */
 function slab(oy: number, uy: number, y0: number, y1: number, out: { t0: number; t1: number }): boolean {
