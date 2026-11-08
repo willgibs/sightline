@@ -2,6 +2,7 @@ import { defaultTuning } from '../../config/tuning';
 import { generateWorld, worldFingerprint } from '../generation';
 import { datan, datan2, dcos, dexp, dlog, dpow, dsin, dtanDeg } from '../kernel/core/detmath';
 import { Hasher } from '../kernel/core/hash';
+import { knownAnswerProblems } from '../kernel/core/known';
 import { missionSpec } from '../kernel/mission';
 import type { World } from '../kernel/world/world';
 import { GOLDEN } from './golden';
@@ -46,6 +47,7 @@ export function runSelfTest(now: () => number = () => 0): SelfTestResult[] {
     const got = run();
     results.push({ name, got, expected, ok: got === expected, ms: now() - t0 });
   };
+  check('known answers', 'all right', () => knownAnswerProblems()[0] ?? 'all right');
   check('deterministic math', GOLDEN.detmath, detmathFingerprint);
   let tal: World | null = null;
   check('valley TAL-4471', GOLDEN.world, () => worldFingerprint((tal = generateWorld(missionSpec('TAL-4471'), defaultTuning))));

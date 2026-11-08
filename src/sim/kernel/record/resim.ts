@@ -39,6 +39,11 @@ export interface ReplayOptions<S extends Simulation = Simulation> {
   systems?: readonly System[];
   /** Milliseconds, to time the run. */
   clock?: () => number;
+  /**
+   * Re-simulate even what this build would refuse (another build's versions or behaviour,
+   * another world): for tools that compare builds, such as `npm run bisect`.
+   */
+  force?: boolean;
   /** Called around each re-simulated tick, to watch the run (npm run playtest). Must only look. */
   watch?: { before?(sim: S): void; after?(sim: S, events: readonly SimEvent[]): void };
 }
@@ -49,7 +54,8 @@ export interface ReplayOptions<S extends Simulation = Simulation> {
  */
 export function replaySimulation<S extends Simulation = Simulation>(rec: Recording, opts: ReplayOptions<S> = {}): S | string {
   const h = rec.header;
-  if (h.simVersion !== SIM_VERSION || h.stateSchema !== STATE_SCHEMA || h.genVersion !== GEN_VERSION) {
+  const force = opts.force === true;
+  if (!force && (h.simVersion !== SIM_VERSION || h.stateSchema !== STATE_SCHEMA || h.genVersion !== GEN_VERSION)) {
     return (
       `made by a build with simulation ${h.simVersion}, state ${h.stateSchema}, generation ${h.genVersion}; ` +
       `this build has ${SIM_VERSION}, ${STATE_SCHEMA}, ${GEN_VERSION}${h.build ? ` (it was ${h.build})` : ''}`
@@ -60,7 +66,7 @@ export function replaySimulation<S extends Simulation = Simulation>(rec: Recordi
   if (h.scene && scene && scene.version !== h.scene.version) return `made in version ${h.scene.version} of the scene '${h.scene.name}'; this build has version ${scene.version}`;
   const game = h.scene && scene ? scene.game : opts.game;
   if (!game) return 'no game was given to re-simulate it in';
-  if (h.behaviour !== game.behaviour) {
+  if (!force && h.behaviour !== game.behaviour) {
     return `made by a build that behaves differently (behaviour ${h.behaviour}; this build's is ${game.behaviour})${h.build ? `: replay it with ${h.build}` : ''}`;
   }
   if (!h.scene && !opts.world && h.mission.terrain.kind !== 'procedural') return `its world '${h.mission.terrain.name}' was built by hand outside any scene; pass the world`;
@@ -70,9 +76,9 @@ export function replaySimulation<S extends Simulation = Simulation>(rec: Recordi
   } catch (e) {
     return `its world can't be built: ${e instanceof Error ? e.message : String(e)}`;
   }
-  if (game.fingerprint(world) !== h.worldFingerprint) return 'this build generates a different valley from the same mission';
+  if (!force && game.fingerprint(world) !== h.worldFingerprint) return 'this build generates a different valley from the same mission';
   const sim = h.scene && scene ? startScene(scene, h.tuning, world) : game.simulation(world, h.tuning, opts.systems ?? game.systems);
-  if (sim.hash() !== h.startHash) return 'this build starts the mission in a different state';
+  if (!force && sim.hash() !== h.startHash) return 'this build starts the mission in a different state';
   return sim;
 }
 

@@ -8,7 +8,10 @@ Written on Nov 7, 2026, at the end of the session that ran the foundation pass, 
 
 - **Phase 0 passed its gate,** Engine runs, on Nov 7, 2026. The **foundation pass** that followed is done: `docs/foundation-plan.md` records each milestone (M1–M10), what was deliberately left to the labs, and the Horizons.
 - **One item waits on the owner:** checking the deployed build on his Mac with the screen in view. That means frame rate, sound, the runs the game keeps, and a replay. It doesn't block planning.
-- **Phase 1 is planned** (`docs/phase-1-plan.md`), and no lab has a branch or a scene yet.
+- **Phase 1 is planned** (`docs/phase-1-plan.md`), and **Wave 0 is on `main`** (W0.2–W0.8). Wave 1 (labs A, B and D) can open; no lab has a branch yet.
+  - `src/sim` is now the kernel, five lanes and the game, each lane behind its `index.ts` (`src/sim/lanes.ts` says who may import whom).
+  - Systems declare what they read, write and emit; brains decide in 'decide' and steer through orders; systems query bodies and spawn inside a tick; one grid search serves every lab; each lane has a code range and a bench.
+  - `npm run explain`, `npm run bench`, `npm run bisect`, `npm run fuzz -- --synctest` and `npm run land` make landing and determinism mechanical. `docs/decisions.md` (Wave 0) has the reasoning; the notes for wave 1 are in the plan's Wave 0 section.
 - **`main` is green** at the commit that added this file.
   - CI runs the check on Linux, macOS and Windows, and a 20-minute run gives the same hash on all three (`e9311dda2ac00379`).
   - A 40-hour fuzz run passed, and Chromium, Firefox, WebKit and Bun all give the golden values.

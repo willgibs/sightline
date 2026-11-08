@@ -22,8 +22,14 @@ import { missionSpec, type SpawnKind } from '../sim/kernel/mission';
 import { PLAYER_ID } from '../sim/game/entities';
 import { buildStamp } from './build';
 import { sceneOf } from '../sim/game/scenes';
+import { knownAnswerProblems } from '../sim/kernel/core/known';
 
 const args = parseArgs(process.argv.slice(2));
+const mathProblems = knownAnswerProblems();
+if (mathProblems.length > 0) {
+  console.error(`This engine's math differs from the known answers (kernel/core/known.ts), so nothing run here replays elsewhere:\n${mathProblems.join('\n')}`);
+  process.exit(1);
+}
 const now = (): number => performance.now();
 
 const replay = args.get('replay');

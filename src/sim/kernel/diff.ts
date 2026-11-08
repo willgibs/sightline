@@ -25,7 +25,7 @@ export function diffStates(a: SimState, b: SimState, limit = 20): Difference[] {
   }
   const ea = new Map(a.entities.map((e) => [e.id, e]));
   const eb = new Map(b.entities.map((e) => [e.id, e]));
-  const ids = [...new Set([...ea.keys(), ...eb.keys()])].sort((x, y) => x - y);
+  const ids = [...new Set([...ea.keys(), ...eb.keys()])].sort((x, y) => x - y); // unique: a set of ids
   for (const id of ids) {
     const x = ea.get(id);
     const y = eb.get(id);
@@ -63,5 +63,5 @@ function walk(x: unknown, y: unknown, path: string, out: Difference[], limit: nu
 
 /** Both lists' keys, once each, in sorted order (code-unit order, the same everywhere). */
 function union(a: readonly string[], b: readonly string[]): string[] {
-  return [...new Set([...a, ...b])].sort((p, q) => (p < q ? -1 : p > q ? 1 : 0));
+  return [...new Set([...a, ...b])].sort((p, q) => (p < q ? -1 : p > q ? 1 : 0)); // unique: a set of keys
 }

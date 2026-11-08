@@ -24,6 +24,7 @@
     "trace": "tsx src/headless/trace.ts",
     "explain": "tsx src/headless/explain.ts",
     "land": "tsx src/headless/land.ts",
+    "bisect": "tsx src/headless/bisect.ts",
     "scene": "tsx src/headless/scene.ts",
     "fuzz": "tsx src/headless/fuzz.ts",
     "playtest": "tsx src/headless/playtest.ts",

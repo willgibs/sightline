@@ -9,22 +9,17 @@
  *   npm run explain -- --base <ref>         against any commit
  *   npm run explain -- --summary <file>     also append it as Markdown (CI's job summary)
  *
- * The other build runs from a temporary git worktree, with this checkout's node_modules.
+ * The other build runs from a temporary git worktree, with this checkout's node_modules
+ * (builds.ts).
  */
-import { execFile, execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { appendFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
 import { diffStates, show } from '../sim/kernel/diff';
 import type { SimState } from '../sim/kernel/state';
 import { parseArgs } from './args';
+import { REPO as repo, git, tool, withBuild } from './builds';
 
-const run = promisify(execFile);
 const args = parseArgs(process.argv.slice(2));
-const repo = fileURLToPath(new URL('../..', import.meta.url));
-const tsx = join(repo, 'node_modules', '.bin', process.platform === 'win32' ? 'tsx.cmd' : 'tsx');
 const baseRef = args.get('base') ?? 'origin/main';
 const lines: string[] = [];
 const say = (s = ''): void => {
@@ -39,14 +34,6 @@ interface TickLine {
 }
 interface Bench {
   report: Record<string, { runs: Record<string, { behaviour: string; state: string; work: Record<string, Record<string, number>> }>; metrics: Record<string, number> }>;
-}
-
-const git = (...a: string[]): string => execFileSync('git', a, { cwd: repo, encoding: 'utf8' }).trim();
-
-/** Runs one of a build's headless tools and returns what it printed. */
-async function tool(dir: string, script: string, ...a: string[]): Promise<string> {
-  const { stdout } = await run(tsx, [join('src/headless', script), ...a], { cwd: dir, maxBuffer: 256 * 1024 * 1024 });
-  return stdout;
 }
 
 const trace = async (dir: string, name: string): Promise<TickLine[]> =>
@@ -66,22 +53,13 @@ if (baseSha === headSha && !dirty) {
   finish();
 }
 
-const base = mkdtempSync(join(tmpdir(), 'sightline-base-'));
-try {
-  git('worktree', 'add', '--detach', '--quiet', base, baseSha);
-  symlinkSync(join(repo, 'node_modules'), join(base, 'node_modules'), 'dir');
-  if (!existsSync(join(base, 'src/headless/trace.ts'))) {
-    say(`The base predates \`npm run trace\` (W0.7), so there is nothing to compare its runs with.`);
-  } else {
-    await explain();
-  }
-} finally {
-  execFileSync('git', ['worktree', 'remove', '--force', base], { cwd: repo });
-  rmSync(base, { recursive: true, force: true });
-}
+await withBuild(baseSha, async (base) => {
+  if (!existsSync(join(base, 'src/headless/trace.ts'))) say(`The base predates \`npm run trace\` (W0.7), so there is nothing to compare its runs with.`);
+  else await explain(base);
+});
 finish();
 
-async function explain(): Promise<void> {
+async function explain(base: string): Promise<void> {
   const [baseRuns, headRuns] = await Promise.all([base, repo].map(async (dir) => JSON.parse(await tool(dir, 'trace.ts', '--list')) as Array<{ name: string; lane: string }>));
   const benches = await Promise.all([base, repo].map(async (dir) => (existsSync(join(dir, 'src/headless/bench.ts')) ? (JSON.parse(await tool(dir, 'bench.ts', '--json')) as Bench) : null)));
   const [baseBench, headBench] = benches;

@@ -318,11 +318,23 @@ The kernel boundary goes first, so everything after it lands in its final place.
   - **Benches per lane:** pinned scenes, quality metrics, and deterministic work counts (rays, grid nodes, bodies) in `--profile`, pinned as budgets.
   - **Behaviour fingerprints in recording headers,** so a preview deploy's recording is refused with a reason. Today it would be accepted, then diverge.
   - **The rule** that only up-to-date branches merge.
-- [ ] W0.8 · Determinism at the edges.
+- [x] W0.8 · Determinism at the edges.
   - **A synctest mode in `npm run fuzz`:** save, step and restore through the on-disk codec as well as `structuredClone`, then compare hashes part by part.
   - **A bisect tool:** first bad tick, then phase, then a state-path diff.
   - **A known-answer check at startup** for `Math.sqrt` and `detmath`.
   - **An architecture-test rule** that sort comparators give a total order, with an id to break ties.
+
+**Notes for wave 1** (from the session that built Wave 0):
+- **Work in your lane.** A in `src/sim/perception`, B in `src/sim/ballistics` (empty, its `index.ts` waiting), D in `src/sim/generation`. Reach any other lane through its `index.ts`, and export what others need from yours there. The architecture test reads the lane map, `src/sim/lanes.ts`; if your lane must import another the map doesn't allow, that's a change to the map, made deliberately.
+- **Add to the kernel's types from your lane, by module augmentation:** a new entity kind as `game/entities.ts` adds the player and guards, new `World` fields as `generation/world.ts` adds the camp. `npm run typecheck` also compiles the kernel alone, so kernel code can't use them. If the kernel itself needs something new from a game, it belongs in the `Game` contract (`kernel/game.ts`).
+- **Every system declares `reads`, `writes` and `emits`.** Two systems in a phase that touch the same data need `after`, or the simulation won't start. `tests/systems.test.ts` diffs the state around every system, in the valley and every scene in `SCENES`, against what it declares, so declare honestly and register your scene.
+- **Inside a tick:** `ctx.query()` for every body's shape as it stands, `ctx.spawn` and `ctx.despawn` (declare `entities`), `ctx.channel` to hand a value to a later system in the same tick, and `ctx.work` for your work counts (pass it as a grid search's `work`). Spawn guards with `spawnGuard` (`game/setup.ts`), which gives them their first order.
+- **Brains** (lab E, and A7's minimal reactions) decide in 'decide' and steer through orders (`brain/orders.ts`), kept in the guard's state and carried out in 'intent'. The no-omniscience probe watches in 'decide'.
+- **Grid search** (`kernel/world/search.ts`): costs are whole centimetres, budgets are expansions, and one `GridSearch` per layer can be kept for the world's life.
+- **Codes:** take event and command codes from your range (`kernel/codes.ts`: A 10–29, B 30–49, D 70–89) and name it in the entry's `range`.
+- **Your bench** (`game/benches.ts`): pin your lab's scene in `game/runs.ts` and `game/golden.ts`, add your metrics, and pin them with `npm run bench -- --write`. That is how your exit note's bench numbers stay true after you.
+- **Landing:** rebase onto `main`, regenerate (the values in `game/golden.ts`, `npm run golden`, `npm run bench -- --write`, and `GOLDEN_TAL_4471` for generation), read `npm run explain`, then `npm run land -- <number>`. The repository's plan has no branch rule, so nothing but this stops a merge from a stale branch.
+- **Recordings carry their build's behaviour digest** (format 10): one made on your preview deploy is refused by `main` with a reason, by design. `npm run bisect -- --recording <file>` shows where your build and the one that made it part ways.
 
 ### A · Perception and awareness
 

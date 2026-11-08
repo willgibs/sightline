@@ -102,13 +102,14 @@ To watch a run, drop its recording on the page, pick it from the start screen (W
 | `npm run sim -- --replay file.slrec` | Re-simulates a recording saved from the browser, and says where a run diverged. |
 | `npm run scene` | Every scene headless, by its own driver, checking its expectations. |
 | `npm run seeds -- --count 100` | Generates many valleys and reports validation, timing, overwatch and access. |
-| `npm run fuzz -- --seeds 20 --minutes 60` | Bots play fresh valleys while every body's promises are checked every tick. |
+| `npm run fuzz -- --seeds 20 --minutes 60` | Bots play fresh valleys while every body's promises are checked every tick; `--synctest` also saves, restores and re-steps every 30 ticks. |
 | `npm run playtest` | Re-simulates and summarizes the runs kept in `playtests/`. |
 | `npm run selftest` | The golden values, in this JavaScript engine. |
 | `npm run golden` | Rewrites the golden recording after a deliberate behaviour change. |
 | `npm run bench` | Every lane's bench: pinned runs, the work each system does, quality metrics. |
 | `npm run explain` | For every pinned run that moved since `origin/main`: where it first diverged, and what changed. |
 | `npm run land -- <number>` | Merges a pull request, only if it is up to date with `main` and green. |
+| `npm run bisect -- --recording <file>` | Where this build and the one that made a recording part ways: tick, system, state paths. |
 | `npm run build` | Production build into `dist/`. |
 
 ## How it fits together

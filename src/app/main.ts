@@ -1,4 +1,5 @@
 import { defaultTuning } from '../config/tuning';
+import { knownAnswerProblems } from '../sim/kernel/core/known';
 import { normalizeSeed } from '../sim/kernel/core/seed';
 import type { SpawnKind } from '../sim/kernel/mission';
 import { Game } from './game';
@@ -21,6 +22,25 @@ const overlay = document.querySelector<HTMLElement>('#overlay')!;
 const dprParam = Number(params.get('dpr'));
 const sceneName = params.get('scene');
 
+/** Shows why the game can't start, in the overlay, and stops. */
+function refuse(title: string, report: string, error?: unknown): never {
+  overlay.innerHTML = `<div class="overlay-panel"><div class="wordmark">SIGHTLINE</div><div class="overlay-title"></div><pre class="report" style="display:block"></pre></div>`;
+  overlay.dataset.mode = 'error';
+  overlay.querySelector('.overlay-title')!.textContent = title;
+  overlay.querySelector('.report')!.textContent = report;
+  throw error ?? new Error(title);
+}
+
+// The simulation's math must give the bits every other engine gives, or nothing played
+// here replays anywhere else (kernel/core/known.ts).
+const mathProblems = knownAnswerProblems();
+if (mathProblems.length > 0) {
+  refuse(
+    "This browser's math differs",
+    `Sightline's simulation must compute the same bits in every browser, so runs replay anywhere. This browser's JavaScript engine gives different answers:\n\n${mathProblems.join('\n')}\n\nTry a current Chrome, Firefox, Safari or Edge.`,
+  );
+}
+
 let game: Game;
 try {
   game = new Game({
@@ -41,13 +61,11 @@ try {
 } catch (e) {
   // Without WebGL 2 there is nothing to draw with: say so, rather than leave a blank page.
   const webgl2 = !!document.createElement('canvas').getContext('webgl2');
-  overlay.innerHTML = `<div class="overlay-panel"><div class="wordmark">SIGHTLINE</div><div class="overlay-title"></div><pre class="report" style="display:block"></pre></div>`;
-  overlay.dataset.mode = 'error';
-  overlay.querySelector('.overlay-title')!.textContent = webgl2 ? 'The game could not start' : 'This browser has no WebGL 2';
-  overlay.querySelector('.report')!.textContent = webgl2
-    ? String(e instanceof Error ? e.message : e)
-    : 'Sightline draws with WebGL 2. Turn on hardware acceleration in the browser settings, or try a current Chrome, Firefox, Safari or Edge.';
-  throw e;
+  refuse(
+    webgl2 ? 'The game could not start' : 'This browser has no WebGL 2',
+    webgl2 ? String(e instanceof Error ? e.message : e) : 'Sightline draws with WebGL 2. Turn on hardware acceleration in the browser settings, or try a current Chrome, Firefox, Safari or Edge.',
+    e,
+  );
 }
 game.start();
 (window as unknown as { sightline: unknown }).sightline = game.automation();

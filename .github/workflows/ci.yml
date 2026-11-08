@@ -128,6 +128,27 @@ jobs:
           name: fuzz-failures
           path: fuzz-failures/
 
+  synctest:
+    name: Long synctest run (save, restore, re-step)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # 5 fresh valleys × two bots × an hour each, every 30 ticks saved through the
+      # on-disk codec and by rollback, put back, re-stepped and compared (kernel/synctest.ts).
+      - run: npm run fuzz -- --seeds 5 --minutes 60 --synctest --out synctest-failures
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synctest-failures
+          path: synctest-failures/
+
   same-everywhere:
     name: Same hash on every platform
     needs: [check, platforms]

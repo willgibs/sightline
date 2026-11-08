@@ -223,6 +223,35 @@ describe('architecture', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('sorts only in total orders, with ties broken by an id or an index', () => {
+    // Array.prototype.sort is stable, so equal elements keep their input order, but a
+    // comparator that isn't a consistent total order lets engines order the same input
+    // differently, and ties that fall back on input order move when that order does
+    // (Jolt's warning about std::sort). So every comparator in the simulation either
+    // chains its comparisons with || down to an id or an index, or says on its line why
+    // its keys can't tie (`// unique: ...`). A sort with no comparator orders strings by
+    // code unit, a total order.
+    const offenders: string[] = [];
+    for (const f of files(sim)) {
+      const src = readFileSync(f, 'utf8');
+      for (let at = src.indexOf('.sort('); at >= 0; at = src.indexOf('.sort(', at + 1)) {
+        let depth = 0;
+        let end = at + 5;
+        for (; end < src.length; end++) {
+          if (src[end] === '(') depth++;
+          else if (src[end] === ')' && --depth === 0) break;
+        }
+        const comparator = src.slice(at + 6, end).trim();
+        if (comparator === '') continue;
+        const lineEnd = src.indexOf('\n', end);
+        const line = src.slice(src.lastIndexOf('\n', at) + 1, lineEnd < 0 ? src.length : lineEnd);
+        if (comparator.includes('||') || /\/\/ unique: /.test(line)) continue;
+        offenders.push(`${relative(root, f)}: .sort(${comparator})`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it('never calls Math.random inside the simulation', () => {
     const offenders = files(sim)
       .filter((f) => !f.endsWith('seed.ts')) // randomSeed() is UI-only and documented as such

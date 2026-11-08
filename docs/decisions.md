@@ -6,6 +6,18 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.
 
+### Determinism, hardened at the edges (W0.8)
+
+**Decision:**
+- **Synctest in the fuzz run** (`npm run fuzz -- --synctest`, `kernel/synctest.ts`). Every 30 ticks the state is saved twice: through `structuredClone`, and through a new exact on-disk codec for save-states (`kernel/record/stateCodec.ts`: every number's 64 bits, −0 and NaN, every key in its order). After 30 more ticks each copy is put back, the codec's into a fresh shadow simulation and the clone into the main one (a rollback), and re-stepped with the same inputs; every tick must match part by part. A weekly CI job runs it for 10 hours of play. A test plants state in a closure and sees it caught at the first re-stepped tick, with its part and path.
+- **Bisect** (`npm run bisect`): from a recording (against the build that made it) or a pinned run (against `origin/main`), the first tick the two builds differ, then the first system within that tick, then the state paths that system left different. `npm run trace` gained recordings, per-system hashes and dumps after any system for it.
+- **Known answers at startup** (`kernel/core/known.ts`): exact bits of `Math.sqrt` for twelve inputs, proved correctly rounded with integer arithmetic in `tests/known.test.ts`, and of every detmath function. The game refuses to start in an engine that gets them wrong, the headless tools stop, and the self-test checks them in every engine CI runs.
+- **Sort comparators** must break ties with an id or an index, or say on their line why their keys can't tie; the architecture test checks every `.sort(` in the simulation. The footstep table's sort now names its tie-break, the gaits' order, which stable sorting already gave.
+
+**What moved:** nothing.
+
+**Why:** the core already matched industry practice; these were its edges (`docs/research/foundations.md`). The fuzz run never restored state mid-run, a divergence named a part of the state but not the tick, system or path, and nothing checked an engine outside CI.
+
 ### Landing, made mechanical (W0.7)
 
 **Decision:**
