@@ -33,10 +33,19 @@ export type Action =
   | 'restart'
   // The fly camera.
   | 'flyUp'
-  | 'flyDown';
+  | 'flyDown'
+  // Watching a replay.
+  | 'replayPlay'
+  | 'replayBack'
+  | 'replayForward'
+  | 'replayStepBack'
+  | 'replayStepForward';
 
-/** Where an action means something: on foot (play), always (even paused), in the debug view, with the fly camera. */
-export type Context = 'play' | 'always' | 'debug' | 'fly';
+/**
+ * Where an action means something: on foot (play), always (even paused), in the debug
+ * view, with the fly camera, watching a replay (where the debug view's keys work too).
+ */
+export type Context = 'play' | 'always' | 'debug' | 'fly' | 'replay';
 
 export interface ActionSpec {
   context: Context;
@@ -69,6 +78,11 @@ export const DEFAULT_ACTIONS: Readonly<Record<Action, ActionSpec>> = {
   restart: { context: 'debug', kind: 'pressed', inputs: ['KeyR'], label: 'restart run' },
   flyUp: { context: 'fly', kind: 'held', inputs: ['Space', 'KeyE'], label: 'up' },
   flyDown: { context: 'fly', kind: 'held', inputs: ['KeyQ'], label: 'down' },
+  replayPlay: { context: 'replay', kind: 'pressed', inputs: ['KeyP'], label: 'play or pause' },
+  replayBack: { context: 'replay', kind: 'pressed', inputs: ['ArrowLeft'], label: 'back 5 s' },
+  replayForward: { context: 'replay', kind: 'pressed', inputs: ['ArrowRight'], label: 'on 5 s' },
+  replayStepBack: { context: 'replay', kind: 'pressed', inputs: ['Comma'], label: 'tick back' },
+  replayStepForward: { context: 'replay', kind: 'pressed', inputs: ['Period'], label: 'tick on' },
 };
 
 /** Looks actions up by input, and inputs up by action, within the active contexts. */
@@ -113,6 +127,10 @@ export function inputName(input: string): string {
     BracketLeft: '[',
     BracketRight: ']',
     Space: 'Space',
+    ArrowLeft: '←',
+    ArrowRight: '→',
+    Comma: ',',
+    Period: '.',
   };
   if (names[input]) return names[input]!;
   if (input.startsWith('Key')) return input.slice(3);

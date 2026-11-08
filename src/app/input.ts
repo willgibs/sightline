@@ -37,6 +37,11 @@ export class InputController {
   readonly latch = new CommandLatch();
   /** The contexts whose bindings count now (actions.ts); the game keeps it current. */
   readonly contexts = new Set<Context>(['play', 'always']);
+  /**
+   * Keys act without the pointer lock (watching a replay: nothing is being played, and the
+   * mouse is for the timeline).
+   */
+  freeKeys = false;
   private readonly commands: Command[] = [];
   /** Inputs held down: key codes, and Mouse0 to Mouse4. */
   private readonly down = new Set<string>();
@@ -173,15 +178,22 @@ export class InputController {
       if (!repeat) this.onAction?.('debugView');
       return;
     }
-    if (!this.locked) {
+    if (!this.locked && !this.freeKeys) {
       // A held action's key pressed before the lock still counts when play resumes.
       if (!repeat && actions.some((a) => this.map.actions[a].kind === 'held')) this.down.add(input);
       return;
     }
-    // While playing, keys are the game's: Tab would move the focus, and browser shortcuts
-    // (reload, find, print, save) would take the window away mid-run. Ctrl+Shift stays the
-    // browser's, for its developer tools.
-    if (e && (this.map.isBound(input) || input.startsWith('F') || input === 'Tab' || ((e.ctrlKey || e.metaKey) && !e.shiftKey))) e.preventDefault();
+    if (!this.locked) {
+      // Free keys: the page keeps its own (Tab, shortcuts), except the ones bound here
+      // in a context that's on (an arrow would scroll it).
+      if (e && actions.length > 0 && !e.ctrlKey && !e.metaKey && !e.altKey) e.preventDefault();
+      else if (e && actions.length > 0) return;
+    } else if (e && (this.map.isBound(input) || input.startsWith('F') || input === 'Tab' || ((e.ctrlKey || e.metaKey) && !e.shiftKey))) {
+      // While playing, keys are the game's: Tab would move the focus, and browser shortcuts
+      // (reload, find, print, save) would take the window away mid-run. Ctrl+Shift stays the
+      // browser's, for its developer tools.
+      e.preventDefault();
+    }
     if (repeat) return;
     this.down.add(input);
     for (const a of actions) {

@@ -6,6 +6,17 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### A recording can be watched, from any camera, at any moment
+
+**Decision:** the game watches recordings (`src/app/replay.ts`):
+
+- **Opening one:** drop a file on the page, pick it on the start screen, choose one the deployed game kept, or load `?replay=<url>` (in development, any session in `playtests/`).
+- **Seeking:** opening one builds its world and re-simulates it once, keeping save-states (`ReplaySeeker`), so seeking anywhere is exact. Playing steps the recorded input forward, so guards do exactly what they did.
+- **The view:** the camera is the player's eyes, looking and zooming as they did, or the fly camera. The player's body is drawn whenever the camera is out of it (`render/playerMesh.ts`): its shape in its stance, the one sight and hits use.
+- **Controls:** a timeline with the run's markers and pauses, speeds from ¼× to 8×, and replay keys in their own context (P, arrows, comma and period). The debug view's keys work in either view.
+
+**Why:** a playtest's recording replays exactly. Watching it is how you find out why a guard saw you, and later the debrief and the tactical map (Phase 2) show the same thing. Building the viewer now also proves the renderer can draw the simulation from any state and any camera, which nothing else had tested.
+
 ### Every playtest is kept, and can be studied without the browser
 
 **Decision:**

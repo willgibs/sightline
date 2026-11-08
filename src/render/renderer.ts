@@ -10,6 +10,7 @@ import type { Snapshot } from '../sim/sim';
 import { DebugLayer } from './debugLayer';
 import { GuardMeshes } from './guardMeshes';
 import { FoliageInteriors } from './interiors';
+import { PlayerMesh } from './playerMesh';
 import { createLook, type LookUniforms } from './materials';
 import { palette } from './palette';
 import { createSky } from './sky';
@@ -50,6 +51,7 @@ export class GameRenderer {
   private guards: GuardMeshes | null = null;
   private solids: SolidMeshes | null = null;
   private interiors: FoliageInteriors | null = null;
+  private player: PlayerMesh | null = null;
   private readonly projected = new THREE.Vector3();
   private debug: DebugLayer | null = null;
   private debugOn = false;
@@ -86,6 +88,8 @@ export class GameRenderer {
     this.worldGroup.add(this.solids.group);
     this.interiors = new FoliageInteriors(world, this.look);
     this.worldGroup.add(this.interiors.group);
+    this.player = new PlayerMesh(this.look, tuning.bodies.player);
+    this.worldGroup.add(this.player.group);
     this.debug = new DebugLayer(world, tuning);
     this.debug.group.visible = this.debugOn;
     this.debug.setCollidersVisible(this.collidersOn);
@@ -99,6 +103,7 @@ export class GameRenderer {
     this.guards?.dispose();
     this.debug?.dispose();
     this.interiors?.dispose();
+    this.player?.dispose();
     disposeTree(this.worldGroup);
     this.scene.remove(this.worldGroup);
     this.worldGroup = new THREE.Group();
@@ -106,10 +111,12 @@ export class GameRenderer {
     this.guards = null;
     this.solids = null;
     this.interiors = null;
+    this.player = null;
     this.debug = null;
   }
 
   setTuning(tuning: Tuning): void {
+    this.player?.setSpec(tuning.bodies.player);
     this.look.uFogDensity.value = tuning.view.fogDensity;
     (this.scene.fog as THREE.FogExp2).density = tuning.view.fogDensity;
   }
@@ -174,6 +181,7 @@ export class GameRenderer {
     this.guards?.update(prev, curr, alpha, cam.position);
     this.solids?.update(prev, curr, alpha);
     this.interiors?.update(pose.x, pose.y, pose.z);
+    this.player?.update(prev, curr, alpha, cam.position);
     if (this.debugOn) this.debug?.update(prev, curr, alpha, time, aim, cam.position);
     this.gl.render(this.scene, cam);
   }

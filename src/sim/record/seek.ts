@@ -1,4 +1,5 @@
 import { neutralInput } from '../input';
+import type { SimEvent } from '../events';
 import type { Simulation } from '../sim';
 import type { SimState } from '../state';
 import type { Recording, TuningChange } from './recording';
@@ -11,6 +12,8 @@ import { replaySimulation, type ReplayOptions } from './resim';
  * cache (about a kilobyte each); the recording itself stays inputs only. A run that
  * ended in a fault can be watched up to the tick before it.
  */
+const NO_EVENTS: readonly SimEvent[] = [];
+
 export class ReplaySeeker {
   readonly sim: Simulation;
   /** The last tick that can be shown: the recording's end, or the tick before its fault. */
@@ -53,10 +56,19 @@ export class ReplaySeeker {
     return this.sim;
   }
 
-  private stepOne(): void {
+  /**
+   * Plays one more tick of the recording, from wherever the simulation is, and returns its
+   * events (the array is reused); none at the end. For watching a replay play.
+   */
+  step(): readonly SimEvent[] {
+    if (this.sim.tick >= this.ticks) return NO_EVENTS;
+    return this.stepOne();
+  }
+
+  private stepOne(): readonly SimEvent[] {
     this.applyTuning();
     this.rec.readInput(this.sim.tick, this.input);
-    this.sim.step(this.input);
+    return this.sim.step(this.input);
   }
 
   /** Brings in any tuning change that applies from the next tick. */

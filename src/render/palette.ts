@@ -34,6 +34,8 @@ export const palette = {
   bush: '#b5bea9',
   guard: '#262a2f',
   guardVisor: '#e9e4d8',
+  /** The player's own body, seen from outside it (the fly camera, a replay): dark like the guards, but blue. */
+  player: '#1f4f6e',
 
   debug: {
     cone: '#ff8c1a',

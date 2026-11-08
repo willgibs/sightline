@@ -416,6 +416,188 @@ body {
   visibility: hidden;
 }
 
+/* Watching a recording: a file picker, or a file dropped on the page. */
+.watch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font: 11px/1.4 var(--mono);
+  color: var(--panel-soft);
+}
+
+.watch-row .link,
+.kept-run .link {
+  border: 1px solid rgba(233, 236, 239, 0.18);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--panel-ink);
+  font: 11px/1 var(--mono);
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.watch-row .link:hover,
+.kept-run .link:hover {
+  border-color: rgba(233, 236, 239, 0.5);
+}
+
+.kept-run {
+  display: inline-flex;
+  gap: 4px;
+}
+
+#overlay:not([data-mode='start']):not([data-mode='paused']) .watch-row {
+  display: none;
+}
+
+/* While the timeline shows, what sits along the bottom moves up above it and the keys. */
+.replaying .toast {
+  bottom: 112px;
+}
+
+/* A replay shows its own keys instead of the debug view's, in either view. */
+.replay-legend {
+  display: none;
+  position: absolute;
+  left: 14px;
+  bottom: 74px;
+  padding: 7px 10px;
+  background: var(--panel);
+  color: var(--panel-soft);
+  font: 10.5px/1 var(--mono);
+  border-radius: 6px;
+}
+
+.replay-legend span {
+  margin-right: 12px;
+}
+
+.replay-legend span:last-child {
+  margin-right: 0;
+}
+
+.replay-legend kbd {
+  margin-right: 5px;
+}
+
+.replaying .replay-legend {
+  display: block;
+}
+
+.replaying #hud.is-debug .legend {
+  display: none;
+}
+
+/* The panel stops above the replay's keys and timeline. */
+.replaying #hud.is-debug .debug-panel {
+  max-height: calc(100vh - 58px - 112px);
+}
+
+.replaying #hud.is-debug .toast {
+  bottom: 112px;
+}
+
+/* The replay's timeline, along the bottom of the view. */
+.timeline {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(29, 34, 39, 0.82);
+  color: var(--panel-ink);
+  font: 11px/1.2 var(--mono);
+  z-index: 5;
+}
+
+.timeline[hidden] {
+  display: none;
+}
+
+.timeline button {
+  border: 1px solid rgba(233, 236, 239, 0.18);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--panel-ink);
+  font: 11px/1 var(--mono);
+  padding: 6px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.timeline button:hover {
+  border-color: rgba(233, 236, 239, 0.5);
+}
+
+.timeline .play {
+  width: 34px;
+}
+
+.timeline .time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline .track {
+  position: relative;
+  flex: 1;
+  min-width: 80px;
+  display: flex;
+  align-items: center;
+}
+
+.timeline .track input {
+  width: 100%;
+  margin: 0;
+  accent-color: #e9ecef;
+}
+
+.timeline .marks {
+  position: absolute;
+  inset: 0 8px;
+  pointer-events: none;
+}
+
+.timeline .mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+}
+
+.timeline .mark-marker {
+  background: #f2b84b;
+}
+
+.timeline .mark-pause {
+  background: rgba(233, 236, 239, 0.35);
+}
+
+.timeline .mark-other {
+  background: rgba(150, 190, 230, 0.6);
+}
+
+.timeline .title {
+  color: var(--panel-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 30%;
+}
+
+@media (max-width: 640px) {
+  .timeline .title {
+    display: none;
+  }
+}
+
 /* Runs the deployed game kept in this browser, offered for saving. */
 .kept {
   display: flex;

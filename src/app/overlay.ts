@@ -12,6 +12,8 @@ export interface OverlayHandlers {
   onResume: () => void;
   onGenerate: (seed: string) => void;
   onSaveRecording: () => void;
+  /** A recording file chosen for watching. */
+  onWatch: (file: File) => void;
   /** The action under an error or an outcome: what it does depends on what happened (game.ts). */
   onRetry: () => void;
   /** A setting changed: apply it and keep it. */
@@ -76,6 +78,11 @@ export class Overlay {
           <button class="link" type="button" data-act="save">Save recording</button>
         </div>
         <div class="kept" hidden></div>
+        <div class="watch-row">
+          <button class="link" type="button" data-act="watch">Watch a recording…</button>
+          <span>or drop one on the page</span>
+          <input type="file" accept=".slrec" hidden />
+        </div>
       </div>`;
     labelKeys(root);
     this.settingsRoot = root.querySelector('.settings')!;
@@ -94,6 +101,13 @@ export class Overlay {
     });
     root.querySelector('[data-act="generate"]')!.addEventListener('click', () => handlers.onGenerate(normalizeSeed(this.seedInput.value)));
     root.querySelector('[data-act="save"]')!.addEventListener('click', () => handlers.onSaveRecording());
+    const picker = root.querySelector<HTMLInputElement>('input[type="file"]')!;
+    root.querySelector('[data-act="watch"]')!.addEventListener('click', () => picker.click());
+    picker.addEventListener('change', () => {
+      const file = picker.files?.[0];
+      picker.value = '';
+      if (file) handlers.onWatch(file);
+    });
     this.seedInput.addEventListener('keydown', (e) => {
       e.stopPropagation();
       // A held Enter repeats; one valley per press.
@@ -191,20 +205,29 @@ export class Overlay {
    * Runs kept in this browser (the deployed game's autosaves, playtest.ts), newest first,
    * each with a way to save it as a file. Empty hides the line.
    */
-  setKept(runs: ReadonlyArray<{ text: string; save: () => void }>): void {
+  setKept(runs: ReadonlyArray<{ text: string; save: () => void; watch: () => void }>): void {
     const el = this.root.querySelector<HTMLElement>('.kept')!;
     el.hidden = runs.length === 0;
     el.replaceChildren();
     if (runs.length === 0) return;
     el.append('Kept in this browser:');
     for (const run of runs) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'link';
-      b.textContent = run.text;
-      b.title = 'Save this run as a recording file';
-      b.addEventListener('click', run.save);
-      el.append(b);
+      const item = document.createElement('span');
+      item.className = 'kept-run';
+      const watch = document.createElement('button');
+      watch.type = 'button';
+      watch.className = 'link';
+      watch.textContent = `▶ ${run.text}`;
+      watch.title = 'Watch this run';
+      watch.addEventListener('click', run.watch);
+      const save = document.createElement('button');
+      save.type = 'button';
+      save.className = 'link';
+      save.textContent = 'save';
+      save.title = 'Save this run as a recording file';
+      save.addEventListener('click', run.save);
+      item.append(watch, save);
+      el.append(item);
     }
   }
 }

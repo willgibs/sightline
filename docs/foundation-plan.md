@@ -113,7 +113,12 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
   - The report holds what only the browser knew: frame-time percentiles and slow frames, the GPU, the screen, the settings and the sound's state.
   - Pauses and markers (M) are noted in the recording itself.
 - [x] `npm run playtest -- <file|dir>` re-simulates each session. It checks that the session replays bit for bit, and that every body kept the motor's promises all the way through. Then it summarizes what happened: distance, steps by surface, the loudest step, stance time, shots, the nearest guard, and each marker with where you were. From the report beside it, it adds frames, the machine and the sound.
-- [ ] A replay viewer with scrubbing.
+- [x] A replay viewer with scrubbing (`src/app/replay.ts`, `timeline.ts`).
+  - Opening a recording: drop it on the page, pick it from the start screen, use one the deployed game kept, or load `?replay=playtests/<name>.slrec` in development.
+  - It builds the run's world and re-simulates the recording once, keeping save-states, so seeking anywhere is exact.
+  - It plays at ¼× to 8×, from the player's eyes (looking and zooming as they did) or the fly camera.
+  - The player's body is drawn whenever the camera is out of it: the same head, torso and legs that guards see and shots hit, in its stance.
+  - The timeline shows the run's markers and pauses. The debug views all work, and sounds play up to 2×.
 - [x] Determinism in every engine, on every push (`.github/workflows/engines.yml`): the browser tests in Chromium, Firefox and WebKit, and the self-test under Bun (JavaScriptCore). All four give the golden values.
   - The weekly run adds 40 hours of bot play on fresh valleys, with every body checked every tick (`npm run fuzz`). A failure is saved as a recording that reproduces it.
   - The first-run hang was Vite meeting a dependency mid-run and reloading the page under the tests; three is now bundled up front.

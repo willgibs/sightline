@@ -13,6 +13,7 @@ import './styles.css';
  *   ?spawn=edge      start where the road leaves the map instead of on an overlook
  *   ?bench           run the 20-second performance flythrough and report
  *   ?dpr=2           render resolution multiplier, 0.5 to 3 (default: device ratio, capped at 1.5)
+ *   ?replay=playtests/<name>.slrec   watch a recording (in development, any session in playtests/)
  */
 const params = new URLSearchParams(window.location.search);
 const canvas = document.querySelector<HTMLCanvasElement>('#view')!;
@@ -35,6 +36,7 @@ try {
     pixelRatioFollowsScreen: !(dprParam > 0),
     sceneName,
     scene: sceneName ? SCENES[sceneName]?.() : null,
+    replayUrl: params.get('replay'),
   });
 } catch (e) {
   // Without WebGL 2 there is nothing to draw with: say so, rather than leave a blank page.

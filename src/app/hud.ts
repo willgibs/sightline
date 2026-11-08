@@ -31,6 +31,7 @@ export class Hud {
       <canvas class="compass" width="440" height="34"></canvas>
       <pre class="debug-panel"></pre>
       <div class="legend"></div>
+      <div class="replay-legend"></div>
       <div class="reticle"></div>
       <div class="range"></div>
       <div class="toast"></div>
@@ -55,6 +56,19 @@ export class Hud {
     ];
     this.legend.innerHTML = legend.map(([actions, text]) => `<span>${keysHtml(map, actions)}${text}</span>`).join('');
     labelKeys(this.legend);
+    // Watching a replay: its own keys, in either view.
+    const replayLegend: Array<[Action[], string]> = [
+      [['replayPlay'], 'play or pause'],
+      [['replayBack', 'replayForward'], '5 s'],
+      [['replayStepBack', 'replayStepForward'], 'a tick'],
+      [['slower', 'faster'], 'speed'],
+      [['restart'], 'start'],
+      [['flyCamera'], 'fly camera'],
+      [['debugView'], 'debug view'],
+    ];
+    const replayKeys = root.querySelector<HTMLElement>('.replay-legend')!;
+    replayKeys.innerHTML = replayLegend.map(([actions, text]) => `<span>${keysHtml(map, actions)}${text}</span>`).join('');
+    labelKeys(replayKeys);
     this.resizeCompass();
   }
 
