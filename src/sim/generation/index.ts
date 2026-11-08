@@ -23,6 +23,6 @@ export { surveyWorld, type Survey, type SurveyAnalysis, type SurveyGuard, type S
 export { analyzeCamp, type CampAnalysis, type PathReport, type PerchReport } from './campAnalysis';
 export { infiltrate, spaceTimeSearch } from './infiltrate';
 export { buildRaster } from './raster';
-export { campPlans, planOn, sameSignature, sharedFields, writtenShots, type Approach, type Plan, type PlanSignature, type WrittenShots } from './plans';
+export { campPlans, planOn, sameSignature, SECTORS, sharedFields, writtenShots, type Approach, type Plan, type PlanSignature, type WrittenShots } from './plans';
 export type { AnalysisParts } from './campAnalysis';
 export type { Cluster } from './clusters';

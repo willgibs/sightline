@@ -2,6 +2,25 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · One overlook, from both sides (E12)
+
+**Decision:** the scenario `overlook` runs on any generated camp with the whole brain awake. `plan=clear` is a perfect shooter on the best overview who never moves and takes everyone he can see, the target last, one shot every 5 s by default (a person's pace; `pace=1.5` is as fast as the bolt allows). `plan=timed` is a shooter on a certified perch who waits for a clear line to the target's head while nobody is watching him, and fires, up to three times. The bench pins both on three camps. Scene expectations hold only what must be true on every camp.
+
+**What it found** (30 fresh camps, series `lab-e-overlook`):
+
+| | Guards down | Target got away | Cleared outright | Undecided or target down |
+| --- | --- | --- | --- | --- |
+| One perch, a shot every 5 s | 8.7 of 9.6 | 22 of 30 | 2 of 30 | 6 |
+| One perch, as fast as the bolt | 8.2 of 9.6 | 10 of 30 | 1 of 30 | 19 |
+
+The timed shot takes the target in 28 of 30, a median 138 s in. In the other two the shots were taken and didn't drop him.
+
+**What was tried and taken back:** ordering the whole camp to cover from the believed perch, having guards duck at the first shot they hear, and making cover hide the head, not the chest. Each made it worse. Guards ran across open ground to reach cover, and those who would have run for the alarm didn't, so the target stopped getting away. Cover within 12 m rarely hides a guard from a ridge in any case. Tuning this blind was the wrong tool, so the brain is as lab E left it and the question goes to the owner with the numbers.
+
+**Why it's open:** the plan asks for "on every validated camp"; 2 of 30 isn't every, and the mission-losing alarm depends on who is left to raise it. The target's escape, not the guards' survival, is what stops a shooter on a ridge.
+
+**What moved:** the brain's bench gains the four numbers. Nothing else pinned.
+
 ## 2026-11-08 · The camp's equipment (E7, E8, A9's doors)
 
 **Decision:**

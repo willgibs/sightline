@@ -21,6 +21,7 @@ import { runScene, sceneOver, sceneTicks, startScene, type Scene as KernelScene 
 import { emptyEstimate, fuseBearings, inEllipse, type Bearing, type FuseGrid } from '../brain';
 import { POLICIES, pursuit } from './baselines';
 import { campScenario } from './scenes/campScenario';
+import { overlook } from './scenes/overlook';
 import type { Tuning } from '../../config/tuning';
 import { withSystem, type System } from '../kernel/systems';
 import { Surface } from '../kernel/world/surfaces';
@@ -537,6 +538,38 @@ function brainMetrics(): Record<string, number> {
   }
   m['reactions (in the scripted scenarios)'] = reactions;
   m['reactions unexplained'] = unexplained;
+  // One overlook, from both sides (E12): a perfect shooter who stays on the best overview, at a person's pace, and one timed shot at the target.
+  let down = 0;
+  let there = 0;
+  let cleared = 0;
+  let away = 0;
+  let timed = 0;
+  const OVERLOOK_SEEDS = GENERATION_SEEDS.slice(0, 3);
+  for (const seed of OVERLOOK_SEEDS) {
+    const clear = overlook(`seed=${seed}&plan=clear`);
+    const sim = startScene(clear, T);
+    const start = new Set(sim.guards.map((g) => g.id));
+    const driver = clear.driver!();
+    const raw = clear.game.still(sim);
+    const ticks = sceneTicks(clear, T);
+    while (!sceneOver(clear, sim, ticks)) sim.step(driver.next(sim, raw));
+    const left = sim.guards.filter((g) => start.has(g.id)).length;
+    there += start.size;
+    down += start.size - left;
+    if (sim.state.outcome.status === 'failed') away++;
+    else if (left === 0) cleared++;
+    const shot = overlook(`seed=${seed}&plan=timed`);
+    const run = startScene(shot, T);
+    const d = shot.driver!();
+    const r = shot.game.still(run);
+    const t = sceneTicks(shot, T);
+    while (!sceneOver(shot, run, t)) run.step(d.next(run, r));
+    if (run.state.outcome.status === 'succeeded') timed++;
+  }
+  m[`overlook: guards down from one perch, of ${there}`] = down;
+  m[`overlook: camps cleared (of ${OVERLOOK_SEEDS.length})`] = cleared;
+  m[`overlook: the target got away (of ${OVERLOOK_SEEDS.length})`] = away;
+  m[`timed shot: target down (of ${OVERLOOK_SEEDS.length})`] = timed;
   return m;
 }
 
