@@ -696,6 +696,27 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - the perfect shooter fails and a planner succeeds on every camp;
   - zero unexplained reactions.
 
+**Recorded before building (Nov 8), so the exit note can be read against it:**
+- **The seed, as the bench runs it.** The bench keeps the seed's policies as brains of their own, run on the same camps, beside the real one:
+  - **The seed search:** The Last of Us's shape without its cheat (close on the last known position; after 10 s unseen one guard goes to check; a timed sweep; a timer ends it, with no map and no check of the truth).
+  - **Xu and Verbrugge's four baselines:** a random walk, a plain state machine, a staleness search and an omniscient chaser.
+- **Where the seed falls short, in the bench's terms:**
+  - **Search cycles.** The seed's honest cycle runs far past the target: The Last of Us's focus tests averaged nearly 2 minutes (about 120 s), and it reached 30 s only by checking the player's true position.
+  - **Truth.** The omniscient chaser, and any director or search that reads the truth, fails the no-omniscience probe at its first decision.
+  - **State.** Per-guard maps over the valley would put about 410,000 numbers into the hashed state.
+  - **Budgets.** The seed's are milliseconds; nothing about them can be pinned.
+  - **Counter-snipers.** No published model is calibrated: nothing says how often a stated ellipse contains the shooter.
+- **The target, in the bench's metrics:**
+  - **No-omniscience, over the whole brain.** Zero leaks: every guard's mind, the commander's input and the pacing layer's are hashed, in runs with the player at two places beyond every sense; every layer has a planted peek the probe catches.
+  - **Search cycles.** From the last percept to the end of the search, 30–45 s in at least 90% of the seeded runs of the search scenario, with the same length to the bit wherever the unsensed player is (ended by belief, never truth).
+  - **The camp's memory.** One search map of at most 5,000 numbers, against the seed's 410,000.
+  - **Calibration.** Over at least 400 seeded shots, the fused ellipse contains the true perch 39% ± 5 points of the time at one standard deviation and 86% ± 5 points at two, and it shrinks with repeated shots from one place.
+  - **Relocation emerges.** At ±5° and 300 m, a shooter who moves 26–30 m between shots is outside the camp's two-sigma ellipse at least half the time, with no meter anywhere.
+  - **Competence.** On the same camps, the honest brain re-finds an evading bot at least 80% as often as the omniscient chaser, ahead of the staleness search, the plain machine and the random walk (their published order). Pacing then throttles it deliberately, so it is fair by design.
+  - **One overlook doesn't clear the camp.** On every validated camp, a perfect shooter on the best perch fails, and a shooter who relocates, splits clusters and times shots succeeds.
+  - **Explained.** Every reaction has a reason code and a chain of causes back to a percept: zero exceptions over the bench's runs.
+  - **Seen to react.** A shot from 300 m gets a reaction a watcher can see inside the design's window: at most 2 s.
+
 **Milestones:**
 - [ ] E1 · Navigation on the grid search (W0.5).
   - Coarse routes over the map layer and a fine local grid over the camp.
