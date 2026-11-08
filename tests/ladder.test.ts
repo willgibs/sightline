@@ -90,6 +90,32 @@ describe('a ladder', () => {
     expect(watch.report.first).toBeNull();
   });
 
+  it('lets go near its foot without the same press taking it again', () => {
+    const { sim, watch } = run();
+    step(sim, watch, 0, 0, true);
+    for (let t = 1; t < 12; t++) step(sim, watch, t, 0, false);
+    // A hand's breadth up: a press drops it to the ground within the press's buffer.
+    for (let t = 12; t < 14; t++) step(sim, watch, t, 1, false);
+    expect(sim.player.motor).toBe('ladder');
+    step(sim, watch, 14, 0, true);
+    expect(sim.player.motor).toBe('air');
+    for (let t = 15; t < 40; t++) step(sim, watch, t, 0, false);
+    expect(sim.player.motor).toBe('ground');
+    expect(watch.report.first).toBeNull();
+  });
+
+  it('goes over the top crouched, as it was checked, under a roof a standing body would not fit', () => {
+    // A roof 1.5 m over the deck: room for a crouch, none to stand.
+    const { sim, watch } = run([box(-1.5, 1.5, -1.5, 1.2, 6.5, 6.7)]);
+    expect(sim.player.stance).toBe('stand');
+    step(sim, watch, 0, 0, true);
+    for (let t = 1; t < 160 && sim.player.motor === 'ladder'; t++) step(sim, watch, t, 1, false);
+    for (let t = 160; t < 260 && sim.player.motor !== 'ground'; t++) step(sim, watch, t, 1, false);
+    expect(sim.player.y).toBeCloseTo(5, 6);
+    expect(sim.player.z).toBeLessThan(1.4);
+    expect(watch.report.first).toBeNull();
+  });
+
   it('waits for what is in its way, and never goes into it', () => {
     // A low slab across the ladder's line at 2 m: the climber's head meets it.
     const { sim, watch } = run([box(-0.6, 0.6, 1.55, 2.6, 2.0, 2.2)]);

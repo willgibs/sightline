@@ -4,6 +4,7 @@ import { makeTerrainSample } from '../kernel/world/heightfield';
 import { surfaceLoudness } from '../kernel/world/surfaces';
 import { bodyHeight, groundBelow, type BodySpec, type BodyState } from './body';
 import { canMantle, planMantleFrom, poseClear, type MantlePose } from './mantle';
+import { requestStance } from './stance';
 import type { MotorContext, MoveIntent } from './motor';
 import type { Solids } from '../kernel/world/solids';
 import type { World } from '../kernel/world/world';
@@ -162,6 +163,7 @@ function startFromTop(b: BodyState, spec: BodySpec, ctx: MotorContext, index: nu
   const out = planMantleFrom(b, line.x, top, line.z, -l.ox, -l.oz, spec, ctx, true);
   if (!out) return false;
   out.then = index;
+  if (b.stance !== 'crouch') requestStance(b, 'crouch', spec, ctx);
   b.mantle = out;
   b.motor = 'mantle';
   b.vx = 0;
@@ -212,6 +214,9 @@ export function stepLadder(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Mot
     // At the top: over the edge, if there's a way.
     const out = planMantleFrom(b, b.x, b.y, b.z, -l.ox, -l.oz, spec, ctx, false);
     if (out) {
+      // Over the edge crouched, as it was checked, and upright again on the far side.
+      out.stand = b.stance === 'stand';
+      if (out.stand) requestStance(b, 'crouch', spec, ctx);
       b.mantle = out;
       b.motor = 'mantle';
       b.ladder = null;

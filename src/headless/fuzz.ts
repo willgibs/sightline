@@ -43,7 +43,7 @@ const one = args.get('seed');
 const seeds = one ? [normalizeSeed(one)] : Array.from({ length: Number(args.get('seeds') ?? 6) }, () => randomSeed());
 // The movement scenes go with them: their walls, windows, ladder, crawl space and guards are where the
 // motor's modes are worked hardest (a fresh valley has few of them).
-const scenes = args.has('no-scenes') ? [] : ['movement-lab', 'movement-course'];
+const scenes = one || args.has('no-scenes') ? [] : ['movement-lab', 'movement-course'];
 const bots = (args.get('bot') ?? 'wander,chaos').split(',').map((b) => b.trim());
 const outDir = args.get('out') ?? '.';
 const synctest = args.has('synctest') ? (args.get('synctest') === 'true' ? 30 : Number(args.get('synctest'))) : 0;
