@@ -28,7 +28,18 @@ export interface FireCommand {
   pitch: number;
 }
 
-export type Command = FireCommand;
+/**
+ * Sandbox (A10): drop a noise where the player looks, from the debug view. It carries the
+ * moment and the view of the frame clicked, like a shot, so it lands where the aim was.
+ */
+export interface NoiseCommand {
+  kind: 'noise';
+  lag: number;
+  yaw: number;
+  pitch: number;
+}
+
+export type Command = FireCommand | NoiseCommand;
 export type CommandKind = Command['kind'];
 
 /** How a command field is stored and quantized. */
@@ -44,6 +55,7 @@ export interface CommandSpec<C> {
 
 export const COMMANDS: { readonly [K in CommandKind]: CommandSpec<Extract<Command, { kind: K }>> } = {
   fire: { code: 1, range: 'foundation', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
+  noise: { code: 10, range: 'perception', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
 };
 
 /** The most commands one tick carries; more are dropped, oldest kept. */

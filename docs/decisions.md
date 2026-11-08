@@ -6,6 +6,15 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
 
+### Sandbox drops and the time scale (A10), and where other stimuli plug in (A9)
+
+**Decision:**
+- **A noise drop is a command** (`noise`, code 10): pressing X in the debug view drops a noise where the view points, carrying the moment and the view of the frame on screen like a shot, so it lands where the aim was at any frame rate. The `sandbox-drops` system (the game's, in 'commands', after the player's own commands) casts along that view from the eye at that moment and makes a 30 m noise where the line lands, heard by the law of sound. It is input the bots never give, so it joins `SYSTEMS` without moving a golden, and a recording replays it.
+- **Automation:** `sightline.noise()` drops one; `sightline.timeScale(x)` sets the debug view's fast-forward (0.25× to 8×).
+- **A9's wiring point** (`perception/stimuli.ts`, `HEARD_AS`): what each sound event is heard as, which sets what it raises a guard to. Lab B's report, impact and bolt become shots and its cry a voice when they land; a body, a comrade dropping, a thrown object, lens glint and an open door come in through `stimulate` at their levels when B4, B6, B9 and D4 are on `main`.
+
+**What moved:** nothing. `SYSTEMS` gains `sandbox-drops`; the spawn-tick scene's system in 'commands' declares its order after it (the same order as before).
+
 ### Cues in the honest view, and the fairness checks (A8)
 
 **Decision:**

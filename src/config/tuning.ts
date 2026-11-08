@@ -243,6 +243,8 @@ export const defaultTuning = {
     },
     // Barks: each line is a voice (a sound the others hear), at most once in this long.
     barks: { cooldown: 8, radius: 22, shout: 60 },
+    // Sandbox (A10): a noise dropped where the player looks, from the debug view.
+    sandbox: { noise: 30, reach: 400 },
   },
 
   guards: {

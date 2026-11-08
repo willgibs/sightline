@@ -428,13 +428,13 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - The bark vocabulary, started now (Alien: Isolation's took most of its cycle). Barks run from specific to generic.
   - The detection indicator at the screen edge.
   - Then the fairness checks.
-- [ ] A9 · The other stimuli, each wired in when its source is on `main`:
+- [ ] A9 · The other stimuli, each wired in when its source is on `main` (none is yet: the wiring point is `perception/stimuli.ts`, and `stimulate` takes the seen ones):
   - bodies and a comrade dropping (B4);
   - impacts (B4);
   - thrown objects (B9);
   - lens glint (B6);
   - open doors (D4).
-- [ ] A10 · Sandbox mode: noise drops, and the time-scale hook.
+- [x] A10 · Sandbox mode: noise drops, and the time-scale hook.
 - [ ] A11 · The budget: 16 guards perceiving within the frame budget, measured by work counts as well as `npm run sim -- --profile`, in Chromium, Firefox and WebKit. Fast paths come only if it needs them: a still body skips the motor, and a distant guard skips perception.
 - [ ] A12 · Trial mode, with the protocol in Exit tests, and the agents' pre-screen.
 - [ ] A13 · Perception joins the valley (`SYSTEMS`), announced, with the version bump.

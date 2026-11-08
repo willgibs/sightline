@@ -52,6 +52,7 @@ export class Hud {
       [['flyCamera'], 'fly camera'],
       [['slower', 'faster'], 'time scale'],
       [['restart'], 'restart run'],
+      [['dropNoise'], 'drop a noise'],
       [['mark'], 'mark moment'],
     ];
     this.legend.innerHTML = legend.map(([actions, text]) => `<span>${keysHtml(map, actions)}${text}</span>`).join('');

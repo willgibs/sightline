@@ -1304,6 +1304,20 @@ export class Game {
       tap: (code: 'KeyC' | 'KeyZ') => this.input.tap(code),
       /** Click as if the left button were pressed now: a shot from the frame on screen. */
       click: () => this.input.click(),
+      /** Sandbox (A10): drop a noise where the view points, as the debug view's key does. */
+      noise: () => this.input.dropNoise(),
+      /**
+       * Sandbox (A10): the debug view's time scale, to the nearest step (0.25× to 8×); the
+       * scale now. Fast-forward runs only in the debug view.
+       */
+      timeScale: (scale?: number) => {
+        if (scale !== undefined && Number.isFinite(scale)) {
+          let best = 0;
+          for (let k = 1; k < TIME_SCALES.length; k++) if (Math.abs(TIME_SCALES[k]! - scale) < Math.abs(TIME_SCALES[best]! - scale)) best = k;
+          this.timeScaleIndex = best;
+        }
+        return TIME_SCALES[this.timeScaleIndex]!;
+      },
       zoom: (on: boolean) => {
         this.input.zoomHeld = on;
       },

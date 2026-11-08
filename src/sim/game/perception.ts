@@ -9,6 +9,7 @@ import type { System, TickContext } from '../kernel/systems';
 import { emptyShape } from '../kernel/world/shape';
 import {
   BARKS,
+  HEARD_AS,
   acousticsOf,
   believe,
   chooseBark,
@@ -168,7 +169,7 @@ const ear = { x: 0, y: 0, z: 0 };
 export function deliverSound(ctx: TickContext, e: Extract<SimEvent, SoundFields>): void {
   const T = ctx.tuning;
   const H = T.perception.hearing;
-  const kind: PendingSound['kind'] = e.type === 'bark' ? 'voice' : 'sound';
+  const kind: PendingSound['kind'] = HEARD_AS[e.type] ?? 'sound';
   const maker = ctx.index.get(e.source);
   const side = maker ? maker.faction : Faction.None;
   let acoustics: Acoustics | null = null;

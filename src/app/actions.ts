@@ -31,6 +31,7 @@ export type Action =
   | 'slower'
   | 'faster'
   | 'restart'
+  | 'dropNoise'
   // The fly camera.
   | 'flyUp'
   | 'flyDown'
@@ -76,6 +77,7 @@ export const DEFAULT_ACTIONS: Readonly<Record<Action, ActionSpec>> = {
   slower: { context: 'debug', kind: 'pressed', inputs: ['BracketLeft'], label: 'slower' },
   faster: { context: 'debug', kind: 'pressed', inputs: ['BracketRight'], label: 'faster' },
   restart: { context: 'debug', kind: 'pressed', inputs: ['KeyR'], label: 'restart run' },
+  dropNoise: { context: 'debug', kind: 'pressed', inputs: ['KeyX'], label: 'drop a noise' },
   flyUp: { context: 'fly', kind: 'held', inputs: ['Space', 'KeyE'], label: 'up' },
   flyDown: { context: 'fly', kind: 'held', inputs: ['KeyQ'], label: 'down' },
   replayPlay: { context: 'replay', kind: 'pressed', inputs: ['KeyP'], label: 'play or pause' },

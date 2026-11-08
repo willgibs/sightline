@@ -24,7 +24,8 @@ export interface FrameShown {
 }
 
 interface Latched {
-  kind: 'fire';
+  /** A shot, or a noise dropped from the sandbox (A10): both about the frame on screen. */
+  kind: 'fire' | 'noise';
   frame: FrameShown;
 }
 

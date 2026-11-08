@@ -199,6 +199,7 @@ export class InputController {
     for (const a of actions) {
       if (this.map.actions[a].kind !== 'pressed') continue;
       if (a === 'fire') this.latch.latch('fire');
+      else if (a === 'dropNoise') this.latch.latch('noise');
       else if (a === 'crouch' || a === 'prone') this.pressed.add(a);
       else this.onAction?.(a);
     }
@@ -207,6 +208,11 @@ export class InputController {
   /** Automation: click, as if the left button were pressed now. */
   click(): void {
     this.latch.latch('fire');
+  }
+
+  /** Automation: drop a noise where the view points, as the sandbox key does (A10). */
+  dropNoise(): void {
+    this.latch.latch('noise');
   }
 
   /**

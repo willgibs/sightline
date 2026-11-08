@@ -45,3 +45,4 @@ export { believe, levelOf, prunePercepts, soundLevel, stateAt, stepLadder, stimu
 export { crackHeard, type CrackHeard, type FlightPoint } from './crack';
 export { BARKS, chooseBark, type BarkLine } from './barks';
 export { describe, explainChain } from './explain';
+export { HEARD_AS } from './stimuli';
