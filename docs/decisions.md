@@ -6,6 +6,18 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.
 
+### One grid search, exact and budgeted (W0.5)
+
+**Decision:** `GridSearch` (`kernel/world/search.ts`) searches either layer of the spatial grid, for generation and the simulation alike: a bounded Dijkstra flood with a bucket queue (Dial's), for hearing and analysis, and A* with the octile estimate, for navigation.
+- **Exact everywhere.** Costs are whole numbers of centimetres, so no rounding can reorder a queue; a cost function returning anything else throws.
+- **One order.** Neighbours are visited in one fixed order (the four sides, then the corners), and A*'s ties break by the lower estimate left, then the lower cell index.
+- **The layer's own moves.** A move follows the grid's walk edges, and a diagonal needs both of its two-step paths open, so no path cuts a corner. A cost function prices or closes any move: walls for sound, roofs, danger.
+- **Budgets, not time** (rule 18): every search takes `maxExpansions`, reports what it expanded, and says if it ran out. The expansions are the work count W0.7's benches pin.
+
+**What moved:** nothing; nothing uses it yet.
+
+**Why:** lab A's hearing flood, lab D's analysis and lab E's navigation would otherwise each have built a search of their own, with their own tie-breaks.
+
 ### Systems query bodies and spawn inside a tick (W0.4)
 
 **Decision:** the tick's context gains three calls.

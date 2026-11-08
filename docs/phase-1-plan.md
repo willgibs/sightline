@@ -305,7 +305,7 @@ The kernel boundary goes first, so everything after it lands in its final place.
   - A scene pins the tick on which a spawned body first exists, for the motor and for perception.
   - Today systems can't see bodies' shapes, and `sim.spawn` works only between ticks.
   - Behaviour doesn't change.
-- [ ] W0.5 · Grid search over both layers of the spatial grid (`kernel/world/grid.ts`).
+- [x] W0.5 · Grid search over both layers of the spatial grid (`kernel/world/grid.ts`).
   - Bounded Dijkstra with a bucket queue, and A\*.
   - A cost per edge, and a fixed neighbour order.
   - Budgeted by iterations (rule 18), deterministic.
