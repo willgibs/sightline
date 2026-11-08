@@ -13,7 +13,7 @@ import { checkValley, type Overwatch } from './overwatch';
 import { scatterProps } from './props';
 import { siteBounds } from './site';
 import { chooseSpawn } from './spawn';
-import { staffPlaceholder } from './staffing';
+import { staffCamp } from './staffing';
 import type { TerrainResult } from './terrain';
 
 /**
@@ -45,13 +45,14 @@ export function generateCampWorld(spec: MissionSpec, tuning: Tuning, clock?: () 
   }
   const colliders = new ColliderSet(G.world.size);
   const camp = buildCompound(new Rng(seed, 'camp'), terrain.heightfield, terrain.features, colliders, G, spec.camp!);
-  staffPlaceholder(camp, terrain.heightfield, G, new Rng(seed, 'staff'), new Rng(seed, 'routines'));
   const props = scatterProps(new Rng(seed, 'props'), terrain.heightfield, terrain.features, colliders, G);
   colliders.build();
+  const grid = buildGrid(terrain.heightfield, colliders, siteBounds(camp, colliders, G.grid.siteMargin), G);
+  // Staffing searches the grid: its chokepoints and its patrols' paths.
+  staffCamp(camp, terrain.heightfield, grid, G, spec.camp!, new Rng(seed, 'staff'), new Rng(seed, 'routines'));
   const report = reportOf(valley);
   const playHalf = terrain.heightfield.size / 2 - G.world.playMargin;
   const spawn = chooseSpawn(spec.insertion, terrain.heightfield, terrain.features, colliders, report, playHalf, camp.site);
-  const grid = buildGrid(terrain.heightfield, colliders, siteBounds(camp, colliders, G.grid.siteMargin), G);
   return {
     grid,
     spec,

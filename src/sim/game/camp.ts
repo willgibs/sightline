@@ -57,18 +57,20 @@ export function spawnCampThings(sim: KernelSimulation): void {
 }
 
 /**
- * A door's leaf: across its doorway when shut, swung into the room about its hinge when
- * open, where it stops bodies and sight like any slab but leaves the doorway clear.
+ * A door's leaf: across its doorway when shut; swung all the way open when open, flat
+ * against the inside of the wall beside the doorway, where it is in no one's way (the
+ * spatial grid, built from the world's colliders alone, doesn't know it is there).
  */
 export function doorSolid(d: DoorSpec, open: boolean): Collider {
-  const leaf = 0.05;
+  const leaf = 0.03;
   if (!open) {
     return { id: 0, kind: 'box', x: d.x, z: d.z, y0: d.y, y1: d.y + d.height, hx: d.width / 2, hz: 0.06, ux: d.ux, uz: d.uz, flags: Blocks.All, surface: Surface.Wood };
   }
-  // Hinged at the doorway's first edge, standing open along the inside of the wall's normal.
-  const hx = d.x - d.ux * (d.width / 2) + d.nx * (d.width / 2 + 0.12) + d.ux * leaf;
-  const hz = d.z - d.uz * (d.width / 2) + d.nz * (d.width / 2 + 0.12) + d.uz * leaf;
-  return { id: 0, kind: 'box', x: hx, z: hz, y0: d.y, y1: d.y + d.height, hx: d.width / 2, hz: leaf, ux: d.nx, uz: d.nz, flags: Blocks.All, surface: Surface.Wood };
+  // Hinged at the doorway's first edge: open, it lies along the wall past that edge, just inside.
+  const inside = 0.1 + leaf + 0.02;
+  const x = d.x - d.ux * d.width + d.nx * inside;
+  const z = d.z - d.uz * d.width + d.nz * inside;
+  return { id: 0, kind: 'box', x, z, y0: d.y, y1: d.y + d.height, hx: d.width / 2, hz: leaf, ux: d.ux, uz: d.uz, flags: Blocks.All, surface: Surface.Wood };
 }
 
 export function vehicleSolid(v: VehicleSpec): Collider {

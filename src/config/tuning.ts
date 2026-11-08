@@ -130,6 +130,20 @@ export const defaultTuning = {
       corridorCover: [3, 5], // low cover along the way in from the breach
     },
 
+    // Staffing a generated camp (lab D, D6; sim/generation/staffing.ts): guards bought with points,
+    // one of every role first, under the cap; sentries at the camp's real chokepoints; patrols on
+    // its lanes with stops and scans; every routine fitted to one cycle of the camp.
+    staffing: {
+      points: [16, 40], // to spend, from difficulty 0 to 1
+      cap: 16, // guards at most (design doc, Validation: budgets hold)
+      cost: { sentry: 2, patrol: 3, marksman: 4, radio: 2, officer: 3, worker: 1 }, // the target is free
+      cycle: [160, 300], // seconds: the camp's cycle, which every routine divides; longer only if a route needs it
+      dwell: [3, 9], // seconds held still at a patrol's stop
+      chokeWidth: 10, // the widest passage a sentry is posted at, metres
+      clearance: 1.0, // no two guards on routine come closer than this, metres
+      offsetTries: 12, // start times tried for a walking guard before he's left out
+    },
+
     // The camp's rhythm: how its guards walk their routines (sim/generation/routine.ts). Part of the
     // camp, like its layout: lab D validates the timing windows these make.
     routines: {

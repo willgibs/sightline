@@ -32,7 +32,7 @@ export const BENCH_GOLDEN: PinnedBench = {
     "runs": {
       "camp-systems": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 2519 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 2759 }
         }
       }
     }

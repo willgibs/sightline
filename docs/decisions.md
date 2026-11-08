@@ -107,6 +107,34 @@ Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Unt
 
 Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the generation lane.
 
+### Staffing: points, chokepoints, a grammar, one cycle (D6)
+
+**Decision:**
+- **Points buy guards** (`generation/staffing.ts`).
+  - Difficulty sets the budget: 16 to 40 points.
+  - Each of the seven roles is bought once first. The roles cost: target 0, worker 1, sentry 2, radio operator 2, patrol 3, officer 3, marksman 4.
+  - Then extras come from a priority list, at most one officer and radio operator, a marksman per tower, three workers, never past 16 guards (counted).
+- **Sentries at the real chokepoints.** Brogue blocks each one-cell corridor and counts what it cuts off. A camp's passages are metres wide, so `minimumCut` (`chokepoints.ts`) finds the minimum vertex cut between two zones by max flow (Edmonds–Karp, breadth first in a fixed order).
+  - It runs on the site layer contracted to 1 m cells, connected wherever the fine walk edges connect, so it agrees with the fine grid on what connects.
+  - A cut wider than 10 m is no chokepoint. A test holds it to a hand-built wall with a 4 m gap.
+  - Sentries stand inside the gate, at the cuts between the camp's zones, then at doors, and never within 8 m of the skeleton's corridor.
+- **Patrols on lanes, with a grammar** (`patrols.ts`, after Xu, Tremblay and Verbrugge).
+  - Loops: the perimeter lane, the yard, and the alleys round each side.
+  - They walk grid paths pulled taut, and stops are snapped to walkable cells.
+  - At each stop, a word of the grammar: a glance, a quarter turn, a half turn, a sweep back and forth, a full turn. Two patrols on one loop walk it half a period apart, and loops that share a lane run it the same way round.
+- **One cycle for the camp.** Every routine divides it: a patrol's period is the cycle over a whole number, its stops' dwell stretched to fit, and a post holds the whole cycle. Each head sweep fits it a whole number of times. Routines gained an optional `offset` (absent for Phase 0's guards, whose bits are unchanged).
+  - The camp repeats exactly every cycle (160–300 s), so its windows can be learned, and analysis (D7) can certify them over one cycle.
+  - A route too long for 300 s drops its dwells, then the cycle grows. A clamped cycle had cut routines short, making them jump metres at the wrap.
+- **No two guards meet on routine.** Before the check existed, guards on different loops reached a lane corner together, shoved each other, and in the worst cases locked for most of a minute.
+  - Each walking guard tries up to 12 start times until he passes everyone at least 1 m clear, all cycle, sampled every quarter second.
+  - The last of a role who can't walk clear holds one of his stops instead, so all seven roles always stay.
+  - Guards now keep to their routines through the motor within 25 cm (tested for two minutes; measured within 11 cm over five, in four camps).
+- **Open doors lie flat** against the inside wall beside their doorway. The grid doesn't know entity solids, so a leaf standing in the room was in routes' way.
+
+**What moved:** nothing in Phase 0's valley. The `camp-systems` run moved with its camp's guards (`e430ba9fbbf75bd5`, state `02a8b5ec0ec11fbc`). The tuning gained `gen.staffing`, so the golden recording is rewritten.
+
+**Why:** the plan's D6. Fitting routines to one cycle makes timing windows exact, and a clear routine is one the analysis can trust.
+
 ### The camp's systems and the objective (D5)
 
 **Decision:**

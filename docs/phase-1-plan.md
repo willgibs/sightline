@@ -661,11 +661,17 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
     - `objective` (open, done or escaped).
   - `camp-power` (phase 'world') powers everything on a running generator's circuit. `objective` (phase 'mission') marks the target's death.
   - The debug view draws the wiring, live or dead. The `camp-systems` scene cuts and restarts the generator and takes the target, and is pinned as the generation lane's run.
-- [ ] D6 · Staffing.
+- [x] D6 · Staffing.
   - All seven roles, bought with points under the 16-guard cap.
   - Sentries at the real chokepoints Brogue's method finds.
   - Patrols on skeleton roadmaps, with a grammar of stops and scans, timed to open and close windows.
   - Routines stay pure functions of time.
+  - **Built** (`generation/staffing.ts`, `patrols.ts`, `chokepoints.ts`).
+    - Points from 16 (easy) to 40 (hard): one of each role first, then extras by a priority list leaning on patrols and marksmen when hard, sentries and workers when easy. That gives about 8, 12 and 15–16 guards.
+    - Chokepoints are minimum vertex cuts (max flow) between the camp's zones, no wider than 10 m. This is Brogue's question generalized from one-cell corridors to passages metres wide. Sentries stand there, or at doors, kept 8 m off the skeleton's corridor.
+    - Patrols walk the perimeter lane, the yard and the alleys along grid paths pulled taut, with stops from a grammar: glance, quarter turn, half turn, sweep, full turn.
+    - Every routine divides one camp cycle (160–300 s, longer only if a route needs it), so the camp repeats exactly. Patrols that share a lane run it the same way round.
+    - Each walking guard tries up to 12 start times until no guard on routine comes within 1 m of another, all cycle long. The last of a role who can't is posted at a stop, so all seven roles stay. Guards then keep to their routines through the motor within 25 cm.
 - [ ] D7 · Analysis on the grid.
   - Infiltration is certified with Safe Interval Path Planning against the routines' known trajectories. It allows exposure that stays below A's fill rates, and is checked against brute-force space-time search on small camps.
   - The sightline graph: directed witness edges, each carrying the intervals of the cycle when it holds. Its strongly connected components are the clusters. Each cluster is certified by a bounded search for a kill order inside the reaction window, or for a split by sabotage or distraction.
