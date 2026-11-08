@@ -38,6 +38,8 @@ Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Unt
 
 **Why:** rule 18's budgets are counts, pinned; time is a trend, reported.
 
+**What moved:** the perception crowd joins the pinned runs (`e106e06750770ec4`, state `21e67f0f78200c87`), which moves `BEHAVIOUR`. Nothing else.
+
 ### Sandbox drops and the time scale (A10), and where other stimuli plug in (A9)
 
 **Decision:**
@@ -58,6 +60,8 @@ Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Unt
 - **The fairness checks** (`tests/fairness.test.ts`), over the lab's own run and a seeded zig-zag through it: every detection's cause is its first cue, at least 1.5 s before outside contact; every change of awareness is caused by a percept of the same guard ('noticed', 'detected' or 'heard'), or is a calm stand-down; every 'heard' by a sound; every bark by an alert; every detection reads back, in words, to its first cue.
 
 **Why:** the design doc's three telegraphs (a head turn, a bark, the meter at your screen's edge) and its rule that every detection can be explained afterwards. Barks run specific to generic so the player learns the cause without hearing a memorable line twice.
+
+**What moved:** the perception lab's fingerprints (`da54eed00707a631`, state `f9afc16fbdc72c64`): at tick 353 a guard's bark reaches another, who hears it and rises (`npm run explain`). Its sight bench rays 25,723 → 26,033, and awareness floods 60,480 grid nodes. Nothing in the valley, so no version moves: until A13 perception runs only in the lab's scenes, which recordings name.
 
 ### Shade and foliage, drawn as simulated (A4)
 
