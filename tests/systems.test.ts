@@ -355,5 +355,5 @@ describe('declared data access', () => {
       expect(run.failures).toEqual([]);
     }
     expect([...found]).toEqual([]);
-  });
+  }, 240_000); // every scene, with a full-tree diff around every system: Windows' runner took 68 s
 });

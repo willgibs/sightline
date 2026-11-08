@@ -1,6 +1,7 @@
 import type { Tuning } from '../../../config/tuning';
 import { buildRoutine, buildWorld, type GuardSpawn, type Routine } from '../../generation';
 import { datan2 } from '../../kernel/core/detmath';
+import { turnTowards } from '../../kernel/core/math';
 import { Rng } from '../../kernel/core/rng';
 import type { InputFrame } from '../../kernel/input';
 import { Blocks, type ColliderInput } from '../../kernel/world/colliders';
@@ -144,6 +145,8 @@ function noiseWorld(p: NoiseParams, tuning: Tuning): World {
 class ArcDriver {
   /** Which way along the arc: 1 toward the north side of the east start, -1 back. */
   private leg = 1;
+  /** Running, where the body is facing: it turns, so a turn at the arc's end isn't a whip of the view. */
+  private yaw: number | null = null;
 
   constructor(private readonly p: NoiseParams) {}
 
@@ -170,7 +173,8 @@ class ArcDriver {
       const w = Math.max(-0.5, Math.min(0.5, (r - this.p.d) * 0.5));
       const tx = this.leg * nz - w * nx;
       const tz = -this.leg * nx - w * nz;
-      out.yaw = datan2(-tx, -tz);
+      this.yaw = turnTowards(this.yaw ?? b.yaw, datan2(-tx, -tz), 8 * sim.dt);
+      out.yaw = this.yaw;
       out.moveZ = 1;
       out.sprint = true;
       return out;

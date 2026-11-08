@@ -88,6 +88,8 @@ In the debug view only:
 | [ and ] | Slow down or speed up time (0.25× to 8×) |
 | R | Restart the run |
 | J | Drop a shot where you look, rifle or not |
+| K | Drop a noise where you look |
+| L | Drop a body where you look |
 
 While watching a replay:
 
@@ -104,7 +106,7 @@ URL options:
 - `?seed=TAL-4471` picks a valley.
 - `?scene=movement-lab` plays a scene.
 - `?trials=<seed>&lab=movement` runs a sitting of the movement lab's exit test: can you predict your own noise and visibility? (`?trials=<seed>` alone is the perception lab's.)
-- `?hz=60` runs the simulation at another tick rate; `?hz=blind` picks 30 or 60 at random and doesn't say which.
+- `?hz=60` runs the simulation at another tick rate; `?hz=blind` picks 30 or 60 at random and doesn't say which (the debug view does).
 - `?view=debug` starts in the debug view.
 - `?spawn=edge` starts where the road leaves the map.
 - `?bench` runs a 20-second performance flythrough.

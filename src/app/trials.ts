@@ -176,6 +176,11 @@ export class TrialSitting {
     return this.phase === 'running' || this.phase === 'playing-on';
   }
 
+  /** Whether the view follows the driver: in a noise trial the player moves round the guard, facing him. */
+  get followsDriver(): boolean {
+    return this.trials[this.k]?.kind === 'noise' && (this.phase === 'running' || this.phase === 'playing-on');
+  }
+
   /** In trial mode the trial's driver moves the player; the mouse only looks. */
   input(sim: Simulation, out: InputFrame): void {
     if (this.driver) this.driver.next(sim, out);
@@ -438,7 +443,7 @@ export class TrialSitting {
     const s = this.score!;
     const misses = this.trials.filter((t) => !t.warmup && this.answers.has(t.k) && this.answers.get(t.k) !== t.seen).length;
     this.host.results(resultsHtml(this.seed, s, probeTally(this.trials, this.answers, this.probes), misses), () => {
-      this.host.download(`sitting-${this.seed}.json`, this.report(s));
+      this.host.download(`sitting-${this.seed.replace(/[^A-Za-z0-9-]/g, '-')}.json`, this.report(s));
       this.saved = true;
       this.persist();
     });

@@ -936,7 +936,11 @@ export class Game {
     const frozen = this.detached || this.bench !== null;
     this.input.sampleTick(this.raw, frozen, this.sim.tick);
     // In trial mode the trial moves the player; the mouse only looks.
-    if (this.trial) this.trial.input(this.sim, this.raw);
+    if (this.trial) {
+      this.trial.input(this.sim, this.raw);
+      // A noise trial moves round the guard, and the view stays on him.
+      if (this.trial.followsDriver) this.input.yaw = this.raw.yaw;
+    }
     if (frozen) {
       this.raw.yaw = this.detached ? this.heldYaw : this.sim.player.yaw;
       this.raw.pitch = this.detached ? this.heldPitch : this.sim.player.pitch;
@@ -1210,7 +1214,7 @@ export class Game {
     const lines = [
       `SIGHTLINE · PHASE 0 · DEBUG VIEW · build ${BUILD}${this.scene ? ` · scene ${this.scene.name} v${this.scene.version}` : ''}`,
       `seed ${w.seed} · tick ${this.sim.tick.toLocaleString('en-US')} · ${clock(played)} played · ${mode}`,
-      `${s.fps.toFixed(0)} fps · frame ${s.frameMs.toFixed(1)} ms (p95 ${s.p95Ms.toFixed(1)}) · cpu ${s.cpuMs.toFixed(1)} ms · sim ${(this.tickMs * 1000).toFixed(0)} µs/tick`,
+      `${this.tuning.sim.tickHz} Hz · ${s.fps.toFixed(0)} fps · frame ${s.frameMs.toFixed(1)} ms (p95 ${s.p95Ms.toFixed(1)}) · cpu ${s.cpuMs.toFixed(1)} ms · sim ${(this.tickMs * 1000).toFixed(0)} µs/tick`,
       `${r.calls} draws · ${(r.triangles / 1000).toFixed(0)}k tris · ${(r.lines / 1000).toFixed(0)}k lines`,
       `systems ${this.systemCosts.map((c) => `${c.name} ${c.usPerTick.toFixed(0)}`).join(' · ') || '—'} µs`,
       ``,
