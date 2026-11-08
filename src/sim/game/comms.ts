@@ -201,6 +201,49 @@ export const checkinDeadline: ScheduleHandler = (ctx, entry) => {
 
 const orders: CampOrder[] = [];
 
+/** Gives the camp its devices, from where they stand: the lab's handmade camp; lab D's camps give them by world.camp.devices. */
+export function giveDevices(sim: Simulation, alarms: ReadonlyArray<{ x: number; z: number }>): void {
+  const c = sim.index.of('commander')[0];
+  if (c) for (const a of alarms) c.camp.devices.alarms.push({ x: a.x, z: a.z, raised: false, powered: true });
+}
+
+/** Cuts the camp's power (E7's sabotage, for now from a script): every alarm goes dead. */
+export function cutPower(sim: Simulation): void {
+  const c = sim.index.of('commander')[0];
+  if (!c) return;
+  c.camp.devices.generatorRunning = false;
+  for (const a of c.camp.devices.alarms) a.powered = false;
+}
+
+/**
+ * A guard reaches an alarm box and throws the switch: raised if it has power and isn't
+ * already (lockdown is set by the box's change, E7), or found dead (the power is off).
+ * Either way it is a physical event, interruptible by dropping the runner or cutting
+ * the power before he arrives.
+ */
+export function raiseAlarm(ctx: TickContext, g: GuardEntity): void {
+  const c = commanderOf(ctx);
+  const b = g.brain;
+  if (!c || !b) return;
+  const box = c.camp.devices.alarms[b.box];
+  if (!box) return;
+  if (box.raised) return;
+  if (!box.powered) {
+    ctx.emit({ type: 'alarm', source: g.id, cause: b.event, box: b.box, stage: 'dead' });
+    return;
+  }
+  box.raised = true;
+  const raised = ctx.emit({ type: 'alarm', source: g.id, cause: b.event, box: b.box, stage: 'raised' });
+  const was = c.camp.level;
+  c.camp.level = 'lockdown';
+  c.camp.since = ctx.tick;
+  if (was !== 'lockdown') ctx.emit({ type: 'level', source: c.id, cause: raised, from: was, to: 'lockdown' });
+  const R = ctx.tuning.brain.alarm.sirenRadius;
+  const siren = ctx.emit({ type: 'siren', source: c.id, cause: raised, x: box.x, y: 3, z: box.z, surface: Surface.Metal, loudness: R / ctx.tuning.noise.radiusPerUnit, radius: R }) as number;
+  deliverSound(ctx, ctx.events[ctx.events.length - 1] as Extract<SimEvent, { type: 'siren' }>);
+  void siren;
+}
+
 /**
  * The commander, once a tick: digests its inbox and spreads its map; and on its own
  * rhythm, plans (ends a search if belief says so, fills the tasks its level calls for)

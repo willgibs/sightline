@@ -47,6 +47,8 @@ export interface GuardMind {
   readonly belief: Readonly<Belief> | null;
   /** His brain's memory: what he's doing and why (brain.ts). Null for a guard with no brain: he keeps to routine, or reacts as lab A's minimal reactions do. */
   readonly brain: BrainState | null;
+  /** Where the camp's alarm boxes are: static knowledge, from the camp's layout (E7). */
+  readonly alarms: readonly { x: number; z: number }[];
   /** A number in [0, 1) from his own stream: the only way a brain rolls dice (rule 3). */
   draw(): number;
   /** Counts the navigator's work, and how many route searches are left this tick. */

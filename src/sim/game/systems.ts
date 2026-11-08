@@ -5,7 +5,7 @@ import { scheduleSystem, type Access, type ScheduleHandler, type System, type Ti
 import { player } from './entities';
 import { drawBrain } from './brains';
 import { guardFire } from './combat';
-import { checkinDeadline, checkinReply, orderDeliver, radioDeliver, speak } from './comms';
+import { checkinDeadline, checkinReply, commanderOf, orderDeliver, radioDeliver, speak, raiseAlarm } from './comms';
 import { think } from './guards';
 import { playerIntent } from './player';
 import { SHOOTING_SYSTEMS } from './shooting';
@@ -102,12 +102,13 @@ const guardBrains: System = {
   name: 'guard-brains',
   phase: 'decide',
   reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.senses', 'guard.brain'],
-  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'schedule', 'entities', 'bullet.bullet'],
-  emits: ['act', 'call', 'shot', 'report'],
+  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'commander.camp.devices', 'commander.camp.level', 'commander.camp.since', 'schedule', 'entities', 'bullet.bullet'],
+  emits: ['act', 'call', 'shot', 'report', 'alarm', 'siren', 'level'],
   run(ctx) {
     const nav = navAllowance(ctx);
+    const alarms = commanderOf(ctx)?.camp.devices.alarms ?? [];
     for (const g of ctx.index.of('guard')) {
-      const change = think(g, ctx.world, ctx.tuning, ctx.tick + 1, () => ctx.draw(g.id, 'brain', (rng) => rng.next()), nav);
+      const change = think(g, ctx.world, ctx.tuning, ctx.tick + 1, () => ctx.draw(g.id, 'brain', (rng) => rng.next()), nav, alarms);
       if (change) {
         g.brain!.event = ctx.emit({ type: 'act', source: g.id, cause: change.cause, from: change.from, to: change.to, why: change.why, x: change.x, z: change.z, weight: change.weight });
       }
@@ -115,6 +116,10 @@ const guardBrains: System = {
         if (g.brain.fire) {
           guardFire(ctx, g, g.brain.fire);
           g.brain.fire = null;
+        }
+        if (g.brain.raise >= 0) {
+          raiseAlarm(ctx, g);
+          g.brain.raise = -1;
         }
         speak(ctx, g);
         ctx.debug((draw) => drawBrain(draw, ctx, g));

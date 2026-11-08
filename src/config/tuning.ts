@@ -281,6 +281,13 @@ export const defaultTuning = {
     cooldown: { investigate: 2.5, search: 2 },
     search: { points: 3, radius: 7, growth: 0.35 },
     taskWeight: 0.9, // how strongly he weighs an order against what his own senses tell him
+    // Alarms (E7): a guard runs for the alarm box when things turn real (design doc: 4–8 s away).
+    alarm: {
+      reach: 44, // metres: a run of about 8 s at his sprint; farther, he won't
+      use: 0.7, // seconds to throw the switch, standing at it
+      role: { sentry: 0.6, patrol: 0.5, marksman: 0, 'radio-operator': 0.3, officer: 0.5, worker: 1, target: 0 },
+      sirenRadius: 1200,
+    },
     // Counter-sniper (E8): triangulating shots from bearings (triangulate.ts) and hunting the shooter.
     sniper: {
       fusion: { half: 720, cells: 120, rangeMin: 80, rangeMax: 650 }, // the commander's grid around the camp, metres, and its ring of plausible perches

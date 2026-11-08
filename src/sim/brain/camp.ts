@@ -53,7 +53,14 @@ export interface SearchState {
   radius: number;
 }
 
+export interface CampDevices {
+  alarms: Array<{ x: number; z: number; raised: boolean; powered: boolean }>;
+  generatorRunning: boolean;
+}
+
 export interface CampState {
+  /** The camp's devices (E7): where they are and whether they work. A stand-in until lab D's entities land. */
+  devices: CampDevices;
   /** A shooter the camp has triangulated (E8): the bearings it fuses, and its estimate. */
   shots: { bearings: Array<Bearing & { tick: number }>; estimate: ShotEstimate | null; tick: number };
   /** The camp's alert level, since when, and the floor it settles back to. */
@@ -90,6 +97,7 @@ export interface CampState {
 export function createCamp(campX: number, campZ: number, tuning: Tuning): CampState {
   const M = tuning.brain.searchMap;
   return {
+    devices: { alarms: [], generatorRunning: true },
     shots: { bearings: [], estimate: null, tick: -1 },
     level: 'calm',
     since: 0,

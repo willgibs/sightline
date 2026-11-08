@@ -191,7 +191,7 @@ export type AlertReason = 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'rep
 /** What a heard sound sounded like (perception/hearing.ts). */
 export type HeardKind = 'sound' | 'shot' | 'voice';
 /** What a guard can be doing, and why he changed (brain/brain.ts, ACTS and ACT_WHYS). Stored by index: only add at the end. */
-export type ActCode = 'routine' | 'return' | 'look' | 'investigate' | 'search' | 'hold' | 'report' | 'task' | 'engage' | 'cover';
+export type ActCode = 'routine' | 'return' | 'look' | 'investigate' | 'search' | 'hold' | 'report' | 'task' | 'engage' | 'cover' | 'alarm';
 export type ReportCode = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear' | 'claim';
 export type TaskCode = 'investigate' | 'search' | 'check' | 'sweep';
 export type LevelCode = 'calm' | 'uneasy' | 'alert' | 'lockdown';
@@ -320,6 +320,19 @@ export interface HurtEvent extends EventBase {
   hits: number;
 }
 
+/** An alarm box was reached (E7): raised, or found dead (no power). Source: the guard; cause: what sent him. */
+export interface AlarmEvent extends EventBase {
+  type: 'alarm';
+  /** Which box, in camp.devices.alarms. */
+  box: number;
+  stage: 'raised' | 'dead';
+}
+
+/** The camp's siren, as lockdown begins (E7): a sound everyone in the valley hears. */
+export interface SirenEvent extends EventBase, SoundFields {
+  type: 'siren';
+}
+
 /** A guard's brain changed what he is doing (brain/brain.ts): source the guard, cause the percept or act behind it. */
 export interface ActEvent extends EventBase {
   type: 'act';
@@ -352,6 +365,8 @@ export type SimEvent =
   | LevelEvent
   | CheckinEvent
   | HurtEvent
+  | AlarmEvent
+  | SirenEvent
   | ReportEvent
   | ImpactEvent
   | DeathEvent
@@ -394,7 +409,7 @@ const STANCES = ['stand', 'crouch', 'prone'] as const satisfies readonly StanceN
 const SOUND = { x: 'f32', y: 'f32', z: 'f32', surface: 'u8', loudness: 'f32', radius: 'f32' } as const;
 const LEVELS = ['calm', 'uneasy', 'alert', 'lockdown'] as const satisfies readonly LevelCode[];
 const REPORT_CODES = ['contact', 'heard', 'shot', 'body', 'missing', 'clear', 'claim'] as const satisfies readonly ReportCode[];
-const ACT_NAMES = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover'] as const satisfies readonly ActCode[];
+const ACT_NAMES = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm'] as const satisfies readonly ActCode[];
 const ACT_WHY_NAMES = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered'] as const satisfies readonly ActReason[];
 const STRIKES = ['terrain', 'collider', 'body'] as const satisfies readonly StrikeKind[];
 const PARTS = ['none', 'head', 'torso', 'legs'] as const satisfies readonly PartName[];
@@ -456,6 +471,8 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   call: { code: 91, range: 'brain', sound: true, fields: { ...SOUND, radio: 'u8' } },
   radio: { code: 92, range: 'brain', sound: false, fields: { kind: { enum: REPORT_CODES }, x: 'f32', z: 'f32', radius: 'f32' } },
   order: { code: 93, range: 'brain', sound: false, fields: { to: 'u32', task: { enum: ['investigate', 'search', 'check', 'sweep'] }, x: 'f32', z: 'f32' } },
+  alarm: { code: 97, range: 'brain', sound: false, fields: { box: 'u8', stage: { enum: ['raised', 'dead'] } } },
+  siren: { code: 98, range: 'brain', sound: true, fields: { ...SOUND } },
   hurt: { code: 96, range: 'brain', sound: false, fields: { part: { enum: ['head', 'torso', 'legs'] }, hits: 'u8' } },
   checkin: { code: 95, range: 'brain', sound: false, fields: { post: 'i32', stage: { enum: ['call', 'answer', 'silence'] } } },
   level: { code: 94, range: 'brain', sound: false, fields: { from: { enum: LEVELS }, to: { enum: LEVELS } } },

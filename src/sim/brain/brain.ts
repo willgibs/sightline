@@ -28,7 +28,7 @@ import { choose, response, type Option } from './utility';
  * percept, an awareness, a belief.
  */
 
-export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover'] as const;
+export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm'] as const;
 export type ActName = (typeof ACTS)[number];
 
 /** Why a guard changed what he's doing: A's reasons for a change of state, and the brain's own. */
@@ -99,6 +99,11 @@ export interface BrainState {
   coverX: number;
   coverZ: number;
   covered: boolean;
+  /** Alarm (E7): the box he's running for, and his hand on it when he gets there. */
+  box: number;
+  useUntil: number;
+  /** He's reached the box this tick: its index, for its system to raise. */
+  raise: number;
 }
 
 /** An order as it reached a guard: what to do, where, when it was given, and the event behind it. */
@@ -143,6 +148,9 @@ export function createBrain(): BrainState {
     coverX: 0,
     coverZ: 0,
     covered: false,
+    box: -1,
+    useUntil: -1,
+    raise: -1,
   };
 }
 
@@ -247,8 +255,14 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
     b.x = b.task!.x;
     b.z = b.task!.z;
   }
-  // Going to look: he says so, and whoever hears it leaves it to him.
+  // Going to look, or running for the alarm: he says so, and whoever hears it leaves it to him.
   if (act === 'investigate') b.say = { report: { ...currentReport(m), kind: 'claim' }, radius: m.tuning.brain.comms.talkRadius, radio: false };
+  if (act === 'alarm' && m.alarms.length > 0) {
+    const box = m.alarms[nearestAlarm(m)]!;
+    b.box = nearestAlarm(m);
+    b.useUntil = -1;
+    b.say = { report: { ...currentReport(m), kind: 'claim', x: box.x, z: box.z }, radius: m.tuning.brain.comms.shoutRadius, radio: false };
+  }
   return { from: prev, to: act, why: reason, x: b.x, z: b.z, cause, weight: 1 };
 }
 
@@ -339,6 +353,8 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       if (!elevated && own) out.push({ act: 'investigate', rank: 3, weight: role.investigate * near * fresh * cool('investigate') * claimed(m, focus) });
       break;
     case 'searching':
+      // A worker runs for the alarm when he has seen something (design doc: still raises the alarm).
+      if (m.post.role === 'worker' && own) out.push({ act: 'alarm', rank: 4, weight: alarmWeight(m, dist) * 0.9 });
       if (order) out.push({ act: 'task', rank: 4, weight: order });
       out.push({ act: 'report', rank: 4, weight: callable });
       out.push({ act: 'hold', rank: 4, weight: 0.2 });
@@ -349,6 +365,8 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       break;
     case 'combat': {
       const sees = seesTarget(m);
+      const alarmW = alarmWeight(m, dist);
+      out.push({ act: 'alarm', rank: 6, weight: alarmW });
       out.push({ act: 'report', rank: 5, weight: callable > 0 ? 1 : 0 });
       out.push({ act: 'engage', rank: 5, weight: sees && dist <= m.tuning.brain.combat.range[m.post.role] ? role.fight : 0 });
       out.push({ act: 'cover', rank: 5, weight: sees || elevated ? 0 : role.fight });
@@ -371,6 +389,43 @@ function claimed(m: GuardMind, at: { x: number; z: number }): number {
     if (dx * dx + dz * dz <= C.claimWithin * C.claimWithin) return C.claimedWeight;
   }
   return 1;
+}
+
+/** How much he wants the alarm: near enough to run to, unclaimed by someone he's heard, and a role that does it. */
+function alarmWeight(m: GuardMind, dist: number): number {
+  const b = m.brain!;
+  if (m.post.elevated || m.alarms.length === 0) return 0;
+  const A = m.tuning.brain.alarm;
+  const role = A.role[m.post.role];
+  if (role <= 0) return 0;
+  const near = nearestAlarm(m);
+  if (near < 0) return 0;
+  const box = m.alarms[near]!;
+  const dx = box.x - m.self.x;
+  const dz = box.z - m.self.z;
+  const d = Math.sqrt(dx * dx + dz * dz);
+  if (d > A.reach || (b.ended['alarm'] !== undefined && m.tick - b.ended['alarm']! < 10 * m.tuning.sim.tickHz)) return 0;
+  // Someone he's heard already running for it? Leave it to him.
+  for (const t of b.told) if (t.kind === 'claim' && t.from !== m.id && (t.x - box.x) * (t.x - box.x) + (t.z - box.z) * (t.z - box.z) < 9) return 0;
+  void dist;
+  return role;
+}
+
+/** The index of the nearest alarm box, or −1. */
+function nearestAlarm(m: GuardMind): number {
+  let best = -1;
+  let bestD = Infinity;
+  for (let i = 0; i < m.alarms.length; i++) {
+    const a = m.alarms[i]!;
+    const dx = a.x - m.self.x;
+    const dz = a.z - m.self.z;
+    const d = dx * dx + dz * dz;
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  }
+  return best;
 }
 
 /** True if he's far from where his routine says he should be. */
@@ -414,6 +469,9 @@ function perform(m: GuardMind, out: Order): void {
       break;
     case 'cover':
       performCover(m, out);
+      break;
+    case 'alarm':
+      performAlarm(m, out);
       break;
   }
 }
@@ -621,6 +679,37 @@ function performEngage(m: GuardMind, out: Order): void {
 function focusOf3(m: GuardMind): { x: number; y: number; z: number } {
   const a = m.awareness;
   return { x: a.fx, y: a.fy, z: a.fz };
+}
+
+/** Runs for the alarm box and throws the switch: an interruptible journey through the motor. */
+function performAlarm(m: GuardMind, out: Order): void {
+  const b = m.brain!;
+  const A = m.tuning.brain.alarm;
+  const hz = m.tuning.sim.tickHz;
+  if (b.box < 0 || b.box >= m.alarms.length) b.box = nearestAlarm(m);
+  if (b.box < 0) {
+    b.done = true;
+    stand(m, out, false);
+    return;
+  }
+  const box = m.alarms[b.box]!;
+  if (b.useUntil >= 0) {
+    stand(m, out, false);
+    if (m.tick >= b.useUntil) {
+      b.raise = b.box;
+      b.useUntil = -1;
+      b.done = true;
+    }
+    return;
+  }
+  const w = walk(m, out, box.x, box.z, m.tuning.brain.paces.run, 'sprint', box.x, box.z);
+  if (w === 'arrived') {
+    b.useUntil = m.tick + Math.round(A.use * hz);
+    stand(m, out, false);
+  } else if (w === 'stuck') {
+    b.done = true;
+    stand(m, out, false);
+  }
 }
 
 /** Moves to the nearest spot that breaks the line from the threat, and holds it, watching. */

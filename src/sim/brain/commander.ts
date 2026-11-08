@@ -129,6 +129,8 @@ function raise(camp: CampState, level: AlertLevel, tick: number): void {
 export function plan(m: CampMind, out: CampOrder[]): void {
   out.length = 0;
   const camp = m.camp;
+  // An alarm raised is lockdown (E7): only a box changing state sets it.
+  if (camp.level !== 'lockdown' && camp.devices.alarms.some((a) => a.raised)) raise(camp, 'lockdown', m.tick);
   const T = m.tuning.brain.camp;
   const hz = m.tuning.sim.tickHz;
   const search = camp.search;

@@ -8,7 +8,7 @@ import type { FoliageVolume } from '../../perception';
 import { WaypointDriver, type Waypoint } from '../bots/waypoints';
 import { PERCEPTION, giveSenses } from '../perception';
 import { giveBrains } from '../brains';
-import { campCheckins, campCommander, commsVoice, giveCommander } from '../comms';
+import { campCheckins, campCommander, commsVoice, giveCommander, giveDevices } from '../comms';
 import { campRules } from '../combat';
 import { arm } from '../shooting';
 import { player } from '../entities';
@@ -275,6 +275,7 @@ export function campBrain(): Scene {
       giveSenses(sim);
       giveBrains(sim);
       giveCommander(sim);
+      giveDevices(sim, [CAMP.alarm]);
       const p = player(sim.index);
       arm(p, sim.tuning);
       p.health = { hits: 0 };
