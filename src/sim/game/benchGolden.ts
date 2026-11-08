@@ -148,7 +148,8 @@ export const BENCH_GOLDEN: PinnedBench = {
           "rifle": { "rays": 1, "nodes": 0, "bodies": 0 },
           "motor": { "rays": 0, "nodes": 0, "bodies": 4780 },
           "bullets": { "rays": 100, "nodes": 0, "bodies": 0 },
-          "thrown": { "rays": 89, "nodes": 0, "bodies": 0 }
+          "thrown": { "rays": 89, "nodes": 0, "bodies": 0 },
+          "perception-hearing": { "rays": 138, "nodes": 0, "bodies": 0 }
         }
       }
     }
