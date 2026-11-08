@@ -2,6 +2,36 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · Lab E: the camp brain
+
+The camp brain is built on the plan's defaults (`docs/phase-1-plan.md`, E) and research seeds; these are the calls made along the way.
+
+### A guard with a brain is opt-in; lab A's minimal reactions stay where they are measured
+
+**Decision:** A guard given a `brain` (`giveBrains`) decides through `decide()` (E3); a guard with senses but no brain keeps lab A's `react` (`game/guards.ts`, `think()`); a guard with neither keeps his routine.
+
+**Why:** Lab A's scenes and trial mode measure sight against guards whose reactions it fixed (its trial protocol needs them to look, not to hunt), so its numbers must not move when E's brain lands. E3's "replace" holds wherever the camp brain runs. The valley moves to the brain in its own announced commit, after A13.
+
+### The camp is an entity with one memory; the commander reads only that
+
+**Decision:** Everything the camp believes is one plain record on a `commander` entity (`CampState`): its alert level, its search map, its roster, its tasks. The commander's mind (`CampMind`) is that record, the static world and the time; nothing else reaches its decisions, and the no-omniscience probe hashes it before and after.
+
+**Why:** Rule 13 applies to the camp as to any guard. A single record makes the "fed only by reports" claim checkable: the map, the level and the ellipse change only by digesting the inbox.
+
+### Reports travel physically; a guard told something only looks and waits
+
+**Decision:** A report is an action: a radio call has a duration and its delivery is scheduled when it finishes, cancelled if the speaker drops, needing a working set and a live operator; a voice is a sound through lab A's hearing. A guard who is only told about something raises his awareness and looks; only his own senses start an investigation or a search of his own.
+
+**Why:** It is the pacing the design doc asks for without a token system that reaches into minds: orders travel by the same honest channels, and convergence is limited by slots on what the commander sends (Halo 3's capacities), plus Blacklist's claiming ("I've got it"), not by reading who is where.
+
+### Triangulation is a grid posterior, not a least-squares intersection
+
+**Decision:** The commander fuses bearings on a coarse grid over a ring of plausible perches, reduced to an ellipse whose one- and two-sigma levels are the posterior's own 39%/86% mass (`brain/triangulate.ts`).
+
+**Why:** Least squares says nothing useful about a lone bearing and is badly overconfident for the long, banana-shaped posteriors a clustered camp makes at 300 m. The grid handles both, is exact in every engine, and its cost is the budget (rule 18). A seeded test holds it to the 39% and 86% rates for one to six listeners.
+
+---
+
 ## 2026-11-08 · Lab B, shooting
 
 Built on its branch as `docs/phase-1-plan.md`, section B, plans it. Its seed, the seed's shortfall and its targets are recorded there.

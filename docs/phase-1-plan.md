@@ -789,10 +789,10 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - The no-omniscience probe covers the commander, with a planted peek it catches.
 - [x] E6 · Radio check-ins, as scheduled events (`game/comms.ts`). The operator calls each post every few minutes. A dead post doesn't answer, the camp goes uneasy, and someone walks over.
 - [ ] E7 · Alarms.
-  - After the reaction window, a guard shouts, or runs 4–8 s to an alarm box or the radio. The run is a journey through the motor, and lockdown is set only by an alarm box or radio changing state.
+  - Done (`game/comms.ts`, `brain/brain.ts`, stand-in boxes until D's devices land): after the reaction window, a guard runs 4–8 s to an alarm box, a journey through the motor; lockdown is set only by the box changing state; dropping him or cutting the power interrupts it.
   - The core's sabotage, by default: hold the use key at arm's length to switch off the generator or cut the radio. Whoever passes or needs it notices the outage. The sabotage kit is Phase 3's.
   - At lockdown, the target escapes by vehicle. That needs bodies to ride moving solids (with C).
-- [ ] E8 · Counter-sniper and reinforcements.
+- [ ] E8 · Counter-sniper and reinforcements. Done so far: triangulation with a calibrated ellipse (`brain/triangulate.ts`), marksmen sweeping the estimate, a visible reaction inside 2 s, reinforcements at lockdown (a squad on foot until D's trucks land). Still to wire with #8: real shot and crack percepts.
   - **Honest triangulation:**
     - every guard who heard the report or the crack forms a bearing, with error from his own stream;
     - reports reach the commander by voice or radio;
