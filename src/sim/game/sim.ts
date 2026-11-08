@@ -1,5 +1,6 @@
 import type { Tuning } from '../../config/tuning';
-import { queryBodies, stridePhase, type BodyState, type Gait, type Stance } from '../body';
+import { stridePhase, type BodyState, type Gait, type Stance } from '../body';
+import { gameBodies } from './remains';
 import { generateWorld, worldFingerprint } from '../generation';
 import type { Game } from '../kernel/game';
 import { neutralInput } from '../kernel/input';
@@ -28,7 +29,7 @@ export const SIGHTLINE: Game<Simulation> = {
   simulation: (world, tuning, systems) => new Simulation(world, tuning, systems),
   start: startRun,
   still: (sim) => neutralInput(sim.player.yaw),
-  bodies: (state, tuning, out) => queryBodies(state.entities, tuning, out),
+  bodies: gameBodies,
   world: (spec, tuning) => generateWorld(spec, tuning),
   fingerprint: worldFingerprint,
   sample: writeSample,

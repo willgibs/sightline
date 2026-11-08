@@ -137,6 +137,19 @@ Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the gener
 
 **Why:** the foundation pass left both changes for one deliberate bump (`docs/foundation-plan.md`, Deliberately later), so seeds change once, not twice. Lab D's repairs need scatter that stays put around them, and the camp generator adds a great deal to the world that a hand-kept list would have missed.
 
+### The bullet, its strike and the body left behind (B2–B4)
+
+**Decision:**
+- **Content in `tuning.ballistics` and `tuning.vitals`:** the rifle (15 rounds, a 1.2 s bolt, a zero dial from 100 to 600 m in 100 m steps), two loads (the published .308 168 gr match at 823 m/s and k = 0.000756; an illustrative subsonic at 320 m/s), the report, crack, bolt and impact radii, the hit rules, the optics, the throwable and the sway's starting values. Drag constants are given at sea-level air and scaled by the mission's density.
+- **The shot event is the bullet's path:** launch point and time, the bore's line, muzzle speed, drag and wind (`RECORDING_VERSION` 11). Labs A and E follow a bullet's path, its crack's included, from the event alone; its strike is an `impact` it caused.
+- **New events (codes 30–35):** `report`, `impact` and `cry` (sounds), `death` (who fired, who fell, the body left), `ranged`, and `bolt` (a sound). **New commands (30–34):** `range`, `throw`, `zeroUp`, `zeroDown`, `suppressor`.
+- **What a strike does:** a headshot kills silently; a torso shot kills, with a cry first as often as the guard's own stream says (35%); a leg shot kills, always with a cry. The guard's entity goes, and a `remains` entity takes his place in the same tick, collapsing over 0.7 s as a pure function of time; queries see it, the motor doesn't collide with it (lab C decides, with carrying).
+- **Systems:** `rifle` in 'commands' after `player-commands`, `bullets` then `aim` in 'projectiles'. The spawn-timing scene's commands system now names `rifle` in its `after`.
+
+**What moved:** `RECORDING_VERSION` 11, so the golden recording is rewritten; the tuning gained sections, so it would have been anyway. The shooting range joins the pinned runs (`411196f29915b2ee` / `5b191832e76a9bc8`, lane `ballistics`), which moves the behaviour digest. No valley or scene value moved: the bots never fire, and without a rifle a click is the bare shot it was. `SIM_VERSION` stays: nothing an earlier build could record behaves differently here, and such a recording is refused by its format anyway.
+
+**Why:** a lab is an isolated scene until Phase 2 joins them; keeping the valley's goldens still lets labs A and D land beside this one without rebasing onto moved values.
+
 ## 2026-11-07 · Wave 0
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.

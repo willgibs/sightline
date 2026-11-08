@@ -473,7 +473,7 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
 | --- | --- | --- |
 | Drawn hold against simulated impact: two loads, 100–500 m, winds 0–8 m/s from any side, slopes ±30° | 18.5 cm low at 500 m (one Euler step per tick under an exact reticle); a field of view that bent Tarkov's reticle by 100–200 m of zero | Under 1 cm everywhere; aim for 0.2 cm |
 | The model against a G7 point-mass solver (.308, 168 gr, sea level) | Gravity only: drop 22–29% short; wind carried with the air: drift 6–9 times too much | Drop within 1 cm and drift within 0.5 cm to 500 m |
-| The closed form against RK4 of its own model, ±30° | — | Under 0.05 cm across the aim |
+| The closed form against RK4 of its own model, ±30° | — | Across the aim, under 0.06 cm to 500 m for the match load (the research found 0.05), and 0.12 cm to 300 m for the subsonic |
 | Decision sensitivity at 300 m, a guard walking 1.35 m/s | Measured by no game | Skipping drop, lead, wind (4 m/s) or ranging (an unaided 15% guess) each moves a centred head shot off the 23 cm head |
 | Sway, the 95th-percentile radius over 20 s | Arma: no numbers published | Free-standing at least 1.5 mil; prone 0.5–0.8; prone rested 0.25; rested, breath held, 0.1 or less |
 | The impact heard back at the shooter | No game times it physically | Flight plus return, to the tick: about 1.28 s at 300 m |
@@ -488,16 +488,19 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
 
 **Milestones:**
 - [ ] B1 · The range scene: firing points with a rest; targets walking routines across 100–500 m; flags and grass that show the wind.
-- [ ] B2 · Content as data in `tuning.ts` (rule 16): the rifle, its ammunition and suppressor, the scope and binoculars, and the throwable.
-- [ ] B3 · One ballistic function, realistic-lite.
+- [x] B2 · Content as data in `tuning.ts` (rule 16): the rifle, its ammunition and suppressor, the scope and binoculars, and the throwable.
+  - Landed: `tuning.ballistics` (the rifle, two loads with their drag constants, the shot's sounds, hits, optics, the throwable, sway) and `tuning.vitals`, bounded in `config/validate.ts`.
+- [x] B3 · One ballistic function, realistic-lite.
   - Gravity, one drag constant per load, and the mission's wind, applied by the lag rule. Carrying the bullet with the air overstates drift six to nine times.
   - Evaluated exactly in closed form, which needs only `dlog`, `dexp` and division, or with Heun's method once per tick. Never with one Euler step per tick.
   - Bullets live in the state tree and fly in the 'projectiles' phase. About 0.5 s to 400 m.
   - The same function draws the reticle's marks and drives the rangefinder, the wind readout and every assist.
-- [ ] B4 · Hits.
+  - Landed: `ballistics/trajectory.ts` (the closed form in the bore's frame) and `aim.ts` (zero, launch, landing, the hold solver). Against RK4 of its own model: 0.53 mm across the aim at ±30° and 500 m. Against the G7 solver: drop and drift within 1 cm and 0.5 cm to 500 m (`tests/ballistics.test.ts`). The instruments that read it are B6's.
+- [x] B4 · Hits.
   - Each bullet's path is swept between two ticks' poses against each body part, the terrain and the colliders. A path bends about 1.4 mm in a tick, so there is no sub-stepping. Hit and impact events follow.
   - A headshot kills. A torso shot kills an unarmored guard, but may let the guard cry out first (drawn from the guard's own stream).
   - A killed guard leaves a body, spawned within the tick (W0.4).
+  - Landed: bullets are entities (`ballistics/bullet.ts`), resolved in 'commands' against the poses the player saw and flown in 'projectiles' (`game/shooting.ts`). A leg shot kills too, always with a cry; lab E may make it a wound. The body left behind collapses as a pure function of time (`game/remains.ts`), and sight lines and bullets see it.
 - [ ] B5 · Bob: whether walking bodies bob in the simulation, and whether a shot leaves from the bobbing eye. Decided by measuring at 300 m; `body/bob.ts` is ready.
 - [ ] B6 · Instruments in the honest view, which today has no crosshair.
   - The scope, with its mil reticle and a zero dial in 100 m steps, and mil holds between steps. A target 50 m from the nearest step sits 11–34 cm off.

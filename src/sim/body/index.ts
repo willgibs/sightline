@@ -23,6 +23,7 @@ export {
 } from './body';
 export { idleIntent, requestStance, stepMotor, type Cylinder, type MotorContext, type MoveIntent } from './motor';
 export { intentFor, intents, motorSystem } from './system';
-export { bodyShape, queryBodies } from './shape';
+export { bodyShape, bodyShapeAt, queryBodies, type ShapePose } from './shape';
 export { bobDepth, headBob, stridePhase, type BobDepths } from './bob';
 export { InvariantWatch, OVERLAP_TOLERANCE, STEEP_TOLERANCE, type InvariantReport } from './invariants';
+export { breathRate, calmVitals, holding, holdLength, stepVitals, type VitalsState } from './vitals';
