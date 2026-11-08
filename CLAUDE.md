@@ -12,7 +12,7 @@ The foundation pass that followed is done.
 
 **Now: Phase 1, planned on Nov 7 in `docs/phase-1-plan.md`.**
 - Wave 0, the shared seams, is on `main` (W0.2–W0.8, Nov 7): the kernel, the lanes and the game (`docs/foundation-shape.md`), brains that decide after perceiving, spawning and queries inside a tick, grid search, code ranges and roles, mechanical landing, and determinism checks at the edges. `docs/decisions.md` (Wave 0) has the reasoning.
-- Waves 1 and 2 are open (A's percepts landed on Nov 8): labs A, B, C, D and E run in parallel, each in its own session, branch and pull request.
+- All five labs reached `main` on Nov 8, each from its own session, branch and pull request. What's left is in the plan's open checkboxes (A9's doors, C9, D9, E7, E8, E12) and the exit tests, which wait on the owner's sittings.
 - A lab session starts from:
   - this file;
   - `docs/phase-1-handoff.md`: what each lab starts from, and the gotchas;
@@ -93,6 +93,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 - Every push to `main` deploys to production on Vercel, publicly at sightline-brown.vercel.app (the repository's website link); other branches get preview deploys. Vercel Authentication still covers sightline-willgibs.vercel.app and the previews, so only the owner's Vercel account can open those.
 - Commit in small, verified steps, each with its tests passing.
 - Land a pull request with `npm run land -- <number>`: it merges only a branch that is up to date with `main` and green (`docs/phase-1-plan.md`, Landing on `main`). A branch takes `main` by merging it, never by rebasing.
+- Sessions land their own pull requests and handle branching and versioning without asking the owner (the owner's word, Nov 8). Push with an explicit destination, `git push origin HEAD:<branch>`; the hand-over's Gotchas say why.
 - Research is a seed, not a ceiling. A lane starts from the strongest prior art in `docs/research/`, says where it falls short, builds past it, and proves the gain on its bench.
 - The foundation is meant to carry many games. Keep the kernel narrow, keep lanes behind their contracts, and generalize at the third use (`docs/foundation-shape.md`).
 
