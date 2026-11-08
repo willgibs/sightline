@@ -6,6 +6,7 @@ import {
   fly,
   freshRifle,
   launch,
+  lineOfSight,
   markDirection,
   pushSway,
   restAvailable,
@@ -20,7 +21,7 @@ import {
 } from '../ballistics';
 import { calmVitals, poseAt, stepVitals, type PoseSample } from '../body';
 import type { Command } from '../kernel/commands';
-import { dcos, dsin, datan2 } from '../kernel/core/detmath';
+import { datan2 } from '../kernel/core/detmath';
 import { air, windAt } from '../kernel/env';
 import { Faction } from '../kernel/state';
 import type { System, TickContext } from '../kernel/systems';
@@ -66,15 +67,6 @@ const sway: SwaySample = { up: 0, right: 0, raise: 0 };
 const strike = emptyStrike();
 const hit = emptyHit();
 const wind = { x: 0, z: 0 };
-
-/** The unit line of sight for view angles. */
-function lineOfSight(yaw: number, pitch: number, out: typeof sight): typeof sight {
-  const cp = dcos(pitch);
-  out.x = -dsin(yaw) * cp;
-  out.y = dsin(pitch);
-  out.z = -dcos(yaw) * cp;
-  return out;
-}
 
 /** The player's commands for the rifle, the rangefinder, the dial and the suppressor. */
 const rifleSystem: System = {

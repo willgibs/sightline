@@ -323,7 +323,7 @@ export const defaultTuning = {
       pulseWidth: 0.15, // share of each beat the kick lasts
       pulseRight: 0.3, // its sideways share
       stance: { stand: 1, crouch: 0.6, prone: 0.42 },
-      rested: 0.42, // multiplier on a rest: a bipod, a sandbag, a wall
+      rested: 0.37, // multiplier on a rest: a bipod, a sandbag, a wall
       held: 0.2, // multiplier on the breathing and the tremor while the breath is held
       holdSettle: 0.5, // seconds a held breath takes to still the aim
       spent: 1.5, // once a hold has run out: extra tremor per second past it, up to spentMax
@@ -359,6 +359,7 @@ export const defaultTuning = {
     holdAtMaxHr: 1.5, // seconds it lasts at the maximum heart rate
     recoverTime: 6, // seconds to get the breath back after a full hold
     minAir: 0.25, // a breath can't be held again until this much of it is back
+    closeCall: 28, // beats a minute a close call adds at once (a crack past the head, a near miss)
   },
 
   view: {

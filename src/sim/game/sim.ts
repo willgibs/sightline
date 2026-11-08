@@ -10,7 +10,8 @@ import type { EntityId, SimState } from '../kernel/state';
 import type { System } from '../kernel/systems';
 import type { Collider } from '../kernel/world/colliders';
 import type { World } from '../kernel/world/world';
-import { PLAYER_ID, player, type GuardEntity, type PlayerEntity } from './entities';
+import { PLAYER_ID, player, type GuardEntity, type PlayerEntity, type RemainsEntity } from './entities';
+import type { Flight } from '../ballistics';
 import type { PlayerControl } from './player';
 import { writeSample } from './samples';
 import { startRun } from './setup';
@@ -60,6 +61,31 @@ export interface Snapshot {
   guards: Float32Array;
   /** Entities' solid shapes (copies), in entity order; their ids say whose (kernel/world/solids.ts). */
   solids: Collider[];
+  /** The player's rifle and vitals as the scope and the HUD draw them, or null without a rifle. */
+  rifle: RifleView | null;
+  /** The bodies killed guards left: where each fell, which way, and when (game/remains.ts draws them). */
+  remains: Array<RemainsEntity['remains'] & { id: number }>;
+  /** Bullets in flight: their launches, so a trace is drawn along the simulated path. */
+  bullets: Array<{ id: number; flight: Flight }>;
+}
+
+/** What the scope and the HUD show of the player's rifle and vitals, at a tick's end. */
+export interface RifleView {
+  /** The sway, mils, and how far the scope is up (rifle.ts, SwaySample): the camera shows `raise` of it. */
+  up: number;
+  right: number;
+  raise: number;
+  rest: number;
+  rounds: number;
+  zero: number;
+  bolt: number;
+  fitting: number;
+  suppressed: boolean;
+  load: string;
+  heartRate: number;
+  /** Seconds the breath has been held, and how much is left to hold. */
+  held: number;
+  air: number;
 }
 
 /**
@@ -135,6 +161,9 @@ export class Simulation extends KernelSimulation {
             guardSpawns: [],
             guards: new Float32Array(n * GUARD_FIELDS),
             solids: [],
+            rifle: null,
+            remains: [],
+            bullets: [],
           };
     const p = this.player;
     s.tick = this.tick;
@@ -166,6 +195,37 @@ export class Simulation extends KernelSimulation {
     const shapes = this.solids.shapes;
     s.solids.length = shapes.length;
     for (let k = 0; k < shapes.length; k++) s.solids[k] = Object.assign(s.solids[k] ?? ({} as Collider), shapes[k]!);
+    const pe = this.index.of('player')[0]!;
+    const r = pe.rifle;
+    const v = pe.vitals;
+    if (r && v) {
+      const view = (s.rifle ??= { up: 0, right: 0, raise: 0, rest: 0, rounds: 0, zero: 0, bolt: 0, fitting: 0, suppressed: false, load: '', heartRate: 0, held: 0, air: 0 });
+      view.up = r.sway.up;
+      view.right = r.sway.right;
+      view.raise = r.sway.raise;
+      view.rest = r.rest;
+      view.rounds = r.rounds;
+      view.zero = r.zero;
+      view.bolt = r.bolt;
+      view.fitting = r.fitting;
+      view.suppressed = r.suppressed;
+      view.load = r.load;
+      view.heartRate = v.heartRate;
+      view.held = v.held;
+      view.air = v.air;
+    } else {
+      s.rifle = null;
+    }
+    const remains = this.index.of('remains');
+    s.remains.length = remains.length;
+    for (let k = 0; k < remains.length; k++) s.remains[k] = Object.assign(s.remains[k] ?? ({} as Snapshot['remains'][number]), remains[k]!.remains, { id: remains[k]!.id });
+    const bullets = this.index.of('bullet');
+    s.bullets.length = bullets.length;
+    for (let k = 0; k < bullets.length; k++) {
+      const b = (s.bullets[k] ??= { id: 0, flight: { ...bullets[k]!.bullet.flight } });
+      b.id = bullets[k]!.id;
+      Object.assign(b.flight, bullets[k]!.bullet.flight);
+    }
     return s;
   }
 }

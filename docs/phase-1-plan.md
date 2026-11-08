@@ -487,7 +487,8 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
 - **Assist layers are view-only.** Arcade, realistic-lite and simulation differ only in what the instruments show, over one physics, so taste call 3 never changes a recording.
 
 **Milestones:**
-- [ ] B1 · The range scene: firing points with a rest; targets walking routines across 100–500 m; flags and grass that show the wind.
+- [x] B1 · The range scene: firing points with a rest; targets walking routines across 100–500 m; flags and grass that show the wind.
+  - Landed: `game/scenes/shootingRange.ts` (`?scene=shooting-range`): a mound with a bipod's ground, sandbags and a wall; eight guards walking and standing at 100–506 m; steel plates; a berm; four flags (a new `'flag'` structure kind) and grass streaming in a 4 m/s crosswind (`render/windCues.ts`); sea-level air. A marksman drives its headless run and pinned bench run.
 - [x] B2 · Content as data in `tuning.ts` (rule 16): the rifle, its ammunition and suppressor, the scope and binoculars, and the throwable.
   - Landed: `tuning.ballistics` (the rifle, two loads with their drag constants, the shot's sounds, hits, optics, the throwable, sway) and `tuning.vitals`, bounded in `config/validate.ts`.
 - [x] B3 · One ballistic function, realistic-lite.
@@ -508,7 +509,7 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
   - Lens glint toward the sun.
   - A sweep test holds the drawn hold to the simulated impact within 1 cm.
   - Marking waits for Phase 2, with the model of what the player has observed.
-- [ ] B7 · Sway, breath and heart rate.
+- [x] B7 · Sway, breath and heart rate.
   - Sway is a pure function of state and time in the simulation (rule 14), so the shot goes where the drawn reticle points at the click's instant. Its parts:
     - incommensurate sines;
     - a heartbeat pulse;
@@ -520,6 +521,7 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
     - prone, rested, breath held: 0.1 mil or less.
   - Breath holds for about 4 s, recovers over about 6 s, and spikes on release.
   - Heart rate rises with sprinting and close calls, and settles over about 20 s.
+  - Landed: `ballistics/sway.ts` (breathing on two incommensurate phases, hashed smooth tremor, the heartbeat's kick, the recoil), sampled at every tick's end with two ticks of history (`rifle.ts`), and `body/vitals.ts` (heart rate, breath held and recovered, `startle` for close calls, which lab E calls when guards shoot back). A rest is found by geometry (`rest.ts`): a bipod prone, sandbags or a wall upright. The ladder measured (`game/ballisticsBench.ts`): 1.64 mil standing, 0.99 crouched, 0.69 prone, 0.255 prone on a rest, 0.046 with the breath held. Shots leave along the camera of the frame clicked on, sway and all, at 30–144 fps (`tests/sway.test.ts`).
 - [ ] B8 · The shot's sound.
   - The report at the muzzle, the crack along the path, the impact.
   - The suppressor cuts the report.

@@ -86,7 +86,13 @@ export const BENCH_GOLDEN: PinnedBench = {
     "runs": {}
   },
   "ballistics": {
-    "metrics": {},
+    "metrics": {
+      "sway, standing (mil, 95th percentile)": 1.6426,
+      "sway, crouched (mil, 95th percentile)": 0.9856,
+      "sway, prone (mil, 95th percentile)": 0.6899,
+      "sway, prone, rested (mil, 95th percentile)": 0.2553,
+      "sway, prone, rested, breath held (mil, 95th percentile)": 0.0464
+    },
     "runs": {
       "shooting-range": {
         "work": {

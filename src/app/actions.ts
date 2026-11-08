@@ -17,9 +17,16 @@ export type Action =
   | 'right'
   | 'sprint'
   | 'zoom'
+  | 'binoculars'
   | 'crouch'
   | 'prone'
   | 'fire'
+  | 'scopeToggle'
+  | 'zeroUp'
+  | 'zeroDown'
+  | 'suppressor'
+  | 'throw'
+  | 'assists'
   // Anywhere, once per press.
   | 'mark'
   | 'debugView'
@@ -62,11 +69,20 @@ export const DEFAULT_ACTIONS: Readonly<Record<Action, ActionSpec>> = {
   left: { context: 'play', kind: 'held', inputs: ['KeyA'], label: 'left' },
   right: { context: 'play', kind: 'held', inputs: ['KeyD'], label: 'right' },
   sprint: { context: 'play', kind: 'held', inputs: ['ShiftLeft', 'ShiftRight'], label: 'sprint' },
-  // F as well as the right button: binoculars on a trackpad.
-  zoom: { context: 'play', kind: 'held', inputs: ['Mouse2', 'KeyF'], label: 'zoom' },
+  // The right button raises the rifle's scope (with no rifle, it zooms the view); V toggles
+  // the scope, for a trackpad. F holds the binoculars up, with their rangefinder.
+  zoom: { context: 'play', kind: 'held', inputs: ['Mouse2'], label: 'scope' },
+  binoculars: { context: 'play', kind: 'held', inputs: ['KeyF'], label: 'binoculars' },
   crouch: { context: 'play', kind: 'pressed', inputs: ['KeyC'], label: 'crouch' },
   prone: { context: 'play', kind: 'pressed', inputs: ['KeyZ'], label: 'prone' },
+  // Fire the rifle; with the binoculars up, laser the range.
   fire: { context: 'play', kind: 'pressed', inputs: ['Mouse0'], label: 'fire' },
+  scopeToggle: { context: 'play', kind: 'pressed', inputs: ['KeyV'], label: 'scope' },
+  zeroUp: { context: 'play', kind: 'pressed', inputs: ['ArrowUp', 'PageUp'], label: 'zero up' },
+  zeroDown: { context: 'play', kind: 'pressed', inputs: ['ArrowDown', 'PageDown'], label: 'zero down' },
+  suppressor: { context: 'play', kind: 'pressed', inputs: ['KeyT'], label: 'suppressor' },
+  throw: { context: 'play', kind: 'pressed', inputs: ['KeyX'], label: 'throw' },
+  assists: { context: 'play', kind: 'pressed', inputs: ['KeyH'], label: 'assists' },
   mark: { context: 'play', kind: 'pressed', inputs: ['KeyM'], label: 'mark moment' },
   debugView: { context: 'always', kind: 'pressed', inputs: ['F3', 'Backquote'], label: 'debug view' },
   colliders: { context: 'debug', kind: 'pressed', inputs: ['KeyB'], label: 'colliders' },
@@ -129,6 +145,8 @@ export function inputName(input: string): string {
     Space: 'Space',
     ArrowLeft: '←',
     ArrowRight: '→',
+    ArrowUp: '↑',
+    ArrowDown: '↓',
     Comma: ',',
     Period: '.',
   };

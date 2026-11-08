@@ -8,6 +8,8 @@ import type { SimEvent } from '../sim/kernel/events';
 import type { World } from '../sim/kernel/world/world';
 import type { Snapshot } from '../sim/game/sim';
 import { DebugLayer } from './debugLayer';
+import { ShotLayer } from './shotLayer';
+import { WindCues } from './windCues';
 import { GuardMeshes } from './guardMeshes';
 import { FoliageInteriors } from './interiors';
 import { PlayerMesh } from './playerMesh';
@@ -52,6 +54,11 @@ export class GameRenderer {
   private solids: SolidMeshes | null = null;
   private interiors: FoliageInteriors | null = null;
   private player: PlayerMesh | null = null;
+  /** The bodies shots leave, their traces and their dust (lab B). */
+  private shots: ShotLayer | null = null;
+  /** Flags and grass showing the wind. */
+  private wind: WindCues | null = null;
+  private tuning: Tuning;
   private readonly projected = new THREE.Vector3();
   private debug: DebugLayer | null = null;
   private debugOn = false;
@@ -63,6 +70,7 @@ export class GameRenderer {
     this.gl = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.gl.setPixelRatio(pixelRatio);
     this.gl.setClearColor(palette.fog);
+    this.tuning = tuning;
     this.camera = new THREE.PerspectiveCamera(tuning.view.fov, 1, 0.08, 7000);
     this.camera.rotation.order = 'YXZ';
     this.look = createLook(NO_WORLD_SUN, tuning.view.fogDensity);
@@ -90,6 +98,11 @@ export class GameRenderer {
     this.worldGroup.add(this.interiors.group);
     this.player = new PlayerMesh(this.look, tuning.bodies.player);
     this.worldGroup.add(this.player.group);
+    this.shots = new ShotLayer(this.look, tuning);
+    this.worldGroup.add(this.shots.group);
+    this.wind = new WindCues(world);
+    this.worldGroup.add(this.wind.group);
+    this.tuning = tuning;
     this.debug = new DebugLayer(world, tuning);
     this.debug.group.visible = this.debugOn;
     this.debug.setCollidersVisible(this.collidersOn);
@@ -104,6 +117,8 @@ export class GameRenderer {
     this.debug?.dispose();
     this.interiors?.dispose();
     this.player?.dispose();
+    this.shots?.dispose();
+    this.wind?.dispose();
     disposeTree(this.worldGroup);
     this.scene.remove(this.worldGroup);
     this.worldGroup = new THREE.Group();
@@ -112,10 +127,14 @@ export class GameRenderer {
     this.solids = null;
     this.interiors = null;
     this.player = null;
+    this.shots = null;
+    this.wind = null;
     this.debug = null;
   }
 
   setTuning(tuning: Tuning): void {
+    this.tuning = tuning;
+    this.shots?.setTuning(tuning);
     this.player?.setSpec(tuning.bodies.player);
     this.look.uFogDensity.value = tuning.view.fogDensity;
     (this.scene.fog as THREE.FogExp2).density = tuning.view.fogDensity;
@@ -143,6 +162,7 @@ export class GameRenderer {
   }
 
   addEvents(events: readonly SimEvent[], time: number): void {
+    this.shots?.addEvents(events);
     if (this.debugOn) this.debug?.addEvents(events, time);
   }
 
@@ -182,6 +202,8 @@ export class GameRenderer {
     this.solids?.update(prev, curr, alpha);
     this.interiors?.update(pose.x, pose.y, pose.z);
     this.player?.update(prev, curr, alpha, cam.position);
+    this.shots?.update(prev, curr, alpha);
+    this.wind?.update((prev.tick + (curr.tick - prev.tick) * alpha) / this.tuning.sim.tickHz, time);
     if (this.debugOn) this.debug?.update(prev, curr, alpha, time, aim, cam.position);
     this.gl.render(this.scene, cam);
   }

@@ -18,6 +18,12 @@ import { Rng } from '../kernel/core/rng';
 import { runScene } from '../kernel/scene';
 import { labWorld } from './scenes/perceptionLab';
 import { SIGHT_TABLE, sightScenario } from './scenes/sightScenario';
+import { SWAY_RUNGS, swayRadius } from './ballisticsBench';
+
+/** A metric to four decimals: enough to see a change, and the same bits everywhere it's computed. */
+function round4(x: number): number {
+  return Math.round(x * 10000) / 10000;
+}
 
 /**
  * A bench for every lane (docs/foundation-shape.md): where "better" is measured instead
@@ -107,7 +113,14 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
     metrics: perceptionMetrics,
   },
   brain: { about: "Lab E: search cycle length, and the calibration of the camp's estimate of where a shot came from, from E5 on.", metrics: () => ({}) },
-  ballistics: { about: 'Lab B: the reticle against the impact, within 1 cm, from B3 on.', metrics: () => ({}) },
+  ballistics: {
+    about: 'Lab B: the reticle against the impact within 1 cm over the sweep, decision sensitivity at 300 m, and the sway ladder.',
+    metrics() {
+      const m: Record<string, number> = {};
+      for (const rung of SWAY_RUNGS) m[`sway, ${rung.name} (mil, 95th percentile)`] = round4(swayRadius(rung, defaultTuning));
+      return m;
+    },
+  },
   game: { about: "The valley's plays, which exercise every lane together: pinned by their fingerprints and work.", metrics: () => ({}) },
 };
 

@@ -1,3 +1,4 @@
+import { dcos, dsin } from '../kernel/core/detmath';
 import { flightAt, timeAtRange, vec3, type Flight, type Vec3 } from './trajectory';
 
 /**
@@ -228,4 +229,26 @@ export function markDirection(sight: Vec3, up: number, right: number, out: Vec3)
   const a = up / 1000;
   const c = right / 1000;
   return unit(sight.x + sf.ux * a + sf.rx * c, sight.y + sf.uy * a, sight.z + sf.uz * a + sf.rz * c, out);
+}
+
+/** The unit line of sight for view angles (math.ts's yaw convention: 0 faces north, turning left). */
+export function lineOfSight(yaw: number, pitch: number, out: Vec3): Vec3 {
+  const cp = dcos(pitch);
+  out.x = -dsin(yaw) * cp;
+  out.y = dsin(pitch);
+  out.z = -dcos(yaw) * cp;
+  return out;
+}
+
+const viewLos = vec3();
+
+/**
+ * Where the camera looks, for view angles and a sway sample (rifle.ts): the line of sight
+ * moved by the sway as far as the scope is up. With the scope fully up this is exactly
+ * the line a shot leaves along (before the zero turns the bore up), which is what makes
+ * the drawn reticle tell the truth; with it down, the eye doesn't follow the rifle.
+ */
+export function viewLine(yaw: number, pitch: number, sway: { up: number; right: number; raise: number }, out: Vec3): Vec3 {
+  lineOfSight(yaw, pitch, viewLos);
+  return markDirection(viewLos, sway.up * sway.raise, sway.right * sway.raise, out);
 }

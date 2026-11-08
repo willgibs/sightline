@@ -90,6 +90,15 @@ export function stepVitals(v: VitalsState, gait: Gait, hold: boolean, breathBase
   v.drift = wrap01(v.drift + rate * 0.618 * dt);
 }
 
+/**
+ * A close call: a bullet cracking past, a near miss, a body found. The heart jumps by
+ * `tuning.vitals.closeCall` beats (more for a bigger fright, by `scale`), then settles as
+ * after a sprint. Lab E calls it when guards shoot back (E10); lab C for falls and finds.
+ */
+export function startle(v: VitalsState, V: Tuning['vitals'], scale = 1): void {
+  v.heartRate = Math.min(V.maxHr, v.heartRate + V.closeCall * scale);
+}
+
 function wrap01(x: number): number {
   return x - Math.floor(x);
 }
