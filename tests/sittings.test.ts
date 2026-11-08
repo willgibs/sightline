@@ -21,8 +21,8 @@ const sitting = (seed: string, _tuning: Tuning = T): Trial[] => {
 
 const played = new Map<string, KeptAnswer[]>();
 /** Each trial of a sitting run and recorded once, answered from the key. */
-function play(seed: string): KeptAnswer[] {
-  if (played.has(seed)) return played.get(seed)!;
+function play(seed: string, keyed = false): KeptAnswer[] {
+  if (played.has(seed + keyed)) return played.get(seed + keyed)!;
   const kept: KeptAnswer[] = [];
   for (const t of sitting(seed)) {
     const scene = sightScenario(t.params);
@@ -30,7 +30,7 @@ function play(seed: string): KeptAnswer[] {
     const recorder = new Recorder(sim, 'test');
     const driver = scene.driver!();
     const raw = scene.game.still(sim);
-    recorder.annotate('trial-answer', JSON.stringify({ sitting: seed, k: t.k, warmup: t.warmup, freeze: t.freeze, answer: t.seen, params: t.params }));
+    recorder.annotate('trial-answer', JSON.stringify({ sitting: seed, k: t.k, warmup: t.warmup, freeze: t.freeze, answer: t.seen, params: t.params, ...(keyed ? { seen: t.seen, borderline: t.borderline, rules: t.rules, flips: t.flips, cueAt: t.cueAt, legible: t.legible } : {}) }));
     for (let i = 0, seen = false; i < SITTING.seconds * T.sim.tickHz && !seen; i++) {
       const events = sim.step(driver.next(sim, raw));
       recorder.record(sim, events);
@@ -39,7 +39,7 @@ function play(seed: string): KeptAnswer[] {
     const rec = recorder.finish(sim);
     kept.push(...answersIn(`trial-${t.k}.slrec`, rec.annotations(), rec.readEvents(), rec.header.tuning));
   }
-  played.set(seed, kept);
+  played.set(seed + keyed, kept);
   return kept;
 }
 
@@ -74,6 +74,19 @@ describe('sittings scored from their recordings', () => {
     expect(r.text).toMatch(/14 of 30 borderline right, under 70%/);
   });
 
+  it('score from the answers\' own key when this build can\'t make the sitting', () => {
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => void lines.push(a.join(' ')));
+    const ok = reportSittings(play('PLAYTEST-A', true), [], T, () => {
+      throw new Error('Tuning has another shape');
+    });
+    vi.restoreAllMocks();
+    const text = lines.join('\n');
+    expect(ok, text).toBe(true);
+    expect(text).toMatch(/30 of 30 scored trials answered\n {2}score {5}100% balanced/);
+    expect(text).toMatch(/this build can't make it again from its seed/);
+  });
+
   it('say so when a recording is of a different trial than its seed makes', () => {
     const kept = play('PLAYTEST-A').map((a) => (a.k === 7 ? { ...a, params: a.params.replace(/d=(\d+)/, (_, d: string) => `d=${Number(d) + 1}`) } : a));
     const r = report(kept);
@@ -93,5 +106,27 @@ describe('sittings scored from their recordings', () => {
     const bad = report([], [{ name: 'sitting-PLAYTEST-A.json', text: JSON.stringify({ ...file, trials }) }]);
     expect(bad.ok).toBe(false);
     expect(bad.text).toMatch(/1 of 35 trials differ from the seed's/);
+  });
+
+  it('still score a file whose tuning this build can\'t use, and say it couldn\'t be checked', () => {
+    const trials = sitting('PLAYTEST-A');
+    const text = JSON.stringify({ format: 'sightline-sitting', version: 1, seed: 'PLAYTEST-A', trials, answers: Object.fromEntries(trials.map((t) => [t.k, t.seen])), tuning: { ...T, perception: { ...T.perception, sandbox: undefined } } });
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => void lines.push(a.join(' ')));
+    const ok = reportSittings([], [{ name: 'old.json', text }], T); // the real generate, which refuses that tuning
+    vi.restoreAllMocks();
+    expect(ok, lines.join('\n')).toBe(true);
+    expect(lines.join('\n')).toMatch(/100% balanced/);
+    expect(lines.join('\n')).toMatch(/can't check it against its seed/);
+  });
+
+  it('take the latest two sittings by when they were played, not by name', () => {
+    const file = (seed: string, savedAt: string): { name: string; text: string } => {
+      const trials = sitting(seed);
+      return { name: `sitting-${seed}.json`, text: JSON.stringify({ format: 'sightline-sitting', version: 1, seed, trials, answers: Object.fromEntries(trials.map((t) => [t.k, t.seen])), tuning: T, savedAt }) };
+    };
+    // By name the last two are B and C; by time they're C and A.
+    const r = report([], [file('PLAYTEST-A', '2026-11-03T09:00:00Z'), file('PLAYTEST-B', '2026-11-01T09:00:00Z'), file('PLAYTEST-C', '2026-11-02T09:00:00Z')]);
+    expect(r.text).toMatch(/The exit test over sittings PLAYTEST-C and PLAYTEST-A/);
   });
 });

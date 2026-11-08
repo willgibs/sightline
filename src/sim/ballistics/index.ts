@@ -33,7 +33,7 @@ export {
   type SightFrame,
   type Zero,
 } from './aim';
-export { emptyStrike, fly, type BodiesAt, type BulletEntity, type BulletState, type Strike } from './bullet';
+export { emptyStrike, flightEnd, fly, type BodiesAt, type BulletEntity, type BulletState, type Strike } from './bullet';
 export { ballisticOf, dialZero, freshRifle, loadOf, pushSway, swayAt, zeroOf, type RifleState, type SwaySample } from './rifle';
 export { smoothNoise, swaySample } from './sway';
 export { restAvailable } from './rest';

@@ -70,6 +70,8 @@ export interface GameOptions {
   replayUrl: string | null;
   /** Trial mode (A12): a sitting of the perception lab's exit test, from this seed; null for none. */
   trials?: string | null;
+  /** Start that sitting over, forgetting any answers kept in this browser. */
+  trialsFresh?: boolean;
 }
 
 const TIME_SCALES = [0.25, 0.5, 1, 2, 4, 8];
@@ -218,7 +220,7 @@ export class Game {
     this.hud = new Hud(opts.hud, this.input.map);
     this.cues = new Cues(opts.hud, this.tuning.perception.sight.cue);
     if (opts.trials) {
-      this.trial = new TrialSitting(opts.hud, this.trialHost(), opts.trials, this.tuning);
+      this.trial = new TrialSitting(opts.hud, this.trialHost(), opts.trials, this.tuning, opts.trialsFresh ?? false);
       // Every trial's run is kept, however short: each holds an answer.
       this.capture.minSeconds = 0;
     }
@@ -287,6 +289,11 @@ export class Game {
     });
     window.addEventListener('beforeunload', (e) => {
       if (!import.meta.env.PROD || !this.sim || this.bench || this.replay) return;
+      // A sitting's answers aren't safe until its file is saved.
+      if (this.trial?.unsaved) {
+        e.preventDefault();
+        return;
+      }
       // Kept by hand, or by the autosave in this browser (playtest.ts).
       const saved = Math.max(this.savedTick, this.capture.savedTick);
       if ((this.sim.tick - saved) / this.tuning.sim.tickHz < UNSAVED_WARNING_SECONDS) return;
@@ -528,7 +535,12 @@ export class Game {
         this.input.releaseLock();
         this.paused = true;
         this.hud.setVisible(false);
-        this.retry = save;
+        // The button works every time: a saved file can be lost too.
+        const saveAgain = (): void => {
+          save();
+          this.retry = saveAgain;
+        };
+        this.retry = saveAgain;
         this.overlay.showMessage('outcome', 'The sitting is done', text, 'Save the sitting');
       },
       resume: () => {

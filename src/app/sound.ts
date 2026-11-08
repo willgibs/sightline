@@ -5,6 +5,7 @@ import { air } from '../sim/kernel/env';
 import type { SimEvent } from '../sim/kernel/events';
 import type { World } from '../sim/kernel/world/world';
 import type { Simulation } from '../sim/game/sim';
+import { flightEnd, type Flight } from '../sim/ballistics';
 import { ambientSources } from '../sim/generation';
 
 /**
@@ -28,6 +29,8 @@ export class GameSound {
   private failure: string | null = null;
   /** The player's ears, by the guards' law of sound (audio/hearing.ts). */
   private readonly ears = new Ears();
+  /** The run being heard: what a bullet's flight meets. */
+  private sim: Simulation | null = null;
   private readonly route = emptyRoute();
 
   constructor(private tuning: Tuning) {
@@ -45,7 +48,7 @@ export class GameSound {
           return;
         }
         this.ctx = new Context({ latencyHint: 'interactive' });
-        this.engine = new SoundEngine(this.ctx, { tuning: this.tuning, route: this.ears.route, steady: this.ears.steady });
+        this.engine = new SoundEngine(this.ctx, { tuning: this.tuning, route: this.ears.route, steady: this.ears.steady, flightEnd: (f, until) => this.flightEnd(f, until) });
         this.engine.startAmbience();
         this.applyWorld();
         this.engine.setVolume(gainOf(this.volume));
@@ -75,6 +78,12 @@ export class GameSound {
   setSimulation(sim: Simulation): void {
     if (sim.world !== this.world) this.setWorld(sim.world);
     this.ears.setSolids(sim.solids);
+    this.sim = sim;
+  }
+
+  /** Where a bullet's flight meets the world (as the guards' hearing finds it): its crack ends there. */
+  private flightEnd(f: Flight, until: number): number {
+    return this.sim ? flightEnd(f, until, 1 / this.tuning.sim.tickHz, this.sim.queryView()) : until;
   }
 
   /** The volume setting, 0 to 1, heard on a square law: half way is a quarter of the power. */

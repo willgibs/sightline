@@ -11,7 +11,7 @@ import './styles.css';
  *   ?seed=TAL-4471   which valley to generate
  *   ?scene=movement-course   play a scene instead (sim/game/scenes/index.ts)
  *   &params=...              with these parameters (a scenario: game/scenes/sightScenario.ts)
- *   ?trials=<seed>           a sitting of trial mode, the perception lab's exit test (A12); any seed, or none for a fresh one
+ *   ?trials=<seed>           a sitting of trial mode, the perception lab's exit test (A12); any seed, or none for a fresh one (&fresh forgets a sitting kept in this browser)
  *   ?view=debug      start in the debug view
  *   ?spawn=edge      start where the road leaves the map instead of on an overlook
  *   ?bench           run the 20-second performance flythrough and report
@@ -60,6 +60,7 @@ try {
     sceneName: params.has('trials') ? 'perception-lab' : sceneName,
     scene: params.has('trials') ? SCENES['perception-lab']!() : sceneName ? SCENES[sceneName]?.(params.get('params') ?? undefined) : null,
     trials: params.has('trials') ? normalizeSeed(params.get('trials') || randomSeed()) : null,
+    trialsFresh: params.has('fresh'),
     replayUrl: params.get('replay'),
   });
 } catch (e) {

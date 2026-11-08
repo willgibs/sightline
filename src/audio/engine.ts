@@ -88,6 +88,8 @@ export interface SoundOptions {
   route?: RouteFn;
   /** The same law for the steady sources, by their index in the world's list. */
   steady?: SteadyFn;
+  /** Where a bullet's flight meets the world, so its crack ends there (the guards' law: ballistics' flightEnd). */
+  flightEnd?: (f: Flight, until: number) => number;
   seed?: number;
 }
 
@@ -116,6 +118,7 @@ export class SoundEngine {
   private readonly muffle: MuffleFn | null;
   private readonly route: RouteFn | null;
   private readonly steady: SteadyFn | null;
+  private readonly flightEnd: ((f: Flight, until: number) => number) | null;
   private readonly heard = emptyRoute();
   private readonly rand: Rand;
   private readonly noise: NoiseBuffers;
@@ -142,6 +145,7 @@ export class SoundEngine {
     this.muffle = opts.muffle ?? null;
     this.route = opts.route ?? null;
     this.steady = opts.steady ?? null;
+    this.flightEnd = opts.flightEnd ?? null;
     this.rand = makeRand(opts.seed ?? 0x5167);
     this.noise = makeNoiseBuffers(ctx, this.rand);
 
@@ -291,7 +295,9 @@ export class SoundEngine {
         f.g = this.tuning.sim.gravity;
         f.wx = e.wx;
         f.wz = e.wz;
-        const c = crackAt(f, e.t + this.tuning.ballistics.maxFlight, this.listenerPose, this.speedOfSound, this.crackOut);
+        // Up to where the bullet meets the world: a wall stops the crack with the bullet, as it does for the guards.
+        const until = e.t + this.tuning.ballistics.maxFlight;
+        const c = crackAt(f, this.flightEnd ? this.flightEnd(f, until) : until, this.listenerPose, this.speedOfSound, this.crackOut);
         if (c) this.spatial(c.x, c.y, c.z, this.tuning.ballistics.sound.crack, (out, when, amp) => crack(this.ctx, out, this.noise, this.rand, when, amp), lead + (c.emitted - e.t));
       } else if (e.type === 'impact') {
         // Heard where it struck, after the way back: about 1.28 s after the trigger at 300 m.
