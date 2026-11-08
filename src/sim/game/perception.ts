@@ -256,9 +256,11 @@ function deliverCrack(ctx: TickContext, e: Extract<SimEvent, { type: 'shot' }>):
   flight.wz = e.wz;
   const maker = ctx.index.get(e.source);
   const side = maker ? maker.faction : Faction.None;
+  const guards = ctx.index.of('guard');
+  if (!guards.some((g) => g.senses)) return;
   // The path ends where the bullet meets the world; there's no crack past that.
   const until = flightEnd(flight, e.t + T.ballistics.maxFlight, 1 / T.sim.tickHz, ctx.query());
-  for (const g of ctx.index.of('guard')) {
+  for (const g of guards) {
     const s = g.senses;
     if (!s || g.id === e.source || side === g.faction) continue;
     listener.x = g.body.x;
