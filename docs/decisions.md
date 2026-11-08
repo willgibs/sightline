@@ -2,6 +2,26 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-07 · Handing over to Phase 1
+
+Phase 1 is planned and built in fresh Claude Code sessions, which know only what the repository holds. `docs/phase-1-handoff.md` is where they start.
+
+### A copy of the design doc in the repository
+
+**Decision:** `docs/design-doc.md` is a copy of the live design doc (revision 36). The live doc stays the source of truth, and the copy is exported again whenever the live doc changes. Its four diagrams are written out as text, because the export drops them.
+
+**Why:** The design doc already serves as the brief for a Claude Code agent: each lab's spec and exit test can be handed over as they stand. But a session without the Claude Docs connector can't open the live doc. A copy beside the code can be read by any session.
+
+### Looking at the game from a script
+
+**Decision:** `npm run look` saves the honest and debug views as pictures from a headless browser. `openGame()` (`src/headless/browser.ts`) gives any script the game in a page, with the automation hooks in scope.
+
+**Why:** `CLAUDE.md` asks for every change to be looked at. The scripts that did the looking during the foundation pass lived outside the repository and ended with that session. These tools also build in what those scripts learned:
+- The tools' own Vite server has no hot reload, so an edit to `src` doesn't reload the page under a run.
+- three is bundled before the page loads.
+- Saves to the playtest inbox are dropped, so scripted runs don't land in `playtests/`.
+- Expressions go to the page as strings, because tsx can wrap a function in helpers the page lacks.
+
 ## 2026-11-07 · Foundation pass
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.

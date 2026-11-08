@@ -1,17 +1,20 @@
 # Sightline: working rules
 
-The design doc is the source of truth: [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j). Build phase by phase. Each system's spec, starting numbers and **Done when** test come from Part 2 of that doc. Taste calls belong to the owner. Work proceeds on the doc's recommended defaults until the owner overrides them.
+The design doc is the source of truth: [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j). If you can't open it, work from its copy in `docs/design-doc.md`; the note at the top of that file says how the copy is kept current. Build phase by phase. Each system's spec, starting numbers and **Done when** test come from Part 2 of the design doc. Taste calls belong to the owner. Work proceeds on the doc's recommended defaults until the owner overrides them.
 
 ## Where we are
 
-Phase 0 (Foundations) is complete, and the owner passed its gate on Nov 7, 2026; see `docs/phase-0-report.md`. The owner approved the wireframe look as the canvas for the next phases.
+Phase 0 (Foundations) passed its gate on Nov 7, 2026 (`docs/phase-0-report.md`), and the owner approved the wireframe look as the canvas for the next phases.
 
-**Now: the foundation pass is done, and waits for the owner's check on his Mac.** Before the labs start, the owner asked for the foundation to be pushed close to its full potential.
-- `docs/foundation-plan.md` is the record: milestones M1–M10 and their status, what is deliberately left to the labs, and the Horizons (futures that may shape interfaces, never add features).
-- Read it before starting work, and keep its checkboxes current as work lands.
-- An independent review of the last stretch found two high and four medium defects, all fixed (`docs/decisions.md`).
+The foundation pass that followed is done.
+- `docs/foundation-plan.md` is its record: milestones M1–M10, what is deliberately left to the labs, and the Horizons (futures that may shape interfaces, never add features).
+- Only the owner's check on his Mac is still open.
 
-**Then Phase 1:** five labs, each an isolated wireframe scene built to its exit test.
+**Now: plan Phase 1.**
+- Start with `docs/phase-1-handoff.md`. It says where things stand, what each lab starts from, what planning needs to settle, and the gotchas.
+- Write the Phase 1 plan as its own file in `docs/`, and keep its checkboxes current as work lands, as the foundation plan was kept.
+
+**Phase 1:** five labs, each an isolated wireframe scene built to its exit test.
 
 | Lab | Builds | Exit test |
 | --- | --- | --- |
@@ -54,8 +57,18 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 - `npm run playtest`: every session in `playtests/` (the dev build saves each run there as it goes), re-simulated, checked and summarized with its telemetry. `-- <file|dir>` for others.
 - `npm run scene` (or `-- <name>`, `-- --list`): every scene in `src/sim/scenes` headless, by its own driver, checking its expectations and re-simulating its recording. `?scene=<name>` plays one in the browser. A regression test that needs more than one tick belongs in a scene.
 - `npm run sim -- --replay <file>`: re-simulate a recording saved in the browser; it says where a run diverged, or why it can't re-simulate in this build.
-- In the browser, `window.sightline` exposes automation hooks for scripted screenshots and playtests: `play`, `debug(on)`, `grid(on)`, `fly(x, y, z, headingDeg, pitchDeg)`, `body()`, `hold([codes])`, `tap('KeyC' | 'KeyZ')`, `click()`, `zoom(on)`, `state()`, `dump()`, `recording()`, `sound()`, `insides()`, `playtest()`, and for replays `replay(base64)`, `replayState()`, `seek(tick)`. `?replay=playtests/<name>.slrec` watches a session in the dev build.
-- Look at the result. Render the honest and debug views and judge them, rather than trusting that code which compiles also reads well.
+- `npm run look`: the honest and debug views as pictures in `shots/`, from a headless browser. `-- --scene <name>`, `--seed`, `--look`, `--walk` and `--fly` choose what to look at (the header of `src/headless/look.ts`).
+- `window.sightline` exposes automation hooks for scripted screenshots and playtests. The full list is `automation()` in `src/app/game.ts`:
+  - **Running:** `play()`, `pause()`.
+  - **Views:** `debug(on)`, `colliders(on)`, `grid(on)`, `overwatch(on)`.
+  - **Camera:** `look(headingDeg, pitchDeg)`, `fly(x, y, z, headingDeg, pitchDeg)`, `body()`.
+  - **Input:** `hold([codes])`, `tap('KeyC' | 'KeyZ')`, `click()`, `zoom(on)`.
+  - **World:** `generate(seed)`, `fog(density)`.
+  - **Reading:** `state()`, `dump()`, `recording()`, `sound()`, `insides()`, `playtest()`.
+  - **Replays:** `replay(base64)`, `replayState()`, `seek(tick)`.
+- To drive the hooks from a script, use `openGame()` in `src/headless/browser.ts`. It starts its own server and browser and evaluates expressions with the hooks in scope.
+- `?replay=playtests/<name>.slrec` watches a kept session in the dev build.
+- Look at the result. Render the honest and debug views and judge them, rather than trusting that code which compiles also reads well. A headless browser draws at a few frames a second, so judge feel and frame rate on a real machine.
 
 ## Workflow
 

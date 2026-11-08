@@ -128,6 +128,10 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 ### M10 · Close out
 - [x] `CLAUDE.md` gains the audit's rules: systems join the phase list, never `step()` (rule 12); what is drawn is what is simulated, with `bob.ts` as the model (14); generation works in site frames (15); content is data in tuning (16); rates are per second times `dt` (17); budgets are iterations, never time (18). The code already complies.
 - [x] `decisions.md`, the Phase 0 report (an addendum on what changed after the gate) and the design doc's phase notes are updated.
+- [x] A handoff for Phase 1:
+  - `docs/phase-1-handoff.md`: where things stand, what each lab starts from, what planning needs to settle, and the gotchas.
+  - A copy of the design doc in `docs/design-doc.md`.
+  - `npm run look`, which replaces the session's throwaway browser scripts.
 - [ ] Verified on the owner's Mac. Done so far:
   - The deployed build loads in the desktop app's browser on the owner's M3 Max (Metal through ANGLE) and generates TAL-4471 in 1.3 s.
   - A 20-minute bot run gives the same final hash on macOS arm64 as on Linux x64 (`e9311dda2ac00379`, CI run on demand).
