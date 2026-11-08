@@ -96,7 +96,7 @@ export function playerIntent(
   return out;
 }
 
-function updateStance(b: BodyState, c: PlayerControl, input: InputFrame, spec: BodySpec, ctx: Pick<MotorContext, 'solids' | 'source' | 'emit'>): void {
+function updateStance(b: BodyState, c: PlayerControl, input: InputFrame, spec: BodySpec, ctx: Pick<MotorContext, 'world' | 'solids' | 'source' | 'emit'>): void {
   if (!input.sprint) c.sprintSuppressed = false;
   if (b.motor === 'mantle' || b.motor === 'ladder') return; // the hands are busy
   let request: 'crouch' | 'prone' | null = input.prone ? 'prone' : input.crouch ? 'crouch' : null;

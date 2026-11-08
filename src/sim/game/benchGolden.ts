@@ -52,7 +52,7 @@ export const BENCH_GOLDEN: PinnedBench = {
     "runs": {
       "movement-course": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 1414 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 1445 }
         }
       }
     }

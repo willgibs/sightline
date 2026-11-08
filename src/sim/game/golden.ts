@@ -34,7 +34,7 @@ export const GOLDEN = {
    * bodies spawned inside a tick; the kernel alone, a run with every lane switched off.
    */
   scenes: {
-    'movement-course': { behaviour: '780d178074ec33ce', state: '8aeb62ad1b153b7b' },
+    'movement-course': { behaviour: '0f2551d99837a6bc', state: '22ce87c566bcad20' },
     'perception-lab': { behaviour: 'ec9629090f983b90', state: '8c078d3b1b2a4e23' },
     'shooting-range': { behaviour: '8cc3e0f7a274c3c5', state: '4545cb7eb41540f3' },
     'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '42c55f2958b14cf0' },

@@ -170,6 +170,77 @@ describe('the prone chain', () => {
     expect(b.stance).toBe('crouch');
   });
 
+  it('keeps what a leg rests on under it as it draws in', () => {
+    // A rock just within reach of the fourth circle at full length, and out of its reach
+    // a moment into getting up if that reach shrank with the chain (PIF-1492, in the fuzz).
+    const circle = chainOf(spec)[3]!;
+    const reach = (Math.abs(circle.at) - spec.radius) * Math.tan((spec.maxSlopeDeg * Math.PI) / 180);
+    const { b, ctx } = setup([box(-2, 2, 0.45, 2, -0.3, spec.stepHeight + reach - 0.004)]);
+    b.stance = 'prone';
+    b.eyeHeight = b.eyeFrom = spec.eyeHeight.prone;
+    b.lying = 1;
+    const sim = new Simulation(ctx.world, T);
+    Object.assign(sim.player, b);
+    const watch = new InvariantWatch(sim);
+    const input = neutralInput(sim.player.yaw);
+    for (let t = 0; t < 60; t++) {
+      input.crouch = t === 1;
+      watch.beforeTick();
+      sim.step(input);
+      watch.afterTick();
+    }
+    expect(watch.report.first).toBeNull();
+    expect(sim.player.stance).toBe('crouch');
+    expect(sim.player.lying).toBe(0);
+  });
+
+  it('waits for room to get up in a slot too narrow to stand in, and can crawl out of it', () => {
+    // Walls 0.55 m apart: room to lie in (0.5 m), none to stand in (0.6 m).
+    const { b, ctx } = setup([box(-1.5, 3, -0.375, -0.275), box(-1.5, 3, 0.275, 0.375)], undefined, 0, 8);
+    b.z = 0; // no way to have walked in standing: only the getting up matters here
+    b.yaw = Math.PI / 2; // facing west, along the slot
+    b.axis = b.yaw;
+    b.stance = 'prone';
+    b.eyeHeight = b.eyeFrom = spec.eyeHeight.prone;
+    b.lying = 1;
+    expect(requestStance(b, 'crouch', spec, ctx)).toBe(true);
+    let worst = 0;
+    for (let t = 1; t < 90; t++) {
+      step(b, ctx, t);
+      worst = Math.max(worst, deepest(b, ctx));
+    }
+    // It has drawn in as far as the walls allow, and the eye waits with it.
+    expect(worst).toBeLessThan(1e-3);
+    expect(b.lying).toBeGreaterThan(0.3);
+    expect(b.lying).toBeLessThan(0.7);
+    expect(b.proneTransition).toBe(true);
+    expect(b.stanceTimer).toBeGreaterThan(0);
+    expect(b.eyeHeight).toBeLessThan(spec.eyeHeight.crouch - 0.05);
+    // Crawl out of the end of the slot, and it finishes getting up.
+    const x = b.x;
+    for (let t = 90; t < 600; t++) {
+      step(b, ctx, t, -0.7, 0);
+      worst = Math.max(worst, deepest(b, ctx));
+    }
+    expect(worst).toBeLessThan(1e-3);
+    expect(b.x).toBeLessThan(x - 1);
+    expect(b.lying).toBe(0);
+    expect(b.proneTransition).toBe(false);
+    expect(b.eyeHeight).toBe(spec.eyeHeight.crouch);
+  });
+
+  it('does not get up with its legs under a shelf, and does once they are out', () => {
+    const { b, ctx } = setup([box(-2, 2, 0.6, 3, 0.8, 1)]);
+    b.stance = 'prone';
+    b.eyeHeight = b.eyeFrom = spec.eyeHeight.prone;
+    b.lying = 1;
+    step(b, ctx, 1);
+    expect(requestStance(b, 'crouch', spec, ctx)).toBe(false);
+    expect(b.stance).toBe('prone');
+    for (let t = 2; t < 150; t++) step(b, ctx, t, 0, -0.7);
+    expect(requestStance(b, 'crouch', spec, ctx)).toBe(true);
+  });
+
   it('stands in the way of other bodies along its whole length', () => {
     const { b, ctx } = setup();
     down(b, ctx);

@@ -45,7 +45,9 @@ import type { DebugDraw } from '../kernel/debugDraw';
  * - a lying body (chain.ts) is a chain of circles along its axis, every one of which keeps
  *   every promise above; it grows out of the standing circle over the stance change and
  *   turns by the largest step that keeps every part clear, found with a fixed number of
- *   bisections. Its head, torso and legs are inside the chain, so they are clear too;
+ *   bisections. It gets up only with headroom along its whole length, and draws in only
+ *   as far as it ends the tick clear, waiting (and able to crawl) where there's no room.
+ *   Its head, torso and legs are inside the chain, so they are clear too;
  * - in a mantle (mantle.ts) the body follows a path whose every pose is re-checked every
  *   tick: never inside anything solid, with no allowance for steps, and never inside
  *   another body; it waits for what's in the way, and gives up if it stays. Only colliders can be
@@ -155,6 +157,9 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
   pushHistory(b);
   b.yaw = i.yaw;
   b.pitch = clamp(i.pitch, -spec.pitchLimit, spec.pitchLimit);
+  const eye = b.eyeHeight;
+  const timer = b.stanceTimer;
+  const changing = b.proneTransition;
   easeStance(b, spec, ctx.dt);
   if (i.climb && b.motor === 'ground') {
     // A ladder in reach takes the press; otherwise whatever can be mantled.
@@ -163,7 +168,12 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
   }
   if (b.motor === 'mantle') stepMantle(b, spec, ctx);
   else if (b.motor === 'ladder') stepLadder(b, i, spec, ctx);
-  else moveBody(b, i, spec, ctx, tanMax);
+  else if (moveBody(b, i, spec, ctx, tanMax)) {
+    // No room yet to draw the body in: it gets up when there is, not before.
+    b.eyeHeight = eye;
+    b.stanceTimer = timer;
+    b.proneTransition = changing;
+  }
   stepLean(b, i, spec, ctx);
   if (ctx.draw) {
     drawController(ctx.draw, b, spec, ctx.world, tanMax);
@@ -171,8 +181,11 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
   }
 }
 
-/** A tick of the modes that drive a velocity (on the ground, in the air): move and collide, settle, footsteps and landing. */
-function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext, tanMax: number): void {
+/**
+ * A tick of the modes that drive a velocity (on the ground, in the air): move and collide,
+ * settle, footsteps and landing. Returns true if a body getting up couldn't draw in this tick.
+ */
+function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext, tanMax: number): boolean {
   const { world, tuning, dt } = ctx;
   MODES[b.motor as 'ground' | 'air'].drive(b, i, spec, ctx, tanMax);
 
@@ -188,10 +201,24 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
   const startOn = b.standingOn;
   const startSlope = b.slopeTan;
   const grew = growLying(b, spec, ctx.dt);
-  if (!resolveMove(b, b.x + b.vx * dt, b.z + b.vz * dt, spec, ctx, dest) && grew) {
-    // No room to grow into: it stays as long as it was.
-    b.lying = was;
-    resolveMove(b, b.x, b.z, spec, ctx, dest);
+  const vx = b.vx;
+  const vz = b.vz;
+  const toX = b.x + vx * dt;
+  const toZ = b.z + vz * dt;
+  if (!resolveMove(b, toX, toZ, spec, ctx, dest)) {
+    if (grew) {
+      // No room to grow into: it stays as long as it was.
+      b.lying = was;
+      resolveMove(b, b.x, b.z, spec, ctx, dest);
+    } else if (b.lying < was) {
+      // No room at the shorter length. If the move works at the length it has, it keeps
+      // that length, so a body held down in a tight place can still crawl out of it.
+      const shorter = b.lying;
+      b.lying = was;
+      b.vx = vx;
+      b.vz = vz;
+      if (!resolveMove(b, toX, toZ, spec, ctx, dest)) b.lying = shorter;
+    }
   }
   const nx = dest.x;
   const nz = dest.z;
@@ -300,10 +327,19 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
   // Lying: the body turns, by what it can, and settles along the ground under it. The
   // final pose is checked exactly as the invariant watch will check it: the circles were
   // cleared against heights the settling may since have changed, and a promise that holds
-  // only most of the time isn't one.
+  // only most of the time isn't one. Getting up, the last step to a standing circle is
+  // checked too. A body that can't draw in stays as long as it was and tries again next
+  // tick; anything else goes back to where it started, unless it's falling or sliding,
+  // when the fall goes on.
   if (b.lying > 0) {
     turnAxis(b, spec, ctx, tanMax);
     lieAlongGround(b, spec, ctx);
+  }
+  if ((b.lying > 0 || startLying > 0) && !chainEndClear(b, spec, ctx)) {
+    if (b.lying < startLying) {
+      b.lying = startLying;
+      lieAlongGround(b, spec, ctx);
+    }
     if (b.motor === 'ground' && !b.sliding && !chainEndClear(b, spec, ctx)) {
       b.x = startX;
       b.z = startZ;
@@ -316,7 +352,7 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
       b.surface = startSurface;
       b.standingOn = startOn;
       b.slopeTan = startSlope;
-      lieAlongGround(b, spec, ctx);
+      if (b.lying > 0) lieAlongGround(b, spec, ctx);
     }
   }
   const L = tuning.noise.landing;
@@ -335,6 +371,7 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
     });
     b.stride = 0;
   }
+  return b.stance !== 'prone' && startLying > 0 && b.lying === startLying;
 }
 
 /**
