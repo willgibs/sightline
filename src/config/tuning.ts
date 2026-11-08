@@ -284,7 +284,7 @@ export const defaultTuning = {
     // Counter-sniper (E8): triangulating shots from bearings (triangulate.ts) and hunting the shooter.
     sniper: {
       fusion: { half: 720, cells: 120, rangeMin: 80, rangeMax: 650 }, // the commander's grid around the camp, metres, and its ring of plausible perches
-      window: 90, // seconds of bearings it fuses
+      keep: 90, // seconds of bearings it fuses
       maxBearings: 16, // bearings it keeps
       minSigmaDeg: 3, // nobody's ear is sharper than this
       maxSigmaDeg: 25, // a bearing worse than this is said to be no bearing at all

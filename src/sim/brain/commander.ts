@@ -96,7 +96,7 @@ function noteShot(camp: CampState, r: Report, tick: number, tuning: Tuning): voi
   const shots = camp.shots;
   shots.bearings.push({ x: r.fromX, z: r.fromZ, ux: dx / d, uz: dz / d, sigma, tick });
   // Keep the newest, within its window.
-  const horizon = tick - Math.round(S.window * tuning.sim.tickHz);
+  const horizon = tick - Math.round(S.keep * tuning.sim.tickHz);
   shots.bearings = shots.bearings.filter((b) => b.tick >= horizon);
   if (shots.bearings.length > S.maxBearings) shots.bearings.splice(0, shots.bearings.length - S.maxBearings);
   const est = shots.estimate ?? emptyEstimate();
