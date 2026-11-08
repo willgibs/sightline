@@ -1,7 +1,7 @@
 import type { Tuning } from '../../config/tuning';
 import type { DoorSpec, VehicleSpec } from '../generation';
 import type { Simulation as KernelSimulation } from '../kernel/sim';
-import type { System } from '../kernel/systems';
+import type { System, TickContext } from '../kernel/systems';
 import { Faction, type EntityBase } from '../kernel/state';
 import { Blocks, type Collider } from '../kernel/world/colliders';
 import { Cell, cellAt } from '../kernel/world/grid';
@@ -39,8 +39,8 @@ export interface VehicleEntity extends EntityBase {
     escape: boolean;
     /** Sabotaged (E7): it won't start. Absent until someone does it. */
     disabled?: boolean;
-    /** On its way out (E7): which leg of the escape route, and how long it has been held up. Absent until it's moving. */
-    driving?: { leg: number; waited: number };
+    /** On the move (E7, E8): the way it's going, which leg it's on, how long it has been held up, what happens at the end, and why it's going. Absent while parked. */
+    driving?: { route: Array<{ x: number; z: number }>; leg: number; waited: number; then: 'escape' | 'dismount'; cause: number };
   };
   solid: Collider;
 }
@@ -68,6 +68,48 @@ export function boardingPoint(world: World, v: VehicleSpec, tuning: Tuning): { x
     if (c && (c.layer.flags[c.index]! & Cell.Walkable) !== 0) return p;
   }
   return sides[0]!;
+}
+
+/** The way the target's vehicle leaves (E7): from the gate on, down the road. */
+export function escapeRoute(world: World): Array<{ x: number; z: number }> {
+  const escape = world.camp.layout?.skeleton.escape;
+  return escape ? escape.slice(3).map((p) => ({ x: p.x, z: p.z })) : [];
+}
+
+/** The way a reinforcement truck comes in (E8): up the road from the edge of the map, stopping short of the gate. Null for a camp with no road laid out. */
+export function truckRoute(world: World, tuning: Tuning): Array<{ x: number; z: number }> | null {
+  const escape = world.camp.layout?.skeleton.escape;
+  if (!escape) return null;
+  const R = tuning.brain.reinforce;
+  const gate = escape[3]!;
+  const edge = world.playHalf - R.edgeMargin;
+  const inside = world.features.road.points.filter((p) => Math.max(Math.abs(p.x), Math.abs(p.z)) < edge);
+  const route: Array<{ x: number; z: number }> = [];
+  for (let k = inside.length - 1; k >= 0; k--) {
+    const p = inside[k]!;
+    const away = Math.sqrt((p.x - gate.x) * (p.x - gate.x) + (p.z - gate.z) * (p.z - gate.z));
+    if (away <= R.truck.stopShort) break;
+    const last = route[route.length - 1];
+    if (!last || Math.sqrt((p.x - last.x) * (p.x - last.x) + (p.z - last.z) * (p.z - last.z)) >= R.truck.every) route.push({ x: p.x, z: p.z });
+  }
+  return route.length >= 2 ? route : null;
+}
+
+/** How long a truck takes over a route, in seconds. */
+export function routeSeconds(route: ReadonlyArray<{ x: number; z: number }>, tuning: Tuning): number {
+  let metres = 0;
+  for (let k = 1; k < route.length; k++) metres += Math.sqrt((route[k]!.x - route[k - 1]!.x) * (route[k]!.x - route[k - 1]!.x) + (route[k]!.z - route[k - 1]!.z) * (route[k]!.z - route[k - 1]!.z));
+  return metres / tuning.brain.alarm.flee.drive;
+}
+
+/** A truck on the road, coming in: at the first point of its route, heading for the second (E8). */
+export function spawnTruck(ctx: TickContext, route: Array<{ x: number; z: number }>, cause: number): void {
+  const R = ctx.tuning.brain.reinforce.truck;
+  const a = route[0]!;
+  const b = route[1]!;
+  const d = Math.sqrt((b.x - a.x) * (b.x - a.x) + (b.z - a.z) * (b.z - a.z)) || 1;
+  const spec: VehicleSpec = { kind: 'truck', x: a.x, y: ctx.world.terrain.heightAt(a.x, a.z), z: a.z, fx: (b.x - a.x) / d, fz: (b.z - a.z) / d, length: R.length, width: R.width, height: R.height, escape: false };
+  ctx.spawn((id): VehicleEntity => ({ id, kind: 'vehicle', faction: Faction.None, vehicle: { index: -1, escape: false, driving: { route, leg: 1, waited: 0, then: 'dismount', cause } }, solid: vehicleSolid(spec) }));
 }
 
 /** The camp's doors and vehicles, as entities, in the camp's order: doors first. */

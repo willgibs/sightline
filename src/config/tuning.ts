@@ -572,6 +572,7 @@ export const defaultTuning = {
       count: 3, // guards in the squad
       spread: 3.5, // metres between them when they arrive
       edgeMargin: 14, // metres inside the map's edge where they arrive, up the camp's road
+      truck: { length: 6.2, width: 2.3, height: 2.9, every: 25, stopShort: 14 }, // their truck (metres): its size, a waypoint this often along the road, and where it stops short of the gate
     },
     // Counter-sniper (E8): triangulating shots from bearings (triangulate.ts) and hunting the shooter.
     sniper: {

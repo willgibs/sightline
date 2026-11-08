@@ -206,6 +206,32 @@ describe('the target and his vehicle (E7)', () => {
   }, 120_000);
 });
 
+describe('reinforcements (E8)', () => {
+  it('come by truck up the road, and get down short of the gate', () => {
+    const sim = startScene(liveCamp('seed=LEB-2534') as Scene<Simulation>, T, world);
+    sim.index.of('vehicle').find((x) => x.vehicle.escape)!.vehicle.disabled = true;
+    const before = sim.guards.length;
+    const c = commanderOf(sim)!;
+    const raw = neutralInput();
+    let arrived: SimEvent | undefined;
+    let seenOnRoad = false;
+    for (let i = 0; i < (T.brain.reinforce.delay + 30) * 30 && !arrived; i++) {
+      if (i === 30) c.camp.level = 'lockdown';
+      for (const e of sim.step(raw)) if (e.type === 'reinforce') arrived = { ...e };
+      if (sim.index.of('vehicle').some((v) => v.vehicle.index === -1 && v.vehicle.driving)) seenOnRoad = true;
+    }
+    expect(seenOnRoad, 'no truck on the road').toBe(true);
+    expect(arrived, 'nobody arrived').toBeDefined();
+    const when = arrived!.tick / 30;
+    expect(when).toBeGreaterThan(T.brain.reinforce.delay - 5);
+    expect(when).toBeLessThan(T.brain.reinforce.delay + 15);
+    expect(sim.guards.length).toBe(before + T.brain.reinforce.count);
+    const gate = world.camp.layout!.skeleton.escape[3]!;
+    const r = arrived as Extract<SimEvent, { type: 'reinforce' }>;
+    expect(Math.hypot(r.x - gate.x, r.z - gate.z)).toBeLessThan(T.brain.reinforce.truck.stopShort + 32);
+  }, 120_000);
+});
+
 describe('doors (E7, A9)', () => {
   const doorCamp = () => world.camp.doors![0]!;
 

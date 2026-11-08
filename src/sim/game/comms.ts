@@ -7,7 +7,7 @@ import { Faction, type EntityBase } from '../kernel/state';
 import type { ScheduleHandler, System, TickContext } from '../kernel/systems';
 import { Surface } from '../kernel/world/surfaces';
 import { believe, createSenses, stimulate, type Percept } from '../perception';
-import { boardingPoint } from './camp';
+import { boardingPoint, escapeRoute, routeSeconds, spawnTruck, truckRoute } from './camp';
 import type { GuardEntity } from './entities';
 import { deliverSound } from './perception';
 import type { Simulation } from './sim';
@@ -222,27 +222,35 @@ const orders: CampOrder[] = [];
 export const reinforceArrive: ScheduleHandler = (ctx, entry) => {
   const c = commanderOf(ctx);
   if (!c) return;
+  const route = truckRoute(ctx.world, ctx.tuning);
+  if (route) {
+    // A generated camp's come by truck, up its road (game/escape.ts).
+    spawnTruck(ctx, route, entry.b);
+    return;
+  }
+  // A handmade camp has no road laid out: on foot, from the edge of the map.
   const T = ctx.tuning.brain.reinforce;
   const site = ctx.world.camp.site;
-  const half = ctx.world.playHalf - T.edgeMargin;
-  // Up the road from the gate: the site's first axis, to the edge of the map.
-  const reach = Math.max(10, half);
-  const ex = site.x + site.ux * reach;
-  const ez = site.z + site.uz * reach;
-  const faceX = -site.ux;
-  const faceZ = -site.uz;
+  const reach = Math.max(10, ctx.world.playHalf - T.edgeMargin);
+  squadArrives(ctx, c, site.x + site.ux * reach, site.z + site.uz * reach, -site.ux, -site.uz, entry.b);
+};
+
+/** A reinforcement squad arrives at (x, z), facing (faceX, faceZ), and goes to hunt what the camp believes (E8). */
+export function squadArrives(ctx: TickContext, c: CommanderEntity, x: number, z: number, faceX: number, faceZ: number, cause: number): void {
+  const T = ctx.tuning.brain.reinforce;
+  const site = ctx.world.camp.site;
   const post = ctx.world.camp.guards.findIndex((g) => g.role === 'patrol');
   for (let k = 0; k < T.count; k++) {
-    const x = ex + -site.uz * (k - (T.count - 1) / 2) * T.spread;
-    const z = ez + site.ux * (k - (T.count - 1) / 2) * T.spread;
+    const px = x + -faceZ * (k - (T.count - 1) / 2) * T.spread;
+    const pz = z + faceX * (k - (T.count - 1) / 2) * T.spread;
     ctx.spawn((id): GuardEntity => {
-      const body = createBody(ctx.world, ctx.solids, ctx.tuning.bodies.guard, x, z, faceX, faceZ);
+      const body = createBody(ctx.world, ctx.solids, ctx.tuning.bodies.guard, px, pz, faceX, faceZ);
       const senses = createSenses(false);
       const brain = createBrain();
       return { id, kind: 'guard', faction: Faction.Camp, body, guard: { spawn: post >= 0 ? post : 0, headYaw: 0, order: standStill() }, senses, brain };
     });
   }
-  const event = ctx.emit({ type: 'reinforce', source: c.id, cause: entry.b, count: T.count, x: ex, z: ez });
+  const event = ctx.emit({ type: 'reinforce', source: c.id, cause, count: T.count, x, z });
   // They hunt: the camp's latest belief, by radio, as an order to go and search there.
   for (const g of ctx.index.of('guard')) {
     if (!g.brain || g.guard.order.tick !== 0 || g.brain.act !== 'routine' || c.camp.roster.some((m) => m.id === g.id)) continue;
@@ -250,7 +258,7 @@ export const reinforceArrive: ScheduleHandler = (ctx, entry) => {
     const target = c.camp.search ?? (c.camp.shots.estimate ? { x: c.camp.shots.estimate.x, z: c.camp.shots.estimate.z } : { x: site.x, z: site.z });
     g.brain.task = { id: c.camp.nextTask++, kind: 'search', x: target.x, z: target.z, issued: ctx.tick, cause: event };
   }
-};
+}
 
 /**
  * The target reaches his vehicle at lockdown (E7). If it's been sabotaged he stays by it and
@@ -271,7 +279,7 @@ export function targetEscapes(ctx: TickContext, g: GuardEntity): void {
   const status = vehicle ? 'escaping' : 'escaped';
   c.camp.objective.status = status;
   for (const o of ctx.index.of('objective')) if (o.objective.target === g.id) o.objective.status = status;
-  if (vehicle) vehicle.vehicle.driving = { leg: 0, waited: 0 };
+  if (vehicle) vehicle.vehicle.driving = { route: escapeRoute(ctx.world), leg: 0, waited: 0, then: 'escape', cause: 0 };
   ctx.despawn(g.id);
 }
 
@@ -415,7 +423,9 @@ export const campCommander: System = {
     // Lockdown calls reinforcements, once.
     if (camp.level === 'lockdown' && camp.reinforceCalled < 0) {
       camp.reinforceCalled = ctx.tick;
-      ctx.schedule(ctx.tuning.brain.reinforce.delay, 'reinforce-arrive', 0, camp.lastCause);
+      // They're due at the gate after the delay, so a truck sets off that much sooner than its drive.
+      const route = truckRoute(ctx.world, ctx.tuning);
+      ctx.schedule(Math.max(1, ctx.tuning.brain.reinforce.delay - (route ? routeSeconds(route, ctx.tuning) : 0)), 'reinforce-arrive', 0, camp.lastCause);
     }
     ctx.debug((draw) => drawCamp(draw, ctx, camp));
   },

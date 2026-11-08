@@ -441,12 +441,12 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - The bark vocabulary, started now (Alien: Isolation's took most of its cycle). Barks run from specific to generic.
   - The detection indicator at the screen edge.
   - Then the fairness checks.
-- [ ] A9 · The other stimuli, each wired in when its source is on `main` (`docs/decisions.md`, A9):
+- [x] A9 · The other stimuli, each wired in when its source is on `main` (`docs/decisions.md`, A9):
   - [x] bodies and a comrade dropping (B4);
   - [x] impacts (B4), and the crack from the bullet's path;
   - [x] thrown objects (B9);
   - [x] lens glint (B6);
-  - [ ] open doors (D4). Lab D's doors are on `main`, but they all stand open and nothing changes them yet, so this goes in with the use key (E7).
+  - [x] doors (D4, E7): a door shut or opened is a sound, and a door not as it was left is something a guard notices. Lab D's doors all start open, so the cue is a door someone has shut.
 - [x] A10 · Sandbox mode: noise drops, and the time-scale hook.
 - [x] A11 · The budget: 16 guards perceiving within the frame budget, measured by work counts as well as `npm run sim -- --profile`, in Chromium, Firefox and WebKit. Fast paths come only if it needs them: a still body skips the motor, and a distant guard skips perception.
 - [x] A12 · Trial mode, with the protocol in Exit tests, and the agents' pre-screen.
@@ -906,11 +906,12 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - Searches end on time since the last percept and the search map's spread, never on the player's true position. Cycles run near 30–45 s, and the camp settles one level up.
   - The no-omniscience probe covers the commander, with a planted peek it catches.
 - [x] E6 · Radio check-ins, as scheduled events (`game/comms.ts`). The operator calls each post every few minutes. A dead post doesn't answer, the camp goes uneasy, and someone walks over.
-- [ ] E7 · Alarms.
+- [x] E7 · Alarms.
   - Done (`game/comms.ts`, `brain/brain.ts`, stand-in boxes until D's devices land): after the reaction window, a guard runs 4–8 s to an alarm box, a journey through the motor; lockdown is set only by the box changing state; dropping him or cutting the power interrupts it.
   - The core's sabotage, by default: hold the use key at arm's length to switch off the generator or cut the radio. Whoever passes or needs it notices the outage. The sabotage kit is Phase 3's.
   - At lockdown, the target runs for the vehicle when he hears the siren (`flee`); reaching it loses the mission, and dropping him first wins it. The drive away needs bodies to ride moving solids (with C).
-- [ ] E8 · Counter-sniper and reinforcements. Done so far: triangulation from real shot and crack percepts, with a calibrated ellipse (`brain/triangulate.ts`), marksmen sweeping the estimate and following newer fixes, a visible reaction inside 2 s, guards under fire taking cover, reinforcements at lockdown (a squad on foot until D's trucks land). Still to come: marksmen moving to overlooking posts (D's perches).
+  - **Built on generated camps** (`game/sabotage.ts`, `game/escape.ts`, `game/doors.ts`). Holding use at arm's length stops the generator, breaks the radio at its set or mast, or disables the target's vehicle. Nobody is told: a guard who looks at stopped equipment takes notice, the operator finds a dead set at the next call, and a runner finds a dead box. A stopped generator stops humming and masking. His truck drives out through the gate, swerving round anyone in the road, and the mission is lost only when it's gone; a sabotaged one strands him beside it, still to be got. Bodies still don't ride moving solids: he is gone from the camp once he's in the cab.
+- [x] E8 · Counter-sniper and reinforcements. Triangulation from real shot and crack percepts, with a calibrated ellipse (`brain/triangulate.ts`), marksmen sweeping the estimate and following newer fixes, a visible reaction inside 2 s, guards under fire taking cover, and reinforcements at lockdown, by truck up the camp's road on a generated camp. Marksmen stay on their towers: measured over 16 camps, a tower already overlooks 98% of the perches and every camp's best overview, so leaving one (which needs ladder links in navigation) waits until a sitting shows it's missed (`docs/decisions.md`, The camp's equipment).
   - **Honest triangulation:**
     - every guard who heard the report or the crack forms a bearing, with error from his own stream;
     - reports reach the commander by voice or radio;

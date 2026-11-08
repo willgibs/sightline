@@ -2,6 +2,20 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · The camp's equipment (E7, E8, A9's doors)
+
+**Decision:**
+- **Sabotage is held, not pressed.** The use key has a held bit now (in the held byte, so older recordings still read). Holding it at arm's length stops the generator, breaks the radio at its set or its mast, or disables the target's vehicle. It's a step of the use system rather than a system of its own, because every other system in 'commands' already orders itself against 'use'.
+- **Nobody is told.** A guard who looks at stopped equipment notices it, once. The operator finds a dead set at his next call. A runner finds a dead box. With the generator down the radio is down too, so a guard who notices can only say so aloud; the operator's report reaches the camp because the set is what's dead.
+- **The hum stops with the generator:** in what masks a guard's hearing, and in the speakers.
+- **The target's truck drives out,** and the mission is lost only when it's gone. It swerves round anyone in the road, and after 4 s held up it goes through, because a truck that a sentry can stop forever is a mission that can't be lost. Sabotaged, it strands him beside it and the mission stays open.
+- **Doors** open and shut at a press and are heard. A guard who walks up to a shut door opens it, so no route needs to know. They all start open, so the cue is a door someone has shut.
+- **Reinforcements come by truck** up the camp's road, timed to reach the gate at the delay, and get down behind it. A handmade camp has no road laid out, so its squad still arrives on foot.
+
+**Marksmen stay on their towers, for now.** The plan had them moving to overlooking posts. Measured over 16 camps, a tower already overlooks 495 of 503 perches (98%) and every camp's best overview, so the move would matter for very few perches. It needs ladder links in navigation and a marksman who is no longer tied to his post, so it waits until a sitting shows it's missed.
+
+**What moved:** nothing pinned. New state is absent until used, so runs that don't use it hash as before. The tuning grew, so the golden recording is rewritten.
+
 ## 2026-11-08 · The camp brain on generated camps (E13)
 
 **Decision:** a scene, `live-camp`, puts lab E's whole brain on any generated camp, with the rifle. It is a scene rather than a change to the valley's systems, so the default valley's behaviour doesn't move until Phase 2 joins the labs. Lab D's entities hold the one answer about whether a box has power or the radio works; `campDevices` keeps the commander's copy of it, and raising a box raises its entity. A handmade scene's camp, with no such entities, keeps the list its scene gave it, so the scripted scenarios and benches are untouched.
