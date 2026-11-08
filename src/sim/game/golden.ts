@@ -22,9 +22,9 @@ export const GOLDEN = {
   world: 'f555512c33daea22',
   /** 60 s of play: the person-like bot in two valleys, the fuzzing bot in one. */
   play: {
-    'TAL-4471 wander': { behaviour: '688ae4eddeadae3a', state: '82b1bcb90b5a2eb0' },
-    'MUD-9031 wander': { behaviour: '67964675cb39477e', state: 'd5b89a98d2fea5b5' },
-    'TAL-4471 chaos': { behaviour: 'f3bd13f84383adec', state: 'c4c1b68e920c1c9e' },
+    'TAL-4471 wander': { behaviour: '688ae4eddeadae3a', state: '0e17f37971ff8d08' },
+    'MUD-9031 wander': { behaviour: '67964675cb39477e', state: '0445d796e8329c2f' },
+    'TAL-4471 chaos': { behaviour: 'f3bd13f84383adec', state: 'fb1d905d4f13c32f' },
   },
   /**
    * Scenes run by their own drivers, each pinning its lane (benches.ts): the movement
@@ -36,13 +36,13 @@ export const GOLDEN = {
    * camp systems, a generated camp with its generator cut and its target taken (lab D).
    */
   scenes: {
-    'movement-course': { behaviour: '0f2551d99837a6bc', state: '22ce87c566bcad20' },
-    'perception-crowd': { behaviour: '8a0406d39b05cc58', state: '0534995faab9b897' },
-    'perception-lab': { behaviour: '0aad2727a0cf9bbb', state: '979e0df9bc9b91a8' },
-    'shooting-range': { behaviour: '8cc3e0f7a274c3c5', state: '4545cb7eb41540f3' },
-    'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '42c55f2958b14cf0' },
-    'kernel-alone': { behaviour: '0698e581024f5b35', state: '7797e5bc3b7451dc' },
-    'camp-systems': { behaviour: 'e5c646c959574b12', state: 'f445484f70376ce2' },
+    'movement-course': { behaviour: '0f2551d99837a6bc', state: '549efd1a98bc727c' },
+    'perception-crowd': { behaviour: '8a0406d39b05cc58', state: '838930f20ad18c54' },
+    'perception-lab': { behaviour: '0aad2727a0cf9bbb', state: 'a7c651e821e7b293' },
+    'shooting-range': { behaviour: '8cc3e0f7a274c3c5', state: '5c849d1f738b28d5' },
+    'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '30be7b87da76f7de' },
+    'kernel-alone': { behaviour: '0698e581024f5b35', state: '045b6f0f6879675a' },
+    'camp-systems': { behaviour: 'e5c646c959574b12', state: 'dfb432c39d4c6d80' },
   },
 } as const;
 

@@ -22,9 +22,10 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * 4: bodies keep their last two poses. 5: guards are bodies; random streams per entity.
  * (Solid entities are a new kind, not a change of layout: existing states read the same.)
  * 6: the outcome. 7: guards keep the order their brain last gave. 8: bodies keep a lean and a
- * mantle; the player's controls keep a climb press (lab C, Nov 8).
+ * mantle; the player's controls keep a climb press (lab C, Nov 8). 9: the valley's guards
+ * carry their senses (A13).
  */
-export const STATE_SCHEMA = 8;
+export const STATE_SCHEMA = 9;
 
 export type EntityId = number;
 

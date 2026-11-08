@@ -180,6 +180,15 @@ Built on the `lab-c-movement` branch to `docs/phase-1-plan.md`, section C. Lean 
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
 
+### Perception joins the valley (A13)
+
+**Decision:**
+- **`SYSTEMS` now holds `PERCEPTION`**, in its phases, and the scenes stop listing it, lab E's too (its scenes, baselines, bench and tests, as its notes said they should). A guard spawned in a generated valley gets his senses at spawn (`setup.ts`, by the world's mission spec: its terrain is procedural), so reinforcements will perceive too. Handmade scenes and test worlds stay as they were: a scene gives senses with `giveSenses` to whom it wants.
+- **`SIM_VERSION` 9 and `STATE_SCHEMA` 9** (lab C took the 8s). Real play changes (guards notice the player, and turn, walk and search by A7's minimal reactions until lab E's brain), though no pinned run does: the bots never come near a camp in their minute, so no `behaviour` fingerprint moves. Every `state` fingerprint does, for the schema number and the valley guards' senses.
+- **Why it's ready:** a bot walking into five valleys' camps for 5 minutes each: every body promise held, guards rose through every state and stood down, and a median tick of 47–67 µs with the 99th percentile under 1 ms.
+
+**What moved:** `SIM_VERSION` 9, `STATE_SCHEMA` 9; every `state` fingerprint; `BEHAVIOUR`; the golden recording; each valley's perception work in the game lane's bench.
+
 ### The other stimuli: lab B's sounds, the crack, bodies and lens glint (A9)
 
 **Decision:**

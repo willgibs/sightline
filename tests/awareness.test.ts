@@ -6,7 +6,7 @@ import { neutralInput } from '../src/sim/kernel/input';
 import { withSystem, type System } from '../src/sim/kernel/systems';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { createSenses, stepLadder, stimulate, type Awareness, type Stimulus } from '../src/sim/perception';
-import { PERCEPTION, giveSenses } from '../src/sim/game/perception';
+import { giveSenses } from '../src/sim/game/perception';
 import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
 import { SYSTEMS } from '../src/sim/game/systems';
@@ -155,7 +155,6 @@ describe('the minimal reactions', () => {
       },
     };
     let systems = withSystem(SYSTEMS, drop);
-    for (const s of PERCEPTION) systems = withSystem(systems, s);
     const sim = new Simulation(world, T, systems);
     placePlayer(sim, 50, 50);
     giveSenses(sim);

@@ -6,7 +6,7 @@ import { Surface } from '../../kernel/world/surfaces';
 import type { World } from '../../kernel/world/world';
 import type { FoliageVolume } from '../../perception';
 import { WaypointDriver, type Waypoint } from '../bots/waypoints';
-import { PERCEPTION, giveSenses } from '../perception';
+import { giveSenses } from '../perception';
 import { SIGHTLINE } from '../sim';
 import type { Scene } from '.';
 
@@ -262,7 +262,6 @@ export function perceptionLab(): Scene {
     description: 'A camp in a long field: a sentry, a patrol and a marksman, cover, shade, foliage, a skyline ridge and a generator. See what they see, and hear what they hear.',
     game: SIGHTLINE,
     world: labWorld,
-    systems: PERCEPTION,
     setup: (sim) => giveSenses(sim),
     driver: () => new WaypointDriver(ROUTE),
     seconds: 90,

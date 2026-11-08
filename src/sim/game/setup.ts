@@ -2,6 +2,8 @@ import { createBody } from '../body';
 import type { Simulation as KernelSimulation } from '../kernel/sim';
 import { Faction } from '../kernel/state';
 import type { TickContext } from '../kernel/systems';
+import type { World } from '../kernel/world/world';
+import { acousticsOf, createSenses } from '../perception';
 import type { GuardEntity, PlayerEntity } from './entities';
 import { spawnCampSystems, spawnCampThings } from './camp';
 import { createGuard, think } from './guards';
@@ -20,6 +22,13 @@ export function startRun(sim: KernelSimulation): void {
   for (let i = 0; i < world.camp.guards.length; i++) spawnGuard(sim, i);
   spawnCampThings(sim);
   spawnCampSystems(sim);
+  // Flooded once, outside any tick (A11).
+  if (perceives(world)) acousticsOf(world, tuning).warm();
+}
+
+/** Whether a world's guards perceive of their own accord: a generated valley's do (A13). A scene built by hand gives senses to whom it wants (scenes/). */
+function perceives(world: World): boolean {
+  return world.spec.terrain.kind === 'procedural';
 }
 
 /** What can spawn: a simulation between ticks, or a system inside one. */
@@ -34,6 +43,7 @@ export type Spawner = Pick<TickContext, 'world' | 'solids' | 'tuning' | 'state' 
 export function spawnGuard(at: Spawner, post: number): GuardEntity {
   const { world, solids, tuning } = at;
   const g = at.spawn((id): GuardEntity => ({ id, kind: 'guard', faction: Faction.Camp, ...createGuard(world, solids, post, tuning) }));
+  if (perceives(world)) g.senses = createSenses(world.camp.guards[post]?.role === 'marksman');
   think(g, world, tuning, at.state.tick + 1);
   return g;
 }

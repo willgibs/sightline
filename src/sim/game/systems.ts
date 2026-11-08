@@ -13,6 +13,7 @@ import { guardFire } from './combat';
 import { checkinDeadline, checkinReply, commanderOf, orderDeliver, radioDeliver, raiseAlarm, reinforceArrive, speak, targetEscapes } from './comms';
 import { think } from './guards';
 import { playerIntent } from './player';
+import { PERCEPTION } from './perception';
 import { SHOOTING_SYSTEMS } from './shooting';
 import { carriedSystem, useSystem } from './use';
 
@@ -215,6 +216,8 @@ export const SYSTEMS: readonly System[] = [
   SHOOTING_SYSTEMS.thrown,
   SHOOTING_SYSTEMS.aim,
   campPower,
+  // Perception (lab A, in the valley since A13): after everything has moved, before anyone decides.
+  ...PERCEPTION,
   guardBrains,
   objectiveStatus,
 ];

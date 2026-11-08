@@ -8,7 +8,7 @@ import { withSystem, type System } from '../kernel/systems';
 import { WaypointDriver, type Waypoint } from './bots/waypoints';
 import { giveBrains } from './brains';
 import { campCheckins, campCommander, commsVoice, giveCommander, tell } from './comms';
-import { PERCEPTION, giveSenses } from './perception';
+import { giveSenses } from './perception';
 import { placePlayer } from './setup';
 import { Simulation } from './sim';
 import { SYSTEMS } from './systems';
@@ -105,7 +105,7 @@ export function pursuit(policy: Policy, seed: number, tuning: Tuning, seconds = 
   };
   // The honest brain runs the camp brain's systems; the baselines the same perception, without the brain.
   let systems = SYSTEMS;
-  for (const s of [...PERCEPTION, commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
+  for (const s of [commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
   if (policy !== 'honest') systems = withSystem(systems, policySystem);
   const sim = new Simulation(world, tuning, systems);
   placePlayer(sim, out[0]!.x, out[0]!.z, -1, 0);

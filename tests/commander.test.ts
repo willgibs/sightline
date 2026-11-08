@@ -3,7 +3,7 @@ import { defaultTuning as T } from '../src/config/tuning';
 import { digest, inEllipse, injectBelief, plan, type CampMind, type CampOrder, type CampState, type Report } from '../src/sim/brain';
 import { giveBrains } from '../src/sim/game/brains';
 import { campCheckins, campCommander, commanderOf, commsVoice, giveCommander } from '../src/sim/game/comms';
-import { PERCEPTION, giveSenses } from '../src/sim/game/perception';
+import { giveSenses } from '../src/sim/game/perception';
 import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
 import { SYSTEMS } from '../src/sim/game/systems';
@@ -220,7 +220,7 @@ describe('in the camp', () => {
   function campRun(place: { x: number; z: number }, seconds: number): { sim: Simulation; events: SimEvent[]; levels: Array<{ t: number; to: string }> } {
     const world = campWorld(T);
     let systems = SYSTEMS;
-    for (const s of [...PERCEPTION, commsVoice, campCommander]) systems = withSystem(systems, s);
+    for (const s of [commsVoice, campCommander]) systems = withSystem(systems, s);
     const sim = new Simulation(world, T, systems);
     placePlayer(sim, place.x, place.z);
     giveSenses(sim);
@@ -290,7 +290,7 @@ describe('no omniscience, over the commander', () => {
     };
     const commander: System = { ...campCommander, after: ['comms-voice', 'test-camp-before', ...extra.map((s) => s.name)] };
     let systems = SYSTEMS;
-    for (const s of [...PERCEPTION, commsVoice, probeBefore, ...extra, commander, probeAfter]) systems = withSystem(systems, s);
+    for (const s of [commsVoice, probeBefore, ...extra, commander, probeAfter]) systems = withSystem(systems, s);
     const sim = new Simulation(world, T, systems);
     placePlayer(sim, place.x, place.z);
     giveSenses(sim);
@@ -374,7 +374,7 @@ describe('radio check-ins', () => {
 
   function checkins(world: World, seconds: number, despawnPost?: number, removeOperator = false): { sim: Simulation; events: SimEvent[] } {
     let systems = SYSTEMS;
-    for (const s of [...PERCEPTION, commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
+    for (const s of [commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
     const sim = new Simulation(world, fast, systems);
     giveSenses(sim);
     giveBrains(sim);
@@ -468,7 +468,7 @@ describe('counter-sniper (E8)', () => {
   it('turns reports of a shot into bearings the commander fuses, and a marksman sweeps there', () => {
     const world = campWorld(T);
     let systems = SYSTEMS;
-    for (const s of [...PERCEPTION, commsVoice, campCommander, campCheckins, reportAt(30)]) systems = withSystem(systems, s);
+    for (const s of [commsVoice, campCommander, campCheckins, reportAt(30)]) systems = withSystem(systems, s);
     const sim = new Simulation(world, T, systems);
     placePlayer(sim, 372, 372);
     giveSenses(sim);
@@ -496,7 +496,7 @@ describe('counter-sniper (E8)', () => {
   it('visibly reacts to a shot from 300 m inside the window', () => {
     const world = campWorld(T);
     let systems = SYSTEMS;
-    for (const s of [...PERCEPTION, commsVoice, campCommander, campCheckins, reportAt(30)]) systems = withSystem(systems, s);
+    for (const s of [commsVoice, campCommander, campCheckins, reportAt(30)]) systems = withSystem(systems, s);
     const sim = new Simulation(world, T, systems);
     placePlayer(sim, 372, 372);
     giveSenses(sim);
@@ -517,7 +517,7 @@ describe('bodies (E9)', () => {
   it('a body a guard finds is reported, and the camp goes on alert', () => {
     const world = campWorld(T);
     let systems = SYSTEMS;
-    for (const s of [...PERCEPTION, commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
+    for (const s of [commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
     const sim = new Simulation(world, T, systems);
     placePlayer(sim, 372, 372);
     giveSenses(sim);
@@ -540,7 +540,7 @@ describe('sandbox body drops (E11)', () => {
   it('a body dropped where the player looks is found by the camp, as any body is', () => {
     const world = campWorld(T);
     let systems = SYSTEMS;
-    for (const s of [...PERCEPTION, commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
+    for (const s of [commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
     const sim = new Simulation(world, T, systems);
     // The player looks west and down, from east of the gate: the ground 8 m ahead.
     placePlayer(sim, 44, 6, -1, 0);
@@ -566,7 +566,7 @@ describe('a body in the open (E9)', () => {
   it('orders guards near it off the exposed ground', () => {
     const world = worldWith(guards([0, 0], [10, 0], [-14, 4]));
     let systems = SYSTEMS;
-    for (const s of [...PERCEPTION, commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
+    for (const s of [commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
     const sim = new Simulation(world, T, systems);
     giveSenses(sim);
     giveBrains(sim);

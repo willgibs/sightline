@@ -3,7 +3,7 @@ import { defaultTuning as T } from '../src/config/tuning';
 import { giveBrains } from '../src/sim/game/brains';
 import { campRules } from '../src/sim/game/combat';
 import { campCommander, commsVoice, giveCommander } from '../src/sim/game/comms';
-import { PERCEPTION, giveSenses } from '../src/sim/game/perception';
+import { giveSenses } from '../src/sim/game/perception';
 import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
 import { SYSTEMS } from '../src/sim/game/systems';
@@ -33,7 +33,7 @@ function worldWith(colliders: ColliderInput[] = [], guards = [SENTRY]): World {
 
 function campy(world: World): Simulation {
   let systems = SYSTEMS;
-  for (const s of [...PERCEPTION, commsVoice, campCommander, campRules]) systems = withSystem(systems, s);
+  for (const s of [commsVoice, campCommander, campRules]) systems = withSystem(systems, s);
   const sim = new Simulation(world, T, systems);
   giveSenses(sim);
   giveBrains(sim);
@@ -99,7 +99,7 @@ describe('working round (flank)', () => {
     const fast = structuredClone(T);
     fast.brain.combat.holdAfter = 0.5;
     let systems = SYSTEMS;
-    for (const s of [...PERCEPTION, commsVoice, campCommander]) systems = withSystem(systems, s);
+    for (const s of [commsVoice, campCommander]) systems = withSystem(systems, s);
     const world = worldWith([wall(5, 6, 1, 1)]);
     const sim = new Simulation(world, fast, systems);
     giveSenses(sim);

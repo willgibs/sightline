@@ -6,7 +6,7 @@ import { Surface } from '../../kernel/world/surfaces';
 import type { World } from '../../kernel/world/world';
 import type { FoliageVolume } from '../../perception';
 import { WaypointDriver, type Waypoint } from '../bots/waypoints';
-import { PERCEPTION, giveSenses } from '../perception';
+import { giveSenses } from '../perception';
 import { giveBrains } from '../brains';
 import { campCheckins, campCommander, commsVoice, giveCommander, giveDevices, giveObjective } from '../comms';
 import { campRules } from '../combat';
@@ -278,7 +278,7 @@ export function campBrain(): Scene {
     description: 'A compound with the guards in the design doc roles: sentries, a patrol pair, a marksman, a radio operator, an officer and a worker, and a target to shoot. If the alarm sounds, he runs for the truck.',
     game: SIGHTLINE,
     world: campWorld,
-    systems: [...PERCEPTION, commsVoice, campCommander, campCheckins, campRules],
+    systems: [commsVoice, campCommander, campCheckins, campRules],
     setup: (sim) => {
       giveSenses(sim);
       giveBrains(sim);

@@ -25,7 +25,7 @@ import { MarksmanDriver, type Step } from '../sim/game/bots/marksman';
 import { player } from '../sim/game/entities';
 import { placePlayer } from '../sim/game/setup';
 import { arm } from '../sim/game/shooting';
-import { PERCEPTION, giveSenses } from '../sim/game/perception';
+import { giveSenses } from '../sim/game/perception';
 import { SIGHTLINE, type Simulation } from '../sim/game/sim';
 import type { Scene } from '../sim/game/scenes';
 import { datan2 } from '../sim/kernel/core/detmath';
@@ -316,7 +316,7 @@ function fireInSimulation(r: Row, shots: WrittenShots): { fell: boolean; text: s
       description: '',
       game: SIGHTLINE,
       world: () => r.world,
-      systems: [...PERCEPTION, hold],
+      systems: [hold],
       setup: (sim) => {
         giveSenses(sim);
         placePlayer(sim, perch.x, perch.z, c.site.x - perch.x, c.site.z - perch.z);
@@ -377,7 +377,7 @@ function simulateWaysIn(list: Row[]): void {
       description: '',
       game: SIGHTLINE,
       world: () => r.world,
-      systems: [...PERCEPTION, hold],
+      systems: [hold],
       setup: (sim) => giveSenses(sim),
       driver: () => new PathDriver(plan, dt),
       seconds: plan.arrive,

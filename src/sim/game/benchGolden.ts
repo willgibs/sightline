@@ -209,7 +209,8 @@ export const BENCH_GOLDEN: PinnedBench = {
     "runs": {
       "TAL-4471 wander": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 14400 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 14400 },
+          "perception-sight": { "rays": 234, "nodes": 0, "bodies": 0 }
         }
       },
       "MUD-9031 wander": {

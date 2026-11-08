@@ -21,5 +21,7 @@ export const GEN_VERSION = 4;
  * too steep to stand on, a body's own speed no longer carries it uphill. 8: a body lying
  * down is a chain of circles along its axis, and the eye is the centre of the head wherever a
  * lean or lying down puts it (lab C, C2).
+ * 9: the valley's guards perceive (A13: lab A's sight, hearing and awareness join its
+ * systems).
  */
-export const SIM_VERSION = 8;
+export const SIM_VERSION = 9;

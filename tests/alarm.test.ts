@@ -3,7 +3,7 @@ import { defaultTuning as T } from '../src/config/tuning';
 import { giveBrains } from '../src/sim/game/brains';
 import { campRules } from '../src/sim/game/combat';
 import { campCommander, commanderOf, commsVoice, cutPower, giveCommander, giveDevices, giveObjective } from '../src/sim/game/comms';
-import { PERCEPTION, giveSenses } from '../src/sim/game/perception';
+import { giveSenses } from '../src/sim/game/perception';
 import { Simulation } from '../src/sim/game/sim';
 import { SYSTEMS } from '../src/sim/game/systems';
 import { neutralInput } from '../src/sim/kernel/input';
@@ -25,7 +25,7 @@ function worldWith(guards = [G]): World {
 
 function campy(world: World, alarms: Array<{ x: number; z: number }>): Simulation {
   let systems = SYSTEMS;
-  for (const s of [...PERCEPTION, commsVoice, campCommander]) systems = withSystem(systems, s);
+  for (const s of [commsVoice, campCommander]) systems = withSystem(systems, s);
   const sim = new Simulation(world, T, systems);
   giveSenses(sim);
   giveBrains(sim);
@@ -134,7 +134,7 @@ describe('the target at lockdown (E7)', () => {
   function withTarget(extra: System[] = []): { sim: Simulation; target: number } {
     const world = worldWith([G, { ...G, id: 1, role: 'target' as never, x: 10, z: 2 }]);
     let systems = SYSTEMS;
-    for (const s of [...PERCEPTION, commsVoice, campCommander, campRules, ...extra]) systems = withSystem(systems, s);
+    for (const s of [commsVoice, campCommander, campRules, ...extra]) systems = withSystem(systems, s);
     const sim = new Simulation(world, T, systems);
     giveSenses(sim);
     giveBrains(sim);
@@ -215,7 +215,7 @@ describe('reinforcements (E8)', () => {
     const fast = structuredClone(T);
     fast.brain.reinforce.delay = 3;
     let systems = SYSTEMS;
-    for (const s of [...PERCEPTION, commsVoice, campCommander]) systems = withSystem(systems, s);
+    for (const s of [commsVoice, campCommander]) systems = withSystem(systems, s);
     const world = worldWith();
     const sim = new Simulation(world, fast, systems);
     giveSenses(sim);

@@ -7,7 +7,7 @@ import { MarksmanDriver, type Step } from '../bots/marksman';
 import type { InputFrame } from '../../kernel/input';
 import { giveBrains } from '../brains';
 import { player } from '../entities';
-import { PERCEPTION, giveSenses } from '../perception';
+import { giveSenses } from '../perception';
 import { arm } from '../shooting';
 import { placePlayer } from '../setup';
 import { SIGHTLINE, type Simulation } from '../sim';
@@ -95,7 +95,7 @@ function noiseAt(tick: number, x: number, z: number, radius: number): System {
 export function campScenario(params?: string): Scene {
   const p = parseCampScenario(params);
   const canonical = formatCampScenario(p);
-  const tuningSystems: System[] = [...PERCEPTION, commsVoice, campCommander, campCheckins, campRules];
+  const tuningSystems: System[] = [commsVoice, campCommander, campCheckins, campRules];
   const name = 'camp-scenario';
   if (p.script === 'suspicion') {
     const noise = NOISES[p.seed % NOISES.length]!;

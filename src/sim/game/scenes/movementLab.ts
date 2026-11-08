@@ -10,7 +10,6 @@ import type { World } from '../../kernel/world/world';
 import { createSenses, type FoliageVolume } from '../../perception';
 import { WaypointDriver, type Waypoint } from '../bots/waypoints';
 import type { RemainsEntity } from '../entities';
-import { PERCEPTION } from '../perception';
 import { SIGHTLINE } from '../sim';
 import type { Scene } from '.';
 
@@ -343,7 +342,6 @@ export function movementLab(): Scene {
     description: "A yard of every surface around a guard who listens, a garden of walls and windows, and a field under a guard who watches. Learn how loud and how visible you are.",
     game: SIGHTLINE,
     world: arenaWorld,
-    systems: PERCEPTION,
     setup: (sim) => {
       seen = fresh();
       for (const k of SENSING) sim.guards[k]!.senses ??= createSenses(false);

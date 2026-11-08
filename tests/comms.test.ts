@@ -3,7 +3,7 @@ import { defaultTuning as T } from '../src/config/tuning';
 import { injectBelief, mapMass, mapSpread, spreadBelief, type CampState } from '../src/sim/brain';
 import { giveBrains } from '../src/sim/game/brains';
 import { campCommander, commanderOf, commsVoice, giveCommander, tell } from '../src/sim/game/comms';
-import { PERCEPTION, giveSenses } from '../src/sim/game/perception';
+import { giveSenses } from '../src/sim/game/perception';
 import { Simulation } from '../src/sim/game/sim';
 import { SYSTEMS } from '../src/sim/game/systems';
 import { neutralInput } from '../src/sim/kernel/input';
@@ -27,7 +27,7 @@ function worldWith(...guards: Array<Parameters<typeof testGuard>[0]>): World {
 
 function campy(world: World, extra: System[] = []): Simulation {
   let systems = SYSTEMS;
-  for (const s of [...PERCEPTION, commsVoice, campCommander, ...extra]) systems = withSystem(systems, s);
+  for (const s of [commsVoice, campCommander, ...extra]) systems = withSystem(systems, s);
   const sim = new Simulation(world, T, systems);
   giveSenses(sim);
   giveBrains(sim);

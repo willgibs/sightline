@@ -26,7 +26,7 @@ import { withSystem, type System } from '../kernel/systems';
 import { Surface } from '../kernel/world/surfaces';
 import { giveBrains } from './brains';
 import { campCommander, commsVoice, giveCommander } from './comms';
-import { PERCEPTION, giveSenses } from './perception';
+import { giveSenses } from './perception';
 import { placePlayer } from './setup';
 import { SYSTEMS } from './systems';
 import { campHeight, campWorld } from './scenes/campBrain';
@@ -578,7 +578,7 @@ export function inWorldCalibration(T: Tuning, shots: number): { one: number; two
       },
     };
     let systems = SYSTEMS;
-    for (const s of [...PERCEPTION, commsVoice, campCommander, shot]) systems = withSystem(systems, s);
+    for (const s of [commsVoice, campCommander, shot]) systems = withSystem(systems, s);
     // Each shot in its own world seed: every guard's streams start from it, so his ear errs afresh.
     const shotWorld = campWorld(T);
     shotWorld.seed = `${shotWorld.seed}/shot${k}`;

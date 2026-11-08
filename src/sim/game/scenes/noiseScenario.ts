@@ -9,7 +9,6 @@ import { Surface } from '../../kernel/world/surfaces';
 import type { World } from '../../kernel/world/world';
 import type { System } from '../../kernel/systems';
 import { acousticsOf, createSenses } from '../../perception';
-import { PERCEPTION } from '../perception';
 import { placePlayer } from '../setup';
 import { SIGHTLINE, type Simulation } from '../sim';
 import type { Scene } from '.';
@@ -205,7 +204,7 @@ export function noiseScenario(params?: string): Scene {
     description: `One sentry with his back turned, the player moving at a ${p.gait} on ${p.surface} ${p.d} m away${p.mask ? `, a generator running ${MASK_DISTANCE[p.mask]} m from him` : ''}${p.expect === null ? '' : p.expect === 'heard' ? ': he hears it' : ': he never hears it'}.`,
     game: SIGHTLINE,
     world: (tuning) => noiseWorld(p, tuning),
-    systems: [...PERCEPTION, listen],
+    systems: [listen],
     setup: (sim) => {
       heardAt = -1;
       placePlayer(sim, GUARD.x + p.d, GUARD.z, -1, 0);

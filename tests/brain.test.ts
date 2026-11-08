@@ -4,7 +4,7 @@ import { ACTS, choose, type ActName, type GuardMind } from '../src/sim/brain';
 import { EVENTS } from '../src/sim/kernel/events';
 import { emptyMind, guardMind } from '../src/sim/game/guards';
 import { giveBrains } from '../src/sim/game/brains';
-import { PERCEPTION, giveSenses } from '../src/sim/game/perception';
+import { giveSenses } from '../src/sim/game/perception';
 import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
 import { SYSTEMS } from '../src/sim/game/systems';
@@ -46,7 +46,7 @@ function noiseAt(tick: number, x: number, z: number, radius: number): System {
 
 function brainy(world: World, extra: System[] = []): Simulation {
   let systems = SYSTEMS;
-  for (const s of [...PERCEPTION, ...extra]) systems = withSystem(systems, s);
+  for (const s of [...extra]) systems = withSystem(systems, s);
   const sim = new Simulation(world, T, systems);
   giveSenses(sim);
   giveBrains(sim);
@@ -198,7 +198,6 @@ function probeRun(world: World, place: { x: number; z: number }, extra: System[]
     },
   };
   let systems = SYSTEMS;
-  for (const s of PERCEPTION) systems = withSystem(systems, s);
   for (const s of extra) systems = withSystem(systems, s);
   systems = withSystem(systems, probe);
   const sim = new Simulation(world, tuning, systems);
