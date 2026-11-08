@@ -5,7 +5,8 @@ import { audibility, travelTime } from '../sim/kernel/sound';
 import { surfaceName } from '../sim/kernel/world/surfaces';
 import type { AmbientSource } from '../sim/generation';
 import { emptyRoute, type RouteFn, type SteadyFn } from './hearing';
-import { footstep, humLoop, makeNoiseBuffers, makeRand, rustle, waterLoop, windBed, type Loop, type NoiseBuffers, type Rand } from './voices';
+import { footstep, humLoop, makeNoiseBuffers, makeRand, murmur, rustle, waterLoop, windBed, type Loop, type NoiseBuffers, type Rand } from './voices';
+import { BARKS } from '../sim/perception';
 
 /**
  * The sound engine: plays what the simulation reports, the way the simulation says it
@@ -253,6 +254,13 @@ export class SoundEngine {
             footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), gait, amp), lead,
           );
         }
+      } else if (e.type === 'bark' || e.type === 'noise') {
+        // A guard's voice (a murmur until voiced lines), or a noise dropped from the sandbox: heard by the law, like any sound.
+        const line = e.type === 'bark' ? BARKS[e.line] : undefined;
+        const words = line ? line.text.split(' ').length : 2;
+        this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) =>
+          e.type === 'bark' ? murmur(this.ctx, out, this.noise, this.rand, when, words, line?.shout ?? false, amp) : footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), 1.6, amp), lead,
+        );
       } else if (e.type === 'stance' && own) {
         // Your own clothes, at your ears. Not a sound in the simulation (nobody else hears
         // it), so another body's change of stance is silent.

@@ -423,7 +423,7 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - About 1.5 s to react to something alarming, always telegraphed: Bungie found an untelegraphed delay read as a bug.
   - Stand-downs start near 20 s.
   - Minimal reactions show each state: look, walk to the believed spot, go back. E's brain replaces them.
-- [ ] A8 · Cues in the honest view.
+- [x] A8 · Cues in the honest view.
   - Head and body turn, and weapon raised.
   - The bark vocabulary, started now (Alien: Isolation's took most of its cycle). Barks run from specific to generic.
   - The detection indicator at the screen edge.

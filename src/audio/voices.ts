@@ -427,3 +427,23 @@ export function humLoop(ctx: BaseAudioContext, out: AudioNode, noise: NoiseBuffe
     },
   };
 }
+
+/**
+ * A guard's bark, before voiced lines exist (Phase 3's Sound track): a murmur of syllables
+ * at a voice's pitch, one per word, a shout louder and higher. Its words are captioned
+ * (app/cues.ts); its loudness and place are the hearing law's, like any sound.
+ */
+export function murmur(ctx: BaseAudioContext, out: AudioNode, noise: NoiseBuffers, rand: Rand, when: number, words: number, shout: boolean, amp: number): number {
+  const voice = new GainNode(ctx, { gain: amp });
+  voice.connect(out);
+  let t = when;
+  let end = when;
+  const base = shout ? 900 : 650;
+  for (let k = 0; k < words; k++) {
+    const length = 0.09 + 0.08 * rand();
+    end = Math.max(end, burst(ctx, voice, noise.white, rand, t, 'bandpass', base * (0.85 + 0.3 * rand()), 6, 0.015, length, 1));
+    end = Math.max(end, burst(ctx, voice, noise.white, rand, t, 'bandpass', base * 2.6 * (0.9 + 0.2 * rand()), 9, 0.015, length * 0.8, 0.35));
+    t += length + 0.05 + 0.04 * rand();
+  }
+  return end;
+}

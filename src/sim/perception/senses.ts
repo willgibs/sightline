@@ -47,6 +47,8 @@ export interface PendingSound {
   kind: 'sound' | 'shot' | 'voice';
   /** How clearly: its level over the masked threshold (1 at the edge of hearing). */
   clarity: number;
+  /** A voice's own level for listeners (a bark's line: perception/barks.ts); 0 for other sounds. */
+  voice: number;
   /** Where it seemed to come from, blurred: the guess, not the fix. */
   x: number;
   y: number;

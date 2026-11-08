@@ -34,7 +34,7 @@ export const GOLDEN = {
    */
   scenes: {
     'movement-course': { behaviour: '40c97133a0ef732d', state: 'a72123b8c4cb29d8' },
-    'perception-lab': { behaviour: '0dfa42645814f21a', state: '6625deddfd28368b' },
+    'perception-lab': { behaviour: 'da54eed00707a631', state: 'f9afc16fbdc72c64' },
     'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '2535df87754d14eb' },
     'kernel-alone': { behaviour: '0698e581024f5b35', state: 'b51b84477d71dbf1' },
   },

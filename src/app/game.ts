@@ -3,8 +3,9 @@ import type { Tuning } from '../config/tuning';
 import { FixedStepClock } from '../sim/kernel/core/clock';
 import { headingDegrees, lerp, moveTowards } from '../sim/kernel/core/math';
 import { headBob } from '../sim/body';
-import { tableExposure } from '../sim/perception';
-import { lightAt } from '../sim/kernel/env';
+import { BARKS, beliefRadius, explainChain, groundLight, lightName, movementVisibility, stanceVisibility } from '../sim/perception';
+import { EventLog } from '../sim/kernel/eventlog';
+import { Cues } from './cues';
 import { generateWorld, simTuningKey, worldTuningKey } from '../sim/generation';
 import type { World } from '../sim/kernel/world/world';
 import { neutralInput } from '../sim/kernel/input';
@@ -92,6 +93,10 @@ export class Game {
   private readonly renderer: GameRenderer;
   private readonly input: InputController;
   private readonly hud: Hud;
+  /** The honest view's cues that a guard is noticing you (A8): the edge indicator, and what guards say. */
+  private readonly cues: Cues;
+  /** The run's events, kept for explaining what guards did (sim/kernel/eventlog.ts); not simulation state. */
+  private readonly log = new EventLog();
   private readonly overlay: Overlay;
   private readonly sound: GameSound;
   /** Every run kept as it goes: in playtests/ in development, in this browser when deployed (playtest.ts). */
@@ -190,6 +195,7 @@ export class Game {
       this.input.map,
     );
     this.hud = new Hud(opts.hud, this.input.map);
+    this.cues = new Cues(opts.hud, this.tuning.perception.sight.cue);
     this.overlay = new Overlay(opts.overlay, {
       onResume: () => this.resume(),
       onGenerate: (seed) => {
@@ -441,6 +447,8 @@ export class Game {
   }
 
   private restartRun(): void {
+    this.log.clear();
+    this.cues.clear();
     this.exitReplayMode();
     this.sim = this.scene ? startScene(this.scene, this.tuning, this.world) : new Simulation(this.world, this.tuning);
     const recorder = new Recorder(this.sim, BUILD);
@@ -467,6 +475,7 @@ export class Game {
 
   /** Hot-reloaded tuning (dev only). */
   applyTuning(next: Tuning): void {
+    this.cues.setCue(next.perception.sight.cue);
     const problems = tuningProblems(next);
     if (problems.length > 0) {
       // Keep playing on the last good numbers rather than handing bad ones to the simulation.
@@ -760,6 +769,7 @@ export class Game {
     // A click from now on is about this frame.
     this.input.latch.frameShown(this.sim.tick, this.clock.alpha, pose.yaw, pose.pitch);
     this.hud.updateCompass(pose.yaw);
+    this.cues.draw(this.curr, pose, this.time);
     this.hud.setRange(this.debug ? this.aimText : null);
 
     if (!this.paused) this.tickWindow += dt;
@@ -806,9 +816,24 @@ export class Game {
     // A fresh snapshot when guards came or went (snapshot() reuses `swap` only when they match).
     this.curr = this.sim.snapshot(swap);
     for (const e of events) if (e.type === 'outcome') this.decided = true;
+    this.log.add(events);
     if (events.length > 0) {
       this.renderer.addEvents(events, this.time);
       this.sound.play(events, this.sim.player.eyeHeight, this.soundTiming, !this.detached);
+      this.caption(events);
+    }
+  }
+
+  /** Captions what guards say that reaches the player's ears by the law of sound (A8). */
+  private caption(events: readonly SimEvent[]): void {
+    const p = this.sim.player;
+    const ear = { x: p.x, y: p.y + p.eyeHeight, z: p.z };
+    const view = { x: ear.x, z: ear.z, yaw: this.replay ? p.yaw : this.input.yaw };
+    for (const e of events) {
+      if (e.type !== 'bark') continue;
+      const line = BARKS[e.line];
+      if (!line || this.sound.levelAt(e.x, e.y, e.z, e.radius, ear.x, ear.y, ear.z) < 1) continue;
+      this.cues.say(line.text, line.shout, e.x, e.z, view, this.time);
     }
   }
 
@@ -912,11 +937,10 @@ export class Game {
     const played = this.sim.tick / T.sim.tickHz;
     const slopeDeg = (Math.atan(p.slopeTan) * 180) / Math.PI;
     // The light where the player's chest is: in the sun, or shaded by terrain or something solid.
-    const light = lightAt(w, this.sim.solids, w.spec.env, this.sim.tick / T.sim.tickHz, p.x, p.y + p.eyeHeight * 0.75, p.z, T.visibility);
-    const lightName = light === T.visibility.light.lit ? 'sun' : light === T.visibility.light.shade ? 'shade' : light === T.visibility.light.dusk ? 'dusk' : 'dark';
-    const exp = tableExposure(p, T.bodies.player, T, light);
-    const V = T.visibility;
-    const moveFactor = p.gait === 'idle' ? V.movement.still : p.gait === 'sprint' ? V.movement.sprinting : V.movement.moving;
+    // The player as guards see them (sim/perception/sight.ts): the light at the ground beneath, the caps and the rates.
+    const light = groundLight(w, this.sim.solids, w.spec.env, this.sim.tick / T.sim.tickHz, p.x, p.y, p.z, T);
+    const stanceCap = stanceVisibility(p, T.bodies.player, T);
+    const moveFactor = movementVisibility(p, T.bodies.player, T);
     const sizes = this.replay ? null : (this.recorder?.sizes ?? null);
     const kb = (n: number) => (n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`);
     const scale = TIME_SCALES[this.timeScaleIndex]!;
@@ -939,7 +963,7 @@ export class Game {
       `${p.stance}${p.proneTransition ? ' (changing)' : ''} · ${p.gait} ${p.speed.toFixed(2)} m/s · ${surfaceName(p.surface)}${p.standingOn >= 0 ? ' (object)' : `, slope ${slopeDeg.toFixed(0)}°`}`,
       `noise ${p.loudness.toFixed(2)} → heard within ${(p.loudness * T.noise.radiusPerUnit).toFixed(1)} m`,
       `outcome ${this.sim.state.outcome.status}${this.sim.state.outcome.reason ? ` · ${this.sim.state.outcome.reason}` : ''}`,
-      `seen ×${exp.toFixed(2)} = ${p.stance} ${V.stance[p.stance]} × ${p.gait === 'idle' ? 'still' : 'moving'} ${moveFactor} × ${lightName} ${light}`,
+      `seen: ranges ×${(stanceCap * light).toFixed(2)} (stance ×${stanceCap.toFixed(2)}, ${lightName(light, T)} ×${light}) · fills ×${moveFactor.toFixed(2)} moving`,
       `aim ${this.aimText ?? '—'}`,
       ``,
       `WORLD`,
@@ -952,12 +976,42 @@ export class Game {
           ? `watching ${this.replay.label} · recorded by build ${this.replay.rec.header.build || '?'}`
           : 'recording —',
       ``,
+      ...this.perceptionLines(),
       `SOUND`,
       this.sound.report(),
       ``,
       `PLAYTEST · ${this.capture.status}`,
     ];
     return lines.join('\n');
+  }
+
+  /**
+   * The debug panel's perception section: each guard who perceives, where he stands on the
+   * awareness ladder, his meter and what he believes; and the last change of awareness
+   * explained back to what caused it (design doc · Fairness rules).
+   */
+  private perceptionLines(): string[] {
+    const guards = this.sim.guards.filter((g) => g.senses);
+    if (guards.length === 0) return [];
+    const T = this.tuning;
+    const lines = ['', 'PERCEPTION'];
+    for (const g of guards) {
+      const s = g.senses!;
+      const role = this.world.camp.guards[g.guard.spawn]?.role ?? 'guard';
+      const b = s.belief;
+      const believes = b ? `believes you at ${b.x.toFixed(0)}, ${b.z.toFixed(0)} ± ${beliefRadius(b, this.sim.tick, T.sim.tickHz, T.perception.awareness.believedSpeed).toFixed(1)} m${b.seen ? ' (seen)' : ''}` : 'no belief';
+      lines.push(`${role} ${g.id} · ${s.awareness.state} · meter ${Math.round(s.sight.meter * 100)}% · ${believes}`);
+    }
+    const last = [...this.log.all].reverse().find((e) => e.type === 'alert');
+    if (last) for (const line of explainChain(this.log.explain(last.id), (id) => this.who(id))) lines.push(`  ${line}`);
+    return lines;
+  }
+
+  /** Who an entity is, for explanations: you, or a guard by role. */
+  private who(id: number): string {
+    if (id === this.sim.playerId) return 'you';
+    const g = this.sim.guards.find((x) => x.id === id);
+    return g ? `${this.world.camp.guards[g.guard.spawn]?.role ?? 'guard'} ${id}` : `entity ${id}`;
   }
 
   // --- Replays. ------------------------------------------------------------------------
@@ -1010,6 +1064,8 @@ export class Game {
   }
 
   private enterReplay(r: Replay): void {
+    this.log.clear();
+    this.cues.clear();
     this.replay = r;
     this.world = r.world;
     this.scene = r.scene;
@@ -1087,12 +1143,14 @@ export class Game {
         break;
       }
       const events = r.seeker.step();
+      this.log.add(events);
       const swap = this.prev;
       this.prev = this.curr;
       this.curr = this.sim.snapshot(swap);
       if (events.length === 0) continue;
       this.renderer.addEvents(events, this.time);
       if (r.speed <= REPLAY_SOUND_SPEED) this.sound.play(events, this.sim.player.eyeHeight, this.soundTiming, !this.detached);
+      this.caption(events);
       for (const e of events) if (e.type === 'outcome') this.hud.toast(`The run ${e.status} here`);
     }
   }
@@ -1286,6 +1344,16 @@ export class Game {
       },
       /** Where the replay is, or null outside one. */
       replayState: () => (this.replay ? { tick: this.sim.tick, ticks: this.replay.ticks, playing: this.replay.playing, speed: this.replay.speed } : null),
+      /** Each guard who perceives: his state on the awareness ladder, meter and belief (lab A). */
+      perception: () =>
+        this.sim.guards
+          .filter((g) => g.senses)
+          .map((g) => ({ id: g.id, role: this.world.camp.guards[g.guard.spawn]?.role ?? null, state: g.senses!.awareness.state, meter: g.senses!.sight.meter, belief: g.senses!.belief ? { ...g.senses!.belief } : null })),
+      /** An event explained back to what caused it, in words (sim/perception/explain.ts); the latest change of awareness if no id. */
+      explain: (id?: number) => {
+        const target = id ?? [...this.log.all].reverse().find((e) => e.type === 'alert')?.id;
+        return target === undefined ? [] : explainChain(this.log.explain(target), (x) => this.who(x));
+      },
       seek: (tick: number) => {
         finite('seek', tick);
         if (!this.replay) throw new Error('sightline.seek() needs a replay: open one with sightline.replay()');

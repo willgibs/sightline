@@ -43,3 +43,5 @@ export { SEED_LAW } from './seed';
 export { Acoustics, acousticsOf, emptyHeard, type Heard, type SoundSource } from './hearing';
 export { believe, levelOf, prunePercepts, soundLevel, stateAt, stepLadder, stimulate, type Change, type Stimulus } from './awareness';
 export { crackHeard, type CrackHeard, type FlightPoint } from './crack';
+export { BARKS, chooseBark, type BarkLine } from './barks';
+export { describe, explainChain } from './explain';

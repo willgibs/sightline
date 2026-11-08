@@ -1,6 +1,6 @@
 import type { Tuning } from '../config/tuning';
 import { SoundEngine, type ListenerPose, type SoundTiming } from '../audio/engine';
-import { Ears } from '../audio/hearing';
+import { Ears, emptyRoute } from '../audio/hearing';
 import { air } from '../sim/kernel/env';
 import type { SimEvent } from '../sim/kernel/events';
 import type { World } from '../sim/kernel/world/world';
@@ -28,6 +28,7 @@ export class GameSound {
   private failure: string | null = null;
   /** The player's ears, by the guards' law of sound (audio/hearing.ts). */
   private readonly ears = new Ears();
+  private readonly route = emptyRoute();
 
   constructor(private tuning: Tuning) {
     document.addEventListener('visibilitychange', () => this.visibility());
@@ -106,6 +107,11 @@ export class GameSound {
     const e = this.engine;
     if (!e || events.length === 0 || this.ctx?.state !== 'running') return;
     this.guard(() => e.play(events, earToFeet, timing, inBody));
+  }
+
+  /** How loud a sound would be at the listener by the law of sound (audio/hearing.ts): 0 out of earshot. */
+  levelAt(x: number, y: number, z: number, radius: number, lx: number, ly: number, lz: number): number {
+    return this.ears.route(x, y, z, radius, lx, ly, lz, this.route)?.clarity ?? 0;
   }
 
   /** For the debug panel: two lines. */

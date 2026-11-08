@@ -6,6 +6,18 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
 
+### Cues in the honest view, and the fairness checks (A8)
+
+**Decision:**
+- **On the guard:** his head and body turn toward what caught his attention (A7's reactions), and his rifle comes up with his awareness: slung while unaware or curious, at the ready while suspicious or searching, shouldered at his eye in combat. The snapshot carries his rung of the ladder; at 300 m through a scope, the rifle carries it.
+- **Barks** (`perception/barks.ts`): a line on each rise of the ladder and on settling, from specific to generic (Blacklist): the line that fits why he changed ("Footsteps. Close.", "Something moved out there."), unless he said it within 8 s, then his state's generic one ("Who's there?"). Each is a voice, heard by the law of sound (22 m, a shout 60 m), and raises the guards who hear it to its line's level: "Contact! There!" brings others to suspicious. Lines are only added at the end: a recording stores a line by its index. The speakers play a murmur of syllables until voiced lines (Phase 3).
+- **The detection indicator at the screen's edge** (`app/cues.ts`): for every guard at the cue (30%) or above, a mark on an ellipse just inside the screen's edge, toward him, wider, thicker and warmer as his meter fills and his awareness rises, solid red at 100%. Nothing below the cue.
+- **Captions:** a guard's words, only when they reach your ears by the law of sound, with an arrow toward where they came from.
+- **Explained afterwards:** `describe` and `explainChain` (`perception/explain.ts`) say each event of a chain in words with the numbers that decided it; the debug panel's perception section shows each guard's state, meter and belief and the last change of awareness explained back to what caused it; `sightline.explain(id)` and `sightline.perception()` for scripts.
+- **The fairness checks** (`tests/fairness.test.ts`), over the lab's own run and a seeded zig-zag through it: every detection's cause is its first cue, at least 1.5 s before outside contact; every change of awareness is caused by a percept of the same guard ('noticed', 'detected' or 'heard'), or is a calm stand-down; every 'heard' by a sound; every bark by an alert; every detection reads back, in words, to its first cue.
+
+**Why:** the design doc's three telegraphs (a head turn, a bark, the meter at your screen's edge) and its rule that every detection can be explained afterwards. Barks run specific to generic so the player learns the cause without hearing a memorable line twice.
+
 ### Shade and foliage, drawn as simulated (A4)
 
 **Decision:**

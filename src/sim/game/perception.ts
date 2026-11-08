@@ -2,13 +2,18 @@ import { bodyShape, hasBody, type BodyEntity } from '../body';
 import { dcos, dsin } from '../kernel/core/detmath';
 import type { DebugDraw } from '../kernel/debugDraw';
 import { air } from '../kernel/env';
-import { isSound, type SimEvent, type SoundFields } from '../kernel/events';
+import { isSound, type AlertReason, type SimEvent, type SoundFields } from '../kernel/events';
 import { Faction, type Entity } from '../kernel/state';
+import { Surface } from '../kernel/world/surfaces';
 import type { System, TickContext } from '../kernel/systems';
 import { emptyShape } from '../kernel/world/shape';
 import {
+  BARKS,
   acousticsOf,
   believe,
+  chooseBark,
+  rung,
+  type AwarenessState,
   createSenses,
   prunePercepts,
   soundLevel,
@@ -193,7 +198,8 @@ export function deliverSound(ctx: TickContext, e: Extract<SimEvent, SoundFields>
       return [r * dcos(a), r * dsin(a)] as const;
     });
     const arrives = Math.max(ctx.tick, Math.ceil((e.t + heard.length / air(ctx.world.spec.env).speedOfSound) * T.sim.tickHz - 1e-9));
-    s.heard.push({ arrives, cause: e.id, kind, clarity: heard.clarity, x: heard.fromX + ox, y: heard.fromY, z: heard.fromZ + oz, radius });
+    const voice = e.type === 'bark' ? (BARKS[e.line]?.level ?? 0) : 0;
+    s.heard.push({ arrives, cause: e.id, kind, clarity: heard.clarity, voice, x: heard.fromX + ox, y: heard.fromY, z: heard.fromZ + oz, radius });
   }
 }
 
@@ -219,8 +225,8 @@ export const perceptionAwareness: System = {
   name: 'perception-awareness',
   phase: 'awareness',
   reads: ['guard.senses', 'guard.body'],
-  writes: ['guard.senses.awareness', 'guard.senses.percepts', 'guard.senses.belief', 'guard.senses.heard', 'rng.awareness'],
-  emits: ['heard', 'alert'],
+  writes: ['guard.senses', 'rng.awareness', 'rng.hearing'],
+  emits: ['heard', 'alert', 'bark'],
   run(ctx) {
     const T = ctx.tuning;
     const S = T.perception.sight;
@@ -274,11 +280,31 @@ export const perceptionAwareness: System = {
         stimulate(a, { kind: h.kind, level: soundLevel(h, T), x: h.x, y: h.y, z: h.z, cause: id, reason }, tick, T, draw);
       }
       prunePercepts(s.percepts, tick);
+      const searched = a.searched;
       const change = stepLadder(a, sight.meter, sight.detected || sight.noticed, tick, T, draw);
-      if (change) ctx.emit({ type: 'alert', source: g.id, cause: change.cause, from: change.from, to: change.to, reason: change.reason });
+      if (!change) continue;
+      const alert = ctx.emit({ type: 'alert', source: g.id, cause: change.cause, from: change.from, to: change.to, reason: change.reason });
+      bark(ctx, g, s, change.to, change.reason, rung(change.to) > rung(change.from), searched, alert);
     }
   },
 };
+
+/**
+ * A guard says the line for his change of state (perception/barks.ts), and it's heard: a
+ * voice, by the law of sound, which raises the guards who hear it to its line's level.
+ */
+function bark(ctx: TickContext, g: GuardEntity, s: Senses, to: AwarenessState, reason: AlertReason, rising: boolean, afterSearch: boolean, cause: number): void {
+  const B = ctx.tuning.perception.barks;
+  const line = chooseBark(to, reason, rising, afterSearch, s.barked, ctx.tick, Math.round(B.cooldown * ctx.tuning.sim.tickHz));
+  if (line === null) return;
+  s.barked[String(line)] = ctx.tick;
+  const b = g.body;
+  const radius = BARKS[line]!.shout ? B.shout : B.radius;
+  ctx.emit({ type: 'bark', source: g.id, cause, line, x: b.x, y: b.y + b.eyeHeight - ctx.tuning.perception.hearing.lift, z: b.z, surface: Surface.Grass, loudness: radius / ctx.tuning.noise.radiusPerUnit, radius });
+  // Made after hearing ran this tick: delivered here, as the sound it is.
+  const e = ctx.events[ctx.events.length - 1]!;
+  if (e.type === 'bark') deliverSound(ctx, e);
+}
 
 /** The perception lab's systems, each in its phase (scenes add them with `systems`). */
 export const PERCEPTION: readonly System[] = [perceptionSight, perceptionHearing, perceptionAwareness];

@@ -16,9 +16,12 @@ interface GuardMesh {
   /** The head sphere and the rifle, drawn in the guard's plain colour. */
   plain: THREE.Mesh[];
   visor: THREE.Mesh;
+  rifle: THREE.Mesh;
   role: GuardRole;
   /** In the sun as last drawn (A4). */
   lit: boolean;
+  /** How his rifle is held (A8): 0 slung, 1 at the ready, 2 shouldered. */
+  hold: number;
 }
 
 /**
@@ -103,13 +106,33 @@ export class GuardMeshes {
     const visor = new THREE.Mesh(this.visorGeo, this.visorMaterial);
     head.add(skull, visor);
     const rifle = new THREE.Mesh(this.rifleGeo, this.honestMaterial);
-    rifle.position.set(0.2, this.rifleY, -0.18);
-    rifle.rotation.set(-0.35, 0.25, 0.2);
     root.add(legs, body, head, rifle);
     this.group.add(root);
-    const g: GuardMesh = { root, head, body, legs, plain: [skull, rifle], visor, role, lit: true };
+    const g: GuardMesh = { root, head, body, legs, plain: [skull, rifle], visor, rifle, role, lit: true, hold: -1 };
+    this.holdRifle(g, 0);
     this.paint(g);
     return g;
+  }
+
+  /**
+   * How he holds his rifle, by his awareness (A8): slung while unaware or curious, at the
+   * ready while suspicious or searching, shouldered at his eye in combat. Read at 300 m
+   * through a scope, the rifle carries what the ladder says.
+   */
+  private holdRifle(g: GuardMesh, hold: number): void {
+    if (hold === g.hold) return;
+    g.hold = hold;
+    const r = g.rifle;
+    if (hold === 0) {
+      r.position.set(0.2, this.rifleY, -0.18);
+      r.rotation.set(-0.35, 0.25, 0.2);
+    } else if (hold === 1) {
+      r.position.set(0.17, this.rifleY + 0.14, -0.34);
+      r.rotation.set(-0.12, 0.06, 0.04);
+    } else {
+      r.position.set(0.1, this.headY - 0.07, -0.42);
+      r.rotation.set(0, 0, 0);
+    }
   }
 
   /** Puts a guard's materials on: by role in the debug view, plain in the honest one; lit or in shade. */
@@ -160,6 +183,8 @@ export class GuardMeshes {
         g.lit = lit;
         this.paint(g);
       }
+      const rung = b[o + 8]!;
+      this.holdRifle(g, rung >= 4 ? 2 : rung >= 2 ? 1 : 0);
       const dx = eye.x - x;
       const dz = eye.z - z;
       g.root.visible = !(dx * dx + dz * dz < this.reach * this.reach && eye.y > y - 0.12 && eye.y < y + this.height);
