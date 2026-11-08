@@ -29,11 +29,11 @@ import { choose, response, type Option } from './utility';
  * percept, an awareness, a belief.
  */
 
-export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank'] as const;
+export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee'] as const;
 export type ActName = (typeof ACTS)[number];
 
 /** Why a guard changed what he's doing: A's reasons for a change of state, and the brain's own. */
-export const ACT_WHYS = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered', 'body', 'glint'] as const;
+export const ACT_WHYS = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered', 'body', 'glint', 'siren'] as const;
 export type ActWhy = (typeof ACT_WHYS)[number];
 
 /** A change of what a guard is doing, for its system to emit as an 'act' event. */
@@ -105,6 +105,12 @@ export interface BrainState {
   useUntil: number;
   /** He's reached the box this tick: its index, for its system to raise. */
   raise: number;
+  /** The target (E7): he has reached his vehicle, for its system to take him off. */
+  aboard: boolean;
+  /** The radio call he's in the middle of (E4): what he said when he picked up the handset, delivered as said. */
+  calling: Report | null;
+  /** The tick he first heard the siren, or −1: he knows the alarm is up (E7). */
+  sirenAt: number;
 }
 
 /** An order as it reached a guard: what to do, where, when it was given, and the event behind it. */
@@ -152,6 +158,9 @@ export function createBrain(): BrainState {
     box: -1,
     useUntil: -1,
     raise: -1,
+    aboard: false,
+    calling: null,
+    sirenAt: -1,
   };
 }
 
@@ -170,12 +179,15 @@ export function decide(m: GuardMind, out: Order): ActChange | null {
   const a = m.awareness;
   let change: ActChange | null = null;
   const newest = Math.max(newestPercept(m), newestTold(b));
+  if (b.sirenAt < 0 && heardSiren(m)) b.sirenAt = m.tick;
   if (b.done || m.tick >= b.thinkAt || a.state !== b.state || newest !== b.percept) {
     b.state = a.state;
     b.percept = newest;
     b.thinkAt = m.tick + Math.max(1, Math.round(T.think * m.tuning.sim.tickHz));
     const running = b.done ? null : b.act;
     if (b.done) b.ended[b.act] = m.tick;
+    // An order that was never taken up lapses; one he's carrying out lasts as long as the walk does.
+    if (b.task && b.act !== 'task' && (m.tick - b.task.issued) / m.tuning.sim.tickHz >= T.camp.keepOrder) b.task = null;
     fillOptions(m, options);
     const best = running && !outranked(options, running, T.switchRatio) ? running : (choose(options, T.pickShare, m.draw)?.act ?? 'routine');
     if (best !== b.act || b.done) change = begin(m, best, b.done);
@@ -237,6 +249,7 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
   b.fireAt = -1;
   b.covered = false;
   b.useUntil = -1;
+  b.calling = null;
   b.route.points.length = 0;
   b.route.next = 0;
   const focus = focusOf(m);
@@ -251,7 +264,7 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
   // Why: what his senses gave him, while something drives him; calm or nothing when it doesn't.
   const reacting = act !== 'routine' && act !== 'return';
   const ordered = act === 'task' && b.task !== null;
-  const reason: ActWhy = ordered ? 'ordered' : reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
+  const reason: ActWhy = ordered ? 'ordered' : act === 'flee' ? 'siren' : reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
   // A reaction traces to what he sensed; if that memory is gone, to the act that led here.
   const cause = ordered ? b.task!.cause : reacting ? perceptCause(m) || b.event : b.event;
   b.cause = cause;
@@ -317,6 +330,7 @@ function focusOf(m: GuardMind): { x: number; z: number } {
 function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   out.length = 0;
   const T = m.tuning.brain;
+  const W = T.weights;
   const b = m.brain!;
   const hz = m.tuning.sim.tickHz;
   const role = T.roles[m.post.role];
@@ -339,13 +353,15 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   // Worth calling in: something to report, a radio in his hands, and he hasn't just called it in.
   const task = b.task;
   const order =
-    task && (!elevated || task.kind === 'sweep') && (m.tick - task.issued) / hz < m.tuning.brain.camp.keepOrder ? (task.kind === 'sweep' || task.kind === 'cover' ? 1 : task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
+    task && (!elevated || task.kind === 'sweep') && (b.act === 'task' || (m.tick - task.issued) / hz < T.camp.keepOrder) ? (task.kind === 'sweep' || task.kind === 'cover' ? 1 : task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
   // Worth calling in: something he sensed himself (what he was only told is already on the
   // net), a radio in his hands, and he hasn't just called it in.
   // (Once he's on his way, he finishes: a percept lapsing doesn't call him back mid-walk.)
   const own = ownEvidence(m) || b.act === 'investigate' || b.act === 'search';
   const callable = own ? role.report * cool('report') : 0;
   out.push({ act: 'routine', rank: 0, weight: 1 });
+  // The target, at lockdown: for the vehicle, ahead of everything (design doc: he flees first).
+  if (m.post.role === 'target' && m.escape && b.sirenAt >= 0) out.push({ act: 'flee', rank: 7, weight: 1 });
   const off = offRoutine(m);
   switch (state) {
     case 'unaware':
@@ -354,38 +370,38 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       break;
     case 'curious':
       out.push({ act: 'look', rank: 2, weight: 1 });
-      if (order) out.push({ act: 'task', rank: 2, weight: order * 0.9 });
+      if (order) out.push({ act: 'task', rank: 2, weight: order * W.orderCurious });
       break;
     case 'suspicious':
       if (order) out.push({ act: 'task', rank: 3, weight: order });
-      out.push({ act: 'report', rank: 3, weight: callable * 0.2 });
+      out.push({ act: 'report', rank: 3, weight: callable * W.reportSuspicious });
       out.push({ act: 'look', rank: 3, weight: T.lookWeight });
       if (!elevated && own) out.push({ act: 'investigate', rank: 3, weight: role.investigate * near * fresh * cool('investigate') * claimed(m, focus) });
       break;
     case 'searching': {
       // Rounds landing near him: he gets behind something first (design doc: uses cover).
-      if (!elevated && underFire(m)) out.push({ act: 'cover', rank: 4.5, weight: role.fight > 0 ? 1 : 0.6 });
+      if (!elevated && underFire(m)) out.push({ act: 'cover', rank: 4.5, weight: role.fight > 0 ? 1 : W.coverNoFight });
       // A worker runs for the alarm when he has seen something (design doc: still raises the alarm).
-      if (m.post.role === 'worker' && own) out.push({ act: 'alarm', rank: 4, weight: alarmWeight(m, dist) * 0.9 });
+      if (m.post.role === 'worker' && own) out.push({ act: 'alarm', rank: 4, weight: alarmWeight(m) * W.workerAlarm });
       if (order) out.push({ act: 'task', rank: 4, weight: order });
       out.push({ act: 'report', rank: 4, weight: callable });
-      out.push({ act: 'hold', rank: 4, weight: 0.2 });
+      out.push({ act: 'hold', rank: 4, weight: W.holdSearching });
       if (!elevated && own) {
         out.push({ act: 'investigate', rank: 4, weight: role.investigate * near * fresh * cool('investigate') * claimed(m, focus) });
-        out.push({ act: 'search', rank: 4, weight: role.search * (0.25 + 0.75 * fresh) * near * cool('search') });
+        out.push({ act: 'search', rank: 4, weight: role.search * (W.searchStale + (1 - W.searchStale) * fresh) * near * cool('search') });
       }
       break;
     }
     case 'combat': {
       const sees = seesTarget(m);
-      const alarmW = alarmWeight(m, dist);
+      const alarmW = alarmWeight(m);
       out.push({ act: 'alarm', rank: 6, weight: alarmW });
       out.push({ act: 'report', rank: 5, weight: callable > 0 ? 1 : 0 });
       out.push({ act: 'engage', rank: 5, weight: sees && dist <= m.tuning.brain.combat.range[m.post.role] ? role.fight : 0 });
       out.push({ act: 'cover', rank: 5, weight: sees || elevated ? 0 : role.fight });
       // Having held cover without a sight of him, he works round to where he can.
       out.push({ act: 'flank', rank: 5, weight: !sees && !elevated && b.ended.cover !== undefined ? role.flank : 0 });
-      out.push({ act: 'hold', rank: 5, weight: 0.25 });
+      out.push({ act: 'hold', rank: 5, weight: W.holdCombat });
       break;
     }
   }
@@ -398,6 +414,7 @@ function claimed(m: GuardMind, at: { x: number; z: number }): number {
   const hz = m.tuning.sim.tickHz;
   for (const t of b.told) {
     if (t.kind !== 'claim' || t.from === m.id) continue;
+    if (yields(m, t.from, 'investigate')) continue;
     if ((m.tick - t.heard) / hz > C.claimFor) continue;
     const dx = t.x - at.x;
     const dz = t.z - at.z;
@@ -406,23 +423,30 @@ function claimed(m: GuardMind, at: { x: number; z: number }): number {
   return 1;
 }
 
+/** Two guards claiming one thing at once mustn't both back off: whichever is on his way with the lower id keeps it (true: this claim doesn't count against him). */
+function yields(m: GuardMind, claimer: number, act: ActName): boolean {
+  return m.brain!.act === act && m.id < claimer;
+}
+
 /** True if a round has just struck near him: a shot percept that's a strike, close by. */
 function underFire(m: GuardMind): boolean {
   const hz = m.tuning.sim.tickHz;
+  const C = m.tuning.brain.combat;
   for (const p of m.percepts) {
     if (p.kind !== 'shot' || p.sound !== 'impact') continue;
-    if ((m.tick - p.tick) / hz > 3) continue;
+    if ((m.tick - p.tick) / hz > C.underFireFor) continue;
     const dx = p.x - m.self.x;
     const dz = p.z - m.self.z;
-    if (dx * dx + dz * dz < 18 * 18) return true;
+    if (dx * dx + dz * dz < C.underFireWithin * C.underFireWithin) return true;
   }
   return false;
 }
 
 /** How much he wants the alarm: near enough to run to, unclaimed by someone he's heard, and a role that does it. */
-function alarmWeight(m: GuardMind, dist: number): number {
+function alarmWeight(m: GuardMind): number {
   const b = m.brain!;
-  if (m.post.elevated || m.alarms.length === 0) return 0;
+  // The siren is going: the alarm is up, and there's nothing to run for.
+  if (m.post.elevated || m.alarms.length === 0 || b.sirenAt >= 0) return 0;
   const A = m.tuning.brain.alarm;
   const role = A.role[m.post.role];
   if (role <= 0) return 0;
@@ -432,10 +456,9 @@ function alarmWeight(m: GuardMind, dist: number): number {
   const dx = box.x - m.self.x;
   const dz = box.z - m.self.z;
   const d = Math.sqrt(dx * dx + dz * dz);
-  if (d > A.reach || (b.ended['alarm'] !== undefined && m.tick - b.ended['alarm']! < 10 * m.tuning.sim.tickHz)) return 0;
+  if (d > A.reach || (b.ended.alarm !== undefined && m.tick - b.ended.alarm < A.retry * m.tuning.sim.tickHz)) return 0;
   // Someone he's heard already running for it? Leave it to him.
-  for (const t of b.told) if (t.kind === 'claim' && t.from !== m.id && (t.x - box.x) * (t.x - box.x) + (t.z - box.z) * (t.z - box.z) < 9) return 0;
-  void dist;
+  for (const t of b.told) if (t.kind === 'claim' && t.from !== m.id && !yields(m, t.from, 'alarm') && (t.x - box.x) * (t.x - box.x) + (t.z - box.z) * (t.z - box.z) < A.claimWithin * A.claimWithin) return 0;
   return role;
 }
 
@@ -504,6 +527,9 @@ function perform(m: GuardMind, out: Order): void {
     case 'flank':
       performFlank(m, out);
       break;
+    case 'flee':
+      performFlee(m, out);
+      break;
   }
 }
 
@@ -539,7 +565,7 @@ function standToward(m: GuardMind, out: Order, tx: number, tz: number, scan: boo
   const toward = dx * dx + dz * dz > 1e-6 ? yawFromDirection(dx, dz) : self.yaw;
   const yaw = turnTowards(self.yaw, toward, A.turnRate * dt);
   let head = 0;
-  if (scan) head = (20 * Math.PI / 180) * dsin((2 * Math.PI * (m.tick / m.tuning.sim.tickHz)) / A.scanPeriod);
+  if (scan) head = m.tuning.brain.sniper.sweepHeadDeg * DEG * dsin((2 * Math.PI * (m.tick / m.tuning.sim.tickHz)) / A.scanPeriod);
   writeOrder(m, out, 0, 0, 'idle', yaw, head);
 }
 
@@ -573,7 +599,9 @@ function walk(m: GuardMind, out: Order, x: number, z: number, pace: number, gait
   if (w === 'arrived') return 'arrived';
   if (w === 'stalled') {
     // Something the grid doesn't know is in the way, and sidestepping hasn't cleared it.
-    b.routed = -1;
+    // He gives up on this route, and may look for another after routeRetry: never every tick.
+    b.routed = m.tick;
+    b.routeOk = false;
     return 'stuck';
   }
   const A = m.tuning.perception.awareness;
@@ -615,11 +643,14 @@ function performReport(m: GuardMind, out: Order): void {
   const hz = m.tuning.sim.tickHz;
   if (b.until < 0) {
     b.until = m.tick + Math.round(C.talk * hz);
-    b.say = { report: currentReport(m), radius: C.talkRadius, radio: true };
+    // What he says when he picks up the handset is what the net carries when he's done.
+    b.calling = currentReport(m);
+    b.say = { report: { ...b.calling }, radius: C.talkRadius, radio: true };
   }
   stand(m, out, false);
   if (m.tick >= b.until) {
-    b.radio = b.say?.report ?? currentReport(m);
+    b.radio = b.calling ?? currentReport(m);
+    b.calling = null;
     b.until = -1;
     b.done = true;
   }
@@ -774,6 +805,29 @@ function focusOf3(m: GuardMind): { x: number; y: number; z: number } {
   return { x: a.fx, y: a.fy, z: a.fz };
 }
 
+/** True if the siren is among what he's hearing now. */
+function heardSiren(m: GuardMind): boolean {
+  for (const p of m.percepts) if (p.kind === 'voice' && p.sound === 'siren') return true;
+  return false;
+}
+
+/** The target's run for his vehicle at lockdown: a journey through the motor, interruptible. */
+function performFlee(m: GuardMind, out: Order): void {
+  const b = m.brain!;
+  const e = m.escape;
+  if (!e) {
+    b.done = true;
+    stand(m, out, false);
+    return;
+  }
+  const F = m.tuning.brain.alarm.flee;
+  const w = walk(m, out, e.x, e.z, F.pace, 'sprint', e.x, e.z);
+  const dx = e.x - m.self.x;
+  const dz = e.z - m.self.z;
+  if (w === 'arrived' || dx * dx + dz * dz < F.arrive * F.arrive) b.aboard = true;
+  if (w !== 'walking') stand(m, out, false); // 'stuck': he stands and tries again after routeRetry; he doesn't give up on his way out
+}
+
 /** Works round to one side of where he believes the target is, then stands to see. */
 function performFlank(m: GuardMind, out: Order): void {
   const b = m.brain!;
@@ -798,7 +852,7 @@ function performFlank(m: GuardMind, out: Order): void {
   }
   const w = walk(m, out, b.coverX, b.coverZ, m.tuning.brain.paces.search, 'walk', b.x, b.z);
   if (w === 'arrived' || w === 'stuck') {
-    b.linger = m.tick + Math.round(3 * hz);
+    b.linger = m.tick + Math.round(C.flankLinger * hz);
     stand(m, out, true);
   }
 }
@@ -871,9 +925,9 @@ function findCover(m: GuardMind, tx: number, tz: number): { x: number; z: number
       const toThreatZ = tz - z;
       // Further from the threat than where he stands, or not much closer.
       const nearer = Math.sqrt(toThreatX * toThreatX + toThreatZ * toThreatZ) - Math.sqrt((tx - self.x) * (tx - self.x) + (tz - self.z) * (tz - self.z));
-      if (nearer < -2) continue;
+      if (nearer < -C.coverCloser) continue;
       if (!nav.blockedFrom(tx, tz, x, z, C.chest)) continue;
-      const d = (x - self.x) * (x - self.x) + (z - self.z) * (z - self.z) + (nearer < 0 ? 4 : 0);
+      const d = (x - self.x) * (x - self.x) + (z - self.z) * (z - self.z) + (nearer < 0 ? C.coverCloserCost : 0);
       if (d < bestD) {
         bestD = d;
         best = { x, z };

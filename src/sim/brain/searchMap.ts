@@ -155,19 +155,18 @@ export function clearSeen(m: SearchMap, x: number, z: number, radius: number, wo
         const dz = cz - z;
         if (dx * dx + dz * dz > radius * radius) continue;
         rays++;
-        if (seen(world, x, z, cx, cz, eyeHeight)) m.p[k] = 0;
+        if (seen(world, x, z, cx, cz, eyeHeight, tuning.brain.searchMap.seenStep, tuning.brain.searchMap.seenHeight)) m.p[k] = 0;
       }
     }
   }
 }
 
 /** True if a ground point can be seen across the terrain and cover from eye height at (x, z). */
-function seen(world: World, x: number, z: number, cx: number, cz: number, eyeHeight: number): boolean {
+function seen(world: World, x: number, z: number, cx: number, cz: number, eyeHeight: number, step: number, height: number): boolean {
   const ey = world.terrain.heightAt(x, z) + eyeHeight;
   const dx = cx - x;
   const dz = cz - z;
   const d = Math.sqrt(dx * dx + dz * dz);
-  const step = 1;
   const n = Math.max(1, Math.floor(d / step));
   for (let s = 1; s < n; s++) {
     const f = s / n;
@@ -178,7 +177,7 @@ function seen(world: World, x: number, z: number, cx: number, cz: number, eyeHei
     const L = k >= 0 ? world.grid.site : world.grid.map;
     const c = k >= 0 ? k : cellIndex(L, px, pz);
     const top = c >= 0 ? L.cover[c]! / 10 : 0;
-    const line = ey + (0.3 + world.terrain.heightAt(cx, cz) - ey) * f;
+    const line = ey + (height + world.terrain.heightAt(cx, cz) - ey) * f;
     if (line < ground + top) return false;
   }
   return true;

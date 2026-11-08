@@ -49,6 +49,8 @@ export interface GuardMind {
   readonly brain: BrainState | null;
   /** Where the camp's alarm boxes are: static knowledge, from the camp's layout (E7). */
   readonly alarms: readonly { x: number; z: number }[];
+  /** Where the camp's escape vehicle stands, if it has one (static, like the alarm boxes): the target's way out at lockdown. */
+  readonly escape: Readonly<{ x: number; z: number }> | null;
   /** A number in [0, 1) from his own stream: the only way a brain rolls dice (rule 3). */
   draw(): number;
   /** Counts the navigator's work, and how many route searches are left this tick. */

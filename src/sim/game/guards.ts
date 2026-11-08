@@ -36,6 +36,11 @@ type Writable<T> = { -readonly [K in keyof T]: T[K] };
 
 const NO_PERCEPTS: readonly Percept[] = [];
 const NO_ALARMS: readonly { x: number; z: number }[] = [];
+export interface CampFacts {
+  alarms: readonly { x: number; z: number }[];
+  escape: Readonly<{ x: number; z: number }> | null;
+}
+const NO_FACTS: CampFacts = { alarms: NO_ALARMS, escape: null };
 /** The awareness of a guard without senses: unaware, attending to nothing. */
 const UNAWARE: Readonly<MindAwareness> = Object.freeze({ state: 'unaware', since: 0, focus: false, fx: 0, fy: 0, fz: 0, cause: 0, reason: 'heard' });
 
@@ -46,7 +51,7 @@ const UNAWARE: Readonly<MindAwareness> = Object.freeze({ state: 'unaware', since
  * boundary, from his own state; the brain never sees the rest. Writes into `out`, which is
  * reused.
  */
-export function guardMind(g: GuardEntity, world: World, tuning: Tuning, tick: number, out: Writable<GuardMind>, draw: () => number = noDraw, nav: NavAllowance = noNav, alarms: readonly { x: number; z: number }[] = NO_ALARMS): GuardMind {
+export function guardMind(g: GuardEntity, world: World, tuning: Tuning, tick: number, out: Writable<GuardMind>, draw: () => number = noDraw, nav: NavAllowance = noNav, facts: CampFacts = NO_FACTS): GuardMind {
   out.id = g.id;
   out.self = g.body;
   out.head = g.guard.headYaw;
@@ -62,14 +67,15 @@ export function guardMind(g: GuardEntity, world: World, tuning: Tuning, tick: nu
   out.brain = g.brain ?? null;
   out.draw = draw;
   out.nav = nav;
-  out.alarms = alarms;
+  out.alarms = facts.alarms;
+  out.escape = facts.escape;
   return out;
 }
 
 /** A mind for guardMind to fill: every field is written on each use. */
 export function emptyMind(): Writable<GuardMind> {
   const unset = null as never;
-  return { id: 0, self: unset, head: 0, post: unset, world: unset, tuning: unset, tick: 0, time: 0, percepts: NO_PERCEPTS, awareness: UNAWARE, belief: null, brain: null, draw: noDraw, nav: noNav, alarms: NO_ALARMS };
+  return { id: 0, self: unset, head: 0, post: unset, world: unset, tuning: unset, tick: 0, time: 0, percepts: NO_PERCEPTS, awareness: UNAWARE, belief: null, brain: null, draw: noDraw, nav: noNav, alarms: NO_ALARMS, escape: null };
 }
 
 const noDraw = (): number => {
@@ -86,8 +92,8 @@ const mind = emptyMind();
  * awareness (which keep to the routine while he's unaware); without, the routine. Writes the
  * order into his state, and returns the change of what he's doing, if any, to emit.
  */
-export function think(g: GuardEntity, world: World, tuning: Tuning, tick: number, draw?: () => number, nav?: NavAllowance, alarms?: readonly { x: number; z: number }[]): ActChange | null {
-  const m = guardMind(g, world, tuning, tick, mind, draw, nav, alarms);
+export function think(g: GuardEntity, world: World, tuning: Tuning, tick: number, draw?: () => number, nav?: NavAllowance, facts?: CampFacts): ActChange | null {
+  const m = guardMind(g, world, tuning, tick, mind, draw, nav, facts);
   if (g.brain) return decide(m, g.guard.order);
   if (g.senses) react(m, g.guard.order);
   else keepRoutine(m, g.guard.order);

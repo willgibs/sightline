@@ -9,7 +9,7 @@ import { Surface } from '../kernel/world/surfaces';
 import { player } from './entities';
 import { drawBrain } from './brains';
 import { guardFire } from './combat';
-import { checkinDeadline, checkinReply, commanderOf, orderDeliver, radioDeliver, raiseAlarm, reinforceArrive, speak } from './comms';
+import { checkinDeadline, checkinReply, commanderOf, orderDeliver, radioDeliver, raiseAlarm, reinforceArrive, speak, targetEscapes } from './comms';
 import { think } from './guards';
 import { playerIntent } from './player';
 import { SHOOTING_SYSTEMS } from './shooting';
@@ -159,9 +159,11 @@ const guardBrains: System = {
   emits: ['act', 'call', 'shot', 'report', 'alarm', 'siren', 'level'],
   run(ctx) {
     const nav = navAllowance(ctx);
-    const alarms = commanderOf(ctx)?.camp.devices.alarms ?? [];
-    for (const g of ctx.index.of('guard')) {
-      const change = think(g, ctx.world, ctx.tuning, ctx.tick + 1, () => ctx.draw(g.id, 'brain', (rng) => rng.next()), nav, alarms);
+    const devices = commanderOf(ctx)?.camp.devices;
+    // Where the boxes stand, and nothing of their state: a guard learns the alarm is up from the siren.
+    const facts = devices ? { alarms: devices.alarms.map((a) => ({ x: a.x, z: a.z })), escape: devices.escape } : undefined;
+    for (const g of [...ctx.index.of('guard')]) {
+      const change = think(g, ctx.world, ctx.tuning, ctx.tick + 1, () => ctx.draw(g.id, 'brain', (rng) => rng.next()), nav, facts);
       if (change) {
         g.brain!.event = ctx.emit({ type: 'act', source: g.id, cause: change.cause, from: change.from, to: change.to, why: change.why, x: change.x, z: change.z, weight: change.weight });
       }
@@ -174,6 +176,7 @@ const guardBrains: System = {
           raiseAlarm(ctx, g);
           g.brain.raise = -1;
         }
+        if (g.brain.aboard) targetEscapes(ctx, g);
         speak(ctx, g);
         ctx.debug((draw) => drawBrain(draw, ctx, g));
       }

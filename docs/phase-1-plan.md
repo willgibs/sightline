@@ -796,7 +796,7 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
 - [ ] E7 · Alarms.
   - Done (`game/comms.ts`, `brain/brain.ts`, stand-in boxes until D's devices land): after the reaction window, a guard runs 4–8 s to an alarm box, a journey through the motor; lockdown is set only by the box changing state; dropping him or cutting the power interrupts it.
   - The core's sabotage, by default: hold the use key at arm's length to switch off the generator or cut the radio. Whoever passes or needs it notices the outage. The sabotage kit is Phase 3's.
-  - At lockdown, the target escapes by vehicle. That needs bodies to ride moving solids (with C).
+  - At lockdown, the target runs for the vehicle when he hears the siren (`flee`); reaching it loses the mission, and dropping him first wins it. The drive away needs bodies to ride moving solids (with C).
 - [ ] E8 · Counter-sniper and reinforcements. Done so far: triangulation with a calibrated ellipse (`brain/triangulate.ts`), marksmen sweeping the estimate, a visible reaction inside 2 s, reinforcements at lockdown (a squad on foot until D's trucks land). Still to wire with #8: real shot and crack percepts.
   - **Honest triangulation:**
     - every guard who heard the report or the crack forms a bearing, with error from his own stream;

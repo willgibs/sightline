@@ -51,14 +51,20 @@ export interface SearchState {
   x: number;
   z: number;
   radius: number;
+  /** Someone has been to the spot the latest report named and called it clear: nobody else is sent there until a new report. */
+  cleared: boolean;
 }
 
 export interface CampDevices {
   alarms: Array<{ x: number; z: number; raised: boolean; powered: boolean }>;
   generatorRunning: boolean;
+  /** Where the target's vehicle stands, if the camp has one (E7): where he runs at lockdown. */
+  escape: { x: number; z: number } | null;
 }
 
 export interface CampState {
+  /** The mission's objective (E7): the target's entity id and whether he's still to be got, a stand-in until lab D's. */
+  objective: { target: number; status: 'open' | 'done' | 'escaped' } | null;
   /** The camp's devices (E7): where they are and whether they work. A stand-in until lab D's entities land. */
   devices: CampDevices;
   /** A shooter the camp has triangulated (E8): the bearings it fuses, and its estimate. */
@@ -103,7 +109,8 @@ export interface CampState {
 export function createCamp(campX: number, campZ: number, tuning: Tuning): CampState {
   const M = tuning.brain.searchMap;
   return {
-    devices: { alarms: [], generatorRunning: true },
+    devices: { alarms: [], generatorRunning: true, escape: null },
+    objective: null,
     shots: { bearings: [], estimate: null, tick: -1, dirty: false },
     level: 'calm',
     since: 0,

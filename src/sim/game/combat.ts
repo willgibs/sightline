@@ -4,6 +4,7 @@ import { dcos, dsin } from '../kernel/core/detmath';
 import { air, windAt } from '../kernel/env';
 import { Faction } from '../kernel/state';
 import type { BodyPart } from '../kernel/world/shape';
+import type { SimEvent } from '../kernel/events';
 import { decide, type System, type TickContext } from '../kernel/systems';
 import { player, type GuardEntity, type PlayerEntity } from './entities';
 
@@ -77,12 +78,12 @@ export function hurtPlayer(ctx: TickContext, p: PlayerEntity, part: BodyPart, sh
   ctx.emit({ type: 'hurt', source: shooter, cause, part, hits: p.health.hits });
 }
 
-/** The lab's rules: the player who takes enough hits dies, and the run is over. */
+/** The lab's rules: the player who takes enough hits dies; the objective is done if the target falls, lost if he gets away. */
 export const campRules: System = {
   name: 'camp-rules',
   phase: 'mission',
-  reads: ['player.health', 'events'],
-  writes: ['outcome'],
+  reads: ['player.health', 'events', 'commander.camp'],
+  writes: ['outcome', 'commander.camp.objective'],
   emits: ['outcome'],
   run(ctx) {
     const p = player(ctx.index);
@@ -97,6 +98,19 @@ export const campRules: System = {
         }
       }
       decide(ctx, 'failed', 'shot dead by the camp', source, cause);
+      return;
+    }
+    // The objective (stand-in until lab D's): the target falling, or getting away.
+    const obj = ctx.index.of('commander')[0]?.camp.objective;
+    if (!obj) return;
+    if (obj.status === 'open') {
+      const death = ctx.events.find((e): e is Extract<SimEvent, { type: 'death' }> => e.type === 'death' && e.victim === obj.target);
+      if (death) {
+        obj.status = 'done';
+        decide(ctx, 'succeeded', 'the target is down', death.source, death.id);
+      }
+    } else if (obj.status === 'escaped') {
+      decide(ctx, 'failed', 'the target got away', p.id);
     }
   },
 };

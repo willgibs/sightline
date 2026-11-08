@@ -167,6 +167,53 @@ describe('a search', () => {
   });
 });
 
+describe('a spot called clear', () => {
+  const world = worldWith(guards([0, 0], [20, 0], [-20, 0]));
+
+  it('is not sent another guard, until a new report names it', () => {
+    const camp = campOf(world);
+    digest(camp, report('heard', 30, 30), 100, T, world);
+    const out: CampOrder[] = [];
+    plan(campMind(camp, world, 110), out);
+    expect(out.map((o) => o.task.kind)).toEqual(['investigate']);
+    digest(camp, report('clear', 30, 30, out[0]!.guard, 200), 200, T, world);
+    plan(campMind(camp, world, 210), out);
+    expect(out).toEqual([]);
+    // Something new from about there: back to looking.
+    digest(camp, report('heard', 32, 30, 2, 220), 220, T, world);
+    plan(campMind(camp, world, 230), out);
+    expect(out.map((o) => o.task.kind)).toEqual(['investigate']);
+  });
+});
+
+describe('lockdown', () => {
+  const world = worldWith(guards([0, 0], [20, 0], [-20, 0], [0, 20]));
+
+  it('outlasts a search: a raised alarm keeps the camp hunting, and the level never drops', () => {
+    const camp = campOf(world);
+    camp.devices.alarms.push({ x: 5, z: 5, raised: true, powered: true });
+    digest(camp, report('contact', 30, 30), 100, T, world);
+    const out: CampOrder[] = [];
+    plan(campMind(camp, world, 110), out);
+    expect(camp.level).toBe('lockdown');
+    const since = camp.since;
+    // Long past the time any search would have ended.
+    plan(campMind(camp, world, 100 + (T.brain.camp.search.maxSeconds + 10) * 30), out);
+    expect(camp.level).toBe('lockdown');
+    expect(camp.since).toBe(since);
+    expect(camp.search).not.toBeNull();
+  });
+
+  it('hunts even if nothing had been reported when the alarm went', () => {
+    const camp = campOf(world);
+    camp.devices.alarms.push({ x: 5, z: 5, raised: true, powered: true });
+    plan(campMind(camp, world, 10), []);
+    expect(camp.level).toBe('lockdown');
+    expect(camp.search).not.toBeNull();
+    expect(camp.search!.x).toBe(5);
+  });
+});
+
 describe('in the camp', () => {
   function campRun(place: { x: number; z: number }, seconds: number): { sim: Simulation; events: SimEvent[]; levels: Array<{ t: number; to: string }> } {
     const world = campWorld(T);

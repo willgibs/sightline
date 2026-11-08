@@ -204,11 +204,11 @@ export type AlertReason = 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'rep
 /** What a heard sound sounded like (perception/hearing.ts). */
 export type HeardKind = 'sound' | 'shot' | 'voice';
 /** What a guard can be doing, and why he changed (brain/brain.ts, ACTS and ACT_WHYS). Stored by index: only add at the end. */
-export type ActCode = 'routine' | 'return' | 'look' | 'investigate' | 'search' | 'hold' | 'report' | 'task' | 'engage' | 'cover' | 'alarm' | 'flank';
+export type ActCode = 'routine' | 'return' | 'look' | 'investigate' | 'search' | 'hold' | 'report' | 'task' | 'engage' | 'cover' | 'alarm' | 'flank' | 'flee';
 export type ReportCode = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear' | 'claim';
 export type TaskCode = 'investigate' | 'search' | 'check' | 'sweep' | 'cover';
 export type LevelCode = 'calm' | 'uneasy' | 'alert' | 'lockdown';
-export type ActReason = 'start' | 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm' | 'arrived' | 'nothing' | 'stalled' | 'no-route' | 'lost' | 'told' | 'report' | 'ordered' | 'body' | 'glint';
+export type ActReason = 'start' | 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm' | 'arrived' | 'nothing' | 'stalled' | 'no-route' | 'lost' | 'told' | 'report' | 'ordered' | 'body' | 'glint' | 'siren';
 
 /**
  * A guard's detection meter rose through the cue (30%): the first sign shows, at the
@@ -435,8 +435,8 @@ const STANCES = ['stand', 'crouch', 'prone'] as const satisfies readonly StanceN
 const SOUND = { x: 'f32', y: 'f32', z: 'f32', surface: 'u8', loudness: 'f32', radius: 'f32' } as const;
 const LEVELS = ['calm', 'uneasy', 'alert', 'lockdown'] as const satisfies readonly LevelCode[];
 const REPORT_CODES = ['contact', 'heard', 'shot', 'body', 'missing', 'clear', 'claim'] as const satisfies readonly ReportCode[];
-const ACT_NAMES = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank'] as const satisfies readonly ActCode[];
-const ACT_WHY_NAMES = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered', 'body', 'glint'] as const satisfies readonly ActReason[];
+const ACT_NAMES = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee'] as const satisfies readonly ActCode[];
+const ACT_WHY_NAMES = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered', 'body', 'glint', 'siren'] as const satisfies readonly ActReason[];
 const STRIKES = ['terrain', 'collider', 'body'] as const satisfies readonly StrikeKind[];
 const PARTS = ['none', 'head', 'torso', 'legs'] as const satisfies readonly PartName[];
 

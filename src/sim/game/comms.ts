@@ -2,6 +2,7 @@ import { REPORT_KINDS, alertRung, createBrain, createCamp, digest, fuseShots, ma
 import type { DebugDraw } from '../kernel/debugDraw';
 import type { SimEvent } from '../kernel/events';
 import { createBody } from '../body';
+import { air } from '../kernel/env';
 import { Faction, type EntityBase } from '../kernel/state';
 import type { ScheduleHandler, System, TickContext } from '../kernel/systems';
 import { Surface } from '../kernel/world/surfaces';
@@ -149,7 +150,7 @@ export const campCheckins: System = {
     const hz = ctx.tuning.sim.tickHz;
     if (ctx.tick < ch.next || ch.pending) return;
     if (!radioUp(ctx, c)) {
-      ch.next = ctx.tick + Math.round(5 * hz);
+      ch.next = ctx.tick + Math.round(T.retry * hz);
       return;
     }
     // Round-robin over the camp's posts, skipping anyone it has already given up on.
@@ -242,10 +243,26 @@ export const reinforceArrive: ScheduleHandler = (ctx, entry) => {
   }
 };
 
+/** The target reaches his vehicle at lockdown (E7): he's away, and the mission fails. A stand-in until the vehicle really drives (lab C and D). */
+export function targetEscapes(ctx: TickContext, g: GuardEntity): void {
+  const c = commanderOf(ctx);
+  if (!c?.camp.objective || c.camp.objective.target !== g.id) return;
+  c.camp.objective.status = 'escaped';
+  ctx.despawn(g.id);
+}
+
 /** Gives the camp its devices, from where they stand: the lab's handmade camp; lab D's camps give them by world.camp.devices. */
-export function giveDevices(sim: Simulation, alarms: ReadonlyArray<{ x: number; z: number }>): void {
+export function giveDevices(sim: Simulation, alarms: ReadonlyArray<{ x: number; z: number }>, escape?: { x: number; z: number }): void {
   const c = sim.index.of('commander')[0];
-  if (c) for (const a of alarms) c.camp.devices.alarms.push({ x: a.x, z: a.z, raised: false, powered: true });
+  if (!c) return;
+  for (const a of alarms) c.camp.devices.alarms.push({ x: a.x, z: a.z, raised: false, powered: true });
+  if (escape) c.camp.devices.escape = { x: escape.x, z: escape.z };
+}
+
+/** Names the mission's target (E7): the entity whose death is the objective, and who runs for the vehicle at lockdown. */
+export function giveObjective(sim: Simulation, target: number): void {
+  const c = sim.index.of('commander')[0];
+  if (c) c.camp.objective = { target, status: 'open' };
 }
 
 /** Cuts the camp's power (E7's sabotage, for now from a script): every alarm goes dead. */
@@ -280,9 +297,9 @@ export function raiseAlarm(ctx: TickContext, g: GuardEntity): void {
   c.camp.since = ctx.tick;
   if (was !== 'lockdown') ctx.emit({ type: 'level', source: c.id, cause: raised, from: was, to: 'lockdown' });
   const R = ctx.tuning.brain.alarm.sirenRadius;
-  const siren = ctx.emit({ type: 'siren', source: c.id, cause: raised, x: box.x, y: 3, z: box.z, surface: Surface.Metal, loudness: R / ctx.tuning.noise.radiusPerUnit, radius: R }) as number;
+  const y = ctx.world.terrain.heightAt(box.x, box.z) + ctx.tuning.brain.alarm.sirenHeight;
+  ctx.emit({ type: 'siren', source: c.id, cause: raised, x: box.x, y, z: box.z, surface: Surface.Metal, loudness: R / ctx.tuning.noise.radiusPerUnit, radius: R });
   deliverSound(ctx, ctx.events[ctx.events.length - 1] as Extract<SimEvent, { type: 'siren' }>);
-  void siren;
 }
 
 /**
@@ -347,9 +364,15 @@ export const orderDeliver: ScheduleHandler = (ctx, entry) => {
   if (!g || g.kind !== 'guard' || !g.brain) return;
   const task = c.camp.tasks.find((t) => t.id === entry.b);
   if (!task) return;
-  g.brain.task = { id: task.id, kind: task.kind, x: task.x, z: task.z, issued: ctx.tick, cause: task.cause };
+  const b = g.brain;
+  b.task = { id: task.id, kind: task.kind, x: task.x, z: task.z, issued: ctx.tick, cause: task.cause };
+  // A new order starts afresh, even mid-task: not the old one's linger, its sweep or its cover.
+  b.linger = -1;
+  b.until = -1;
+  b.covered = false;
+  b.routed = -1;
   // The order is news to him: he reconsiders now.
-  g.brain.thinkAt = ctx.tick;
+  b.thinkAt = ctx.tick;
 };
 
 function radioUp(ctx: TickContext, c: CommanderEntity): boolean {
@@ -394,7 +417,7 @@ export function speak(ctx: TickContext, g: GuardEntity): void {
     const y = body.y + body.eyeHeight - ctx.tuning.perception.hearing.lift;
     const id = ctx.emit({ type: 'call', source: g.id, cause: report.cause, x: body.x, y, z: body.z, surface: Surface.Grass, loudness: radius / ctx.tuning.noise.radiusPerUnit, radius, radio: radio ? 1 : 0, say: report.kind });
     const c = commanderOf(ctx);
-    if (c) c.camp.voices.push({ event: id, report, heardUntil: ctx.tick + Math.round((radius / 300 + 1) * ctx.tuning.sim.tickHz) });
+    if (c) c.camp.voices.push({ event: id, report, heardUntil: ctx.tick + Math.round((radius / air(ctx.world.spec.env).speedOfSound + 1) * ctx.tuning.sim.tickHz) });
     // The event lands after 'perception' this tick, so it is delivered by hand (perception.ts).
     const call = ctx.events[ctx.events.length - 1] as Extract<SimEvent, { type: 'call' }>;
     deliverSound(ctx, call);

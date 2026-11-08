@@ -40,8 +40,11 @@ export interface Route {
   stalls: number;
 }
 
+/** Farther than any route: 'nothing yet', as a plain finite number, so a route survives the state's codec. */
+const FAR = 1e30;
+
 export function emptyRoute(): Route {
-  return { points: [], next: 0, best: Infinity, progressTick: 0, sideX: 0, sideZ: 0, sideUntil: -1, stalls: 0 };
+  return { points: [], next: 0, best: FAR, progressTick: 0, sideX: 0, sideZ: 0, sideUntil: -1, stalls: 0 };
 }
 
 /** Why a route was or wasn't found, for the reason a brain reports and the bench counts. */
@@ -85,7 +88,7 @@ export class Navigator {
   find(ax: number, az: number, bx: number, bz: number, opts: FindOptions, out: Route): RouteResult {
     out.points.length = 0;
     out.next = 0;
-    out.best = Infinity;
+    out.best = FAR;
     out.progressTick = 0;
     out.sideUntil = -1;
     out.stalls = 0;
@@ -262,7 +265,7 @@ export class Navigator {
   }
 
   /**
-   * True if a body can walk the straight segment: every sample stands on a walkable cell
+   * True if a body can walk the straight segment, to its end: every sample stands on a walkable cell
    * (the finest layer there) and fits among the colliders, by the test the grid was built
    * with (kernel/world/grid.ts), so a pulled route never cuts what the search went around.
    */
@@ -280,7 +283,7 @@ export class Navigator {
     world.colliders.query(Math.min(ax, bx) - r, Math.min(az, bz) - r, Math.max(ax, bx) + r, Math.max(az, bz) + r, ids);
     const step = this.tuning.brain.nav.sampleStep;
     const n = Math.max(1, Math.ceil(len / step));
-    for (let s = 1; s < n; s++) {
+    for (let s = 1; s <= n; s++) {
       const px = ax + (dx * s) / n;
       const pz = az + (dz * s) / n;
       const fine = cellIndex(site, px, pz);
@@ -363,7 +366,7 @@ export function followRoute(route: Route, x: number, z: number, speed: number, i
   // On to the next waypoint once this one is reached.
   while (d < N.arrive && route.next * 2 + 2 < route.points.length) {
     route.next++;
-    route.best = Infinity;
+    route.best = FAR;
     route.stalls = 0;
     px = route.points[route.next * 2]!;
     pz = route.points[route.next * 2 + 1]!;

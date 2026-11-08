@@ -118,14 +118,12 @@ export function pursuit(policy: Policy, seed: number, tuning: Tuning, seconds = 
   giveCommander(sim);
   // Every guard starts out believing the intruder is at the last known position: a radio
   // report in hand, as if a contact had just been called in and lost.
-  const hzTick = 2;
   const ctx = (sim as unknown as { ctx: Parameters<typeof tell>[0] }).ctx;
   for (const g of sim.guards) {
     const report = { kind: 'contact' as const, x: lkp.x, y: 0.8, z: lkp.z, radius: 10, tick: 0, from: 0, fromX: lkp.x, fromZ: lkp.z, cause: 0 };
     if (g.brain) tell(ctx, g, report, 'radio', 0);
   }
   commanderOfSim(sim)?.camp.inbox.push({ kind: 'contact', x: lkp.x, y: 0.8, z: lkp.z, radius: 10, tick: 0, from: 0, fromX: lkp.x, fromZ: lkp.z, cause: 0 });
-  void hzTick;
   const driver = new WaypointDriver(out, 2);
   const raw = neutralInput();
   const ticks = Math.round(seconds * hz);

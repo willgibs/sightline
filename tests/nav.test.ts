@@ -85,6 +85,16 @@ describe('navigation', () => {
     }
   });
 
+  it('ends as near as a body can stand when the goal is inside something solid', () => {
+    const world = testWorld({ size: 120, colliders: [wall(0, 0, 1.5, 1.5)], spawn: { x: -30, z: 30 } });
+    const nav = navigatorOf(world, T);
+    const r = emptyRoute();
+    expect(nav.find(-12, 0, 0, 0, { work: { rays: 0, nodes: 0, bodies: 0 } }, r)).toBe('found');
+    const [ex, ez] = waypoints(r).at(-1)!;
+    expect(Math.abs(ex) > 1.5 || Math.abs(ez) > 1.5).toBe(true);
+    expect(Math.hypot(ex, ez)).toBeLessThan(4.5);
+  });
+
   it('says there is no route where there is none, and when a budget runs out', () => {
     // A sealed room: walls all round.
     const world = testWorld({

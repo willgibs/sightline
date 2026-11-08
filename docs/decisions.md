@@ -30,6 +30,18 @@ The camp brain is built on the plan's defaults (`docs/phase-1-plan.md`, E) and r
 
 **Why:** Least squares says nothing useful about a lone bearing and is badly overconfident for the long, banana-shaped posteriors a clustered camp makes at 300 m. The grid handles both, is exact in every engine, and its cost is the budget (rule 18). A seeded test holds it to the 39% and 86% rates for one to six listeners.
 
+### Lockdown doesn't lapse; a search below it does
+
+**Decision:** A search ends on belief, as planned, at every level below lockdown. A raised alarm stays raised, so a camp in lockdown keeps hunting and never stands down from it. A guard learns the alarm is up from the siren (`sirenAt` in his brain), and only the box's position is in his mind: he doesn't run for a box he has heard sounding, and the target runs for his vehicle only once he has heard it.
+
+**Why:** A review found a search's end dropping lockdown to the camp's floor, and the next plan raising it again, over and over. The design doc has lockdown as how good loses, with no way back from it in a mission.
+
+### What a commander doesn't know, it doesn't know
+
+**Decision:** A guard who finishes a task without a "clear" (he got stuck, a sweep ran out) stays on the commander's books until the order lapses, and the roster puts a guard where he was sent, not where he is.
+
+**Why:** Both look like leaks, and a review flagged them. But the commander reads only what's reported to it: an order given and not reported on is exactly what it knows. A short lapse is the honest cost.
+
 ---
 
 ## 2026-11-08 · Lab B, shooting

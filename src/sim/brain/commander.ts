@@ -49,6 +49,8 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   const M = tuning.brain.searchMap;
   if (r.kind === 'clear') {
     clearSeen(camp.map, r.x, r.z, tuning.brain.comms.clearRadius, world, tuning, tuning.bodies.guard.eyeHeight.stand);
+    const R = tuning.brain.comms.clearRadius;
+    if (camp.search && (camp.search.x - r.x) * (camp.search.x - r.x) + (camp.search.z - r.z) * (camp.search.z - r.z) <= R * R) camp.search.cleared = true;
     // Someone has finished looking: free the slot if it was his task, and retire the task if it's done.
     for (const t of camp.tasks) {
       const before = t.assigned.length;
@@ -86,11 +88,12 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   }
   // A search at this level, centred on the latest report.
   if (!camp.search && alertRung(camp.level) >= alertRung('uneasy')) {
-    camp.search = { started: tick, startLevel: camp.floor, x: r.x, z: r.z, radius: Math.max(r.radius, M.injectRadius) };
+    camp.search = { started: tick, startLevel: camp.floor, x: r.x, z: r.z, radius: Math.max(r.radius, M.injectRadius), cleared: false };
   } else if (camp.search) {
     camp.search.x = r.x;
     camp.search.z = r.z;
     camp.search.radius = Math.max(r.radius, M.injectRadius);
+    camp.search.cleared = false;
   }
 }
 
@@ -187,9 +190,15 @@ export function plan(m: CampMind, out: CampOrder[]): void {
   if (camp.level !== 'lockdown' && camp.devices.alarms.some((a) => a.raised)) raise(camp, 'lockdown', m.tick);
   const T = m.tuning.brain.camp;
   const hz = m.tuning.sim.tickHz;
+  // A camp in lockdown is hunting, whether or not anyone has reported anything yet.
+  if (camp.level === 'lockdown' && !camp.search) {
+    const box = camp.devices.alarms.find((a) => a.raised);
+    camp.search = { started: m.tick, startLevel: camp.floor, x: box ? box.x : m.world.camp.site.x, z: box ? box.z : m.world.camp.site.z, radius: m.tuning.brain.searchMap.injectRadius, cleared: false };
+  }
   const search = camp.search;
   // Ending a search: on time since the last report and the map's spread, never on the truth.
-  if (search) {
+  // Not at lockdown: a raised alarm stays raised, and the camp doesn't stand down from it.
+  if (search && camp.level !== 'lockdown') {
     const quiet = (m.tick - camp.lastPercept) / hz;
     if (quiet >= T.search.minSeconds && (quiet >= T.search.maxSeconds || mapMass(camp.map) < T.search.lowMass || mapSpread(camp.map) > T.search.wideArea)) endSearch(camp, m.tick);
   }
@@ -199,11 +208,13 @@ export function plan(m: CampMind, out: CampOrder[]): void {
   if (camp.level === 'calm') return;
   const slots = camp.level === 'uneasy' ? T.slots.uneasy : camp.level === 'alert' ? T.slots.alert : T.slots.lockdown;
   // Investigate where the last report said.
-  if (camp.search && slots.investigate > 0 && camp.tasks.filter((t) => t.kind === 'investigate').length === 0 && camp.level === 'uneasy') {
+  if (camp.search && !camp.search.cleared && slots.investigate > 0 && camp.tasks.filter((t) => t.kind === 'investigate').length === 0 && camp.level === 'uneasy') {
     addTask(camp, 'investigate', camp.search.x, camp.search.z, 2, investigators(camp, camp.search.x, camp.search.z, T.slots.lockdown.investigate + 1, m.tuning), m.tick);
   }
   // A shooter the camp has fixed: the marksmen sweep where it believes he is (E8).
   const shot = camp.shots.estimate;
+  // A newer fix than the one being swept retires that sweep, so the marksmen follow the estimate.
+  if (shot) camp.tasks = camp.tasks.filter((t) => t.kind !== 'sweep' || t.issued >= camp.shots.tick);
   if (shot && m.tick - camp.shots.tick < T.keepOrder * m.tuning.sim.tickHz && camp.tasks.filter((t) => t.kind === 'sweep').length === 0) {
     addTask(camp, 'sweep', shot.x, shot.z, 3, m.world.camp.guards.filter((g) => g.role === 'marksman').length, m.tick);
   }
@@ -268,7 +279,7 @@ function assign(m: CampMind, out: CampOrder[]): void {
         const pos = whereIs(m, g);
         const dx = pos.x - t.x;
         const dz = pos.z - t.z;
-        const cost = Math.sqrt(dx * dx + dz * dz) + (1 - suit) * 20;
+        const cost = Math.sqrt(dx * dx + dz * dz) + (1 - suit) * m.tuning.brain.camp.rolePenalty;
         const better =
           t.priority > bestPrio ||
           cost < bestCost - 1e-9 ||
@@ -297,7 +308,7 @@ const pose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
 function whereIs(m: CampMind, g: RosterEntry): { x: number; z: number } {
   const age = (m.tick - g.tick) / m.tuning.sim.tickHz;
   // Heard from recently, believe that; otherwise the routine he published.
-  if (age < 20 && g.tick > 0) return g;
+  if (age < m.tuning.brain.camp.rosterTrust && g.tick > 0) return g;
   const post = m.world.camp.guards[g.post]!;
   routinePose(post.routine, m.time, pose);
   return { x: pose.x, z: pose.z };
@@ -307,5 +318,5 @@ function whereIs(m: CampMind, g: RosterEntry): { x: number; z: number } {
 export function spreadCamp(camp: CampState, tick: number, tuning: Tuning, world: World): void {
   const M = tuning.brain.searchMap;
   const every = Math.max(1, Math.round(tuning.sim.tickHz / M.updateHz));
-  if (tick % every === 0) spreadBelief(camp.map, M.spreadRate, world);
+  if (tick % every === 0) spreadBelief(camp.map, M.spreadRate * (every / tuning.sim.tickHz), world);
 }

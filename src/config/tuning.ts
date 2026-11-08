@@ -306,6 +306,10 @@ export const defaultTuning = {
       use: 0.7, // seconds to throw the switch, standing at it
       role: { sentry: 0.6, patrol: 0.5, marksman: 0, 'radio-operator': 0.3, officer: 0.5, worker: 1, target: 0 },
       sirenRadius: 1200,
+      flee: { pace: 4.6, arrive: 1.2 }, // the target's run for the vehicle at lockdown (m/s, and how close counts as aboard)
+      retry: 10, // seconds before he'll try the alarm again, after a run that came to nothing
+      claimWithin: 3, // metres from the box for someone's shout to count as claiming it
+      sirenHeight: 3, // metres above the box's foot that the horn sounds from
     },
     // Reinforcements (E8): called at lockdown, arriving after a delay as a squad that hunts.
     reinforce: {
@@ -324,6 +328,7 @@ export const defaultTuning = {
       minSigmaDeg: 1.5, // nobody's ear is sharper than this
       maxSigmaDeg: 25, // a bearing worse than this is said to be no bearing at all
       sweepSeconds: 8, // how long a marksman sweeps a believed perch
+      sweepHeadDeg: 20, // how far his head swings to either side of it
     },
     // Minimal combat (E10): guards engage, take cover and call support; the player can be hit and die.
     combat: {
@@ -339,6 +344,11 @@ export const defaultTuning = {
       coverPoints: 12, // spots per ring
       coverAfter: 2.5, // seconds without a sight of the target before he looks for cover
       holdAfter: 6, // seconds he holds cover without seeing anything before moving up
+      coverCloser: 2, // metres nearer the threat that a cover spot may be and still be worth taking
+      coverCloserCost: 4, // square metres of extra run it counts as, if it is nearer
+      underFireFor: 3, // seconds a nearby strike keeps him looking for cover
+      underFireWithin: 18, // metres: a strike this close counts as being shot at
+      flankLinger: 3, // seconds he stands and looks when he has worked round
       flankDistance: 18, // metres to the side of the believed position he works toward, moving up
       chest: 1.2, // height of the line he has to break
     },
@@ -358,6 +368,16 @@ export const defaultTuning = {
       fresh: { from: 2, to: 25, at0: 1, at1: 0.05 }, // how fresh the belief is
     },
     lookWeight: 0.35, // the weight of standing to look, when it competes with going
+    // The weights of the options that don't come from a role or a curve (brain.ts).
+    weights: {
+      orderCurious: 0.9, // an order, to a guard who's only curious
+      reportSuspicious: 0.2, // stopping to call it in, while only suspicious
+      workerAlarm: 0.9, // a worker's run for the box, while searching
+      coverNoFight: 0.6, // getting under cover, for one who doesn't fight
+      holdSearching: 0.2, // standing his ground, while searching
+      holdCombat: 0.25, // standing his ground, in combat
+      searchStale: 0.25, // a search's pull once the belief has gone cold
+    },
     // Reports (E4): what guards tell each other and the camp (reports.ts, game/comms.ts).
     comms: {
       talk: 1.6, // seconds a radio call lasts: long enough to be interrupted
@@ -380,8 +400,10 @@ export const defaultTuning = {
     searchMap: {
       cells: 64,
       cell: 2.5,
-      spreadRate: 0.25, // share of a cell's belief that bleeds to its neighbours per update,
-      updateHz: 2, // updates a second, a rate (rule 17)
+      spreadRate: 0.5, // share of a cell's belief that bleeds to its neighbours per second,
+      updateHz: 2, // applied this many times a second (rule 17)
+      seenStep: 1, // metres between the samples of a line of sight over the ground
+      seenHeight: 0.3, // height above the ground that has to be in view for a spot to count as seen
       clearRays: 400, // cells one clearing may test
       injectRadius: 8, // metres: the least a report can be spread over
     },
@@ -392,6 +414,8 @@ export const defaultTuning = {
       noOfficerEvery: 3, // seconds between plans with no officer to run them: searches turn sloppy
       // How many guards it may send: the pacing layer's role slots, by the camp's level.
       coverSeconds: 25, // seconds a guard told to get under cover stays there, after a body turns up in the open
+      rolePenalty: 20, // metres of extra walk a wholly unsuited role counts as, when choosing who goes
+      rosterTrust: 20, // seconds the camp believes where it last heard a guard was, before falling back on his routine
       slots: {
         uneasy: { investigate: 1, search: 0 },
         alert: { investigate: 1, search: 3 },
@@ -410,6 +434,7 @@ export const defaultTuning = {
         uneasyEvery: 75, // and how often once the camp is uneasy
         reply: { min: 1, max: 3 }, // seconds a post takes to answer, drawn from its own stream
         deadline: 12, // seconds without an answer before the post counts as silent
+        retry: 5, // seconds before trying again when there's no set or no operator
       },
     },
   },
