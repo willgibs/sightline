@@ -472,26 +472,51 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
   - the miss breakdown in telemetry;
   - the owner's call.
 
+**Recorded before building** (Nov 8, by the lab B session). Each row is a number the lane's bench (`game/benches.ts`, lane `ballistics`) measures, with the seed's value where the research measured one. The exit note gives the bench's values against both columns.
+
+| Measure | The seed | Target |
+| --- | --- | --- |
+| Drawn hold against simulated impact: two loads, 100–500 m, winds 0–8 m/s from any side, slopes ±30° | 18.5 cm low at 500 m (one Euler step per tick under an exact reticle); a field of view that bent Tarkov's reticle by 100–200 m of zero | Under 1 cm everywhere; aim for 0.2 cm |
+| The model against a G7 point-mass solver (.308, 168 gr, sea level) | Gravity only: drop 22–29% short; wind carried with the air: drift 6–9 times too much | Drop within 1 cm and drift within 0.5 cm to 500 m |
+| The closed form against RK4 of its own model, ±30° | — | Across the aim, under 0.06 cm to 500 m for the match load (the research found 0.05), and 0.12 cm to 300 m for the subsonic |
+| Decision sensitivity at 300 m, a guard walking 1.35 m/s | Measured by no game | Skipping drop, lead, wind (4 m/s) or ranging (an unaided 15% guess) each moves a centred head shot off the 23 cm head |
+| Sway, the 95th-percentile radius over 20 s | Arma: no numbers published | Free-standing at least 1.5 mil; prone 0.5–0.8; prone rested 0.25; rested, breath held, 0.1 or less |
+| The impact heard back at the shooter | No game times it physically | Flight plus return, to the tick: about 1.28 s at 300 m |
+| What decided each miss | Sniper Elite: a hidden score | Range, lead, wind and sway error in mils, for every shot, in the playtest summary |
+
+**How the lab is built** (decided before building; `docs/decisions.md`, Lab B, has the reasons):
+- **One ballistic function** (`ballistics/trajectory.ts`): the closed form for one drag constant, in the bore's frame, with the lag rule for wind. A bullet's whole path is its launch, so a bullet in the state is its launch and nothing else, and its position at any instant is exact.
+- **Bullets are entities.** A shot is resolved in 'commands' against the poses the player saw (the two ticks of history), from its instant to the tick's start, then flown in 'projectiles' every tick, each segment swept against every body part between two ticks' poses, the terrain and the colliders.
+- **The rifle and vitals are components the run's setup gives.** The range gives them now; the valley gets them in Phase 2. Until then a click in the valley is the bare shot it was, and no valley golden moves.
+- **Sway is sampled at every tick's end, kept with two ticks of history** like a body's pose, and both the camera and the shot read it through one function at the frame's instant: the shot goes where the drawn reticle pointed.
+- **Assist layers are view-only.** Arcade, realistic-lite and simulation differ only in what the instruments show, over one physics, so taste call 3 never changes a recording.
+
 **Milestones:**
-- [ ] B1 · The range scene: firing points with a rest; targets walking routines across 100–500 m; flags and grass that show the wind.
-- [ ] B2 · Content as data in `tuning.ts` (rule 16): the rifle, its ammunition and suppressor, the scope and binoculars, and the throwable.
-- [ ] B3 · One ballistic function, realistic-lite.
+- [x] B1 · The range scene: firing points with a rest; targets walking routines across 100–500 m; flags and grass that show the wind.
+  - Landed: `game/scenes/shootingRange.ts` (`?scene=shooting-range`): a mound with a bipod's ground, sandbags and a wall; eight guards walking and standing at 100–506 m; steel plates; a berm; four flags (a new `'flag'` structure kind) and grass streaming in a 4 m/s crosswind (`render/windCues.ts`); sea-level air. A marksman drives its headless run and pinned bench run.
+- [x] B2 · Content as data in `tuning.ts` (rule 16): the rifle, its ammunition and suppressor, the scope and binoculars, and the throwable.
+  - Landed: `tuning.ballistics` (the rifle, two loads with their drag constants, the shot's sounds, hits, optics, the throwable, sway) and `tuning.vitals`, bounded in `config/validate.ts`.
+- [x] B3 · One ballistic function, realistic-lite.
   - Gravity, one drag constant per load, and the mission's wind, applied by the lag rule. Carrying the bullet with the air overstates drift six to nine times.
   - Evaluated exactly in closed form, which needs only `dlog`, `dexp` and division, or with Heun's method once per tick. Never with one Euler step per tick.
   - Bullets live in the state tree and fly in the 'projectiles' phase. About 0.5 s to 400 m.
   - The same function draws the reticle's marks and drives the rangefinder, the wind readout and every assist.
-- [ ] B4 · Hits.
+  - Landed: `ballistics/trajectory.ts` (the closed form in the bore's frame) and `aim.ts` (zero, launch, landing, the hold solver). Against RK4 of its own model: 0.53 mm across the aim at ±30° and 500 m. Against the G7 solver: drop and drift within 1 cm and 0.5 cm to 500 m (`tests/ballistics.test.ts`). The instruments that read it are B6's.
+- [x] B4 · Hits.
   - Each bullet's path is swept between two ticks' poses against each body part, the terrain and the colliders. A path bends about 1.4 mm in a tick, so there is no sub-stepping. Hit and impact events follow.
   - A headshot kills. A torso shot kills an unarmored guard, but may let the guard cry out first (drawn from the guard's own stream).
   - A killed guard leaves a body, spawned within the tick (W0.4).
-- [ ] B5 · Bob: whether walking bodies bob in the simulation, and whether a shot leaves from the bobbing eye. Decided by measuring at 300 m; `body/bob.ts` is ready.
-- [ ] B6 · Instruments in the honest view, which today has no crosshair.
+  - Landed: bullets are entities (`ballistics/bullet.ts`), resolved in 'commands' against the poses the player saw and flown in 'projectiles' (`game/shooting.ts`). A leg shot kills too, always with a cry; lab E may make it a wound. The body left behind collapses as a pure function of time (`game/remains.ts`), and sight lines and bullets see it.
+- [x] B5 · Bob: whether walking bodies bob in the simulation, and whether a shot leaves from the bobbing eye. Decided by measuring at 300 m; `body/bob.ts` is ready.
+  - Decided: neither, so nothing in the motor changes (`docs/decisions.md`, B5; the measurements are tests in `tests/bob.test.ts`). A walking guard's head dips 2.6 cm: 0.087 mil at 300 m, under a quarter of the head's radius, five times smaller than the smallest decision (ranging, 0.46 mil), and under a pixel and a half through the scope. The shooter's camera stops bobbing as the scope comes up, so a scoped shot leaves exactly from the drawn eye; unscoped, the barrel's 25 mil of pointing error is a hundred times a sprint's dip at 300 m. Revisit when Phase 3's walk cycles come with art.
+- [x] B6 · Instruments in the honest view, which today has no crosshair.
   - The scope, with its mil reticle and a zero dial in 100 m steps, and mil holds between steps. A target 50 m from the nearest step sits 11–34 cm off.
   - Binoculars with the rangefinder and a wind readout.
   - Lens glint toward the sun.
   - A sweep test holds the drawn hold to the simulated impact within 1 cm.
   - Marking waits for Phase 2, with the model of what the player has observed.
-- [ ] B7 · Sway, breath and heart rate.
+  - Landed: `app/scope.ts` draws the scope (a mil reticle in the camera's own projection, the zero, the rounds, rest and breath marks, a flare when facing the sun) and the binoculars (a mil scale and the rangefinder); the right button raises the scope, F the binoculars, the arrows click the zero, Shift holds the breath while scoped, H changes the assists. The sweep (`tests/reticle.test.ts`, `game/ballisticsBench.ts`): 160 shots through the whole simulation, worst 0.136 cm; each hold drawn within 0.001 mil of where three.js projects the point, on three screen shapes. Glint is a pure function (`ballistics/glint.ts`) for lab A's A9.
+- [x] B7 · Sway, breath and heart rate.
   - Sway is a pure function of state and time in the simulation (rule 14), so the shot goes where the drawn reticle points at the click's instant. Its parts:
     - incommensurate sines;
     - a heartbeat pulse;
@@ -503,18 +528,40 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
     - prone, rested, breath held: 0.1 mil or less.
   - Breath holds for about 4 s, recovers over about 6 s, and spikes on release.
   - Heart rate rises with sprinting and close calls, and settles over about 20 s.
-- [ ] B8 · The shot's sound.
+  - Landed: `ballistics/sway.ts` (breathing on two incommensurate phases, hashed smooth tremor, the heartbeat's kick, the recoil), sampled at every tick's end with two ticks of history (`rifle.ts`), and `body/vitals.ts` (heart rate, breath held and recovered, `startle` for close calls, which lab E calls when guards shoot back). A rest is found by geometry (`rest.ts`): a bipod prone, sandbags or a wall upright. The ladder measured (`game/ballisticsBench.ts`): 1.64 mil standing, 0.99 crouched, 0.69 prone, 0.255 prone on a rest, 0.046 with the breath held. Shots leave along the camera of the frame clicked on, sway and all, at 30–144 fps (`tests/sway.test.ts`).
+- [x] B8 · The shot's sound.
   - The report at the muzzle, the crack along the path, the impact.
   - The suppressor cuts the report.
   - The impact's sound reaches the shooter at flight time plus return time, about 1.28 s at 300 m.
   - Voices in the audio engine.
   - Sandbox shot drops.
-- [ ] B9 · The throwable: its arc, and a landing sound that draws one guard.
-- [ ] B10 · Hit confirmation, and telemetry.
+  - Landed: `report`, `impact` and `cry` events (sounds, with radii by the suppressor, the load and what was struck) and the crack as a function of the path (`ballistics/crack.ts`: the Mach cone's point, d·tan μ upstream of the nearest pass), for lab A's hearing and the speakers alike. Voices in `audio/shotVoices.ts`. Measured offline in Chromium (`tests/browser/shot.test.ts`): the strike of a 300 m shot comes back 1.24–1.33 s after the trigger; a listener 10 m off the path hears the crack near 0.4 s and the report after 0.8 s; the shooter hears no crack; the suppressor cuts the report by more than 12 dB. Sandbox: J in the debug view drops a shot where you look (`shotDrop`, command 35), rifle or not.
+- [x] B9 · The throwable: its arc, and a landing sound that draws one guard.
+  - Landed: X throws a stone (`ballistics/thrown.ts`, three carried) on an exact arc, swept a chord a tick against the world and the bodies, bouncing (30% of the speed into a surface kept, 55% along it) until it settles; each touch is a `clatter` sound (code 36), loudest at the first: 31 m on grass at a full throw, about 40 m on gravel. Measured against the Phase 0 test camp, where guards stand in pairs 7–10 m apart, a landing beside one guard reaches his partner too: which single guard walks over is lab A's (A7's minimal reactions, A9 wires the stimulus) and lab E's (E5's commander), not the sound's.
+- [x] B10 · Hit confirmation, and telemetry.
+  - Landed: dust where a shot strikes (darker than the ground, so it reads at 500 m), a flash on steel, a trace along the simulated path, and the body's collapse, all drawn from the simulation (`render/shotLayer.ts`, tested without a GPU in `tests/shotLayer.test.ts`); the thump of a hit 1.28 s after the trigger at 300 m (B8). The decision-sensitivity check is on the bench (B6). The miss breakdown (`game/telemetry.ts`) is in `npm run playtest` and on the screen at the end of a run. No kill cam: the payoff is physical, and the replay already plays a shot back at a quarter speed.
   - Dust on a miss, so the player can correct like a spotter.
   - The decision-sensitivity check, and the miss breakdown in the playtest summary.
   - A kill cam, if any, is only a slowed replay of the recording.
 - [ ] Taste call 3, the exit test, the bench numbers, a note, a playable link.
+  - **Ready for the owner's sitting** (Nov 8): B1–B10 landed (willgibs/sightline#1). Open the range at https://sightline-brown.vercel.app/?scene=shooting-range, about 10 minutes and 15 rounds. What to try:
+    - Go prone (Z) on the mound: REST lights up in the scope. Hold the breath with Shift while scoped and press between heartbeats.
+    - Range a walker with the binoculars (F, then click), then dial the zero (↑ ↓) to the nearest 100 m and hold the rest, or keep 100 m and hold over with the dope card.
+    - Read the wind from the flags (from the west, a full crosswind) and hold into it; lead a walker about 1.8 mil at 300 m.
+    - Hear the strike come back about 1.3 s after the shot at 300 m; watch the dust on a miss and correct like a spotter.
+    - Press H to try the arcade and simulation instruments; the run's end lists what decided every shot.
+  - **The bench against the seed** (`npm run bench`, lane ballistics):
+
+    | Measure | The seed | Target | Measured |
+    | --- | --- | --- | --- |
+    | Drawn hold against simulated impact, 160 shots through the simulation | 18.5 cm at 500 m | under 1 cm; aim 0.2 | 0.136 cm worst |
+    | The model against a G7 solver, to 500 m | drop 22–29% short, or drift 6–9 times too much | drop within 1 cm, drift within 0.5 | 0.82 cm and 0.45 cm |
+    | The closed form against RK4, ±30° | — | under 0.06 cm (match), 0.12 (subsonic) | 0.053 cm and 0.11 cm |
+    | A skipped decision at 300 m, against the head's 0.38 mil | measured by no game | each off the head | drop 1.79, lead 1.84, wind 0.60, ranging 0.46 mil |
+    | Sway (95th percentile): standing, prone, rested, breath held | no numbers published | ≥ 1.5, 0.5–0.8, 0.25, ≤ 0.1 mil | 1.64, 0.69, 0.255, 0.046 mil |
+    | The strike heard back from 300 m | not timed by any game | flight and return, about 1.28 s | 1.24–1.33 s, rendered in Chromium |
+    | What decided each miss | a hidden score | every shot, in mils | `npm run playtest` and the run's end |
+  - **Two questions for the owner:** Is the 300 m walking shot earned and satisfying? And taste call 3: keep realistic-lite (the default: you make the four decisions with a rangefinder, a dope card and the flags), go more arcade (the instruments make them for you: the hold and the wind read out, the landing marked), or more simulation (no dope card: you learn the drops)? Each is only a layer of what the instruments show, over the one physics.
 
 ### C · Movement and body
 

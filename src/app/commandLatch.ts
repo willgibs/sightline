@@ -24,8 +24,8 @@ export interface FrameShown {
 }
 
 interface Latched {
-  /** A shot, or a noise dropped from the sandbox (A10): both about the frame on screen. */
-  kind: 'fire' | 'noise';
+  /** The timed commands, all about the frame on screen: firing, ranging and throwing along its line of sight, and the sandbox's dropped noise (A10) and shot. */
+  kind: 'fire' | 'noise' | 'range' | 'throw' | 'shotDrop';
   frame: FrameShown;
 }
 

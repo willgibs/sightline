@@ -40,8 +40,9 @@ import { readInput, writeInput } from './inputCodec';
  * 7: the mission spec carries its environment. 8: a run that ended in a fault says so.
  * 9: the scene a run was played in, and worlds built by hand. 10: the behaviour
  * fingerprint of the build that made it. 11: the scene's parameters (a scenario's).
+ * 12: a shot carries its bullet's path (lab B).
  */
-export const RECORDING_VERSION = 11;
+export const RECORDING_VERSION = 12;
 const MAGIC = [0x53, 0x4c, 0x52, 0x43]; // SLRC
 /** Larger than a day of play. Anything bigger is not a recording. */
 export const MAX_RECORDING_BYTES = 512 * 1024 * 1024;

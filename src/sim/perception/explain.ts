@@ -42,6 +42,20 @@ export function describe(e: SimEvent): string {
       return `changed stance, ${e.from} to ${e.to}`;
     case 'shot':
       return 'fired';
+    case 'report':
+      return `a shot's report${e.suppressed === 1 ? ', suppressed' : ''}, heard to ${m(e.radius)} m`;
+    case 'impact':
+      return `a bullet struck ${e.what === 'body' ? `a body, in the ${e.part}` : e.what === 'terrain' ? 'the ground' : 'cover'}, heard to ${m(e.radius)} m`;
+    case 'death':
+      return `fell, hit in the ${e.part}`;
+    case 'cry':
+      return `cried out, heard to ${m(e.radius)} m`;
+    case 'ranged':
+      return e.range < 0 ? 'ranged, and found nothing' : `ranged ${e.range} m`;
+    case 'bolt':
+      return `worked the bolt, heard to ${m(e.radius)} m`;
+    case 'clatter':
+      return `something thrown landed, heard to ${m(e.radius)} m`;
     case 'outcome':
       return `the run ${e.status}`;
   }

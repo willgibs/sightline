@@ -46,6 +46,14 @@ body {
   opacity: 0;
 }
 
+/* The scope and the binoculars (scope.ts): under every other piece of the HUD. */
+.instruments {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
 .compass {
   position: absolute;
   top: 14px;

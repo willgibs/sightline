@@ -39,7 +39,45 @@ export interface NoiseCommand {
   pitch: number;
 }
 
-export type Command = FireCommand | NoiseCommand;
+/** Laser the range along the frame's line of sight, with the binoculars up (ballistics lane). */
+export interface RangeCommand {
+  kind: 'range';
+  lag: number;
+  yaw: number;
+  pitch: number;
+}
+
+/** Throw the throwable along the frame's line of sight (ballistics lane). */
+export interface ThrowCommand {
+  kind: 'throw';
+  lag: number;
+  yaw: number;
+  pitch: number;
+}
+
+/**
+ * Sandbox (the debug view): a shot dropped where the frame's line of sight meets the world,
+ * fired from the eye whether or not a rifle is carried (ballistics lane).
+ */
+export interface ShotDropCommand {
+  kind: 'shotDrop';
+  lag: number;
+  yaw: number;
+  pitch: number;
+}
+
+/** One click of the scope's zero dial, up or down; fit or take off the suppressor. */
+export interface ZeroUpCommand {
+  kind: 'zeroUp';
+}
+export interface ZeroDownCommand {
+  kind: 'zeroDown';
+}
+export interface SuppressorCommand {
+  kind: 'suppressor';
+}
+
+export type Command = FireCommand | NoiseCommand | RangeCommand | ThrowCommand | ZeroUpCommand | ZeroDownCommand | SuppressorCommand | ShotDropCommand;
 export type CommandKind = Command['kind'];
 
 /** How a command field is stored and quantized. */
@@ -56,6 +94,12 @@ export interface CommandSpec<C> {
 export const COMMANDS: { readonly [K in CommandKind]: CommandSpec<Extract<Command, { kind: K }>> } = {
   fire: { code: 1, range: 'foundation', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
   noise: { code: 10, range: 'perception', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
+  range: { code: 30, range: 'ballistics', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
+  throw: { code: 31, range: 'ballistics', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
+  zeroUp: { code: 32, range: 'ballistics', fields: {} },
+  zeroDown: { code: 33, range: 'ballistics', fields: {} },
+  suppressor: { code: 34, range: 'ballistics', fields: {} },
+  shotDrop: { code: 35, range: 'ballistics', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
 };
 
 /** The most commands one tick carries; more are dropped, oldest kept. */

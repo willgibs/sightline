@@ -255,6 +255,121 @@ export const defaultTuning = {
     catchUp: 1.5, // how much faster than walking a guard may hurry back to his routine
   },
 
+  // The rifle, its ammunition and suppressor, the optics and the throwable (design doc ·
+  // Weapons, tools and ballistics; the ballistics lane, sim/ballistics). Content as data
+  // (rule 16): recordings embed it, and replay with the numbers they were made with.
+  ballistics: {
+    // The core mission's rifle: a bolt-action .308 with a fixed 10× scope and a suppressor to fit or take off.
+    rifle: {
+      rounds: 15, // per mission (design doc · Loadout: about 15, so a camp can't be brute-forced)
+      boltTime: 1.2, // seconds from a shot until the next round is chambered
+      raiseTime: 0.3, // seconds to bring the scope to the eye; until it's there the shot isn't where you look
+      zero: { min: 100, max: 600, step: 100, start: 100 }, // metres: the dial clicks in 100 m steps
+      load: 'match', // the load the rifle starts with (a key of loads)
+      suppressed: false, // the suppressor fitted at the start
+      fitTime: 3, // seconds to fit or take off the suppressor; no shooting meanwhile
+      unaimedMil: 25, // the barrel's pointing error with the scope down: a shot from the hip
+    },
+    // Each load: muzzle speed, and one quadratic drag constant (a = −k·|v|·v) at the
+    // reference air (airDensity); the mission's air scales it. Fitted to a G7 point-mass
+    // solver's time of flight (docs/research/scripts/ballistics.py).
+    loads: {
+      // Hornady .308 Win 168 gr ELD Match: 823 m/s, G7 0.263. 0.41 s and 1.8 mil of drop to 300 m (100 m zero).
+      match: { muzzleSpeed: 823, drag: 0.000756 },
+      // A subsonic .308: 320 m/s, G7 0.30 assumed (no published BC was found). Quiet, slow, with heavy drop.
+      subsonic: { muzzleSpeed: 320, drag: 0.00037 },
+    },
+    airDensity: 1.225, // kg/m³ the loads' drag constants are given at: sea level, 15 °C
+    maxFlight: 4, // seconds a bullet flies before it's dropped, far past any target
+    // The shot's sounds, as radii in metres: how far an unmasked guard with normal
+    // hearing would just hear each one (sim/kernel/sound.ts).
+    sound: {
+      report: 2400, // the muzzle report, unsuppressed: the whole valley hears it
+      suppressedReport: 220, // the suppressor cuts the report sharply (about 20 dB) but it's still a shot
+      subsonicReport: 0.5, // a subsonic load's report is quieter still: this share of the radius
+      crack: 160, // the supersonic crack, heard this far from the bullet's path; a subsonic bullet makes none
+      bolt: 8, // working the bolt
+      // A bullet's strike, by what it hits: the thump of a body carries back to the shooter.
+      impact: { body: 650, metal: 900, rock: 320, wood: 260, ground: 160, water: 140 },
+    },
+    // What a hit does (design doc · Hits).
+    hits: {
+      cryChance: 0.35, // a torso shot kills an unarmored guard, but this often he cries out first
+      cryRadius: 90, // his cry, heard this far
+      collapseTime: 0.7, // seconds for the body to fall to the ground
+    },
+    // The optics. Field is the true angle across the view, degrees.
+    scope: { fieldDeg: 3.6 }, // a fixed 10× scope: 6.3 m across at 100 m
+    binoculars: { fieldDeg: 6.5, rangeMax: 1500 }, // 8× glasses with a laser rangefinder, to the nearest metre
+    // Lens glint (design doc · Tools: binoculars glint when facing the sun): full while the
+    // lens faces within fullDeg of half way between the sun and the one who sees it, gone by zeroDeg.
+    glint: { fullDeg: 12, zeroDeg: 35 },
+    // The throwable (design doc · Tools): a rock that pulls one guard's attention.
+    throwable: {
+      count: 3, // carried at the start
+      speed: 13, // m/s, along the view lifted by liftDeg
+      liftDeg: 12,
+      radius: 0.05, // metres
+      bounce: 0.3, // share of the speed into the ground kept after a bounce
+      friction: 0.55, // share of the speed along the ground kept after a bounce
+      rest: 1.2, // m/s: slower than this at a touch, it stops
+      // Its landing, as heard: the radius at 10 m/s on dirt, scaled by speed and the surface's loudness.
+      landing: 26,
+      maxFlight: 6, // seconds before it's taken as settled wherever it is
+    },
+    // Sway: the aim's wander from where you look, in milliradians (a mil is 10 cm at
+    // 100 m). Pure functions of the state and the time (sim/ballistics/sway.ts); starting
+    // values to tune, meant to give a 95th-percentile radius of about 1.5 mil standing,
+    // 0.5–0.8 prone, 0.25 prone on a rest, and 0.1 rested with the breath held.
+    sway: {
+      breath: 1.25, // breathing, up and down, standing and calm
+      breathRate: 0.25, // breaths a second at rest (15 a minute); faster with the heart
+      drift: 0.4, // the breathing's slower sideways drift, as a share of its rise and fall
+      tremor: 0.55, // grip tremor, smooth noise on both axes
+      tremorRate: 1.7, // its changes a second
+      pulse: 0.22, // the heartbeat's kick, mostly vertical
+      pulseWidth: 0.15, // share of each beat the kick lasts
+      pulseRight: 0.3, // its sideways share
+      stance: { stand: 1, crouch: 0.6, prone: 0.42 },
+      rested: 0.37, // multiplier on a rest: a bipod, a sandbag, a wall
+      held: 0.2, // multiplier on the breathing and the tremor while the breath is held
+      holdSettle: 0.5, // seconds a held breath takes to still the aim
+      spent: 1.5, // once a hold has run out: extra tremor per second past it, up to spentMax
+      spentMax: 3,
+      heart: 0.012, // extra sway per beat a minute above resting
+      moving: 6, // multiplier while moving, easing back to 1 over settle
+      movingSpeed: 0.1, // m/s: moving faster than this unsettles the aim at once
+      settle: 0.8, // seconds to settle after stopping
+      restTime: 0.4, // seconds to settle onto a rest, or come off one
+      recoil: 7, // the shot's kick, up, then settling over recoilTime
+      recoilTime: 0.45,
+      recoilRight: 0.25, // its sideways share
+      recoilFloor: 0.35, // the least of the kick a stance and a rest leave
+      gasp: 1.6, // multiplier on the breathing just after a long hold is let go, fading over gaspTime
+      gaspTime: 1.5,
+      // Where a rest is: under the rifle's fore-end this far ahead of the eye, this far below the line of sight.
+      restReach: { prone: 0.75, upright: 0.55 },
+      restBand: { prone: [0.12, 0.4], upright: [0.04, 0.32] },
+      bipodPitchDeg: 18, // a bipod rests only aiming within this of level
+    },
+  },
+
+  // Breath and heart rate: every shooter's, steadying or shaking the aim (design doc ·
+  // Vitals; sim/body/vitals.ts). Lab C extends them.
+  vitals: {
+    restingHr: 68, // beats a minute, calm
+    maxHr: 175,
+    // The heart rate each gait drives toward, beats a minute: sprinting raises it.
+    effortHr: { idle: 68, crawl: 88, crouch: 92, walk: 96, sprint: 165 },
+    rise: 6, // seconds for the heart to close most of the way to a higher rate
+    calm: 6.5, // seconds to settle most of the way back: about 20 s from a sprint to calm
+    holdTime: 4, // seconds a breath steadies the aim, calm; shorter as the heart races
+    holdAtMaxHr: 1.5, // seconds it lasts at the maximum heart rate
+    recoverTime: 6, // seconds to get the breath back after a full hold
+    minAir: 0.25, // a breath can't be held again until this much of it is back
+    closeCall: 28, // beats a minute a close call adds at once (a crack past the head, a near miss)
+  },
+
   view: {
     fov: 58, // vertical degrees, about 91° horizontal at 16:9
     zoomFov: 9, // binocular-style zoom while holding the right mouse button

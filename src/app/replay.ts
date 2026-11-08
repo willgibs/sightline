@@ -62,11 +62,11 @@ export class Replay {
     return this.speed;
   }
 
-  /** Whether the player had an optic up on this tick: the replay zooms as they did. */
-  opticAt(tick: number): boolean {
-    if (this.ticks === 0) return false;
+  /** The optic the player had up on this tick, if any: the replay zooms as they did. */
+  opticAt(tick: number): Optic {
+    if (this.ticks === 0) return Optic.None;
     this.rec.readInput(Math.max(0, Math.min(this.ticks - 1, tick)), this.input);
-    return this.input.optic !== Optic.None;
+    return this.input.optic;
   }
 
   /** The next marker after `tick`, or before it (dir −1), if any. */

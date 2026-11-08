@@ -53,6 +53,7 @@ export class Hud {
       [['slower', 'faster'], 'time scale'],
       [['restart'], 'restart run'],
       [['dropNoise'], 'drop a noise'],
+      [['shotDrop'], 'drop a shot'],
       [['mark'], 'mark moment'],
     ];
     this.legend.innerHTML = legend.map(([actions, text]) => `<span>${keysHtml(map, actions)}${text}</span>`).join('');

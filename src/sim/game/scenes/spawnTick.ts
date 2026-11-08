@@ -81,7 +81,7 @@ export function spawnTick(): Scene {
     reads: [],
     writes: ['entities'],
     emits: [],
-    after: ['player-commands', 'sandbox-drops'],
+    after: ['player-commands', 'rifle', 'sandbox-drops'],
     run: (ctx) => void (ctx.tick === ARRIVALS[1].tick && arrive(ctx, 1)),
   };
   const watchMotor: System = {

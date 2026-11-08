@@ -117,8 +117,29 @@ export const BENCH_GOLDEN: PinnedBench = {
     "runs": {}
   },
   "ballistics": {
-    "metrics": {},
-    "runs": {}
+    "metrics": {
+      "reticle against impact, worst of 160 shots (cm)": 0.1355,
+      "300 m walker: head radius (mil)": 0.3825,
+      "300 m walker: drop skipped (mil off)": 1.7859,
+      "300 m walker: lead skipped (mil off)": 1.8418,
+      "300 m walker: wind skipped (mil off)": 0.5967,
+      "300 m walker: ranged by eye, 15% out (mil off)": 0.4599,
+      "sway, standing (mil, 95th percentile)": 1.6426,
+      "sway, crouched (mil, 95th percentile)": 0.9856,
+      "sway, prone (mil, 95th percentile)": 0.6899,
+      "sway, prone, rested (mil, 95th percentile)": 0.2553,
+      "sway, prone, rested, breath held (mil, 95th percentile)": 0.0464
+    },
+    "runs": {
+      "shooting-range": {
+        "work": {
+          "rifle": { "rays": 1, "nodes": 0, "bodies": 0 },
+          "motor": { "rays": 0, "nodes": 0, "bodies": 4780 },
+          "bullets": { "rays": 100, "nodes": 0, "bodies": 0 },
+          "thrown": { "rays": 89, "nodes": 0, "bodies": 0 }
+        }
+      }
+    }
   },
   "game": {
     "metrics": {},
