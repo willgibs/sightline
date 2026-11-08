@@ -1,4 +1,4 @@
-import { REPORT_KINDS, alertRung, clearSeen, createCamp, injectBelief, mapMass, spreadBelief, type CampState, type Report, type Told, type Via } from '../brain';
+import { REPORT_KINDS, alertRung, createCamp, digest, mapMass, plan, spreadCamp, type CampMind, type CampOrder, type CampState, type Report, type Task, type Told, type Via } from '../brain';
 import type { DebugDraw } from '../kernel/debugDraw';
 import type { SimEvent } from '../kernel/events';
 import { Faction, type EntityBase } from '../kernel/state';
@@ -34,7 +34,12 @@ declare module '../kernel/state' {
 /** Puts a commander in a run: the camp's single memory (E4, E5). */
 export function giveCommander(sim: Simulation): CommanderEntity {
   const site = sim.world.camp.site;
-  return sim.spawn((id): CommanderEntity => ({ id, kind: 'commander', faction: Faction.Camp, camp: createCamp(site.x, site.z, sim.tuning) }));
+  const camp = createCamp(site.x, site.z, sim.tuning);
+  for (const g of sim.guards) {
+    const post = sim.world.camp.guards[g.guard.spawn]!;
+    camp.roster.push({ id: g.id, post: g.guard.spawn, x: post.x, z: post.z, tick: 0, status: 'ok' });
+  }
+  return sim.spawn((id): CommanderEntity => ({ id, kind: 'commander', faction: Faction.Camp, camp }));
 }
 
 /** The run's commander, if the camp brain runs. */
@@ -107,10 +112,7 @@ export const radioDeliver: ScheduleHandler = (ctx, entry) => {
   const { report, speaker } = c.camp.airwaves[at]!;
   c.camp.airwaves.splice(at, 1);
   // The net needs a working set and a live operator: otherwise the call goes nowhere.
-  if (!c.camp.netWorking) return;
-  let operator = false;
-  for (const g of ctx.index.of('guard')) if (ctx.world.camp.guards[g.guard.spawn]?.role === 'radio-operator') operator = true;
-  if (!operator) return;
+  if (!radioUp(ctx, c)) return;
   const event = ctx.emit({ type: 'radio', source: speaker, cause: report.cause, kind: report.kind, x: report.x, z: report.z, radius: report.radius });
   for (const g of ctx.index.of('guard')) {
     if (g.id === speaker) continue;
@@ -121,33 +123,74 @@ export const radioDeliver: ScheduleHandler = (ctx, entry) => {
   c.camp.inbox.push(report);
 };
 
-/** The commander's digest of its inbox, once a tick (E5 builds its decisions on this). */
+const orders: CampOrder[] = [];
+
+/**
+ * The commander, once a tick: digests its inbox and spreads its map; and on its own
+ * rhythm, plans (ends a search if belief says so, fills the tasks its level calls for)
+ * and sends its orders down the net (delivered after the net's delay, if it works).
+ */
 export const campCommander: System = {
   name: 'camp-commander',
   phase: 'camp',
   after: ['comms-voice'],
-  reads: ['commander.camp'],
-  writes: ['commander.camp'],
-  emits: [],
+  reads: ['commander.camp', 'guard.guard.spawn', 'guard.brain'],
+  writes: ['commander.camp', 'schedule'],
+  emits: ['level', 'order'],
   run(ctx) {
     const c = commanderOf(ctx);
     if (!c) return;
-    const M = ctx.tuning.brain.searchMap;
     const camp = c.camp;
-    for (const r of camp.inbox) {
-      if (r.kind === 'clear') {
-        clearSeen(camp.map, r.x, r.z, ctx.tuning.brain.comms.clearRadius, ctx.world, ctx.tuning, ctx.tuning.bodies.guard.eyeHeight.stand);
-        continue;
-      }
-      injectBelief(camp.map, r.x, r.z, Math.max(r.radius, M.injectRadius), 1);
-      camp.lastPercept = ctx.tick;
-    }
+    const before = camp.level;
+    for (const r of camp.inbox) digest(camp, r, ctx.tick, ctx.tuning, ctx.world);
     camp.inbox.length = 0;
-    const every = Math.round(ctx.tuning.sim.tickHz / M.updateHz);
-    if (ctx.tick % every === 0) spreadBelief(camp.map, M.spreadRate, ctx.world);
+    spreadCamp(camp, ctx.tick, ctx.tuning, ctx.world);
+    const T = ctx.tuning.brain.camp;
+    const hz = ctx.tuning.sim.tickHz;
+    const officer = campHasOfficer(ctx);
+    const every = Math.max(1, Math.round((officer ? T.planEvery : T.noOfficerEvery) * hz));
+    if (ctx.tick - camp.planned >= every) {
+      camp.planned = ctx.tick;
+      const mind: CampMind = { camp, world: ctx.world, tuning: ctx.tuning, tick: ctx.tick, time: ctx.tick / hz, officer };
+      plan(mind, orders);
+      for (const o of orders) sendOrder(ctx, c, o.guard, o.task);
+    }
+    if (camp.level !== before) ctx.emit({ type: 'level', source: c.id, cause: camp.lastCause, from: before, to: camp.level });
     ctx.debug((draw) => drawCamp(draw, ctx, camp));
   },
 };
+
+/** True if the camp's officer is on his feet: a fact about the commander's own body (commander.ts, CampMind). */
+function campHasOfficer(ctx: TickContext): boolean {
+  for (const g of ctx.index.of('guard')) if (ctx.world.camp.guards[g.guard.spawn]?.role === 'officer') return true;
+  return false;
+}
+
+/** The net's delivery of an order: after the delay, if the set and the operator are there. */
+function sendOrder(ctx: TickContext, c: CommanderEntity, guard: number, task: Task): void {
+  const event = ctx.emit({ type: 'order', source: c.id, cause: task.cause, to: guard, task: task.kind, x: task.x, z: task.z });
+  c.camp.tasks.find((t) => t.id === task.id)!.cause = event;
+  ctx.schedule(ctx.tuning.brain.comms.netDelay, 'order-deliver', guard, task.id);
+}
+
+/** An order arrives over the radio, if the net can carry it. */
+export const orderDeliver: ScheduleHandler = (ctx, entry) => {
+  const c = commanderOf(ctx);
+  if (!c || !radioUp(ctx, c)) return;
+  const g = ctx.index.get(entry.a);
+  if (!g || g.kind !== 'guard' || !g.brain) return;
+  const task = c.camp.tasks.find((t) => t.id === entry.b);
+  if (!task) return;
+  g.brain.task = { id: task.id, kind: task.kind, x: task.x, z: task.z, issued: ctx.tick, cause: task.cause };
+  // The order is news to him: he reconsiders now.
+  g.brain.thinkAt = ctx.tick;
+};
+
+function radioUp(ctx: TickContext, c: CommanderEntity): boolean {
+  if (!c.camp.netWorking) return false;
+  for (const g of ctx.index.of('guard')) if (ctx.world.camp.guards[g.guard.spawn]?.role === 'radio-operator') return true;
+  return false;
+}
 
 /** The camp in the debug view: its search map as points over the ground, and its alert level. */
 function drawCamp(draw: DebugDraw, ctx: TickContext, camp: CampState): void {

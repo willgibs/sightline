@@ -4,7 +4,7 @@ import { dcos, dsin } from '../kernel/core/detmath';
 import { scheduleSystem, type Access, type ScheduleHandler, type System, type TickContext } from '../kernel/systems';
 import { player } from './entities';
 import { drawBrain } from './brains';
-import { radioDeliver, speak } from './comms';
+import { orderDeliver, radioDeliver, speak } from './comms';
 import { think } from './guards';
 import { playerIntent } from './player';
 import { SHOOTING_SYSTEMS } from './shooting';
@@ -18,6 +18,7 @@ import { SHOOTING_SYSTEMS } from './shooting';
 /** Handlers for scheduled entries, by kind (kernel/schedule.ts): a radio call's delivery, and what later labs schedule. */
 export const SCHEDULE_HANDLERS: Readonly<Record<string, ScheduleHandler>> = {
   'radio-deliver': radioDeliver,
+  'order-deliver': orderDeliver,
 };
 
 const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
@@ -123,7 +124,7 @@ function navAllowance(ctx: TickContext): NavAllowance {
 /** What the schedule's handlers touch beyond the schedule (kernel/systems.ts, scheduleSystem). */
 const SCHEDULED_ACCESS = {
   reads: ['commander.camp', 'guard.senses', 'guard.brain', 'guard.guard.spawn'],
-  writes: ['commander.camp', 'guard.brain.told', 'guard.senses.awareness', 'guard.senses.belief', 'rng.awareness'],
+  writes: ['commander.camp', 'guard.brain.told', 'guard.brain.task', 'guard.brain.thinkAt', 'guard.senses.awareness', 'guard.senses.belief', 'rng.awareness'],
   emits: ['radio'],
 } as const satisfies Access;
 

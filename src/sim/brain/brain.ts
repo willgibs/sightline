@@ -27,11 +27,11 @@ import { choose, response, type Option } from './utility';
  * percept, an awareness, a belief.
  */
 
-export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report'] as const;
+export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task'] as const;
 export type ActName = (typeof ACTS)[number];
 
 /** Why a guard changed what he's doing: A's reasons for a change of state, and the brain's own. */
-export const ACT_WHYS = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report'] as const;
+export const ACT_WHYS = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered'] as const;
 export type ActWhy = (typeof ACT_WHYS)[number];
 
 /** A change of what a guard is doing, for its system to emit as an 'act' event. */
@@ -90,6 +90,18 @@ export interface BrainState {
   say: { report: Report; radius: number; radio: boolean } | null;
   /** The newest report he's acted on: to start one reaction per report. */
   toldHeard: number;
+  /** The order he's been given (E5), once it has reached him. */
+  task: Tasking | null;
+}
+
+/** An order as it reached a guard: what to do, where, when it was given, and the event behind it. */
+export interface Tasking {
+  id: number;
+  kind: 'investigate' | 'search';
+  x: number;
+  z: number;
+  issued: number;
+  cause: number;
 }
 
 export function createBrain(): BrainState {
@@ -118,6 +130,7 @@ export function createBrain(): BrainState {
     radio: null,
     say: null,
     toldHeard: -1,
+    task: null,
   };
 }
 
@@ -152,6 +165,12 @@ export function decide(m: GuardMind, out: Order): ActChange | null {
 }
 
 /** The newest percept's tick, or −1. */
+/** True if he has sensed something himself: a percept that isn't just a voice telling him. */
+function ownEvidence(m: GuardMind): boolean {
+  for (const p of m.percepts) if (p.kind !== 'voice') return true;
+  return false;
+}
+
 function newestPercept(m: GuardMind): number {
   let tick = -1;
   for (const p of m.percepts) if (p.tick > tick) tick = p.tick;
@@ -207,9 +226,14 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
   }
   // Why: what his senses gave him, while something drives him; calm or nothing when it doesn't.
   const reacting = act !== 'routine' && act !== 'return';
-  const reason: ActWhy = reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
-  const cause = reacting ? perceptCause(m) : b.event;
+  const ordered = act === 'task' && b.task !== null;
+  const reason: ActWhy = ordered ? 'ordered' : reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
+  const cause = ordered ? b.task!.cause : reacting ? perceptCause(m) : b.event;
   b.cause = cause;
+  if (ordered) {
+    b.x = b.task!.x;
+    b.z = b.task!.z;
+  }
   return { from: prev, to: act, why: reason, x: b.x, z: b.z, cause, weight: 1 };
 }
 
@@ -274,32 +298,42 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
     return t < c ? 0 : 1;
   };
   // Worth calling in: something to report, a radio in his hands, and he hasn't just called it in.
-  const callable = role.report * (m.belief !== null || m.awareness.focus ? 1 : 0) * cool('report');
+  const task = b.task;
+  const order =
+    task && !elevated && (m.tick - task.issued) / hz < m.tuning.brain.camp.keepOrder ? (task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
+  // Worth calling in: something he sensed himself (what he was only told is already on the
+  // net), a radio in his hands, and he hasn't just called it in.
+  const own = ownEvidence(m);
+  const callable = own ? role.report * cool('report') : 0;
   out.push({ act: 'routine', rank: 0, weight: 1 });
   const off = offRoutine(m);
   switch (state) {
     case 'unaware':
       if (off && !elevated) out.push({ act: 'return', rank: 1, weight: 1 });
+      if (order) out.push({ act: 'task', rank: 2, weight: order });
       break;
     case 'curious':
       out.push({ act: 'look', rank: 2, weight: 1 });
+      if (order) out.push({ act: 'task', rank: 2, weight: order * 0.9 });
       break;
     case 'suspicious':
+      if (order) out.push({ act: 'task', rank: 3, weight: order });
       out.push({ act: 'report', rank: 3, weight: callable * 0.2 });
       out.push({ act: 'look', rank: 3, weight: T.lookWeight });
-      if (!elevated) out.push({ act: 'investigate', rank: 3, weight: role.investigate * near * fresh * cool('investigate') });
+      if (!elevated && own) out.push({ act: 'investigate', rank: 3, weight: role.investigate * near * fresh * cool('investigate') });
       break;
     case 'searching':
+      if (order) out.push({ act: 'task', rank: 4, weight: order });
       out.push({ act: 'report', rank: 4, weight: callable });
       out.push({ act: 'hold', rank: 4, weight: 0.2 });
-      if (!elevated) {
+      if (!elevated && own) {
         out.push({ act: 'investigate', rank: 4, weight: role.investigate * near * fresh * cool('investigate') });
         out.push({ act: 'search', rank: 4, weight: role.search * (0.25 + 0.75 * fresh) * cool('search') });
       }
       break;
     case 'combat':
-      out.push({ act: 'report', rank: 5, weight: callable * 0.5 });
-      out.push({ act: 'hold', rank: 5, weight: 1 });
+      out.push({ act: 'report', rank: 5, weight: callable > 0 ? 1 : 0 });
+      out.push({ act: 'hold', rank: 5, weight: 0.5 });
       break;
   }
 }
@@ -336,6 +370,9 @@ function perform(m: GuardMind, out: Order): void {
       break;
     case 'report':
       performReport(m, out);
+      break;
+    case 'task':
+      performTask(m, out);
       break;
   }
 }
@@ -458,7 +495,40 @@ function currentReport(m: GuardMind): Report {
   const f = focusOf(m);
   const y = m.belief ? m.belief.y : a.focus ? a.fy : m.self.y;
   const base = m.belief ? m.belief.radius : C.radius[kind];
-  return { kind, x: f.x, y, z: f.z, radius: Math.max(base, C.radius[kind]), tick: m.tick, from: m.id, cause: perceptCause(m) };
+  return { kind, x: f.x, y, z: f.z, radius: Math.max(base, C.radius[kind]), tick: m.tick, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: perceptCause(m) };
+}
+
+/** An order from the commander: go there, look around, and call it clear. */
+function performTask(m: GuardMind, out: Order): void {
+  const b = m.brain!;
+  const T = m.tuning.brain;
+  const hz = m.tuning.sim.tickHz;
+  const task = b.task;
+  if (!task) {
+    b.done = true;
+    stand(m, out, false);
+    return;
+  }
+  if (b.linger >= 0) {
+    lookAround(m, out);
+    if (m.tick >= b.linger) {
+      b.radio = { kind: 'clear', x: task.x, y: m.self.y, z: task.z, radius: T.comms.clearRadius, tick: m.tick, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: task.cause };
+      b.task = null;
+      b.done = true;
+    }
+    return;
+  }
+  b.x = task.x;
+  b.z = task.z;
+  const w = walk(m, out, task.x, task.z, task.kind === 'search' ? T.paces.search : T.paces.investigate, 'walk', task.x, task.z);
+  if (w === 'arrived') {
+    b.linger = m.tick + Math.round(T.linger.search * hz);
+    lookAround(m, out);
+  } else if (w === 'stuck') {
+    b.task = null;
+    b.done = true;
+    stand(m, out, false);
+  }
 }
 
 function performInvestigate(m: GuardMind, out: Order): void {

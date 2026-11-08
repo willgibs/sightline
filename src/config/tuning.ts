@@ -280,6 +280,7 @@ export const defaultTuning = {
     linger: { investigate: 4.5, search: 2.5 },
     cooldown: { investigate: 2.5, search: 2 },
     search: { points: 3, radius: 7, growth: 0.35 },
+    taskWeight: 0.9, // how strongly he weighs an order against what his own senses tell him
     roles: {
       // What each role is willing to do (0 never, 1 fully): the role column of the design doc's table.
       sentry: { investigate: 0.65, search: 0.75, flank: 0.6, report: 0.8 },
@@ -317,6 +318,25 @@ export const defaultTuning = {
       updateHz: 2, // updates a second, a rate (rule 17)
       clearRays: 400, // cells one clearing may test
       injectRadius: 8, // metres: the least a report can be spread over
+    },
+    // The camp (E5, commander.ts): alert levels, tasks, pacing and search cycles.
+    camp: {
+      planEvery: 0.5, // seconds between the commander's plans
+      keepOrder: 25, // seconds an order stays good if nothing renews it
+      noOfficerEvery: 3, // seconds between plans with no officer to run them: searches turn sloppy
+      // How many guards it may send: the pacing layer's role slots, by the camp's level.
+      slots: {
+        uneasy: { investigate: 1, search: 0 },
+        alert: { investigate: 1, search: 3 },
+        lockdown: { investigate: 1, search: 4 },
+      },
+      search: {
+        minSeconds: 30, // a search ends no sooner than this after the last report of anything suspicious,
+        maxSeconds: 45, // and no later than this after it
+        lowMass: 0.2, // the map holds less than this: looked at, and nothing there
+        wideArea: 1200, // square metres the belief has bled over: he could be anywhere
+        avoid: 12, // metres between the spots of two searchers
+      },
     },
   },
 

@@ -20,8 +20,10 @@ export interface Report {
   radius: number;
   /** When he noticed it. */
   tick: number;
-  /** Who said it. */
+  /** Who said it, and where he was. */
   from: number;
+  fromX: number;
+  fromZ: number;
   /** The event behind it: the percept the speaker acted on. */
   cause: number;
 }

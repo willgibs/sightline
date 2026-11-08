@@ -52,7 +52,7 @@ describe('reports', () => {
     speaker.senses!.awareness.focus = true;
     speaker.senses!.awareness.fx = 20;
     speaker.senses!.awareness.fz = 0;
-    speaker.brain!.say = { report: { kind: 'heard', x: 20, y: 0, z: 0, radius: 10, tick: 0, from: speaker.id, cause: 0 }, radius: T.brain.comms.talkRadius, radio: false };
+    speaker.brain!.say = { report: { kind: 'heard', x: 20, y: 0, z: 0, radius: 10, tick: 0, from: speaker.id, fromX: 0, fromZ: 0, cause: 0 }, radius: T.brain.comms.talkRadius, radio: false };
     const ev = run(sim, 2);
     expect(ev.some((e) => e.type === 'call')).toBe(true);
     const near = sim.guards[1]!;
@@ -66,7 +66,7 @@ describe('reports', () => {
     // The same speech heard by one at 5 m and one at 60 m (beyond a talking voice's reach).
     const sim = campy(worldWith(SENTRY, { ...SENTRY, id: 1, x: 5, z: 0 }, { ...SENTRY, id: 2, x: 60, z: 0 }));
     const speaker = sim.guards[0]!;
-    speaker.brain!.say = { report: { kind: 'heard', x: 20, y: 0, z: 0, radius: 10, tick: 0, from: speaker.id, cause: 0 }, radius: T.brain.comms.talkRadius, radio: false };
+    speaker.brain!.say = { report: { kind: 'heard', x: 20, y: 0, z: 0, radius: 10, tick: 0, from: speaker.id, fromX: 0, fromZ: 0, cause: 0 }, radius: T.brain.comms.talkRadius, radio: false };
     run(sim, 1);
     expect(sim.guards[1]!.brain!.told.length).toBe(1);
     expect(sim.guards[2]!.brain!.told.length).toBe(0);
@@ -75,7 +75,7 @@ describe('reports', () => {
   it('a radio call reaches the camp after its delay, when the speaker finishes it', () => {
     const sim = campy(worldWith(SENTRY, { ...SENTRY, id: 1, x: -60, z: -60 }, OPERATOR));
     const speaker = sim.guards[0]!;
-    speaker.brain!.radio = { kind: 'contact', x: 20, y: 0, z: 0, radius: 5, tick: 0, from: speaker.id, cause: 0 };
+    speaker.brain!.radio = { kind: 'contact', x: 20, y: 0, z: 0, radius: 5, tick: 0, from: speaker.id, fromX: 0, fromZ: 0, cause: 0 };
     const radio: SimEvent[] = [];
     const raw = neutralInput();
     for (let i = 0; i < 4 * 30; i++) for (const e of sim.step(raw)) if (e.type === 'radio') radio.push({ ...e });
@@ -109,13 +109,13 @@ describe('reports', () => {
   it('the radio needs an operator and a working set', () => {
     // No operator: the call goes nowhere.
     const a = campy(worldWith(SENTRY, { ...SENTRY, id: 1, x: -60, z: -60 }));
-    a.guards[0]!.brain!.radio = { kind: 'contact', x: 20, y: 0, z: 0, radius: 5, tick: 0, from: a.guards[0]!.id, cause: 0 };
+    a.guards[0]!.brain!.radio = { kind: 'contact', x: 20, y: 0, z: 0, radius: 5, tick: 0, from: a.guards[0]!.id, fromX: 0, fromZ: 0, cause: 0 };
     run(a, 4);
     expect(a.guards[1]!.brain!.told.length).toBe(0);
     // A broken set: the same.
     const b = campy(worldWith(SENTRY, { ...SENTRY, id: 1, x: -60, z: -60 }, OPERATOR));
     commanderOf(b)!.camp.netWorking = false;
-    b.guards[0]!.brain!.radio = { kind: 'contact', x: 20, y: 0, z: 0, radius: 5, tick: 0, from: b.guards[0]!.id, cause: 0 };
+    b.guards[0]!.brain!.radio = { kind: 'contact', x: 20, y: 0, z: 0, radius: 5, tick: 0, from: b.guards[0]!.id, fromX: 0, fromZ: 0, cause: 0 };
     run(b, 4);
     expect(b.guards[1]!.brain!.told.length).toBe(0);
     // Voice still works without the radio.
@@ -126,7 +126,7 @@ describe('reports', () => {
     const g = sim.guards[0]!;
     expect(g.senses!.awareness.state).toBe('unaware');
     const ctx = (sim as unknown as { ctx: Parameters<typeof tell>[0] }).ctx;
-    tell(ctx, g, { kind: 'contact', x: 12, y: 0, z: 3, radius: 4, tick: 0, from: 99, cause: 5 }, 'radio', 7);
+    tell(ctx, g, { kind: 'contact', x: 12, y: 0, z: 3, radius: 4, tick: 0, from: 99, fromX: 0, fromZ: 0, cause: 5 }, 'radio', 7);
     run(sim, 2);
     expect(g.senses!.awareness.focus).toBe(true);
     expect(g.senses!.belief?.x).toBeCloseTo(12, 6);
@@ -163,7 +163,7 @@ describe('the search map', () => {
     const c = commanderOf(sim)!;
     injectBelief(c.camp.map, 10, 10, 8, 1);
     const before = mapMass(c.camp.map);
-    c.camp.inbox.push({ kind: 'clear', x: 10, y: 0, z: 10, radius: 16, tick: 0, from: 1, cause: 0 });
+    c.camp.inbox.push({ kind: 'clear', x: 10, y: 0, z: 10, radius: 16, tick: 0, from: 1, fromX: 10, fromZ: 10, cause: 0 });
     sim.step(neutralInput());
     expect(mapMass(c.camp.map)).toBeLessThan(before * 0.5);
   });
@@ -181,7 +181,9 @@ describe('searching guards report in', () => {
     const sim = campy(worldWith(SENTRY, { ...SENTRY, id: 1, x: -55, z: -55 }, OPERATOR));
     const g = sim.guards[0]!;
     const ctx = (sim as unknown as { ctx: Parameters<typeof tell>[0] }).ctx;
-    tell(ctx, g, { kind: 'shot', x: 9, y: 0, z: 0, radius: 10, tick: 0, from: 99, cause: 0 }, 'voice', 0);
+    // He heard it himself, too: a report is worth calling in only from his own senses.
+    g.senses!.percepts.push({ kind: 'shot', x: 9, y: 0, z: 0, radius: 10, strength: 3, tick: 0, expires: 999, cause: 0 });
+    tell(ctx, g, { kind: 'shot', x: 9, y: 0, z: 0, radius: 10, tick: 0, from: 99, fromX: 0, fromZ: 0, cause: 0 }, 'voice', 0);
     const ev = run(sim, 14);
     expect(ev.some((e) => e.type === 'act' && e.to === 'report')).toBe(true);
     expect(ev.some((e) => e.type === 'radio')).toBe(true);
