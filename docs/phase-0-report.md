@@ -80,3 +80,24 @@ Measured in Node 22 on the build machine, with no GPU, so rendering ran in softw
 1. **Movement:** crouching and going prone work. Whether it feels deliberate enough gets judged once there is more gameplay.
 2. **Look:** the pale, contour-lined wireframe is approved as the canvas for the next phases.
 3. **Performance:** 120 fps on the owner's Mac (display limit), with 1.4 ms of CPU per frame.
+
+## After the gate: the foundation pass, Nov 7
+
+Before Phase 1, the owner asked for the foundation to be pushed close to its full potential. `docs/foundation-plan.md` has the plan, milestone by milestone, and `docs/decisions.md` has the reasoning for each change. What changed since the gate:
+
+- **Deploys:** GitHub and Vercel are set up. Every push to `main` runs CI and deploys. CI runs the full check on Linux on every push; the browser tests run in Chromium, Firefox and WebKit, and the self-test under Bun. Weekly runs add macOS and Windows (final hashes compared) and 40 hours of bot play on fresh valleys with every body checked every tick.
+- **The simulation's interfaces:**
+  - One plain-data state tree, with entities, save-states and restore.
+  - Declared system phases, and one motor shared by every body.
+  - Timed commands, and an event registry with causes.
+  - Recordings that are checked and seekable, and that reproduce a failed tick.
+  - One world query and one body shape for sight, shots and the rangefinder.
+  - Entities with solid shapes, and the environment (sun, wind, air, light).
+  - Sites, scenes with rules that decide the outcome, and the perception boundary for guard brains.
+- **Presentation and feel:**
+  - Sound in the game, timed against the picture.
+  - Footsteps at the moment the stride runs out, and a head bob that dips on them.
+  - An action map and player settings, and a debug channel for systems.
+  - Foliage seen from inside, guards hidden when the camera is in them, and the player's own body drawn when the camera is outside it.
+- **The playtest loop:** every run is kept as it goes, in `playtests/` in development and in the browser when deployed. `npm run playtest` re-simulates and summarizes runs, and a replay viewer scrubs through any recording from any camera.
+- **Behaviour changes:** `SIM_VERSION` 6 and `GEN_VERSION` 3, each change logged in `decisions.md`. A 20-minute bot run now takes 1.4 s headless, about 40 µs a tick (8 µs at the gate). The guards now move with the full motor, and events, solids and the environment are new. It still runs at more than 800× real time.
