@@ -493,7 +493,7 @@ export class Game {
         this.startBench();
       } else if (this.trial) {
         // Trial mode: the lab behind the overlay while the sitting is prepared.
-        this.overlay.setStartTitle('Trial mode · the perception lab');
+        this.overlay.setStartTitle(`Trial mode · the ${this.opts.trials?.startsWith(MOVEMENT_SITTING) ? 'movement' : 'perception'} lab`);
         this.overlay.show('loading');
         this.trial.prepare();
       } else {
