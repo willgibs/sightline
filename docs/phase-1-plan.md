@@ -642,7 +642,16 @@ Playable at `?scene=movement-lab`; the movement course stays as a regression tes
 - [x] C8 · Noise and visibility trials, with A's trial mode.
   - Landed: `?trials=<seed>&lab=movement`, 5 warm-ups and 30 scored, 15 noise and 15 visibility, scored by lab A's protocol (`game/movementTrials.ts`, `scenes/noiseScenario.ts`). The factors reported are the surface, the gait, the distance, the masking, the light and the skyline. The owner's two sittings are the exit test, below.
 - [ ] C9 · Feel: whether 30 Hz interpolation is responsive enough, and whether moving feels deliberate. Since every rate is per second, a blind comparison of 30 and 60 Hz is possible in the owner's sitting.
+  - Built: `?hz=<n>` and `?hz=blind`; the debug view says which rate it picked. The judgement is the owner's.
 - [ ] Exit test, the bench numbers, a note, a playable link.
+  - The bench against the seed, as it stands (Nov 8):
+    - Zero broken promises over 44 hours of fuzz (20 valleys, the lab and the course, both bots), every pose of every mode checked every tick, and the save, restore and re-step synctest over the new modes.
+    - Lean: 0 of 2,000 lines from the eye to a guard's head differ by direction; the seed's camera-only lean, 19.
+    - Mantle: 0 ticks inside someone walking across the landing; the seed's once-checked path, 15.
+    - Prone: 0 poses inside a wall turning between walls a metre apart, against 259 for the seed. Under the fuzzing bot the drawn shape is short of its target (see above): 398 of 16,869 lying poses over 2 cm, against 3,258.
+    - Surface tags: 0 cells whose tag differs from their drawn material.
+    - Trial accuracy by factor comes from the owner's two sittings.
+  - Playable at `?scene=movement-lab`, and a sitting at `?trials=<seed>&lab=movement`.
 
 ### D · Camp generator
 
