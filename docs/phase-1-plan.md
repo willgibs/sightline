@@ -540,7 +540,7 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
   - The decision-sensitivity check, and the miss breakdown in the playtest summary.
   - A kill cam, if any, is only a slowed replay of the recording.
 - [ ] Taste call 3, the exit test, the bench numbers, a note, a playable link.
-  - **Ready for the owner's sitting** (Nov 8): B1–B10 landed. Open the range at `?scene=shooting-range` (the preview deploy, then production once landed), about 10 minutes and 15 rounds. What to try:
+  - **Ready for the owner's sitting** (Nov 8): B1–B10 landed (willgibs/sightline#1). Open the range at https://sightline-brown.vercel.app/?scene=shooting-range, about 10 minutes and 15 rounds. What to try:
     - Go prone (Z) on the mound: REST lights up in the scope. Hold the breath with Shift while scoped and press between heartbeats.
     - Range a walker with the binoculars (F, then click), then dial the zero (↑ ↓) to the nearest 100 m and hold the rest, or keep 100 m and hold over with the dope card.
     - Read the wind from the flags (from the west, a full crosswind) and hold into it; lead a walker about 1.8 mil at 300 m.

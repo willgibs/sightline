@@ -7,6 +7,7 @@ import {
   flightAt,
   fly,
   flyThrown,
+  thrownAt,
   landingRadius,
   freshRifle,
   launch,
@@ -69,6 +70,9 @@ export function arm(p: PlayerEntity, tuning: Tuning): void {
 const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
 const eye = vec3();
 const sight = vec3();
+/** The debug view's drawing of a stone's arc: one line a step, for as long as a throw can last. */
+const ARC_STEP = 0.05;
+const ARC_STEPS = 64;
 const aim = vec3();
 const sway: SwaySample = { up: 0, right: 0, raise: 0 };
 const strike = emptyStrike();
@@ -236,7 +240,27 @@ const thrownSystem: System = {
   emits: ['clatter'],
   run(ctx) {
     const now = ctx.tick / ctx.tuning.sim.tickHz;
-    for (const e of ctx.index.of('thrown')) if (!e.thrown.rest) flyThrownOn(ctx, e, now);
+    for (const e of ctx.index.of('thrown')) {
+      if (e.thrown.rest) continue;
+      flyThrownOn(ctx, e, now);
+      // The debug view: the arc it is on, from its last touch to where it next meets the ground.
+      ctx.debug((draw) => {
+        if (e.thrown.rest) return;
+        const g = ctx.tuning.sim.gravity;
+        thrownAt(e.thrown, g, e.thrown.t, eye);
+        for (let k = 1; k <= ARC_STEPS; k++) {
+          thrownAt(e.thrown, g, e.thrown.t + k * ARC_STEP, sight);
+          draw.line(eye.x, eye.y, eye.z, sight.x, sight.y, sight.z, 'info');
+          if (sight.y <= ctx.world.terrain.heightAt(sight.x, sight.z)) {
+            draw.point(sight.x, sight.y, sight.z, 0.12, 'warn');
+            break;
+          }
+          eye.x = sight.x;
+          eye.y = sight.y;
+          eye.z = sight.z;
+        }
+      });
+    }
   },
 };
 

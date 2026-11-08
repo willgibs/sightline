@@ -11,7 +11,10 @@ import { emptyShape } from '../src/sim/kernel/world/shape';
 import { player } from '../src/sim/game/entities';
 import { placePlayer } from '../src/sim/game/setup';
 import { arm } from '../src/sim/game/shooting';
+import { SCENES } from '../src/sim/game/scenes';
 import { Simulation } from '../src/sim/game/sim';
+import { sceneOver, sceneTicks, startScene } from '../src/sim/kernel/scene';
+import { SyncTest, describeSyncFailure } from '../src/sim/kernel/synctest';
 
 /**
  * The rifle's rules in a tick (game/shooting.ts): rounds, the bolt, the dial, the
@@ -166,6 +169,29 @@ describe('the throwable', () => {
     expect(first.radius).toBeLessThan(45);
   });
 
+  it('shows its arc in the debug view, to where it next meets the ground, and drawing changes nothing', () => {
+    const pitch = (20 * Math.PI) / 180;
+    const run = (draw: boolean): { hash: string; lines: number; arcEnd: number; points: number } => {
+      const sim = range();
+      arm(player(sim.index), T);
+      sim.drawDebug = draw;
+      step(sim, neutralInput(0, pitch), [{ kind: 'throw', lag: 0, yaw: 0, pitch }]);
+      for (let i = 0; i < 6; i++) step(sim, neutralInput(0, pitch));
+      const shapes = sim.debugCanvas.shapes;
+      const lines = shapes.filter((s) => s.kind === 'line');
+      const last = lines[lines.length - 1];
+      return { hash: sim.hash(), lines: lines.length, arcEnd: last && last.kind === 'line' ? last.by : NaN, points: shapes.filter((s) => s.kind === 'point').length };
+    };
+    const shown = run(true);
+    const quiet = run(false);
+    expect(shown.hash).toBe(quiet.hash);
+    expect(quiet.lines).toBe(0);
+    // The arc runs on to the flat ground and marks where it meets it.
+    expect(shown.lines).toBeGreaterThan(5);
+    expect(shown.arcEnd).toBeLessThanOrEqual(0);
+    expect(shown.points).toBeGreaterThanOrEqual(1);
+  });
+
   it('is only thrown while one is left', () => {
     const sim = range();
     arm(player(sim.index), T);
@@ -177,5 +203,35 @@ describe('the throwable', () => {
     };
     throws(3);
     expect(sim.index.of('thrown')).toHaveLength(1);
+  });
+});
+
+describe('the range, saved and put back', () => {
+  it('continues bit for bit with bullets in the air and a stone in flight', () => {
+    const scene = SCENES['shooting-range']!();
+    const world = scene.world(T);
+    const sim = startScene(scene, T, world);
+    const shadow = startScene(scene, T, world);
+    // Every 5 ticks: a bullet takes 12 to reach 300 m and a stone far more, so saves fall inside every flight.
+    const every = 5;
+    const sync = new SyncTest(sim, shadow, every);
+    const driver = scene.driver!();
+    const still = scene.game.still(sim);
+    const ticks = sceneTicks(scene, T);
+    let bulletsSaved = 0;
+    let stonesSaved = 0;
+    while (!sceneOver(scene, sim, ticks) && !sync.report.failure) {
+      if (sim.tick % every === 0) {
+        bulletsSaved += sim.index.of('bullet').length;
+        stonesSaved += sim.index.of('thrown').filter((o) => !o.thrown.rest).length;
+      }
+      sync.beforeTick();
+      sim.step(driver.next(sim, still));
+      sync.afterTick();
+    }
+    expect(sync.report.failure ? describeSyncFailure(sync.report.failure) : null).toBeNull();
+    expect(sync.report.saves).toBeGreaterThan(50);
+    expect(bulletsSaved).toBeGreaterThan(5);
+    expect(stonesSaved).toBeGreaterThan(2);
   });
 });

@@ -21,6 +21,9 @@ Built on its branch as `docs/phase-1-plan.md`, section B, plans it. Its seed, th
 - Resolving the shot against history is the single-player form of lag compensation; the bodies already keep the two poses it needs.
 - Giving the valley a rifle now would move every valley golden's state for a feature no bot uses, while labs A and D land beside this one. A loadout given by the setup keeps the valley still until Phase 2 joins the labs on purpose.
 - Sway that changes every tick can't be re-evaluated exactly between ticks unless both sides read the same samples; two ticks of history is what the pose already does, so the shot and the drawn reticle agree by construction.
+- **The binoculars' wind readout is arcade's only.** The plan's B6 lists a wind readout with the rangefinder; the design doc has the wind read "from flags, grass and smoke, or from the rangefinder on easier settings". So realistic-lite reads the flags, and arcade's readout gives the wind beside the hold. If the owner wants the readout on realistic-lite too, it is one condition in `app/scope.ts`.
+- **Bullets and stones survive a save and a restore.** A synctest over the whole range run, saving every 5 ticks, puts saves inside every flight (`tests/shooting.test.ts`): a bullet in the state is only its launch, so nothing else needs keeping.
+- **A thrown stone explains itself** (rule 8): the debug view draws the arc it is on, from its last touch to where it next meets the ground, and every touch's `clatter` is already a sound ring at its radius.
 ## 2026-11-08 · Public
 
 ### The repository is public, under MIT
