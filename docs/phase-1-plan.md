@@ -362,6 +362,27 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - a crack-bias scenario;
   - trial accuracy above the rules-only predictor.
 
+**Recorded before building (Nov 8), so the exit note can be read against it:**
+- **The seed, as the bench runs it.** The perception bench keeps the seed as a model of its own (`seedSight`): Blacklist's nested zones (core 60°, periphery 120°, each with a hard range), time linear in distance inside a zone, and the design doc's table applied as one product of rates, with no caps. Both models are swept over the same factor grid.
+- **Where the seed falls short, in the bench's terms:**
+  - **Fixed points.** It can't meet the design's ranges together. Rates alone make any exposure inside a zone complete given time, so a still, prone player in cover is still found at 140 m, against a target of never beyond 50 m.
+  - **Edges.** A zone's edge is a cliff: time to detection jumps from its slowest to never within a centimetre.
+  - **Telegraph.** Nothing bounds the time from the first cue to 100%: at a metre's range it is under half a second.
+  - **Foliage.** It has none: a canopy hides a guard from you but not you from him.
+  - **The crack.** It has no model: a crack is heard from the shooter.
+- **The target, in the bench's metrics:**
+  - **The design's ranges in daylight:**
+    - a standing, walking player in the open is spotted out to 150 m, ±10 m;
+    - a still, prone player in cover is never spotted beyond 50 m;
+    - crouched in shade at 30 m, spotted in 3–6 s;
+    - a marksman's narrow cone reaches 400 m, ±20 m.
+  - **Monotone:** no step up in exposure, anywhere on the grid, detects more slowly.
+  - **Telegraphed:** outside a 2.5 m contact zone, at least 1.5 s from the first cue (30%) to 100%, in every combination.
+  - **No cliffs:** every edge, of range and of cone, ramps over at least 2 m or 4°.
+  - **Symmetric, bit for bit:** foliage between a guard and the player, both ways; a sound's clarity in the player's speakers and for a guard at the player's cell.
+  - **The crack:** a listener 5–20 m from a supersonic path hears it from 55–62° off the shooter's bearing.
+  - **Readable:** the owner beats the rules-only predictor on borderline trials (A12).
+
 **Milestones:**
 - [ ] A1 · The lab scene.
   - It holds a sentry, a patrol, a marksman post, cover, shade, a skyline ridge, gravel and grass, and a generator.
