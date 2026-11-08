@@ -62,6 +62,8 @@ export class PlayerMesh {
     const inside = dx * dx + dz * dz < (this.spec.radius + 0.12) ** 2 && eye.y > p.y - 0.12 && eye.y < p.y + p.eyeHeight + s.head.r + 0.12;
     this.group.visible = !inside;
     if (inside) return;
+    // Lit or in shade as the simulation finds the ground beneath (A4).
+    this.material.uniforms.uSunlit!.value = curr.light >= 1 ? 1 : 0;
     this.head.position.set(s.head.x, s.head.y, s.head.z);
     this.head.scale.setScalar(s.head.r);
     this.torso.set(s.torso);

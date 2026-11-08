@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { PLAYTEST_NAME } from '../src/headless/playtestInbox';
 import { FrameHistogram } from '../src/app/perf';
@@ -40,6 +40,29 @@ function run(seconds: number): { sim: Simulation; recorder: Recorder; play(secon
 const context = { build: 'test', machine: () => ({ gpu: 'none' }), settings: () => ({ volume: 1 }) };
 
 describe('playtest capture', () => {
+  it('keeps two runs begun in the same second under different names', async () => {
+    vi.useFakeTimers({ now: new Date('2026-11-08T10:00:00Z'), toFake: ['Date'] });
+    try {
+      const store = new MemoryStore();
+      const capture = new PlaytestCapture(store, context);
+      capture.minSeconds = 0;
+      const names: string[] = [];
+      for (let k = 0; k < 3; k++) {
+        const r = run(0);
+        capture.startRun(r.sim, r.recorder, 'TEST-0000', 'sight');
+        r.play(0.1, capture);
+        capture.save('new run');
+        await capture.settled();
+        names.push(store.saved.at(-1)!.name);
+      }
+      expect(new Set(names).size).toBe(3);
+      expect(names[0]).toMatch(/^\d{8}-\d{6}-scene-sight$/);
+      expect(names[2]).toMatch(/-scene-sight-3$/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps a run every minute of play, with a recording that replays it and a report', async () => {
     const store = new MemoryStore();
     const capture = new PlaytestCapture(store, context);

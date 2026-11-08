@@ -55,6 +55,8 @@ export class Hud {
       [['flyCamera'], 'fly camera'],
       [['slower', 'faster'], 'time scale'],
       [['restart'], 'restart run'],
+      [['dropNoise'], 'drop a noise'],
+      [['dropBody'], 'drop a body'],
       [['shotDrop'], 'drop a shot'],
       [['mark'], 'mark moment'],
     ];

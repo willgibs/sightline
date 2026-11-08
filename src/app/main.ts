@@ -1,6 +1,6 @@
 import { defaultTuning, type Tuning } from '../config/tuning';
 import { knownAnswerProblems } from '../sim/kernel/core/known';
-import { normalizeSeed } from '../sim/kernel/core/seed';
+import { normalizeSeed, randomSeed } from '../sim/kernel/core/seed';
 import type { SpawnKind } from '../sim/kernel/mission';
 import { Game } from './game';
 import { SCENES } from '../sim/game/scenes';
@@ -11,6 +11,7 @@ import './styles.css';
  *   ?seed=TAL-4471   which valley to generate
  *   ?scene=movement-course   play a scene instead (sim/game/scenes/index.ts)
  *   &params=...              with these parameters (a scenario: game/scenes/sightScenario.ts)
+ *   ?trials=<seed>           a sitting of trial mode, the perception lab's exit test (A12); any seed, or none for a fresh one (&fresh forgets a sitting kept in this browser)
  *   ?view=debug      start in the debug view
  *   ?spawn=edge      start where the road leaves the map instead of on an overlook
  *   ?bench           run the 20-second performance flythrough and report
@@ -70,8 +71,11 @@ try {
     bench: params.has('bench'),
     pixelRatio: dprParam > 0 ? Math.min(3, Math.max(0.5, dprParam)) : Math.min(window.devicePixelRatio || 1, 1.5),
     pixelRatioFollowsScreen: !(dprParam > 0),
-    sceneName,
-    scene: sceneName ? SCENES[sceneName]?.(params.get('params') ?? undefined) : null,
+    // Trial mode (A12) plays in the perception lab.
+    sceneName: params.has('trials') ? 'perception-lab' : sceneName,
+    scene: params.has('trials') ? SCENES['perception-lab']!() : sceneName ? SCENES[sceneName]?.(params.get('params') ?? undefined) : null,
+    trials: params.has('trials') ? normalizeSeed(params.get('trials') || randomSeed()) : null,
+    trialsFresh: params.has('fresh'),
     replayUrl: params.get('replay'),
   });
 } catch (e) {

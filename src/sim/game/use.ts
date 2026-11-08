@@ -67,7 +67,7 @@ function hides(ctx: TickContext, x: number, z: number): boolean {
 export const useSystem: System = {
   name: 'use',
   phase: 'commands',
-  after: ['rifle'],
+  after: ['rifle', 'sandbox-drops'],
   reads: ['input', 'player.body', 'player.control', 'remains.remains', 'solid.solid'],
   writes: ['player.control', 'remains.remains'],
   emits: [],

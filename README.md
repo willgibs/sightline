@@ -83,7 +83,7 @@ In the debug view only:
 | --- | --- |
 | B | Show every collider: purple blocks everything, blue blocks movement, green blocks sight |
 | O | Show overwatch perches and their sightlines to the camp |
-| L | Show the spatial grid |
+| U | Show the spatial grid |
 | N | Fly camera (Space or E up, Q down, Shift fast) |
 | [ and ] | Slow down or speed up time (0.25× to 8×) |
 | R | Restart the run |

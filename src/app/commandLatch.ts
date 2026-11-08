@@ -24,8 +24,8 @@ export interface FrameShown {
 }
 
 interface Latched {
-  /** The timed commands: firing, ranging and throwing all happen along the frame's line of sight. */
-  kind: 'fire' | 'range' | 'throw' | 'shotDrop';
+  /** The timed commands, all about the frame on screen: firing, ranging and throwing along its line of sight, and the sandbox's dropped noise, body and shot. */
+  kind: 'fire' | 'noise' | 'bodyDrop' | 'range' | 'throw' | 'shotDrop';
   frame: FrameShown;
 }
 

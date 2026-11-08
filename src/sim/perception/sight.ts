@@ -290,6 +290,36 @@ export function exposure(at: QueryView, env: EnvSpec, t: number, tuning: Tuning,
   return exposureRate(out, eye.far, eye.sharp, minClear(target, tuning), tuning);
 }
 
+/** Whether a point is inside the gaze: within `halfDeg` of where the eye looks. */
+export function inGaze(eye: Observer, x: number, y: number, z: number, halfDeg: number): boolean {
+  const dx = x - eye.x;
+  const dy = y - eye.y;
+  const dz = z - eye.z;
+  const cp = dcos(eye.pitch);
+  const fx = -dsin(eye.yaw) * cp;
+  const fy = dsin(eye.pitch);
+  const fz = -dcos(eye.yaw) * cp;
+  const cx = fy * dz - fz * dy;
+  const cy = fz * dx - fx * dz;
+  const cz = fx * dy - fy * dx;
+  return (datan2(Math.sqrt(cx * cx + cy * cy + cz * cz), fx * dx + fy * dy + fz * dz) * 180) / Math.PI <= halfDeg;
+}
+
+/**
+ * Whether the line from the eye to a point is open: nothing solid on it, up to `stop`
+ * metres short of the point (so whoever is at the point doesn't block it), and the
+ * foliage on the way letting through at least `through`.
+ */
+export function lineOpen(at: QueryView, eye: Observer, x: number, y: number, z: number, stop: number, through: number): boolean {
+  const dx = x - eye.x;
+  const dy = y - eye.y;
+  const dz = z - eye.z;
+  const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (len <= stop) return true;
+  raycast(at, eye.x, eye.y, eye.z, dx / len, dy / len, dz / len, len - stop, Blocks.Sight, hit, eye.id);
+  return hit.dist >= len - stop - 1e-6 && foliageOf(at.world).transmittance(eye.x, eye.y, eye.z, x, y, z) >= through;
+}
+
 /**
  * The rate law alone: from what exposure measured (distance, angle, stance, light,
  * movement, and each ray's clearance, foliage and sky, in `x`), the zone, the range and

@@ -102,6 +102,95 @@ Built on the `lab-c-movement` branch to `docs/phase-1-plan.md`, section C. Lean 
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
 
+### The other stimuli: lab B's sounds, the crack, bodies and lens glint (A9)
+
+**Decision:**
+- **Lab B's sounds, by what they are** (`perception/stimuli.ts`): a report, an impact and a bolt are shots, raising a guard to searching, with his attention on where he heard it (a deliberate miss draws his eye to the strike, as the design says). A cry is a voice at the same level, one his own side doesn't ignore. A stone's clatter stays a plain sound, by its clarity: it's a distraction, so he looks and doesn't search, and it never sends the camp hunting.
+- **The crack comes from the bullet's path** (`game/perception.ts`, `deliverCrack`, with lab B's `crackAt`): each guard within 160 m of the path hears a shot from where the shock left it, when it reaches him, ahead of the report from the muzzle. So a suppressed shot's crack searches the path's side of the valley, not the shooter's. The path ends where the bullet meets the terrain or a wall (`flightEnd`, for the guards and the speakers alike), and a listener beyond that end hears no crack at all (found by the review: a bullet stopped by a wall cracked at guards past it, from under the ground).
+- **A new event, `spotted` (code 16), for what a guard catches sight of that isn't a person** (`perception-spotting`, in 'perception' after sight and hearing):
+  - A body is seen by the same law as a body lying still (`exposure`: its zones, caps, rays and foliage), and is news once per guard. One falling in plain view is seen falling, since it stands for the first moments of its collapse. It raises him to searching (the strongest stimulus), with a shouted "Man down! Man down!" that raises whoever hears it. He keeps it in mind for 2 minutes, and lab E can read it from his percepts.
+  - A flash from a lens (lab B's `glint`, with the mirror's condition against the sun) is seen by a guard looking that way, in his core cone or a marksman's far one, up to 600 m with a clear line, when its glint is at least half. It's news when it starts, and raises him to suspicious.
+- **The sandbox can drop a body** (`bodyDrop`, command 11; L in the debug view; `sightline.dropBody()`), already down, for a guard to find, as the design doc's sandbox line asks. The noise drop moved from X to K, because throw took X.
+
+**Why:** the design's "What gives you away" list, each by the law that already applies, so a player who has learned sight and hearing has learned these too.
+
+**What moved:** the perception lab's and the crowd's `state` fingerprints (`a568f302cd499718`, `869e55ebeb231e6b`), for the new fields of a guard's senses; their behaviour didn't move, since no body or rifle is in those scenes. The tuning gains the levels, so the golden recording is rewritten. Open doors (D4) wait for lab D's code on `main`.
+
+### Trial mode: the exit test, built into the lab (A12)
+
+**Decision:**
+- **A sitting** (`?trials=<seed>`, `sim/game/trials.ts`, `app/trials.ts`) is the plan's protocol: 5 warm-ups whose outcome is shown, then 30 scored trials, none shown until the end. Each trial is a sight scenario: you, a guard who reacts as he would, 8 s, and a brief of what you'll do ("You crouch-walk behind the low wall, 60 m from a sentry"). It freezes at the start or at the first cue (his meter at 30%, plus 0.3 s for his head to start turning) and asks Y or N: will he see you? Every trial is a run of its own, recorded with the answer as an annotation; the results screen scores the sitting and saves it as a file.
+- **The key is the simulation's.** Each candidate is run: seen or not, when, its first cue. It is **borderline** when one step of one factor toward the other outcome flips it, and every factor that does is recorded, for item analysis by factor (counting only the first, in a fixed order, credited stance with 41% of the flips and the skyline with 0.3%; counting every flip, the skyline flips 3 of the 30 borderline trials in the bench's two sittings, and stance 18).
+- **The borderline trials are split by the sight table.** The research's rules-only baseline (the table applied to distance, stance and light, with no cues) proved strong: on sittings drawn without the split it scored 71% balanced on average and up to 86%, and 67% of the borderline trials. So each borderline cell holds as many trials the table gets right as wrong, and the table alone gets 7 of 15; the bar of 21 of 30 then can't be met by knowing the table, only by reading movement, cover, the skyline and the cues. The comparison with the baseline is on the borderline trials (docs/research/foundations.md): 3 more right of the 30 than the table alone.
+- **The trials are spread over the factors**, as the research advises for "before the first sitting". Each cell gathers three times the candidates it needs, and the sitting takes those that add the most new pairs of factor levels, a greedy pairwise covering array over the guard, his gaze, the distance, the stance, the movement and the spot (light, cover and skyline are one draw), with the outcome and the kind of trial among the levels, so a surface feature, shade for instance, doesn't come to mean one or the other. The bench's first sitting covers 192 pairs against 165 taken first come. The warm-ups show all four combinations of seen or not and frozen at the start or at the cue.
+- **The freeze doesn't tell (found by a review of this pull request).** Every seen trial reaches the first cue and most not-seen ones don't, so freezes taken where a cue existed made "frozen at the first sign" mean yes (77% seen) and "frozen at the start" mean no (30%), and a reader going by that alone scored 73%. Now each not-seen cell gathers trials that reach the cue, and each freeze kind holds the same share of seen and not seen (8 of 15, within clear and borderline, 53% either way), so the freeze alone scores 50%. The two kinds are also scored apart, as the research asks, since only the first-cue ones test reading the cues. The first cue's time still says a lot: a meter that reaches 30% early reaches 100% in time. A reader of that alone, with the table on start-frozen trials, scores 73% and fails the verdict; whether reading it counts is the owner's call, and is asked in the morning note.
+- **The probe:** a trial frozen at its first cue then asks what told you (the mark, his head, his voice, the situation alone; Space skips). One tap, and it never gates. The results say how often each was named and how often that answer was right, and how often a cue was named that the simulation says couldn't be read.
+- **Nothing is lost to a reload (found by the review).** Answers live in this browser's storage as they're given, and a reload picks up at the next question (`&fresh` starts over); the page asks before leaving an unfinished or unsaved sitting, in deployed builds; the sitting's file can be saved repeatedly; Y and N are ignored for 250 ms after a question appears (a double-tap) and with Ctrl, ⌘ or Alt held.
+- **Scoring survives later builds (the review).** Each answer's annotation carries its key, so `npm run playtest` scores a sitting whose recordings this build can no longer re-simulate, or a sitting file whose tuning it can't use, and says what it couldn't check; a recording that contradicts its key is still a failure. The latest two sittings are by when they were played, not by name, and runs begun in the same second keep their own names.
+- **The review:** on the results, R plays back the trials answered wrong, each with what happened and which single steps would have changed it. It's the research's cued retrospection, on a deterministic replay of the trial itself; nothing played in it is kept.
+- **The verdict** (`verdict`) is the plan's four conditions over two sittings. The bench measures it against readers of known skill, 4,000 pairs of sittings each, beside the plan's first rule (48 of 60 right): a reader right on every clear trial who guesses the borderline ones passes 2.0% of the time (the first rule: 17.4%, the research's 18%); a reader right 80% of the time passes 50.9% (58.6%, the research's 57%); one right 90% of the time, 99.0% (99.5%).
+- **`npm run playtest` scores sittings** from the answers their trials' recordings hold, generating each sitting again from its seed with the recording's own tuning and checking every recording against its trial; and from sitting files (`sitting-<seed>.json`, which carry their tuning), the record of a sitting played on a deployed build, which keeps only its last few runs. With two complete sittings it gives the verdict. In trial mode every trial's run is kept, however short.
+- **The agents' pre-screen** (`npm run trials -- <seed> --shots`): every trial's freeze frame as the honest view draws it, with a manifest of what the simulation recorded there (whether the indicator shows, where the guard's eyes are drawn, whether his head can be read: at least 2 pixels, nothing solid between, foliage letting through 15%). The first pre-screen, of sitting PRESCREEN-1, passed its perception check (the guard where the manifest puts him, and the indicator wherever it says, in the frames checked) and found two things:
+  - **The first cue's mark was invisible on a pale sky:** a cream arc at 40% opacity, luma 208 on a sky of 198–206. It now has a dark keyline and starts at 75% opacity (`app/cues.ts`).
+  - **The bush hid less than the record said.** From inside a bush the view draws the guard with 18% of his contrast, as the simulation's transmittance there (0.17–0.21) says, and he plainly reads; the record's threshold was 50%. It is now 15%.
+  Its findings change no trial: a trial is only ever dropped where the simulation shows a cue missing, and the generator already does that.
+
+**Why:** the exit test is the owner's, and it should measure readability, not knowledge of the table; a test of a test (the readers) is cheap here because the simulation is the key.
+
+**What moved:** the perception bench gains the trial metrics. No golden: trial mode runs only in its scenarios.
+
+### The budget: sixteen guards perceiving (A11)
+
+**Decision:**
+- **The perception crowd** (`perception-crowd`): the lab with sixteen guards perceiving (the camp's most: eight sentries, seven on patrol and the tower, two marksmen, a worker), pinned in the perception bench, so its work is a budget: 34 rays a tick for sight and, over the 90 s walk in, 371,207 grid nodes for hearing.
+- **Measured:**
+  - in Node, per tick: median 0.14 ms, 99th percentile 1.9 ms, worst 5.5–7.8 ms (a burst of barks);
+  - with `npm run scene -- perception-crowd --profile`: sight 107 µs, awareness and hearing 35 µs, the motor 37 µs;
+  - in headless Chromium: 131 µs a tick, from `tests/browser/budget.test.ts`, which CI also runs in Firefox and WebKit;
+  - against a 33 ms tick, and about 10 ms of a 60 Hz frame's own work.
+- **One fast path, because it was needed:** a sound's flood goes no farther than 25 m along its path (`hearing.floodReach`). Beyond it a sound arrives by the straight line alone, which in the open is the same answer, and through walls loses 12 dB each. A shout's whole 60 m flood took 12 ms, and two in a tick 24 ms; now about 2 ms.
+- **Fast paths already there:** a distant guard skips perception, because a body beyond every zone's farthest possible reach costs no rays. The world's steady sounds are flooded once, at the scene's setup, outside any tick.
+- **Not needed:** a still body skipping the motor (lab C's), since the motor costs 37 µs for 17 bodies.
+
+**Why:** rule 18's budgets are counts, pinned; time is a trend, reported.
+
+**What moved:** the perception crowd joins the pinned runs (`e106e06750770ec4`, state `21e67f0f78200c87`), which moves `BEHAVIOUR`. Nothing else.
+
+### Sandbox drops and the time scale (A10), and where other stimuli plug in (A9)
+
+**Decision:**
+- **A noise drop is a command** (`noise`, code 10): pressing K in the debug view (X until lab B's throw took it) drops a noise where the view points, carrying the moment and the view of the frame on screen like a shot, so it lands where the aim was at any frame rate. The `sandbox-drops` system (the game's, in 'commands', after the player's own commands) casts along that view from the eye at that moment and makes a 30 m noise where the line lands, heard by the law of sound. It is input the bots never give, so it joins `SYSTEMS` without moving a golden, and a recording replays it.
+- **Automation:** `sightline.noise()` drops one; `sightline.timeScale(x)` sets the debug view's fast-forward (0.25× to 8×).
+- **A9's wiring point** (`perception/stimuli.ts`, `HEARD_AS`): what each sound event is heard as, which sets what it raises a guard to. Lab B's report, impact and bolt become shots and its cry a voice when they land; a body, a comrade dropping, a thrown object, lens glint and an open door come in through `stimulate` at their levels when B4, B6, B9 and D4 are on `main`.
+
+**What moved:** nothing. `SYSTEMS` gains `sandbox-drops`, after lab B's `rifle` in 'commands' (it reads the bodies the rifle may change); the spawn-tick scene's system in 'commands' declares its order after both (the same order as before).
+
+### Cues in the honest view, and the fairness checks (A8)
+
+**Decision:**
+- **On the guard:** his head and body turn toward what caught his attention (A7's reactions), and his rifle comes up with his awareness: slung while unaware or curious, at the ready while suspicious or searching, shouldered at his eye in combat. The snapshot carries his rung of the ladder; at 300 m through a scope, the rifle carries it.
+- **Barks** (`perception/barks.ts`): a line on each rise of the ladder and on settling, from specific to generic (Blacklist): the line that fits why he changed ("Footsteps. Close.", "Something moved out there."), unless he said it within 8 s, then his state's generic one ("Who's there?"). Each is a voice, heard by the law of sound (22 m, a shout 60 m), and raises the guards who hear it to its line's level: "Contact! There!" brings others to suspicious. Lines are only added at the end: a recording stores a line by its index. The speakers play a murmur of syllables until voiced lines (Phase 3).
+- **The detection indicator at the screen's edge** (`app/cues.ts`): for every guard at the cue (30%) or above, a mark on an ellipse just inside the screen's edge, toward him, wider, thicker and warmer as his meter fills and his awareness rises, solid red at 100%. Nothing below the cue.
+- **Captions:** a guard's words, only when they reach your ears by the law of sound, with an arrow toward where they came from.
+- **Explained afterwards:** `describe` and `explainChain` (`perception/explain.ts`) say each event of a chain in words with the numbers that decided it; the debug panel's perception section shows each guard's state, meter and belief and the last change of awareness explained back to what caused it; `sightline.explain(id)` and `sightline.perception()` for scripts.
+- **The fairness checks** (`tests/fairness.test.ts`), over the lab's own run and a seeded zig-zag through it: every detection's cause is its first cue, at least 1.5 s before outside contact; every change of awareness is caused by a percept of the same guard ('noticed', 'detected' or 'heard'), or is a calm stand-down; every 'heard' by a sound; every bark by an alert; every detection reads back, in words, to its first cue.
+
+**Why:** the design doc's three telegraphs (a head turn, a bark, the meter at your screen's edge) and its rule that every detection can be explained afterwards. Barks run specific to generic so the player learns the cause without hearing a memorable line twice.
+
+**What moved:** the perception lab's fingerprints (`da54eed00707a631`, state `f9afc16fbdc72c64`): at tick 353 a guard's bark reaches another, who hears it and rises (`npm run explain`). Its sight bench rays 25,723 → 26,033, and awareness floods 60,480 grid nodes. Nothing in the valley, so no version moves: until A13 perception runs only in the lab's scenes, which recordings name.
+
+### Shade and foliage, drawn as simulated (A4)
+
+**Decision:**
+- **The ground's shade is the simulation's.** A world that draws its shade names an area (`world.shadeArea`; the lab's camp, field and ridge at 0.5 m). The renderer fills a map of `groundLight` at each texel's centre (`perception/light.ts`, `shadeMap`, 0.7 s once per world) and the terrain shader reads it bilinearly, lit at half or more, dropping the direct sun in shade. `drawnLit` is that read on the CPU: at 20,000 points over the area the drawing agrees with the simulation at 19,982 (99.91%), and at 6,000 points within 1.5 m of a shadow at 5,810 (96.8%), where only a texel's reach can differ.
+- **Bodies are lit as the simulation finds them:** the snapshot carries the light beneath each guard and the player (computed where the world draws its shade), and each is drawn in sun or in shade.
+- **Foliage is drawn from the same volumes by the same law:** each bush and canopy, by its back faces, solves its chord along each pixel's line of sight and draws opacity 1 − exp(−density × chord). Lying in a bush you see out through as much bush as a guard sees in through. A body standing inside foliage is drawn undimmed (the drawing doesn't know what is in front of the back face), the one place it understates.
+- **Fog grows with distance from the eye**, in our shaders and in three.js's own chunk: a guard's contrast against the haze no longer changes as you turn.
+
+**Why:** shade multiplies detection by 0.6 and nothing drew it (the plan's gotcha); a light gem would tell the player what the world should show. A GPU shadow map would agree only up to its bias and resolution; drawing the simulation's own answer agrees by construction, up to a texel.
+
+**What moved:** nothing simulated. The snapshot gains three fields per guard (light, meter, awareness, the last two for A8) and the player's light. The lab's world gains its shade area, so its fingerprint moved (recordings of the lab from before refuse, by design).
+
 ### The awareness ladder and its minimal reactions (A7)
 
 **Decision:**

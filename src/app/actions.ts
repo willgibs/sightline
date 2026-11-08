@@ -42,6 +42,8 @@ export type Action =
   | 'slower'
   | 'faster'
   | 'restart'
+  | 'dropNoise'
+  | 'dropBody'
   | 'shotDrop'
   // The fly camera.
   | 'flyUp'
@@ -96,11 +98,13 @@ export const DEFAULT_ACTIONS: Readonly<Record<Action, ActionSpec>> = {
   debugView: { context: 'always', kind: 'pressed', inputs: ['F3', 'Backquote'], label: 'debug view' },
   colliders: { context: 'debug', kind: 'pressed', inputs: ['KeyB'], label: 'colliders' },
   overwatch: { context: 'debug', kind: 'pressed', inputs: ['KeyO'], label: 'overwatch' },
-  grid: { context: 'debug', kind: 'pressed', inputs: ['KeyL'], label: 'grid' },
+  grid: { context: 'debug', kind: 'pressed', inputs: ['KeyU'], label: 'grid' },
   flyCamera: { context: 'debug', kind: 'pressed', inputs: ['KeyN'], label: 'fly camera' },
   slower: { context: 'debug', kind: 'pressed', inputs: ['BracketLeft'], label: 'slower' },
   faster: { context: 'debug', kind: 'pressed', inputs: ['BracketRight'], label: 'faster' },
   restart: { context: 'debug', kind: 'pressed', inputs: ['KeyR'], label: 'restart run' },
+  dropNoise: { context: 'debug', kind: 'pressed', inputs: ['KeyK'], label: 'drop a noise' },
+  dropBody: { context: 'debug', kind: 'pressed', inputs: ['KeyL'], label: 'drop a body' },
   // Sandbox: a shot where you look, rifle or not.
   shotDrop: { context: 'debug', kind: 'pressed', inputs: ['KeyJ'], label: 'drop a shot' },
   flyUp: { context: 'fly', kind: 'held', inputs: ['Space', 'KeyE'], label: 'up' },

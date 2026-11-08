@@ -3,7 +3,7 @@ import type { SimEvent } from './events';
 import type { Game } from './game';
 import type { InputFrame } from './input';
 import { Recorder, type Recording } from './record/recording';
-import type { Simulation } from './sim';
+import type { Profiler, Simulation } from './sim';
 import { withSystem, type System } from './systems';
 import type { World } from './world/world';
 
@@ -109,9 +109,10 @@ export interface SceneRun<S extends Simulation = Simulation> {
   failures: string[];
 }
 
-/** Runs a scene headless with its driver, recording it and checking its expectations. */
-export function runScene<S extends Simulation>(scene: Scene<S>, tuning: Tuning, opts: { build?: string; seconds?: number; world?: World } = {}): SceneRun<S> {
+/** Runs a scene headless with its driver, recording it and checking its expectations. A profiler times each system. */
+export function runScene<S extends Simulation>(scene: Scene<S>, tuning: Tuning, opts: { build?: string; seconds?: number; world?: World; profiler?: Profiler } = {}): SceneRun<S> {
   const sim = startScene(scene, tuning, opts.world);
+  sim.profiler = opts.profiler ?? null;
   const recorder = new Recorder(sim, opts.build ?? '');
   const driver = scene.driver?.();
   const input = scene.game.still(sim);

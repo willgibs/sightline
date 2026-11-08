@@ -2,7 +2,7 @@ import type { Scene as KernelScene } from '../../kernel/scene';
 import type { Simulation } from '../sim';
 import { movementCourse } from './movementCourse';
 import { movementLab } from './movementLab';
-import { perceptionLab } from './perceptionLab';
+import { perceptionCrowd, perceptionLab } from './perceptionLab';
 import { SIGHT_TABLE, sightScenario } from './sightScenario';
 import { shootingRange } from './shootingRange';
 import { spawnTick } from './spawnTick';
@@ -18,6 +18,7 @@ export type Scene = KernelScene<Simulation>;
 export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   'movement-course': movementCourse,
   'movement-lab': movementLab,
+  'perception-crowd': perceptionCrowd,
   'perception-lab': perceptionLab,
   sight: sightScenario,
   'spawn-tick': spawnTick,

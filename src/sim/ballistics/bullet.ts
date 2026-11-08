@@ -100,6 +100,22 @@ export function fly(b: BulletState, until: number, dt: number, world: QueryView,
 
 const NO_BODIES: readonly QueryBody[] = Object.freeze([]);
 
+const flightProbe: BulletState = { shooter: 0, shot: 0, flight: null as unknown as Flight, swept: 0 };
+const flightStrike = emptyStrike();
+
+/**
+ * Where a flight's path ends against the world: the mission time it first meets the
+ * terrain or a collider that stops bullets, or `until` if it doesn't. A crack can't come
+ * from past a wall the bullet never got through (crack.ts: "its strike, or the longest it
+ * flies"). Bodies aren't swept: at the moment of the shot nobody knows where they'll be.
+ */
+export function flightEnd(f: Flight, until: number, dt: number, world: QueryView): number {
+  flightProbe.flight = f;
+  flightProbe.swept = f.t;
+  const struck = fly(flightProbe, until, dt, world, (_, out) => ((out.length = 0), out), flightStrike);
+  return struck ? struck.t : until;
+}
+
 /** One piece of the path, t0 to t1: the first strike along its chord, or false. */
 function sweepPiece(b: BulletState, t0: number, t1: number, still: QueryView, bodiesAt: BodiesAt, out: Strike): boolean {
   const f = b.flight;
