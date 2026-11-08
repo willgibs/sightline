@@ -281,6 +281,12 @@ export const defaultTuning = {
     cooldown: { investigate: 2.5, search: 2 },
     search: { points: 3, radius: 7, growth: 0.35 },
     taskWeight: 0.9, // how strongly he weighs an order against what his own senses tell him
+    // Adaptation within a mission (E9): a ledger of repeated tricks and a memory of incidents.
+    adapt: {
+      cellSize: 8, // metres: stimuli within this of each other count as one spot
+      forget: 240, // seconds a spot stays in the ledger without a repeat
+      repeatCount: 3, // from this many repeats of one trick, two guards go and it is radioed in
+    },
     // Alarms (E7): a guard runs for the alarm box when things turn real (design doc: 4–8 s away).
     alarm: {
       reach: 44, // metres: a run of about 8 s at his sprint; farther, he won't

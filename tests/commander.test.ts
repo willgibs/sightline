@@ -288,6 +288,33 @@ describe('no omniscience, over the commander', () => {
   });
 });
 
+describe('adaptation within a mission (E9)', () => {
+  const world = worldWith(guards([0, 0], [10, 0], [-10, 0]));
+
+  it('a repeated trick draws more: the third rock at one spot sends two guards', () => {
+    const camp = campOf(world);
+    const out: CampOrder[] = [];
+    digest(camp, report('heard', 20, 20), 100, T, world);
+    plan(campMind(camp, world, 110), out);
+    expect(camp.tasks.find((t) => t.kind === 'investigate')!.capacity).toBe(1);
+    // Later, the same trick twice more at the same spot.
+    digest(camp, report('heard', 21, 19), 400, T, world);
+    digest(camp, report('heard', 19, 21), 700, T, world);
+    camp.tasks.length = 0;
+    plan(campMind(camp, world, 710), out);
+    expect(camp.tasks.find((t) => t.kind === 'investigate')!.capacity).toBe(2);
+  });
+
+  it('remembers where shots and bodies were reported', () => {
+    const camp = campOf(world);
+    digest(camp, report('shot', 200, 40), 100, T, world);
+    digest(camp, report('shot', 205, 45), 130, T, world);
+    digest(camp, report('body', 12, 8), 300, T, world);
+    expect(camp.incidents.find((i) => i.kind === 'shots')!.count).toBe(2);
+    expect(camp.incidents.find((i) => i.kind === 'body')!.count).toBe(1);
+  });
+});
+
 describe('radio check-ins', () => {
   // Every few seconds, for a test that can't wait minutes.
   const fast = structuredClone(T);

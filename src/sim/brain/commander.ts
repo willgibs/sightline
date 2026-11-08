@@ -61,6 +61,9 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   injectBelief(camp.map, r.x, r.z, Math.max(r.radius, M.injectRadius), 1);
   camp.lastPercept = tick;
   camp.lastCause = r.cause;
+  // The ledger of repeated tricks and the memory of incidents (E9): what the camp learns
+  // only from what was reported to it.
+  remember(camp, r, tick, tuning);
   if (r.kind === 'shot') noteShot(camp, r, tick, tuning);
   // A post gone quiet is a job for someone: walk over and see (E6).
   if (r.kind === 'missing') {
@@ -106,6 +109,35 @@ function noteShot(camp: CampState, r: Report, tick: number, tuning: Tuning): voi
   }
 }
 
+/** The ledger: a repeated stimulus at about the same spot counts up, and old spots are forgotten. Incidents: shots and bodies, where they were. */
+function remember(camp: CampState, r: Report, tick: number, tuning: Tuning): void {
+  const A = tuning.brain.adapt;
+  const hz = tuning.sim.tickHz;
+  camp.ledger = camp.ledger.filter((e) => (tick - e.tick) / hz < A.forget);
+  if (r.kind === 'heard' || r.kind === 'claim') {
+    const near = camp.ledger.find((e) => e.kind === r.kind && Math.abs(e.x - r.x) < A.cellSize && Math.abs(e.z - r.z) < A.cellSize);
+    if (near) {
+      near.count++;
+      near.tick = tick;
+    } else camp.ledger.push({ kind: r.kind, x: r.x, z: r.z, count: 1, tick });
+  }
+  if (r.kind === 'shot' || r.kind === 'body') {
+    const kind = r.kind === 'shot' ? 'shots' : 'body';
+    const near = camp.incidents.find((e) => e.kind === kind && Math.abs(e.x - r.x) < A.cellSize * 3 && Math.abs(e.z - r.z) < A.cellSize * 3);
+    if (near) {
+      near.count++;
+      near.tick = tick;
+    } else camp.incidents.push({ kind, x: r.x, z: r.z, count: 1, tick });
+  }
+}
+
+/** How many guards a report of a repeated trick draws: the ledger's count, capped by the pacing slots. */
+function investigators(camp: CampState, x: number, z: number, slots: number, tuning: Tuning): number {
+  const A = tuning.brain.adapt;
+  const repeated = camp.ledger.find((e) => e.kind === 'heard' && Math.abs(e.x - x) < A.cellSize && Math.abs(e.z - z) < A.cellSize);
+  return repeated && repeated.count >= A.repeatCount ? Math.min(slots, 2) : Math.min(slots, 1);
+}
+
 /** A report also says where its speaker is: the camp remembers. */
 function noteMan(camp: CampState, r: Report): void {
   const man = camp.roster.find((m) => m.id === r.from);
@@ -146,7 +178,7 @@ export function plan(m: CampMind, out: CampOrder[]): void {
   const slots = camp.level === 'uneasy' ? T.slots.uneasy : camp.level === 'alert' ? T.slots.alert : T.slots.lockdown;
   // Investigate where the last report said.
   if (camp.search && slots.investigate > 0 && camp.tasks.filter((t) => t.kind === 'investigate').length === 0 && camp.level === 'uneasy') {
-    addTask(camp, 'investigate', camp.search.x, camp.search.z, 2, slots.investigate, m.tick);
+    addTask(camp, 'investigate', camp.search.x, camp.search.z, 2, investigators(camp, camp.search.x, camp.search.z, T.slots.lockdown.investigate + 1, m.tuning), m.tick);
   }
   // A shooter the camp has fixed: the marksmen sweep where it believes he is (E8).
   const shot = camp.shots.estimate;

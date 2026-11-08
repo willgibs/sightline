@@ -81,6 +81,10 @@ export interface CampState {
   /** The last tick a report of something suspicious came in, and its cause. */
   lastPercept: number;
   lastCause: number;
+  /** A ledger of the stimuli the camp has seen, by kind and rough place (E9): repeats get taken more seriously. */
+  ledger: Array<{ kind: string; x: number; z: number; count: number; tick: number }>;
+  /** What the camp remembers of incidents the player caused (E9). */
+  incidents: Array<{ kind: 'shots' | 'body'; x: number; z: number; count: number; tick: number }>;
   /** Reinforcements called (E8): when they were called, or −1. */
   reinforceCalled: number;
   /** The men it knows it has. */
@@ -110,6 +114,8 @@ export function createCamp(campX: number, campZ: number, tuning: Tuning): CampSt
     airwaves: [],
     nextAir: 1,
     netWorking: true,
+    ledger: [],
+    incidents: [],
     reinforceCalled: -1,
     lastPercept: -1,
     lastCause: 0,
