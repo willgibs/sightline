@@ -1565,6 +1565,8 @@ export class Game {
       click: () => this.input.click(),
       /** Sandbox (A10): drop a noise where the view points, as the debug view's key does. */
       noise: () => this.input.dropNoise(),
+      /** Drops a body where the view points, as the sandbox key does (A9). */
+      dropBody: () => this.input.dropBody(),
       /**
        * Sandbox (A10): the debug view's time scale, to the nearest step (0.25× to 8×); the
        * scale now. Fast-forward runs only in the debug view.

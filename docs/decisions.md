@@ -40,6 +40,20 @@ Built on its branch as `docs/phase-1-plan.md`, section B, plans it. Its seed, th
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
 
+### The other stimuli: lab B's sounds, the crack, bodies and lens glint (A9)
+
+**Decision:**
+- **Lab B's sounds, by what they are** (`perception/stimuli.ts`): a report, an impact and a bolt are shots, raising a guard to searching, with his attention on where he heard it (a deliberate miss draws his eye to the strike, as the design says). A cry is a voice at the same level, one his own side doesn't ignore. A stone's clatter stays a plain sound, by its clarity: it's a distraction, so he looks and doesn't search, and it never sends the camp hunting.
+- **The crack comes from the bullet's path** (`game/perception.ts`, `deliverCrack`, with lab B's `crackAt`): each guard within 160 m of the path hears a shot from where the shock left it, when it reaches him, ahead of the report from the muzzle. So a suppressed shot's crack searches the path's side of the valley, not the shooter's.
+- **A new event, `spotted` (code 16), for what a guard catches sight of that isn't a person** (`perception-spotting`, in 'perception' after sight and hearing):
+  - A body is seen by the same law as a body lying still (`exposure`: its zones, caps, rays and foliage), and is news once per guard. One falling in plain view is seen falling, since it stands for the first moments of its collapse. It raises him to searching (the strongest stimulus), with a shouted "Man down! Man down!" that raises whoever hears it. He keeps it in mind for 2 minutes, and lab E can read it from his percepts.
+  - A flash from a lens (lab B's `glint`, with the mirror's condition against the sun) is seen by a guard looking that way, in his core cone or a marksman's far one, up to 600 m with a clear line, when its glint is at least half. It's news when it starts, and raises him to suspicious.
+- **The sandbox can drop a body** (`bodyDrop`, command 11; L in the debug view; `sightline.dropBody()`), already down, for a guard to find, as the design doc's sandbox line asks. The noise drop moved from X to K, because throw took X.
+
+**Why:** the design's "What gives you away" list, each by the law that already applies, so a player who has learned sight and hearing has learned these too.
+
+**What moved:** the perception lab's and the crowd's `state` fingerprints (`a568f302cd499718`, `869e55ebeb231e6b`), for the new fields of a guard's senses; their behaviour didn't move, since no body or rifle is in those scenes. The tuning gains the levels, so the golden recording is rewritten. Open doors (D4) wait for lab D's code on `main`.
+
 ### Trial mode: the exit test, built into the lab (A12)
 
 **Decision:**

@@ -71,7 +71,7 @@ describe('the fairness rules, over whole runs of the lab', () => {
           }
           const p = byId.get(a.cause);
           expect(p, `alert ${a.id} (${a.from} → ${a.to}, ${a.reason})`).toBeDefined();
-          expect(['noticed', 'detected', 'heard']).toContain(p!.type);
+          expect(['noticed', 'detected', 'heard', 'spotted']).toContain(p!.type);
           expect(p!.source).toBe(a.source);
         }
       });

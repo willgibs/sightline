@@ -77,6 +77,7 @@ function events(): { sim: Simulation; all: SimEvent[]; valley: number; range: Si
     { type: 'heard', id: 0, tick, t: tick / 30, source: guard, cause: 1, kind: 'sound', clarity: 1.7, x: 11, y: 0.3, z: -38, radius: 4.5 },
     { type: 'alert', id: 0, tick, t: tick / 30, source: guard, cause: 0, from: 'unaware', to: 'curious', reason: 'heard' },
     { type: 'bark', id: 0, tick, t: tick / 30, source: guard, cause: 0, ...voice, line: 3 },
+    { type: 'spotted', id: 0, tick, t: tick / 30, source: guard, cause: 0, what: 'body', x: 12.5, y: 0.3, z: -40.25, distance: 42.5 },
     { type: 'noise', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, loudness: 2, radius: 24 },
   ];
   perceived.forEach((e) => all.push({ ...e, id: all.length + 1 }));

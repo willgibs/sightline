@@ -1,6 +1,7 @@
 import { intentFor, motorSystem, poseAt, type PoseSample } from '../body';
 import { carryOut } from '../brain';
 import { dcos, dsin } from '../kernel/core/detmath';
+import { Faction } from '../kernel/state';
 import { scheduleSystem, type ScheduleHandler, type System } from '../kernel/systems';
 import { Blocks } from '../kernel/world/colliders';
 import { emptyHit, raycast } from '../kernel/world/query';
@@ -63,22 +64,23 @@ const playerCommands: System = {
 const look = emptyHit();
 
 /**
- * Sandbox drops (A10): a noise dropped from the debug view lands where the player looked
- * when they pressed the key, along their view from the eye at that moment, and is heard by
- * the law of sound like any other. A command in the input, so a recording replays it.
+ * Sandbox drops (A10, A9): a noise or a body dropped from the debug view lands where the
+ * player looked when they pressed the key, along their view from the eye at that moment.
+ * The noise is heard by the law of sound like any other; the body lies there already down,
+ * for a guard to find. Commands in the input, so a recording replays them.
  */
 const sandboxDrops: System = {
   name: 'sandbox-drops',
   phase: 'commands',
   after: ['player-commands', 'rifle'],
   reads: ['input', 'player.body', '*.body', 'solid.solid'],
-  writes: [],
+  writes: ['entities'],
   emits: ['noise'],
   run(ctx) {
     const p = player(ctx.index);
     const S = ctx.tuning.perception.sandbox;
     for (const c of ctx.input.commands) {
-      if (c.kind !== 'noise') continue;
+      if (c.kind !== 'noise' && c.kind !== 'bodyDrop') continue;
       poseAt(p.body, c.lag, pose);
       const cp = dcos(c.pitch);
       const dx = -dsin(c.yaw) * cp;
@@ -86,6 +88,12 @@ const sandboxDrops: System = {
       const dz = -dcos(c.yaw) * cp;
       const hit = raycast(ctx.query(), pose.x, pose.y + pose.eyeHeight, pose.z, dx, dy, dz, S.reach, Blocks.Sight, look, p.id);
       if (hit.what === 'none') continue;
+      if (c.kind === 'bodyDrop') {
+        const t = ctx.tick / ctx.tuning.sim.tickHz;
+        const eye = ctx.tuning.bodies.guard.eyeHeight.prone;
+        ctx.spawn((id) => ({ id, kind: 'remains' as const, faction: Faction.Camp, remains: { of: 0, post: -1, x: hit.x, y: hit.y, z: hit.z, yaw: c.yaw, eye, vx: 0, vz: 0, fell: t - ctx.tuning.ballistics.hits.collapseTime, part: 'torso' as const } }));
+        continue;
+      }
       ctx.emit({
         type: 'noise',
         source: p.id,

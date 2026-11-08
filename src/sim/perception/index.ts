@@ -15,7 +15,7 @@
  */
 export type { Belief, Percept, PerceptKind } from './percept';
 export { beliefRadius } from './percept';
-export { AWARENESS, createSenses, rung, type Awareness, type AwarenessState, type PendingSound, type Senses, type SightState } from './senses';
+export { AWARENESS, createSenses, rung, type Awareness, type AwarenessState, type PendingSound, type PendingSpot, type Senses, type SightState } from './senses';
 export { exposure as tableExposure, movementVisibility, stanceVisibility } from './visibility';
 export {
   ZONES,
@@ -34,6 +34,8 @@ export {
   type SightRay,
   type SightTarget,
   type Zone,
+  inGaze,
+  lineOpen,
 } from './sight';
 export { stepMeter, type MeterStep } from './meter';
 export { drawnLit, groundLight, lightName, shadeMap, type ShadeArea, type ShadeMap } from './light';

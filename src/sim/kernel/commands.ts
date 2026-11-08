@@ -39,6 +39,14 @@ export interface NoiseCommand {
   pitch: number;
 }
 
+/** Sandbox (A9): drop a body where the player looks, as a noise is dropped. It lies already down. */
+export interface BodyDropCommand {
+  kind: 'bodyDrop';
+  lag: number;
+  yaw: number;
+  pitch: number;
+}
+
 /** Laser the range along the frame's line of sight, with the binoculars up (ballistics lane). */
 export interface RangeCommand {
   kind: 'range';
@@ -77,7 +85,7 @@ export interface SuppressorCommand {
   kind: 'suppressor';
 }
 
-export type Command = FireCommand | NoiseCommand | RangeCommand | ThrowCommand | ZeroUpCommand | ZeroDownCommand | SuppressorCommand | ShotDropCommand;
+export type Command = FireCommand | NoiseCommand | BodyDropCommand | RangeCommand | ThrowCommand | ZeroUpCommand | ZeroDownCommand | SuppressorCommand | ShotDropCommand;
 export type CommandKind = Command['kind'];
 
 /** How a command field is stored and quantized. */
@@ -94,6 +102,7 @@ export interface CommandSpec<C> {
 export const COMMANDS: { readonly [K in CommandKind]: CommandSpec<Extract<Command, { kind: K }>> } = {
   fire: { code: 1, range: 'foundation', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
   noise: { code: 10, range: 'perception', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
+  bodyDrop: { code: 11, range: 'perception', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
   range: { code: 30, range: 'ballistics', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
   throw: { code: 31, range: 'ballistics', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
   zeroUp: { code: 32, range: 'ballistics', fields: {} },

@@ -220,6 +220,7 @@ export class InputController {
       else if (a === 'scopeToggle') this.scopeToggled = !this.scopeToggled;
       else if (a === 'shotDrop') this.latch.latch('shotDrop');
       else if (a === 'dropNoise') this.latch.latch('noise');
+      else if (a === 'dropBody') this.latch.latch('bodyDrop');
       else if (a === 'zeroUp' || a === 'zeroDown' || a === 'suppressor') {
         if (this.armed) this.simple.push({ kind: a });
       } else this.onAction?.(a);
@@ -237,6 +238,11 @@ export class InputController {
   /** Automation: drop a noise where the view points, as the sandbox key does (A10). */
   dropNoise(): void {
     this.latch.latch('noise');
+  }
+
+  /** Automation: drop a body where the view points, as the sandbox key does (A9). */
+  dropBody(): void {
+    this.latch.latch('bodyDrop');
   }
 
   /**

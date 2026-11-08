@@ -36,8 +36,8 @@ export const GOLDEN = {
    */
   scenes: {
     'movement-course': { behaviour: '40c97133a0ef732d', state: 'a72123b8c4cb29d8' },
-    'perception-crowd': { behaviour: 'e106e06750770ec4', state: '21e67f0f78200c87' },
-    'perception-lab': { behaviour: 'da54eed00707a631', state: 'f9afc16fbdc72c64' },
+    'perception-crowd': { behaviour: 'e106e06750770ec4', state: '869e55ebeb231e6b' },
+    'perception-lab': { behaviour: 'da54eed00707a631', state: 'a568f302cd499718' },
     'shooting-range': { behaviour: 'b1e8920883443ac0', state: '991969418ddbcee4' },
     'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '2535df87754d14eb' },
     'kernel-alone': { behaviour: '0698e581024f5b35', state: 'b51b84477d71dbf1' },

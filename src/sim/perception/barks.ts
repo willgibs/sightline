@@ -39,6 +39,10 @@ export const BARKS: readonly BarkLine[] = [
   { text: 'Contact! There!', to: 'combat', reason: 'any', shout: true, level: 0.55 },
   { text: 'Must have been nothing.', to: 'unaware', reason: 'any', shout: false, level: 0 },
   { text: 'Back to it.', to: 'unaware', reason: 'calm', shout: false, level: 0 },
+  // A9: what he says on finding a body, and on a flash from a lens.
+  { text: 'Is that... a body?', to: 'suspicious', reason: 'body', shout: false, level: 0 },
+  { text: 'Man down! Man down!', to: 'searching', reason: 'body', shout: true, level: 0.8 },
+  { text: 'Something flashed up there.', to: 'suspicious', reason: 'glint', shout: false, level: 0 },
 ];
 
 /**

@@ -36,6 +36,8 @@ export function describe(e: SimEvent): string {
     }
     case 'heard':
       return `heard ${e.kind === 'voice' ? 'a voice' : e.kind === 'shot' ? 'a shot' : 'a sound'}, ${e.clarity.toFixed(1)}× over his threshold, from about (${m(e.x)}, ${m(e.z)}) ± ${m(e.radius)} m`;
+    case 'spotted':
+      return e.what === 'body' ? `saw a body, ${m(e.distance)} m away` : `saw a flash from a lens, ${m(e.distance)} m away`;
     case 'alert':
       return `${e.from} → ${e.to}: ${e.reason}`;
     case 'stance':

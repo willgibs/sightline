@@ -9,13 +9,22 @@ import type { PendingSound } from './senses';
  * voice to its line's level.
  *
  * Each source is wired in when it is on `main`:
- * - lab B's report, impact and bolt are shots, and a cry is a voice (B4, B8);
- * - a body seen, a comrade dropping, a thrown object landing, lens glint and an open door
- *   come in as stimuli at their own levels through `stimulate` (B4, B6, B9, D4).
+ * - lab B's report, impact and bolt are shots (an impact draws the eye to where it struck),
+ *   and a cry is a voice, one a guard's own side doesn't ignore (B4, B8);
+ * - a thrown thing's clatter stays a sound, by its clarity: it's a distraction, and it
+ *   draws a guard to look, not to search (B9);
+ * - a body seen, a comrade dropping and a flash from a lens come in by sight through
+ *   'perception-spotting' (game/perception.ts), at their own levels (B4, B6);
+ * - an open door is lab D's, when it's on `main` (D4).
  */
 export const HEARD_AS: Readonly<Partial<Record<EventType, PendingSound['kind']>>> = {
   footstep: 'sound',
   land: 'sound',
   noise: 'sound',
+  clatter: 'sound',
   bark: 'voice',
+  cry: 'voice',
+  report: 'shot',
+  impact: 'shot',
+  bolt: 'shot',
 };

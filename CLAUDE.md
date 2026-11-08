@@ -76,7 +76,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
   - **Running:** `play()`, `pause()`.
   - **Views:** `debug(on)`, `colliders(on)`, `grid(on)`, `overwatch(on)`.
   - **Camera:** `look(headingDeg, pitchDeg)`, `fly(x, y, z, headingDeg, pitchDeg)`, `body()`.
-  - **Input:** `hold([codes])`, `tap('KeyC' | 'KeyZ')`, `click()`, `zoom(on)`, `noise()` (drop a noise where the view points: the sandbox, A10).
+  - **Input:** `hold([codes])`, `tap('KeyC' | 'KeyZ')`, `click()`, `zoom(on)`, `noise()` and `dropBody()` (drop a noise or a body where the view points: the sandbox, A10 and A9).
   - **Time:** `timeScale(x)` (the debug view's, 0.25× to 8×).
   - **World:** `generate(seed)`, `fog(density)`.
   - **Reading:** `state()`, `dump()`, `recording()`, `sound()`, `insides()`, `playtest()`, `perception()` (each perceiving guard's state, meter and belief), `explain(id)` (an event back to its causes, in words).

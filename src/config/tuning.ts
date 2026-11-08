@@ -188,6 +188,10 @@ export const defaultTuning = {
       minCueSeconds: 1.5, // outside contact, the first cue comes at least this long before 100%
       hold: 1.5, // seconds the meter holds after the body leaves view,
       decay: 0.12, // then falls this much per second
+      // A flash from a lens (A9): the glint at or above `min` is seen from this far by a guard
+      // looking that way (his core cone, or a marksman's far one), through foliage letting
+      // through at least `through`, with nothing solid in the way.
+      glint: { min: 0.5, range: 600, through: 0.15 },
       skylineReach: 1500, // a line on past the body that hits nothing this far ends in open sky
       skylineRampDeg: 0.5, // it counts as sky from this far below level to this far above, ramping
       groundLift: 0.05, // light is taken this far above the ground beneath the body (owner)
@@ -231,6 +235,10 @@ export const defaultTuning = {
       sound: { faint: 0.3, clear: 0.62 },
       shot: 0.8, // a shot heard: searching
       glimpse: 0.8, // having seen you at 100%: searching, once he loses you
+      cry: 0.8, // a comrade's cry heard: searching
+      body: 0.8, // a body seen: searching (design doc: the strongest stimulus)
+      glint: 0.55, // a flash from a lens: suspicious
+      keepBody: 120, // seconds a body stays in his mind (a sound or a shot: hearing.keep)
       floor: 0.15, // after a search he never settles below this (design doc: a raised baseline)
       sharp: 1.25, // and his eyes are this much quicker
       // Minimal reactions (A7), until lab E's brain: how he turns and moves at each state.
