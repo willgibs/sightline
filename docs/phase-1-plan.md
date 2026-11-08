@@ -802,7 +802,7 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - **Counter-snipers hunt.** They move to overlooking posts, sweep candidate perches in the order of belief, and glint.
   - **The reaction is visible.** A shot from 300 m gets a visible reaction inside the window: Halo's playtests found that sniping makes AI look oblivious.
   - **Reinforcements** arrive by truck after a delay, as a squad that hunts.
-- [ ] E9 · Found bodies and adaptation within a mission. All of it comes through A's perception, and only from incidents the player caused and could see.
+- [ ] E9 · Found bodies and adaptation within a mission. All of it comes through A's perception, and only from incidents the player caused and could see. Done so far: a ledger of repeated tricks and a memory of incidents (`brain/commander.ts`); body percepts wait for A's #8.
   - A body found means alert.
   - A ledger of habituation by stimulus and cell, so repeated tricks lose effect.
   - Floors on decay, so posture stays up.
@@ -813,7 +813,7 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - The player's health is two or three hits (`tuning.brain.combat`), and the player can die (`game/combat.ts`, `campRules`).
   - Phase 2 only joins labs, so this is built here.
 - [ ] E11 · Sandbox body drops.
-- [ ] E12 · The scenarios and the baselines (see Exit tests).
+- [ ] E12 · The scenarios and the baselines (see Exit tests). Done so far: the scenario family `camp-scenario` (suspicion, search, alarm), the search-cycle and calibration benches (the ellipse contains the perch 36% and 92% of the time in the world, against a 39/86 target), and the honest brain against Xu and Verbrugge's baselines (`game/baselines.ts`, pinned in the bench). "One overlook doesn't clear the camp" waits for lab D's validated camps.
 - [ ] Exit test, the bench numbers, a note, a playable link.
 
 ### Gate · Labs pass
