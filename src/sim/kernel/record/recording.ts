@@ -511,7 +511,8 @@ function checkHeader(v: unknown): RecordingHeader {
   if (
     !m ||
     typeof m !== 'object' ||
-    Object.keys(m).sort().join() !== 'env,genVersion,insertion,seed,terrain' ||
+    !['env,genVersion,insertion,seed,terrain', 'camp,env,genVersion,insertion,seed,terrain'].includes(Object.keys(m).sort().join()) ||
+    ('camp' in m && !plainSmall(m.camp)) ||
     !envOk(m.env) ||
     !text(m.seed, 64) ||
     !whole(m.genVersion, 1, 1e6) ||
@@ -550,6 +551,17 @@ function checkHeader(v: unknown): RecordingHeader {
     }
   }
   return h as unknown as RecordingHeader;
+}
+
+/**
+ * A part of the mission the kernel carries but doesn't read, such as the camp a game
+ * generates (lab D's camp spec): an object of plain values, small. The game that builds
+ * the world checks what it means, and refuses to build one it doesn't understand.
+ */
+function plainSmall(v: unknown): boolean {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+  const values = Object.values(v as Record<string, unknown>);
+  return values.length <= 32 && values.every((x) => (typeof x === 'number' && Number.isFinite(x)) || typeof x === 'boolean' || (typeof x === 'string' && x.length <= 64));
 }
 
 /** Where a mission's terrain comes from: the procedural valley, or a world built by hand for a scene. */

@@ -1,6 +1,6 @@
 import { defaultTuning } from '../../config/tuning';
 import { InvariantWatch } from '../body';
-import { generateWorld } from '../generation';
+import { campMission, generateWorld } from '../generation';
 import type { LayerName } from '../lanes';
 import { LAYERS } from '../lanes';
 import { Hasher } from '../kernel/core/hash';
@@ -52,7 +52,8 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
     metrics: () => ({}),
   },
   generation: {
-    about: "Lab D: valleys valid at their first attempt, of a held-out series, and the least margin left under the attempt budget.",
+    about:
+      "Lab D: of a held-out series, Phase 0's valleys and lab D's valid at their first attempt, the least margin left under each budget, and how much of the horizon lab D's ridges overlook.",
     metrics() {
       let first = 0;
       let margin = Infinity;
@@ -62,7 +63,28 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
         if (w.attempt === 0 && w.report.ok) first++;
         margin = Math.min(margin, budget - (w.attempt + 1));
       }
-      return { [`valid at the first attempt (of ${GENERATION_SEEDS.length})`]: first, 'least margin under the attempt budget': margin };
+      // Lab D's valleys (D3), until D9 makes them the default.
+      let campFirst = 0;
+      let campMargin = Infinity;
+      let widest = 0;
+      let narrowestOpen = Infinity;
+      const valleyBudget = defaultTuning.gen.landform.attempts;
+      for (const seed of GENERATION_SEEDS) {
+        const w = generateWorld(campMission(seed), defaultTuning);
+        const v = w.report.valley!;
+        if (w.attempt === 0 && v.ok) campFirst++;
+        campMargin = Math.min(campMargin, valleyBudget - (w.attempt + 1));
+        widest = Math.max(widest, Math.round(v.perchArcDeg));
+        narrowestOpen = Math.min(narrowestOpen, Math.round(v.openGapDeg));
+      }
+      return {
+        [`valid at the first attempt (of ${GENERATION_SEEDS.length})`]: first,
+        'least margin under the attempt budget': margin,
+        [`lab D valleys valid at the first attempt (of ${GENERATION_SEEDS.length})`]: campFirst,
+        'lab D least margin under the valley budget': campMargin,
+        'lab D widest overwatched horizon (°)': widest,
+        'lab D narrowest open horizon (°)': narrowestOpen,
+      };
     },
   },
   body: {

@@ -3,6 +3,7 @@ import type { GenTuning } from '../../config/tuning';
 import { circleDirections, dtanDeg } from '../kernel/core/detmath';
 import { Blocks, type ColliderSet, type RayHit } from '../kernel/world/colliders';
 import type { Heightfield } from '../kernel/world/heightfield';
+import type { Overwatch } from './overwatch';
 
 /**
  * Reads a generated valley the way a sniper would: where are the overwatch perches, and
@@ -36,6 +37,8 @@ export interface TerrainReport {
   steepShare: number;
   ok: boolean;
   problems: string[];
+  /** Terrain with teeth only (landform.ts), absent from Phase 0's valley: D3's checks in full. */
+  valley?: Overwatch;
 }
 
 export const DIRECTIONS = 32;

@@ -23,7 +23,11 @@ export const BENCH_GOLDEN: PinnedBench = {
   "generation": {
     "metrics": {
       "valid at the first attempt (of 6)": 6,
-      "least margin under the attempt budget": 5
+      "least margin under the attempt budget": 5,
+      "lab D valleys valid at the first attempt (of 6)": 6,
+      "lab D least margin under the valley budget": 7,
+      "lab D widest overwatched horizon (°)": 157,
+      "lab D narrowest open horizon (°)": 164
     },
     "runs": {}
   },

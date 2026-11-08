@@ -610,7 +610,7 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
   - one hand-made camp, mirrored, with 7 guards in 3 roles. Nothing analyses who sees whom, what a perch covers, or whether a way in exists.
 - **The targets, as numbers:**
   - **camps:** at least 90 of 100 held-out seeds valid at their first camp attempt, the rest repaired within the iteration budget, each seed's margin reported;
-  - **terrain:** overwatch from the two or three placed ridges only (perches in at most 6 of 16 sectors, with an open gap of at least 90°), confirmed by radial-sweep viewsheds, and approaches through at least 3 corridors that share no chokepoint;
+  - **terrain:** overwatch from the two or three placed ridges only (perches over at most half the horizon, with an open side of at least 120°), confirmed by radial-sweep viewsheds; the camp reachable on foot from at least 3 of 8 directions, and two ways out that share no chokepoint;
   - **infiltration:** safe-interval search agrees with brute-force space-time search on every small test camp, on whether a path exists and on its cost;
   - **rules:** no violation over the 100: no perch above 60% of guard time or 25% of the target's, and the three companion rules;
   - **diversity:** the bots' best plans give 10 distinct signatures over 10 random camps before any review, and each camp's own plan does best on it in the regret matrix;
@@ -625,10 +625,15 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
   - It lands alone.
 - [x] D2 · The seed explorer, first version: a grid of camps with their validation results.
   - `?explore` (`&series=<name>&count=<n>`, the same seeds `npm run seeds -- --from <name>` reports on). Workers generate the camps; each card shows the valley and the camp from above, with the validation results, and opens the seed to play. The survey it draws (`generation/survey.ts`) is where each later milestone adds its layer.
-- [ ] D3 · Terrain with teeth.
+- [x] D3 · Terrain with teeth.
   - Two or three ridge spines placed on chosen bearings 150–500 m out, before noise. They're verified by viewsheds computed with a radial sweep, so overwatch comes from a few sectors, not a ring.
   - Cliffs and chokepoints, so the choice of approach matters.
   - Validation tightens.
+  - **Built** (`generation/landform.ts`, `overwatch.ts`, `campWorld.ts`). A mission with a camp spec (`campMission`, `?camp`) gets it; Phase 0's valley stays the default until D9.
+    - Two or three spines 240–420 m out stand around one side of the horizon, leaving an open side of 130–170° where the road comes in.
+    - Each camp face is a cliff band broken by one or two walkable gullies. The creek crosses the open side, passes the camp and leaves between spines, with banks too steep to climb except at its fords.
+    - The checks: every placed ridge overlooks the camp, overwatch covers at most half the horizon, the open side is at least 120°, the camp is reachable from at least 3 of 8 directions, and two ways out share no chokepoint. A valley that fails is re-rolled, up to 8 times.
+    - 60 of 60 valleys passed at the first attempt; the bench pins 6 of 6 held-out ones, overlooked over at most 157° with an open side of at least 164°.
 - [ ] D4 · `CampSpec` and the compound, laid out in plots and parcels from handmade modules.
   - The skeleton goes down first: a perch line, a low-exposure corridor, a reachable sabotage node, two exfil corridors and the escape route.
   - Then the parcels:

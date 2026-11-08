@@ -4,6 +4,7 @@ import { normalizeSeed } from '../sim/kernel/core/seed';
 import type { SpawnKind } from '../sim/kernel/mission';
 import { Game } from './game';
 import { Explorer } from './explore';
+import { defaultCampSpec, type CampSpec } from '../sim/generation';
 import { SCENES } from '../sim/game/scenes';
 import './styles.css';
 
@@ -19,6 +20,8 @@ import './styles.css';
  *   ?replay=playtests/<name>.slrec   watch a recording (in development, any session in playtests/)
  *   ?explore         the seed explorer instead of the game: a grid of camps and their validation
  *                    (&series=<name> &count=<n>; explore.ts)
+ *   ?camp            a generated camp (lab D) instead of Phase 0's valley, until D9 makes it the
+ *                    default (&difficulty=0.5)
  */
 const params = new URLSearchParams(window.location.search);
 const canvas = document.querySelector<HTMLCanvasElement>('#view')!;
@@ -69,6 +72,7 @@ function startGame(): void {
       sceneName,
       scene: sceneName ? SCENES[sceneName]?.(params.get('params') ?? undefined) : null,
       replayUrl: params.get('replay'),
+      camp: params.has('camp') ? campFromParams(params) : null,
     });
   } catch (e) {
     // Without WebGL 2 there is nothing to draw with: say so, rather than leave a blank page.
@@ -88,4 +92,10 @@ function startGame(): void {
       if (mod) game.applyTuning((mod as unknown as typeof import('../config/tuning')).defaultTuning);
     });
   }
+}
+
+/** The camp a URL asks for: the compound, at the difficulty given (0 to 1). */
+function campFromParams(p: URLSearchParams): CampSpec {
+  const d = Number(p.get('difficulty') ?? defaultCampSpec().difficulty);
+  return { ...defaultCampSpec(), difficulty: Number.isFinite(d) ? Math.min(1, Math.max(0, d)) : defaultCampSpec().difficulty };
 }

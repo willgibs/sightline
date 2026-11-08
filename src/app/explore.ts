@@ -1,5 +1,5 @@
 import type { Tuning } from '../config/tuning';
-import type { Survey } from '../sim/generation';
+import { defaultCampSpec, type CampSpec, type Survey } from '../sim/generation';
 import { Rng } from '../sim/kernel/core/rng';
 import { randomSeed } from '../sim/kernel/core/seed';
 import { palette } from '../render/palette';
@@ -29,6 +29,8 @@ export class Explorer {
   private workers: Worker[] = [];
   private readonly seeds: string[];
   private readonly series: string;
+  /** Lab D's generated camps (`&camp`), or Phase 0's valley; the default becomes the compound at D9. */
+  private readonly camp: CampSpec | null;
 
   constructor(
     root: HTMLElement,
@@ -36,6 +38,7 @@ export class Explorer {
     params: URLSearchParams,
   ) {
     this.series = params.get('series') || 'explore';
+    this.camp = params.has('camp') ? { ...defaultCampSpec(), difficulty: clampUnit(Number(params.get('difficulty') ?? defaultCampSpec().difficulty)) } : null;
     const count = Math.max(1, Math.min(400, Number(params.get('count')) || 24));
     const list = new Rng(this.series, 'list');
     this.seeds = Array.from({ length: count }, () => randomSeed(() => list.next()));
@@ -52,6 +55,7 @@ export class Explorer {
       url.searchParams.set('explore', '');
       url.searchParams.set('series', String(data.get('series') || 'explore'));
       url.searchParams.set('count', String(data.get('count') || 24));
+      if (this.camp) url.searchParams.set('camp', '');
       window.location.href = url.toString();
     });
     head.append(form);
@@ -61,7 +65,7 @@ export class Explorer {
     root.append(head, this.grid);
     for (const seed of this.seeds) {
       const card = el('a', 'explore-card is-pending');
-      card.setAttribute('href', `?seed=${encodeURIComponent(seed)}`);
+      card.setAttribute('href', `?seed=${encodeURIComponent(seed)}${this.camp ? `&camp&difficulty=${this.camp.difficulty}` : ''}`);
       card.innerHTML = `<div class="explore-views"><canvas width="${VIEW}" height="${VIEW}"></canvas><canvas width="${VIEW}" height="${VIEW}"></canvas></div><div class="explore-caption"><span class="explore-seed">${seed}</span><span class="explore-status">generating…</span></div><div class="explore-notes"></div>`;
       this.grid.append(card);
       this.cards.set(seed, card);
@@ -74,7 +78,7 @@ export class Explorer {
     for (let w = 0; w < n; w++) {
       const worker = new Worker(new URL('./exploreWorker.ts', import.meta.url), { type: 'module' });
       worker.onmessage = (e: MessageEvent<ExploreReply>) => this.receive(e.data);
-      const request: ExploreRequest = { tuning: this.tuning, seeds: this.seeds.filter((_, k) => k % n === w), batch: 1 };
+      const request: ExploreRequest = { tuning: this.tuning, seeds: this.seeds.filter((_, k) => k % n === w), batch: 1, camp: this.camp };
       worker.postMessage(request);
       this.workers.push(worker);
     }
@@ -157,6 +161,20 @@ function drawValley(ctx: CanvasRenderingContext2D, s: Survey): void {
   };
   line(s.creek, palette.surface.water, 2);
   line(s.road, '#a8916a', 1.5);
+  for (const rd of s.ridges ?? []) {
+    line(rd.crest, 'rgba(29,34,39,0.7)', 1.2);
+    for (const g of rd.gullies) {
+      ctx.strokeStyle = '#2b8a3e';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(toPx(g.x), toPx(g.z), 3.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  for (const f of s.fords ?? []) {
+    ctx.fillStyle = '#1864ab';
+    ctx.fillRect(toPx(f.x) - 2.5, toPx(f.z) - 2.5, 5, 5);
+  }
   ctx.strokeStyle = 'rgba(29,34,39,0.35)';
   ctx.setLineDash([3, 3]);
   ctx.strokeRect(toPx(-s.playHalf), toPx(-s.playHalf), toPx(s.playHalf) - toPx(-s.playHalf), toPx(s.playHalf) - toPx(-s.playHalf));
@@ -262,6 +280,10 @@ function drawCamp(ctx: CanvasRenderingContext2D, s: Survey): void {
   ctx.fillStyle = 'rgba(29,34,39,0.6)';
   ctx.font = '10px ui-monospace, Menlo, monospace';
   ctx.fillText(`${Math.round(2 * half)} m`, 6, VIEW - 6);
+}
+
+function clampUnit(v: number): number {
+  return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.5;
 }
 
 function el(tag: string, cls: string): HTMLElement {

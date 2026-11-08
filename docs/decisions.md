@@ -107,6 +107,26 @@ Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Unt
 
 Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the generation lane.
 
+### Terrain with teeth, and how a mission asks for a camp (D3)
+
+**Decision:**
+- **A mission asks for a generated camp with a camp spec** (`generation/campSpec.ts`): `{ archetype: 'compound', difficulty }`, carried in the mission spec by module augmentation. The recording header accepts it as a small object of plain values, which the generator checks; the kernel doesn't read it. Until D9, a mission with no camp spec builds Phase 0's valley and test camp, so no golden moved. The game and the explorer take `?camp` (`&difficulty=`).
+- **The valley is placed feature-first** (`generation/landform.ts`).
+  - An open side of 130–170° is chosen first, and two or three ridge spines stand around the rest, 240–420 m out, each spanning 50–80° of the horizon.
+  - Each camp face is a profile with a cliff band, too steep to climb, broken by one or two gullies whose run keeps their slope under about 37°.
+  - The creek enters across the open side, passes the camp at 130–170 m and leaves through the widest gap between spines. Its bed sits 4–8 m below the floor, with banks that rise 2.2 m per metre except within 16 m of a ford, and where the road crosses.
+  - Relief goes on after the features, with the crags kept out of the gullies.
+- **D3's checks** (`generation/overwatch.ts`):
+  - A radial sweep from the camp's eye finds perches: prone shooters' eyes 150–560 m out that clear the horizon and look down at least 2.5°.
+  - Every placed ridge must hold one, perches may cover at most half the horizon (counted in degrees, not in 22.5° sectors, which overstate a long spine), and the widest open side must be at least 120°.
+  - On the spatial grid's map layer (no colliders yet), the camp must be reachable from at least 3 of 8 directions, and a second way out must stay 20 m from the first beyond 90 m of the camp.
+  - A valley that fails is re-rolled from its own stream (`valley#k`), up to `landform.attempts` times.
+- The props, the camp and its routines draw from their own root streams, so a re-rolled valley leaves their draws as they were.
+
+**What moved:** nothing. The tuning gained `gen.landform` and `gen.overwatch`, so the golden recording is rewritten for the new shape. The generation bench adds lab D's valleys: 6 of 6 held-out ones valid at their first attempt, a margin of 7 of 8, overlooked over at most 157°, with an open side of at least 164°.
+
+**Why:** the owner found that one overlook could take a compound apart (phase-1-plan.md, D3). In Phase 0's valley, every valley was overlooked from all 8 of 8 directions, and reachable from all 16 of 16, so no approach differed from another. Counting overwatch in degrees keeps the rule exact for long spines. The creek had to be deep to be a barrier at all: 2.5 m terrain cells smear a shallow bank into a walkable slope.
+
 ### The seed explorer (D2)
 
 **Decision:** `?explore` opens the seed explorer instead of the game (`app/explore.ts`): a grid of camps from a named series, the same seeds `npm run seeds -- --from <name>` reports on, each card drawing the valley and the camp from above with its validation results, and linking to the seed. Workers generate the camps (`app/exploreWorker.ts`), a few at a time, with the tuning the page was given, so the page never imports tuning of its own and hot reload keeps working. What a card draws is the world's survey (`generation/survey.ts`): plain data a worker can post, which each later milestone extends with its layer.

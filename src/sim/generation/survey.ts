@@ -1,6 +1,6 @@
 import type { World } from '../kernel/world/world';
 import type { GuardRole, StructureKind } from './camp';
-import type { Point2 } from './paths';
+import { pointAt, type Point2 } from './paths';
 import type { Site } from './site';
 
 /**
@@ -29,6 +29,9 @@ export interface Survey {
   perches: SurveyPerch[];
   /** The play area's half-size: the square a player can walk in. */
   playHalf: number;
+  /** Terrain with teeth only (D3): each ridge's crest and gullies, and the creek's fords. */
+  ridges?: Array<{ crest: Point2[]; gullies: Point2[] }>;
+  fords?: Point2[];
 }
 
 export interface SurveyTerrain {
@@ -95,12 +98,32 @@ export function surveyWorld(w: World, n = 160): Survey {
     }),
   }));
   const r = w.report;
+  const v = r.valley;
+  const stats: Record<string, number> = v
+    ? {
+        'overwatched horizon (°)': Math.round(v.perchArcDeg),
+        'open horizon (°)': Math.round(v.openGapDeg),
+        'ridges overlooking': v.ridgesSeen,
+        'access (of 8)': v.access,
+        'ways out': v.exfil,
+        'steep (%)': Math.round(v.steepShare * 1000) / 10,
+      }
+    : { 'overwatch sectors (of 8)': r.overwatchSectors, 'access sectors (of 16)': r.accessSectors, ridges: r.ridges, 'steep (%)': Math.round(r.steepShare * 1000) / 10 };
+  const extra: Pick<Survey, 'ridges' | 'fords'> = {};
+  if (w.features.ridges) {
+    extra.ridges = w.features.ridges.map((rd) => ({
+      crest: rd.crest.points.map((p) => ({ x: p.x, z: p.z })),
+      gullies: rd.gullies.map((s) => pointAt(rd.crest, s)),
+    }));
+  }
+  if (w.features.fords) extra.fords = w.features.fords.map((f) => ({ x: f.x, z: f.z }));
   return {
+    ...extra,
     seed: w.seed,
     attempt: w.attempt,
     ok: r.ok,
     problems: [...r.problems],
-    stats: { 'overwatch sectors (of 8)': r.overwatchSectors, 'access sectors (of 16)': r.accessSectors, ridges: r.ridges, 'steep (%)': Math.round(r.steepShare * 1000) / 10 },
+    stats,
     terrain: { size, n, heights },
     road: w.features.road.points.map((p) => ({ x: p.x, z: p.z })),
     creek: w.features.creek.points.map((p) => ({ x: p.x, z: p.z })),

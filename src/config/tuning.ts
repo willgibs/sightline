@@ -63,6 +63,43 @@ export const defaultTuning = {
       siteMargin: 12, // metres of fine grid beyond the camp's outermost structures
     },
 
+    // Terrain with teeth (lab D, D3; sim/generation/landform.ts): the valley a generated camp
+    // stands in. Two or three ridge spines on chosen bearings overlook it from a few sectors,
+    // never a ring; their camp faces are cliffs broken by walkable gullies, and a creek with
+    // steep banks is crossed only at fords, so the way in is a choice.
+    landform: {
+      attempts: 8, // terrain re-rolls before a valley that fails its checks is kept anyway (rule 18)
+      openArcDeg: [130, 170], // the low side, with no ridge: the road comes in through it
+      ridges: [2, 3], // spines placed around the rest of the horizon
+      ridgeDistance: [240, 420], // from the camp to the middle of the crest
+      ridgeSpanDeg: [50, 80], // how much of the horizon each spine takes, seen from the camp
+      ridgeHeight: [30, 58], // crest above the pad
+      ridgeBack: [110, 190], // run of the far slope
+      ridgeBend: [-0.12, 0.3], // how far the crest's ends curl toward the camp, per metre of distance
+      cliffs: 0.9, // how much of a camp face is cliff away from its gullies (1: all of it)
+      gullies: [1, 2], // walkable gullies down each camp face
+      gullyWidth: 26, // across a gully, metres
+      floorRise: 9, // the valley floor's rise toward the play area's edge
+      floorHills: 4, // rolling relief on the floor
+      crags: 6, // broken relief on the spines
+      rim: 90, // hills beyond the play area, for the horizon
+      creekBank: 2.2, // creek banks between fords: too steep to climb (rise per metre)
+      fordBank: 0.45, // and at a ford
+      fords: [2, 3], // crossings besides the road's
+    },
+
+    // What D3 checks a valley for (sim/generation/overwatch.ts): overwatch from the placed
+    // ridges only, never a ring, and ways in and out that don't share a chokepoint.
+    overwatch: {
+      perchAngleDeg: 2.5, // a perch looks down into the camp at least this steeply
+      perchRange: [150, 560], // from the camp
+      maxPerchArcDeg: 180, // perches over at most half the horizon
+      minOpenGapDeg: 120, // the widest stretch of horizon with no perch
+      minAccess: 3, // of 8 octants of the play area's edge, the camp is reachable on foot from this many
+      exfilSeparation: 20, // two ways out stay at least this far apart beyond exfilFree of the camp
+      exfilFree: 90,
+    },
+
     // The camp's rhythm: how its guards walk their routines (sim/generation/routine.ts). Part of the
     // camp, like its layout: lab D validates the timing windows these make.
     routines: {

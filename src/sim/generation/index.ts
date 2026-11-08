@@ -8,6 +8,9 @@
 export { generateWorld, simTuningKey, siteBounds, worldFingerprint, worldTuningKey, type Spawn } from './world';
 export { buildWorld, handmadeMission, type HandmadeSpec } from './handmade';
 export { siteAt, type Site } from './site';
+export { ARCHETYPES, campMission, campSpecProblems, defaultCampSpec, type CampArchetype, type CampSpec } from './campSpec';
+export type { Ford, Ridge } from './landform';
+export type { Overwatch } from './overwatch';
 export { buildTestCamp, GUARD_ROLES, type Camp, type GuardRole, type GuardSpawn, type Structure, type StructureKind } from './camp';
 export { buildRoutine, routinePose, type Leg, type Routine, type RoutinePose } from './routine';
 export type { Bush, Props, Rock, Tree } from './props';
