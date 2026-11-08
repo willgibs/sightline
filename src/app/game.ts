@@ -33,7 +33,7 @@ import { Replay, REPLAY_SOUND_SPEED } from './replay';
 import { Timeline } from './timeline';
 import { frameSpan, type SoundTiming } from '../audio/engine';
 import { FrameStats, percentile } from './perf';
-import { missionSpec, type SpawnKind } from '../sim/kernel/mission';
+import type { SpawnKind } from '../sim/kernel/mission';
 import { startScene } from '../sim/kernel/scene';
 import type { Scene } from '../sim/game/scenes';
 import { SystemProfile } from '../sim/kernel/profile';
@@ -70,8 +70,8 @@ export interface GameOptions {
   sceneName: string | null;
   /** A recording to watch (?replay=<url>), instead of a valley to play. */
   replayUrl: string | null;
-  /** A generated camp to play (?camp, lab D), or null for Phase 0's valley: the default until D9. */
-  camp: CampSpec | null;
+  /** The generated camp to play (lab D). */
+  camp: CampSpec;
   /** Trial mode (A12): a sitting of the perception lab's exit test, from this seed; null for none. */
   trials?: string | null;
   /** Start that sitting over, forgetting any answers kept in this browser. */
@@ -458,7 +458,7 @@ export class Game {
       try {
         if (this.opts.sceneName && this.opts.scene === undefined) throw new Error(`There is no scene called '${this.opts.sceneName}'`);
         const t0 = performance.now();
-        const spec = this.opts.camp ? campMission(seed, this.opts.camp, this.spawnKind) : missionSpec(seed, this.spawnKind);
+        const spec = campMission(seed, this.opts.camp, this.spawnKind);
         world = this.scene ? this.scene.world(this.tuning) : generateWorld(spec, this.tuning, () => performance.now());
         if (this.scene) world.genMs = performance.now() - t0;
       } catch (e) {
@@ -482,7 +482,7 @@ export class Game {
         url.searchParams.set('seed', seed);
       }
       window.history.replaceState(null, '', url);
-      this.overlay.setStartTitle(this.scene ? `Scene · ${this.scene.title}` : this.opts.camp ? 'Phase 1 · Lab D · Camp generator' : 'Phase 0 · Foundations');
+      this.overlay.setStartTitle(this.scene ? `Scene · ${this.scene.title}` : 'Phase 1 · The valley');
       this.overlay.setStatus(
         this.scene
           ? this.scene.description
@@ -1232,7 +1232,7 @@ export class Game {
         ? 'fly camera'
         : `${scale}× speed${short}`;
     const lines = [
-      `SIGHTLINE · PHASE 0 · DEBUG VIEW · build ${BUILD}${this.scene ? ` · scene ${this.scene.name} v${this.scene.version}` : ''}`,
+      `SIGHTLINE · DEBUG VIEW · build ${BUILD}${this.scene ? ` · scene ${this.scene.name} v${this.scene.version}` : ''}`,
       `seed ${w.seed} · tick ${this.sim.tick.toLocaleString('en-US')} · ${clock(played)} played · ${mode}`,
       `${this.tuning.sim.tickHz} Hz · ${s.fps.toFixed(0)} fps · frame ${s.frameMs.toFixed(1)} ms (p95 ${s.p95Ms.toFixed(1)}) · cpu ${s.cpuMs.toFixed(1)} ms · sim ${(this.tickMs * 1000).toFixed(0)} µs/tick`,
       `${r.calls} draws · ${(r.triangles / 1000).toFixed(0)}k tris · ${(r.lines / 1000).toFixed(0)}k lines`,
@@ -1248,7 +1248,7 @@ export class Game {
       `aim ${this.aimText ?? '—'}`,
       ``,
       `WORLD`,
-      `relief ${w.terrain.minHeight.toFixed(0)} to ${w.terrain.maxHeight.toFixed(0)} m · ${w.features.saddles.length} passes · generated in ${Math.round(w.genMs)} ms`,
+      `relief ${w.terrain.minHeight.toFixed(0)} to ${w.terrain.maxHeight.toFixed(0)} m · ${w.features.ridges?.length ?? 0} ridges · generated in ${Math.round(w.genMs)} ms`,
       `overwatch ${w.report.overwatchSectors}/8 directions · ${w.report.perches.length} perches · reachable from ${w.report.accessSectors}/16`,
       `${w.props.trees.length.toLocaleString('en-US')} trees · ${w.props.rocks.length.toLocaleString('en-US')} rocks · ${w.props.bushes.length.toLocaleString('en-US')} bushes · ${w.camp.guards.length} guards${this.sim.solids.count ? ` · ${this.sim.solids.count} solid entities` : ''}`,
       sizes

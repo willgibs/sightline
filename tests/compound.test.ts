@@ -178,12 +178,6 @@ describe("the compound's doors and vehicles", () => {
     }
     expect(watch.report.first).toBeNull();
   });
-
-  it("aren't there in Phase 0's valley, whose runs keep their goldens", () => {
-    const plain = new Simulation(generateWorld({ ...campMission('TAL-4471'), camp: undefined }, T), T);
-    expect(plain.index.of('door').length).toBe(0);
-    expect(plain.solids.count).toBe(0);
-  });
 });
 
 describe("the compound's systems (D5)", () => {

@@ -83,13 +83,14 @@ describe('the synctest', () => {
       },
     };
     const crate = (id: number): SolidEntity => ({ id, kind: 'solid', faction: Faction.None, solid: { kind: 'box', id: 0, x: 400, z: 400, y0: 0, y1: 1, hx: 0.5, hz: 0.5, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Wood } });
-    const sync = play(withSystem(SYSTEMS, hidden), 300, 30, (sim) => void sim.spawn(crate));
+    let crateId = 0;
+    const sync = play(withSystem(SYSTEMS, hidden), 300, 30, (sim) => void (crateId = sim.spawn(crate).id));
     const f = sync.report.failure!;
     expect(f).not.toBeNull();
     expect(f.how).toBe('codec');
-    expect(f.parts).toEqual(['solid:9']);
-    expect(f.paths[0]!.path).toBe('solid:9.solid.x');
+    expect(f.parts).toEqual([`solid:${crateId}`]);
+    expect(f.paths[0]!.path).toBe(`solid:${crateId}.solid.x`);
     // The first tick re-stepped from the save at tick 0: the counter is at 30, not 0.
-    expect(describeSyncFailure(f)).toMatch(/^tick 1, put back by codec: solid:9 differ \(solid:9\.solid\.x: 400 → 400\.3/);
+    expect(describeSyncFailure(f)).toMatch(new RegExp(`^tick 1, put back by codec: solid:${crateId} differ \\(solid:${crateId}\\.solid\\.x: 400 → 400\\.3`));
   });
 });

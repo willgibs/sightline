@@ -152,7 +152,7 @@ describe('tuning validation', () => {
     expect(bad((t) => (t.bodies.player.accel = -0))).toEqual(['tuning.bodies.player.accel is -0']);
     expect(bad((t) => (t.gen.props.treeSpacing = 0))[0]).toMatch(/treeSpacing is 0/);
     expect(bad((t) => (t.gen.world.size = 40000))[0]).toMatch(/size is 40000/);
-    expect(bad((t) => (t.gen.world.maxGenAttempts = 1e308))[0]).toMatch(/maxGenAttempts/);
+    expect(bad((t) => (t.gen.landform.attempts = 1e308))[0]).toMatch(/landform\.attempts/);
     expect(bad((t) => ((t.bodies.player as Record<string, unknown>).extra = 1))).toEqual(['tuning.bodies.player.extra is not a tuning value']);
     expect(bad((t) => delete (t.noise as Partial<typeof t.noise>).radiusPerUnit)).toEqual(['tuning.noise.radiusPerUnit is missing']);
   });

@@ -51,7 +51,7 @@ describe('world generation', () => {
     expect(fingerprint(world)).toBe(fingerprint(tal));
     // And the check isn't vacuous: a gen value does change the valley.
     const gen = structuredClone(defaultTuning);
-    gen.gen.world.hills *= 1.01;
+    gen.gen.world.detail *= 1.01;
     expect(fingerprint(generateWorld(missionSpec('TAL-4471'), gen))).not.toBe(fingerprint(tal));
   });
 
@@ -138,4 +138,4 @@ describe('world generation', () => {
   });
 });
 
-const GOLDEN_TAL_4471 = 'f555512c33daea22';
+const GOLDEN_TAL_4471 = '6493586d720c2b68';

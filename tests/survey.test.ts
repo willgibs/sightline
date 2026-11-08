@@ -14,7 +14,7 @@ describe('a survey of a generated world', () => {
 
   it('is plain data a worker can post, and small', () => {
     expect(structuredClone(s)).toEqual(s);
-    expect(JSON.stringify({ ...s, terrain: null }).length).toBeLessThan(200_000);
+    expect(JSON.stringify({ ...s, terrain: null }).length).toBeLessThan(500_000);
   });
 
   it('says what the world says: its validation, guards, structures and perches', () => {

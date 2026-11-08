@@ -820,7 +820,8 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
     - Repair: shift a patrol's phase, turn or move a post, or move it out of an offending perch's sight, kept only if the camp comes closer to valid, within 12 re-analyses. A camp it can't save is rebuilt from fresh forks, up to 3 times.
     - Firing the reviewers' plans in the simulation (`npm run plans -- --evaluate`) corrected two more: a perch is ground a body can lie on (at most 40°), and its eye is the body's prone eye. Lab C's check gave each tower's rail a gap at the ladder's head.
     - Running the ways in through the real simulation (`npm run plans -- --simulate`) corrected four things in D7's model: the crouched pace (a step takes 5/9 s), towers (open under the roof), how the raster stamps thin things (by cell centres, so a certificate of stealth errs the safe way), and a margin (a certified way may fill the meter only to 85%). With them, every way in tried held in the simulation.
-- [ ] D9 · The valley switches to the generator, and the test camp retires. It lands alone. (Lab D held this for the owner's go-ahead. It isn't a taste call, so it goes ahead without one: `docs/decisions.md`, After the labs.)
+- [x] D9 · The valley switches to the generator, and the test camp retires. It lands alone. (Lab D held this for the owner's go-ahead. It isn't a taste call, so it went ahead without one: `docs/decisions.md`, After the labs.)
+  - **Built.** A mission that names no camp gets the default compound, and its spec says so, so a recording names its camp. Phase 0's terrain, camp and analysis are gone, with the tuning only they read. `GEN_VERSION` 5.
 - [ ] Exit test, the bench numbers, a note, a playable link.
   - **Where it stands (Nov 8), waiting on the owner:**
     - **Two questions, for the camps' sitting:**

@@ -29,8 +29,8 @@ export class Explorer {
   private workers: Worker[] = [];
   private readonly seeds: string[];
   private readonly series: string;
-  /** Lab D's generated camps (`&camp`), or Phase 0's valley; the default becomes the compound at D9. */
-  private readonly camp: CampSpec | null;
+  /** The camps it generates. */
+  private readonly camp: CampSpec;
 
   constructor(
     root: HTMLElement,
@@ -38,7 +38,7 @@ export class Explorer {
     params: URLSearchParams,
   ) {
     this.series = params.get('series') || 'explore';
-    this.camp = params.has('camp') ? { ...defaultCampSpec(), difficulty: clampUnit(Number(params.get('difficulty') ?? defaultCampSpec().difficulty)) } : null;
+    this.camp = { ...defaultCampSpec(), difficulty: clampUnit(Number(params.get('difficulty') ?? defaultCampSpec().difficulty)) };
     const count = Math.max(1, Math.min(400, Number(params.get('count')) || 24));
     const list = new Rng(this.series, 'list');
     this.seeds = Array.from({ length: count }, () => randomSeed(() => list.next()));
@@ -55,7 +55,6 @@ export class Explorer {
       url.searchParams.set('explore', '');
       url.searchParams.set('series', String(data.get('series') || 'explore'));
       url.searchParams.set('count', String(data.get('count') || 24));
-      if (this.camp) url.searchParams.set('camp', '');
       window.location.href = url.toString();
     });
     head.append(form);
@@ -65,7 +64,7 @@ export class Explorer {
     root.append(head, this.grid);
     for (const seed of this.seeds) {
       const card = el('a', 'explore-card is-pending');
-      card.setAttribute('href', `?seed=${encodeURIComponent(seed)}${this.camp ? `&camp&difficulty=${this.camp.difficulty}` : ''}`);
+      card.setAttribute('href', `?seed=${encodeURIComponent(seed)}&difficulty=${this.camp.difficulty}`);
       card.innerHTML = `<div class="explore-views"><canvas width="${VIEW}" height="${VIEW}"></canvas><canvas width="${VIEW}" height="${VIEW}"></canvas></div><div class="explore-caption"><span class="explore-seed">${seed}</span><span class="explore-status">generating…</span></div><div class="explore-notes"></div>`;
       this.grid.append(card);
       this.cards.set(seed, card);

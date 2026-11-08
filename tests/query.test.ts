@@ -109,8 +109,11 @@ describe('the world query', () => {
     const sim = new Simulation(world, T);
     sim.step(neutralInput());
     const bodies = sim.queryBodies();
-    const g = sim.guards.find((e) => !world.camp.guards[e.guard.spawn]!.elevated)!;
     const hit = emptyHit();
+    // A guard on the ground with nothing else on the ray's way to him.
+    const g = sim.guards.find(
+      (e) => !world.camp.guards[e.guard.spawn]!.elevated && [0.4, 1, 1.6].every((y) => raycast({ world, solids: sim.solids, bodies }, e.body.x + 20, e.body.y + y, e.body.z, -1, 0, 0, 20.4, Blocks.Bullet, hit, e.id).what === 'none'),
+    )!;
     const from = (y: number) => raycast({ world, solids: sim.solids, bodies }, g.body.x + 20, g.body.y + y, g.body.z, -1, 0, 0, 50, Blocks.Bullet, hit);
     const s = bodies.find((b) => b.id === g.id)!.shape;
     expect(from(s.head.y - g.body.y)).toMatchObject({ what: 'body', id: g.id, part: 'head' });

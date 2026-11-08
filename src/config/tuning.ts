@@ -28,19 +28,9 @@ export const defaultTuning = {
       padRadius: 78, // flattened camp pad
       padBlend: 36, // blend from the pad into the valley floor
       padHeight: 0.5, // pad elevation; kept off the 5 m contour lines
-      ridgeRadius: [215, 430], // crest distance from the camp, varying around the valley
-      ridgeHeight: [32, 78], // crest height above the pad
-      saddleCount: [3, 4], // low passes through the ridges: the creek uses two, the road one
-      saddleDepth: [0.6, 0.82], // share of the crest height a saddle removes
-      saddleHalfWidthDeg: [15, 24],
-      warpAmplitude: 70, // breaks the bowl's symmetry
-      hills: 15, // broad rolling relief
-      crags: 9, // ridged relief on the slopes
       detail: 0.9, // fine relief
       creekWidth: 7, // flat creek bed
-      creekBankSlope: 0.8, // bank rise per metre (about 39°)
       roadWidth: 6,
-      maxGenAttempts: 6, // re-rolls before accepting a valley that fails validation
     },
 
     props: {

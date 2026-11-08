@@ -109,6 +109,7 @@ describe('recordings', () => {
   it('stay small: a 20-minute mission is a few megabytes', () => {
     const { rec } = play(60);
     const perMinute = rec.toBytes().length;
-    expect(perMinute * 20).toBeLessThan(4 * 1024 * 1024);
+    // The state track stores every guard, and a generated camp has up to 16.
+    expect(perMinute * 20).toBeLessThan(6 * 1024 * 1024);
   });
 });

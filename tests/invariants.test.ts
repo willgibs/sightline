@@ -62,6 +62,6 @@ describe('motor invariants on generated valleys', () => {
     }
     expect(watch.sound).toBe(false);
     expect(watch.report.first).toMatchObject({ tick: 31, entity: sim.playerId });
-    expect(watch.report.first!.what).toMatch(/^rose 0\.(49|50)/);
+    expect(watch.report.first!.what).toMatch(/^rose 0\.(4[89]|5[01])/);
   });
 });

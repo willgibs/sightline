@@ -7,11 +7,8 @@ import { missionSpec, type MissionSpec, type SpawnKind } from '../kernel/mission
  * played in and a shared seed builds the same one anywhere.
  *
  * The core mission's archetype is the compound (owner, Nov 7), built as data in
- * `tuning.gen` so a logging camp or a comms relay can follow in Phase 3 as more data.
- *
- * Until D9, a mission with no camp spec builds Phase 0's valley and test camp, as every
- * recording and golden so far expects; one with a spec builds lab D's. D9 makes the
- * compound the default and retires the test camp.
+ * `tuning.gen` so a logging camp or a comms relay can follow in Phase 3 as more data. A
+ * mission that names no camp gets the default compound (D9, generation/world.ts).
  */
 export interface CampSpec {
   archetype: CampArchetype;
@@ -24,7 +21,7 @@ export type CampArchetype = (typeof ARCHETYPES)[number];
 
 declare module '../kernel/mission' {
   interface MissionSpec {
-    /** The camp to generate (generation/campSpec.ts); absent, Phase 0's test camp. */
+    /** The camp to generate (generation/campSpec.ts); absent, the default compound. */
     camp?: CampSpec;
   }
 }

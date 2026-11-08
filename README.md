@@ -4,7 +4,7 @@ A first-person stealth-sniper game for the browser. Each mission is a freshly ge
 
 It's early, and wireframe on purpose. The rule is to prove the core with plain shapes first: if a mission isn't tense with capsules and boxes, more content won't save it. Art comes after that.
 
-**[Play the latest build](https://sightline-brown.vercel.app)** in a desktop browser with a mouse and keyboard. It's whatever is on `main`: a walkable valley with a test camp and both views, not yet a mission. The labs are playable too: **[the shooting range](https://sightline-brown.vercel.app/?scene=shooting-range)** has 15 rounds and guards walking at 100–500 m, and **[the movement lab](https://sightline-brown.vercel.app/?scene=movement-lab)** has walls to mantle, windows, a ladder, a body to carry and every surface to hear yourself on.
+**[Play the latest build](https://sightline-brown.vercel.app)** in a desktop browser with a mouse and keyboard. It's whatever is on `main`: a walkable valley with a generated camp whose guards see and hear you, and both views, not yet a mission. The labs are playable too: **[the shooting range](https://sightline-brown.vercel.app/?scene=shooting-range)** has 15 rounds and guards walking at 100–500 m, and **[the movement lab](https://sightline-brown.vercel.app/?scene=movement-lab)** has walls to mantle, windows, a ladder, a body to carry and every surface to hear yourself on.
 
 ![A valley overlook in the honest view, with the camp below](docs/images/overlook.png)
 
@@ -17,7 +17,7 @@ It's early, and wireframe on purpose. The rule is to prove the core with plain s
 
 ## Where it stands
 
-**Phase 0** (foundations) passed its gate on Nov 7, 2026. It built a deterministic simulation, a walkable wireframe valley with a test camp, and the tooling every later system builds on.
+**Phase 0** (foundations) passed its gate on Nov 7, 2026. It built a deterministic simulation, a walkable wireframe valley, and the tooling every later system builds on.
 
 **Phase 1 is under way.** It has five labs. Each lab is an isolated wireframe scene, built to its exit test before anything is integrated:
 
