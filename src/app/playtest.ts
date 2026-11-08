@@ -75,7 +75,10 @@ export class BrowserStore implements PlaytestStore {
   async save(name: string, recording: Blob, report: TelemetryReport): Promise<void> {
     const run: StoredRun = { name, savedAt: report.savedAt, label: report.world.scene ?? report.world.seed, ticks: report.run.ticks, tickHz: report.run.tickHz, recording, report };
     const db = await this.open();
-    await request(db.transaction('runs', 'readwrite').objectStore('runs').put(run));
+    // The transaction, not the request: a full disk only shows when the write commits.
+    const put = db.transaction('runs', 'readwrite');
+    put.objectStore('runs').put(run);
+    await done(put);
     // Only the newest few are kept.
     const all = await this.list();
     const tx = db.transaction('runs', 'readwrite');
@@ -91,12 +94,16 @@ export class BrowserStore implements PlaytestStore {
   }
 
   private open(): Promise<IDBDatabase> {
-    this.db ??= new Promise((resolve, reject) => {
+    this.db ??= new Promise<IDBDatabase>((resolve, reject) => {
       const req = indexedDB.open('sightline-playtests', 1);
       req.onupgradeneeded = () => req.result.createObjectStore('runs', { keyPath: 'name' });
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error ?? new Error('IndexedDB would not open'));
       req.onblocked = () => reject(new Error('IndexedDB is blocked by another tab'));
+    }).catch((e: unknown) => {
+      // Not kept: the next save tries to open it again.
+      this.db = null;
+      throw e;
     });
     return this.db;
   }
@@ -142,7 +149,10 @@ interface Run {
   simTicks: number;
   pausedMs: number;
   pauses: number;
+  /** Recorded ticks at the last save that reached the store. */
   savedTick: number;
+  /** Recorded ticks at the last attempt, kept or not: the minute's saves count from it, so a failing store isn't asked every frame. */
+  triedTick: number;
 }
 
 export class PlaytestCapture {
@@ -176,6 +186,7 @@ export class PlaytestCapture {
       pausedMs: 0,
       pauses: 0,
       savedTick: 0,
+      triedTick: 0,
     };
   }
 
@@ -187,7 +198,7 @@ export class PlaytestCapture {
     r.cpu.push(cpuMs);
     r.simMs += simMs;
     r.simTicks += ticks;
-    if ((r.sim.tick - r.savedTick) / r.sim.tuning.sim.tickHz >= EVERY_SECONDS) this.save('minute');
+    if ((r.recorder.ticks - r.triedTick) / r.sim.tuning.sim.tickHz >= EVERY_SECONDS) this.save('minute');
   }
 
   /** A pause began (counted at once, so a save on pausing includes it). */
@@ -203,7 +214,9 @@ export class PlaytestCapture {
   /** Saves the current run now (if anything is new), without waiting for the store. */
   save(reason: string, r: Run | null = this.run): void {
     if (!r || !this.store) return;
-    if (r.sim.tick === r.savedTick || r.sim.tick / r.sim.tuning.sim.tickHz < MIN_SECONDS) return;
+    // What the recorder holds, which after a failed tick includes that tick's input.
+    const ticks = r.recorder.ticks;
+    if (ticks === r.savedTick || ticks / r.sim.tuning.sim.tickHz < MIN_SECONDS) return;
     if (this.saving) {
       // One save at a time; the rest wait their turn, one per run.
       this.pending.set(r, reason);
@@ -234,17 +247,17 @@ export class PlaytestCapture {
   }
 
   private async write(r: Run, reason: string): Promise<void> {
-    const tick = r.sim.tick;
-    const before = r.savedTick;
-    // Counted as saved from now, so the frames while it's written don't ask again.
-    r.savedTick = tick;
+    const ticks = r.recorder.ticks;
+    // The minute's next save counts from this attempt, whether or not it works: a store
+    // that keeps failing is asked once a minute (and on a pause or the like), not every frame.
+    r.triedTick = ticks;
     try {
       const rec = r.recorder.finish(r.sim, r.startedAt);
       const report = this.report(r, reason);
       await this.store!.save(r.name, new Blob(rec.toParts() as BlobPart[], { type: 'application/octet-stream' }), report);
-      this.status = `saved ${r.name} at ${clock(tick / r.sim.tuning.sim.tickHz)} (${reason}) to ${this.store!.where}`;
+      r.savedTick = Math.max(r.savedTick, ticks);
+      this.status = `saved ${r.name} at ${clock(ticks / r.sim.tuning.sim.tickHz)} (${reason}) to ${this.store!.where}`;
     } catch (e) {
-      if (r.savedTick === tick) r.savedTick = before;
       this.status = `couldn't save: ${e instanceof Error ? e.message : String(e)}`;
       console.warn('Sightline: playtest save failed', e);
     }
@@ -262,7 +275,7 @@ export class PlaytestCapture {
       savedAt: new Date().toISOString(),
       reason,
       world: { seed: r.sim.world.seed, scene: r.scene },
-      run: { ticks: r.sim.tick, tickHz: hz, playedSeconds: r.sim.tick / hz, pausedSeconds: r.pausedMs / 1000, pauses: r.pauses },
+      run: { ticks: r.recorder.ticks, tickHz: hz, playedSeconds: r.recorder.ticks / hz, pausedSeconds: r.pausedMs / 1000, pauses: r.pauses },
       frames: {
         count: f.count,
         meanMs: round(f.mean),

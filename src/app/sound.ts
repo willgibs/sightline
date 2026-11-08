@@ -96,11 +96,14 @@ export class GameSound {
     });
   }
 
-  /** One tick's events, timed against the picture (audio/engine.ts, SoundTiming). */
-  play(events: readonly SimEvent[], earToFeet: number, timing: SoundTiming): void {
+  /**
+   * One tick's events, timed against the picture (audio/engine.ts, SoundTiming). `inBody`:
+   * the listener is the player's own eyes, so their steps and clothes sound at the ears.
+   */
+  play(events: readonly SimEvent[], earToFeet: number, timing: SoundTiming, inBody = true): void {
     const e = this.engine;
     if (!e || events.length === 0 || this.ctx?.state !== 'running') return;
-    this.guard(() => e.play(events, earToFeet, timing));
+    this.guard(() => e.play(events, earToFeet, timing, inBody));
   }
 
   /** For the debug panel: two lines. */

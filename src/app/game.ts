@@ -83,7 +83,8 @@ export class Game {
   private tuning: Tuning;
   private world!: World;
   private sim!: Simulation;
-  private recorder!: Recorder;
+  /** The live run's recorder; null before the first run (a page opened on a replay) and never the replay's. */
+  private recorder: Recorder | null = null;
   private prev!: Snapshot;
   private curr!: Snapshot;
   private readonly renderer: GameRenderer;
@@ -269,8 +270,14 @@ export class Game {
     });
     // Watching a replay, a click on the view takes the mouse for looking (the fly camera).
     this.opts.canvas.addEventListener('click', () => {
-      if (this.replay && !this.input.locked) this.input.requestLock();
+      if (!this.replay) return;
+      this.sound.unlock();
+      if (!this.input.locked) this.input.requestLock();
     });
+    // A replay opened from a link or a dropped file starts silent: browsers start sound only
+    // on a click or a key, and while watching, any will do.
+    window.addEventListener('keydown', () => this.replay && this.sound.unlock());
+    window.addEventListener('pointerdown', () => this.replay && this.sound.unlock());
     if (this.opts.replayUrl) this.openReplayUrl(this.opts.replayUrl);
     else this.generate(this.opts.seed);
     requestAnimationFrame(this.frame);
@@ -376,6 +383,7 @@ export class Game {
   // --- World and runs. ---------------------------------------------------------------
 
   private generate(seed: string): void {
+    this.exitReplayMode();
     this.seed = seed;
     this.failure = null;
     // Hand the mouse back while the valley is rebuilt; the overlay invites the player back in.
@@ -428,10 +436,12 @@ export class Game {
   }
 
   private restartRun(): void {
+    this.exitReplayMode();
     this.sim = this.scene ? startScene(this.scene, this.tuning, this.world) : new Simulation(this.world, this.tuning);
-    this.recorder = new Recorder(this.sim, BUILD);
+    const recorder = new Recorder(this.sim, BUILD);
+    this.recorder = recorder;
     this.sound.setSimulation(this.sim);
-    this.capture.startRun(this.sim, this.recorder, this.world.seed, this.scene?.name ?? null);
+    this.capture.startRun(this.sim, recorder, this.world.seed, this.scene?.name ?? null);
     this.savedTick = 0;
     this.failure = null;
     this.sim.drawDebug = this.debug;
@@ -464,6 +474,12 @@ export class Game {
     const simChanged = simTuningKey(next) !== simTuningKey(this.tuning);
     const tickChanged = next.sim.tickHz !== this.tuning.sim.tickHz || next.sim.recordHz !== this.tuning.sim.recordHz;
     this.tuning = next;
+    if (this.replay) {
+      // A replay shows its recording, numbers and all: only the view takes the new tuning.
+      this.renderer.setTuning(this.replayTuning(this.replay));
+      this.notify('Tuning reloaded · the replay keeps its recording’s numbers');
+      return;
+    }
     this.renderer.setTuning(next);
     this.sound.setTuning(next);
     if (worldChanged) {
@@ -475,7 +491,7 @@ export class Game {
     } else if (simChanged) {
       if (!this.sim.fault) {
         this.sim.setTuning(next);
-        this.recorder.tuningChanged(this.sim);
+        this.recorder?.tuningChanged(this.sim);
       }
       this.notify('Tuning reloaded');
     } else {
@@ -507,7 +523,7 @@ export class Game {
     if (this.bench || this.failure || (this.overlay.visible && this.overlay.currentMode === 'outcome')) return;
     this.paused = true;
     this.pausedAt = performance.now();
-    this.recorder.annotate('pause');
+    this.recorder?.annotate('pause');
     this.capture.pauseStarted();
     this.capture.save('pause');
     this.showKept();
@@ -564,7 +580,7 @@ export class Game {
         // At the end, playing starts it over.
         if (!r.playing && this.sim.tick >= r.ticks) this.seekReplay(0);
         r.playing = !r.playing;
-        this.clock.reset();
+        this.holdReplayPicture();
         break;
       }
       case 'replayBack':
@@ -579,6 +595,7 @@ export class Game {
         break;
       case 'mark': {
         // A marker in the recording: "look at this moment" for a playtest or a bug report.
+        if (!this.recorder) break;
         this.recorder.annotate('marker');
         this.hud.toast(`Marked ${clock(this.sim.tick / this.tuning.sim.tickHz)} in the recording`);
         break;
@@ -774,19 +791,19 @@ export class Game {
       events = this.sim.step(this.raw);
     } catch (e) {
       // The state is partway through the tick: keep the failing input, and stop.
-      this.recorder.recordFault(this.sim);
+      this.recorder?.recordFault(this.sim);
       this.fail('tick', e);
       return;
     }
     const swap = this.prev;
     this.prev = this.curr;
-    this.curr = swap;
-    this.recorder.record(this.sim, events);
-    this.sim.snapshot(this.curr);
+    this.recorder?.record(this.sim, events);
+    // A fresh snapshot when guards came or went (snapshot() reuses `swap` only when they match).
+    this.curr = this.sim.snapshot(swap);
     for (const e of events) if (e.type === 'outcome') this.decided = true;
     if (events.length > 0) {
       this.renderer.addEvents(events, this.time);
-      this.sound.play(events, this.sim.player.eyeHeight, this.soundTiming);
+      this.sound.play(events, this.sim.player.eyeHeight, this.soundTiming, !this.detached);
     }
   }
 
@@ -805,7 +822,7 @@ export class Game {
     const next = b.step < a.step - 0.5 ? b.step + 1 : b.step;
     const phase = lerp(a.step, next, t);
     const V = this.tuning.view;
-    const bob = headBob(phase, speed, this.tuning.bodies.player, V.bob) * V.headBob * (1 - optic);
+    const bob = headBob(phase, speed, this.sim.tuning.bodies.player, V.bob) * V.headBob * (1 - optic);
     return {
       x: lerp(a.px, b.px, t),
       y: lerp(a.py, b.py, t) + lerp(a.eye, b.eye, t) + bob,
@@ -895,7 +912,7 @@ export class Game {
     const exp = exposure(p, T.bodies.player, T, light);
     const V = T.visibility;
     const moveFactor = p.gait === 'idle' ? V.movement.still : p.gait === 'sprint' ? V.movement.sprinting : V.movement.moving;
-    const sizes = this.recorder.sizes;
+    const sizes = this.replay ? null : (this.recorder?.sizes ?? null);
     const kb = (n: number) => (n < 1024 * 1024 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`);
     const scale = TIME_SCALES[this.timeScaleIndex]!;
     // A slow machine can't always run the ticks fast-forward asks for (8 a frame at most, times the scale).
@@ -924,7 +941,11 @@ export class Game {
       `relief ${w.terrain.minHeight.toFixed(0)} to ${w.terrain.maxHeight.toFixed(0)} m · ${w.features.saddles.length} passes · generated in ${Math.round(w.genMs)} ms`,
       `overwatch ${w.report.overwatchSectors}/8 directions · ${w.report.perches.length} perches · reachable from ${w.report.accessSectors}/16`,
       `${w.props.trees.length.toLocaleString('en-US')} trees · ${w.props.rocks.length.toLocaleString('en-US')} rocks · ${w.props.bushes.length.toLocaleString('en-US')} bushes · ${w.camp.guards.length} guards${this.sim.solids.count ? ` · ${this.sim.solids.count} solid entities` : ''}`,
-      `recording ${kb(sizes.inputs)} inputs · ${kb(sizes.states)} states · ${kb(sizes.events)} events`,
+      sizes
+        ? `recording ${kb(sizes.inputs)} inputs · ${kb(sizes.states)} states · ${kb(sizes.events)} events`
+        : this.replay
+          ? `watching ${this.replay.label} · recorded by build ${this.replay.rec.header.build || '?'}`
+          : 'recording —',
       ``,
       `SOUND`,
       this.sound.report(),
@@ -963,6 +984,7 @@ export class Game {
    * seeking, and shows it from the start, playing. Says why if this build can't.
    */
   openReplay(bytes: Uint8Array, label: string): void {
+    this.exitReplayMode();
     this.input.releaseLock();
     this.paused = true;
     this.failure = null;
@@ -987,9 +1009,13 @@ export class Game {
     this.world = r.world;
     this.scene = r.scene;
     this.seed = r.rec.header.mission.seed;
-    this.renderer.setWorld(r.world, this.tuning);
-    this.sound.setWorld(r.world);
     this.sim = r.sim;
+    // Bodies drawn, and steady sounds heard, by the recording's numbers; the view by the viewer's.
+    const recorded = this.replayTuning(r);
+    this.renderer.setWorld(r.world, recorded);
+    this.renderer.setTuning(recorded);
+    this.sound.setTuning(r.sim.tuning);
+    this.sound.setWorld(r.world);
     this.sound.setSimulation(this.sim);
     this.sim.drawDebug = this.debug;
     this.clock = new FixedStepClock(r.hz);
@@ -1014,6 +1040,14 @@ export class Game {
       window.history.replaceState(null, '', url);
     }
     this.hud.toast(`Replay · ${this.input.map.describe('replayPlay')} plays or pauses, ← → jump 5 s, N flies`);
+  }
+
+  /** A stopped replay shows exactly the tick it stopped on, not the one before (alpha restarts at 0). */
+  private holdReplayPicture(): void {
+    this.prev = this.sim.snapshot(this.prev);
+    this.curr = this.sim.snapshot(this.curr);
+    this.clock.reset();
+    this.redraws++;
   }
 
   /** Puts the replay at a tick, exactly (from the nearest save-state). */
@@ -1042,17 +1076,17 @@ export class Game {
     for (let i = 0; i < ticks; i++) {
       if (this.sim.tick >= r.ticks) {
         r.playing = false;
+        this.holdReplayPicture();
         this.hud.toast('End of the recording');
         break;
       }
       const events = r.seeker.step();
       const swap = this.prev;
       this.prev = this.curr;
-      this.curr = swap;
-      this.sim.snapshot(this.curr);
+      this.curr = this.sim.snapshot(swap);
       if (events.length === 0) continue;
       this.renderer.addEvents(events, this.time);
-      if (r.speed <= REPLAY_SOUND_SPEED) this.sound.play(events, this.sim.player.eyeHeight, this.soundTiming);
+      if (r.speed <= REPLAY_SOUND_SPEED) this.sound.play(events, this.sim.player.eyeHeight, this.soundTiming, !this.detached);
       for (const e of events) if (e.type === 'outcome') this.hud.toast(`The run ${e.status} here`);
     }
   }
@@ -1061,6 +1095,16 @@ export class Game {
   private leaveReplay(): void {
     const r = this.replay;
     if (!r) return;
+    this.generate(r.rec.header.mission.seed);
+  }
+
+  /**
+   * Undoes everything watching set up: the timeline, the keys, the recording's numbers.
+   * Whatever ends a replay (Leave, a new valley, another recording, a failed open) comes
+   * through here first.
+   */
+  private exitReplayMode(): void {
+    if (!this.replay) return;
     this.replay = null;
     this.timeline.hide();
     document.body.classList.remove('replaying');
@@ -1070,7 +1114,13 @@ export class Game {
     this.input.contexts.delete('replay');
     this.input.contexts.add('play');
     if (!this.debug) this.input.contexts.delete('debug');
-    this.generate(r.rec.header.mission.seed);
+    this.renderer.setTuning(this.tuning);
+    this.sound.setTuning(this.tuning);
+  }
+
+  /** The tuning a replay is drawn and heard with: the recording's bodies and noise, the viewer's view. */
+  private replayTuning(r: Replay): Tuning {
+    return { ...this.tuning, bodies: r.sim.tuning.bodies, noise: r.sim.tuning.noise };
   }
 
   /** The deployed game's kept runs, on the start and pause screens, for saving as files. */
@@ -1120,6 +1170,12 @@ export class Game {
 
   private saveRecording(): void {
     if (!this.sim) return;
+    if (this.replay) {
+      // Watching a recording: saving gives that recording, as it was opened.
+      this.download(new Blob(this.replay.rec.toParts() as BlobPart[], { type: 'application/octet-stream' }), `sightline-${this.replay.label.replace(/\.slrec$/, '')}.slrec`);
+      return;
+    }
+    if (!this.recorder) return;
     const rec = this.recorder.finish(this.sim, new Date().toISOString());
     const name = `sightline-${this.world.seed}-${this.sim.tick}.slrec`;
     this.download(new Blob(rec.toParts() as BlobPart[], { type: 'application/octet-stream' }), name);
@@ -1199,7 +1255,8 @@ export class Game {
       /** The current run's recording as base64, for re-simulating it outside the browser. */
       recording: () => {
         ready('recording');
-        const bytes = this.recorder.finish(this.sim, new Date().toISOString()).toBytes();
+        if (!this.replay && !this.recorder) throw new Error('sightline.recording() needs a run: wait until state().overlay is \'start\'');
+        const bytes = this.replay ? this.replay.rec.toBytes() : this.recorder!.finish(this.sim, new Date().toISOString()).toBytes();
         // In slices: one character at a time takes half a second an hour of play.
         let bin = '';
         for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
@@ -1238,6 +1295,10 @@ export class Game {
         perf: this.stats.summary(),
         render: this.renderer.stats(),
         aim: this.aimText,
+        /** The camera as last drawn. */
+        camera: { x: this.drawnPose.x, y: this.drawnPose.y, z: this.drawnPose.z, yaw: this.drawnPose.yaw, pitch: this.drawnPose.pitch },
+        timeline: this.timeline.visible,
+        contexts: [...this.input.contexts],
         overlay: this.overlay.currentMode,
         overlayVisible: this.overlay.visible,
         spawn: this.world?.spawn,

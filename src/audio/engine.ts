@@ -205,15 +205,18 @@ export class SoundEngine {
   /**
    * Plays one tick's events. `earToFeet` is how far your ears are above your feet, which
    * sets how loud your own footsteps are under the same hearing law as everything else.
-   * Without `timing`, everything plays at once.
+   * Without `timing`, everything plays at once. With the listener out of the player's body
+   * (`inBody` false: the fly camera, a replay watched from outside), the player's steps are
+   * heard from where they happen, like anyone's, and their clothes not at all.
    */
-  play(events: readonly SimEvent[], earToFeet: number, timing?: SoundTiming): void {
+  play(events: readonly SimEvent[], earToFeet: number, timing?: SoundTiming, inBody = true): void {
     for (const e of events) {
       const lead = timing ? leadOf(e.t, timing) : 0;
+      const own = e.source === PLAYER_ID && inBody;
       if (e.type === 'footstep') {
         // The step's kind of sound comes from its gait; how loud it is, from its radius.
         const gait = this.tuning.noise.movement[e.gait];
-        if (e.source === PLAYER_ID) {
+        if (own) {
           const amp = THRESHOLD * audibility(e.radius, earToFeet);
           this.voice(amp, lead, (when) => footstep(this.ctx, this.body, this.noise, this.rand, when, surfaceName(e.surface), gait, amp));
         } else {
@@ -224,7 +227,7 @@ export class SoundEngine {
       } else if (e.type === 'land') {
         // A landing is a heavy footfall: the sprint voice at the landing's own loudness.
         const gait = 1.5;
-        if (e.source === PLAYER_ID) {
+        if (own) {
           const amp = THRESHOLD * audibility(e.radius, earToFeet);
           this.voice(amp, lead, (when) => footstep(this.ctx, this.body, this.noise, this.rand, when, surfaceName(e.surface), gait, amp));
         } else {
@@ -232,7 +235,7 @@ export class SoundEngine {
             footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), gait, amp), lead,
           );
         }
-      } else if (e.type === 'stance' && e.source === PLAYER_ID) {
+      } else if (e.type === 'stance' && own) {
         // Your own clothes, at your ears. Not a sound in the simulation (nobody else hears
         // it), so another body's change of stance is silent.
         const length = e.to === 'prone' || e.from === 'prone' ? 0.5 : 0.22;

@@ -75,16 +75,9 @@ export class InvariantWatch {
     }
   }
 
-  /** True while every promise has held. */
+  /** True while every promise has held: each broken one is noted as `first`, by its own body's limits. */
   get sound(): boolean {
-    const r = this.report;
-    return r.nan === 0 && r.below === 0 && r.inside === 0 && r.worstRise <= this.maxStep() + 1e-9 && r.steepGain < STEEP_TOLERANCE;
-  }
-
-  private maxStep(): number {
-    let step = 0;
-    for (const spec of Object.values(this.sim.tuning.bodies)) step = Math.max(step, spec.stepHeight);
-    return step;
+    return this.report.first === null;
   }
 
   private check(id: EntityId, b: BodyState, spec: BodySpec, was: Before): void {

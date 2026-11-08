@@ -142,6 +142,16 @@ describe.runIf(canSuspend)('the sound engine', () => {
     expect((await render((e) => e.play([stance(PLAYER_ID + 1)], 1.65))).onset).toBe(-1);
   });
 
+  it('hears your own steps from where they happen when the camera is out of your body', async () => {
+    // A replay watched from 30 m away: your 14 m step is out of earshot, and your clothes are silent.
+    const step30 = (e: SoundEngine, inBody: boolean) =>
+      e.play([step(0, -30, 14, 2, 1.15, PLAYER_ID, 0)], 1.65, undefined, inBody);
+    expect((await render((e) => step30(e, true))).onset).toBeGreaterThan(0);
+    expect((await render((e) => step30(e, false))).onset).toBe(-1);
+    const stance = { type: 'stance' as const, id: 1, tick: 1, t: 1 / 30, source: PLAYER_ID, cause: 0, from: 'stand' as const, to: 'crouch' as const };
+    expect((await render((e) => e.play([stance], 1.65, undefined, false))).onset).toBe(-1);
+  });
+
   it('plays your own footsteps as loud as the simulation says they are', async () => {
     // Movement × surface from the tuning table: sprint on gravel vs crouch on grass.
     const N = defaultTuning.noise;

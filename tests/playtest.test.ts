@@ -111,6 +111,57 @@ describe('playtest capture', () => {
     await capture.settled();
   });
 
+  it("asks a failing store once a minute, not every frame, and still tries again on a pause", async () => {
+    let attempts = 0;
+    const failing: PlaytestStore = {
+      where: 'nowhere',
+      save: async () => {
+        attempts++;
+        throw new Error('disk full');
+      },
+    };
+    const capture = new PlaytestCapture(failing, context);
+    const r = run(0);
+    capture.startRun(r.sim, r.recorder, 'TEST-0000', null);
+    r.play(61, capture);
+    await capture.settled();
+    expect(attempts).toBe(1);
+    expect(capture.status).toMatch(/couldn't save: disk full/);
+    // Thirty more seconds of frames: no new attempts until the next minute.
+    r.play(30, capture);
+    await capture.settled();
+    expect(attempts).toBe(1);
+    // A pause asks again: the run still isn't kept anywhere. The next minute counts from it.
+    capture.save('pause');
+    await capture.settled();
+    expect(attempts).toBe(2);
+    r.play(59, capture);
+    await capture.settled();
+    expect(attempts).toBe(2);
+    r.play(2, capture);
+    await capture.settled();
+    expect(attempts).toBe(3);
+  });
+
+  it('keeps the failing tick when a tick fails right after a save', async () => {
+    const store = new MemoryStore();
+    const capture = new PlaytestCapture(store, context);
+    const r = run(0);
+    capture.startRun(r.sim, r.recorder, 'TEST-0000', null);
+    r.play(10, capture);
+    capture.save('pause');
+    await capture.settled();
+    expect(store.saved.at(-1)!.recording.header.ticks).toBe(300);
+    // The next tick fails: the recorder keeps its input, though the simulation's tick doesn't move.
+    r.sim.fault = { tick: 301, system: 'test', message: 'boom' };
+    r.recorder.recordFault(r.sim);
+    capture.save('fault');
+    await capture.settled();
+    expect(store.saved).toHaveLength(2);
+    expect(store.saved[1]!.recording.header.ticks).toBe(301);
+    expect(store.saved[1]!.recording.header.fault).toMatchObject({ tick: 301, system: 'test' });
+  });
+
   it('refuses file names that could leave playtests/', () => {
     for (const bad of ['../x.slrec', 'a/b.slrec', '.hidden.slrec', 'x.exe', 'x.slrec/..', '']) expect(PLAYTEST_NAME.test(bad)).toBe(false);
     expect(PLAYTEST_NAME.test('20261107-185836-scene-movement-course.json')).toBe(true);

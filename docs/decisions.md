@@ -6,6 +6,18 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### An independent review, and what it changed
+
+**Decision:** before handing the pass back, a separate agent reviewed this session's commits (53ffd0d..2053269) without having seen them written: by reading, by running the tests, and with scripts of its own. Every finding was fixed:
+
+- **Replay mode ends one way:** anything that starts a valley or a run, or opens another recording, leaves it first (`exitReplayMode`). Saving or hot-reloading during a replay acts on the recording being watched, never on the last live run's recorder.
+- **A replay shows its own numbers:** bodies are drawn, and steady sounds heard, with the recording's tuning; only the view takes the viewer's.
+- **The camera out of the body:** the fly camera flies on the movement keys in any context. With the camera outside the body, the player's own steps are heard from where they happen.
+- **Saving that fails waits:** a failing store is asked again after the next minute of play or the next pause, not every frame. IndexedDB waits for its transaction to commit, and a failed tick's input counts as something new to save.
+- **The fuzz verdict** is the first broken promise, by each body's own limits.
+
+**Why:** an author's own checks follow the author's assumptions. The two serious findings were paths the author never took: opening a replay straight from a link, and leaving one by any route but Leave.
+
 ### A recording can be watched, from any camera, at any moment
 
 **Decision:** the game watches recordings (`src/app/replay.ts`):
@@ -36,7 +48,7 @@ The working plan, with everything still open, is `docs/foundation-plan.md`.
 
 ### Every engine, every push
 
-**Decision:** a second workflow (`.github/workflows/engines.yml`) runs the browser tests in Chromium, Firefox and WebKit, and the self-test under Bun (JavaScriptCore), on every push. Branches named `ci/...` run it too, so a change to CI can be tried before it reaches `main`. Vite now bundles three before the browser tests start. A dependency first met mid-run made Vite reload the page under the running tests, which was the occasional first-run hang.
+**Decision:** a second workflow (`.github/workflows/engines.yml`) runs the browser tests in Chromium, Firefox and WebKit, and the self-test under Bun (JavaScriptCore), on every push. Branches named `ci/...` run it too, so a change to CI can be tried before it reaches `main`. Vite now bundles three before the browser tests start, because a dependency first met mid-run makes Vite reload the page under the running tests. A test that imports the renderer would hit that. It doesn't explain the occasional first-run hang seen before: no browser test imports three yet. If that hang comes back, `DEBUG=vite:deps` shows what Vite is doing.
 
 **Why:** a recording made in Safari has to replay in Chrome, and in CI. Every engine gives the golden values.
 
@@ -65,7 +77,7 @@ The working plan, with everything still open, is `docs/foundation-plan.md`.
 - **Timing:** each event plays when the frame on screen reaches its moment, plus about a frame. The picture runs a tick behind the newest state, so a sound waits `(t − shown) / scale + hold`, at most a quarter of a second. The hold covers a tick computed late in its frame; it tracks the frame time, jumping up for a slow frame and easing back down. A sound the picture has passed plays at once.
 - **Failures:** sound is never essential. Without Web Audio, or after any error in it, the game plays on silently and the debug panel says why. The panel also shows the context's state, latency and voices, and the steady sources in earshot.
 
-**Why:** a tick's events used to reach the speakers when the frame that ran the tick was drawn: late by up to a tick, and by a different amount each time. In a model of the loop, with frames ±25% uneven, a sprint's steps wandered 28–47 ms from their period at 24–144 fps. That's enough to hear a steady stride as uneven. Timed against the picture, they stay within 3 ms (a test holds them under 4). The added frame roughly matches the screen's own latency, so sound stays in step with what you see.
+**Why:** a tick's events used to reach the speakers when the frame that ran the tick was drawn: late by up to a tick, and by a different amount each time. In a model of the loop, with frames ±25% uneven, a sprint's steps wandered 28–47 ms from their period at 24–144 fps. That's enough to hear a steady stride as uneven. Timed against the picture, they stay within 3 ms of the model's wall clock (a test holds them under 4). In a real browser the audio clock's own steps, a few milliseconds a callback, come on top. That is still well under what an ear notices in a stride. The added frame roughly matches the screen's own latency, so sound stays in step with what you see.
 
 ### The world's steady sounds are listed by the simulation
 

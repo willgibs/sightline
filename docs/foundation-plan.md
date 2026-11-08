@@ -121,7 +121,8 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
   - The timeline shows the run's markers and pauses. The debug views all work, and sounds play up to 2×.
 - [x] Determinism in every engine, on every push (`.github/workflows/engines.yml`): the browser tests in Chromium, Firefox and WebKit, and the self-test under Bun (JavaScriptCore). All four give the golden values.
   - The weekly run adds 40 hours of bot play on fresh valleys, with every body checked every tick (`npm run fuzz`). A failure is saved as a recording that reproduces it.
-  - The first-run hang was Vite meeting a dependency mid-run and reloading the page under the tests; three is now bundled up front.
+  - A dependency first met mid-run makes Vite reload the page under the running tests; adding a browser test that imports three reproduced it. three is now bundled up front, so tests of the renderer can't trip it.
+  - That doesn't explain the original first-run hang: none of today's browser tests import three (the independent review checked). If it recurs, run with `DEBUG=vite:deps`.
   - WebKit's first run found its high-pass filter 1–2 dB quieter than other engines'. Grass, the one voice that used it, now uses a band-pass, recalibrated with `tests/browser/calibrate.test.ts`. (Firefox can't suspend an offline audio context, so only the voices test runs there.)
 
 ### M10 · Close out
@@ -131,7 +132,10 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
   - The deployed build loads in the desktop app's browser on the owner's M3 Max (Metal through ANGLE) and generates TAL-4471 in 1.3 s.
   - A 20-minute bot run gives the same final hash on macOS arm64 as on Linux x64 (`e9311dda2ac00379`, CI run on demand).
   - Still to do with the owner at the screen: frame rate, sound, the kept runs and a replay. The browser pane was hidden, which pauses the page's frames.
-- [ ] An independent review of the result.
+- [x] An independent review of the result (a separate agent, read and run against 53ffd0d..2053269). It found two high, four medium and eight low findings, all fixed:
+  - **High:** a replay opened from a link had no recorder, so the debug view crashed. Ending a replay any way but Leave left replay mode half on.
+  - **Medium:** the fly camera couldn't move sideways in a replay. A failing store was asked to save every frame. Replays from a link stayed silent. A tuning hot reload changed what a replay showed.
+  - **Low:** the player's own steps played at the ears with the camera outside the body, and replays were drawn with the build's body sizes, not the recording's. A paused replay showed the tick before, a quota error reported "saved", and a fault saved right after a pause was lost. The fuzz verdict ignored a body's own limits, and two claims in the docs overreached.
 
 ## Done so far
 

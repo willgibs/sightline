@@ -233,13 +233,18 @@ export class InputController {
     return out;
   }
 
-  /** Free-flight axes for the detached debug camera: the movement keys, up and down, sprint for speed. */
+  /**
+   * Free-flight axes for the detached camera: the movement keys, up and down, sprint for
+   * speed. The camera flies on the movement keys' bindings whatever the context (watching
+   * a replay, on-foot actions are off, but the keys still fly).
+   */
   flyAxes(): { x: number; y: number; z: number; fast: boolean } {
+    const down = (a: Action): boolean => this.map.actions[a].inputs.some((i) => this.down.has(i));
     return {
-      x: (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0),
-      y: (this.held('flyUp') ? 1 : 0) - (this.held('flyDown') ? 1 : 0),
-      z: (this.held('forward') ? 1 : 0) - (this.held('back') ? 1 : 0),
-      fast: this.held('sprint'),
+      x: (down('right') ? 1 : 0) - (down('left') ? 1 : 0),
+      y: (down('flyUp') ? 1 : 0) - (down('flyDown') ? 1 : 0),
+      z: (down('forward') ? 1 : 0) - (down('back') ? 1 : 0),
+      fast: down('sprint'),
     };
   }
 }
