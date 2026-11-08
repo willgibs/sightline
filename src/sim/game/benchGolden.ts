@@ -85,7 +85,7 @@ export const BENCH_GOLDEN: PinnedBench = {
     "metrics": {
       "search map: numbers": 4096,
       "search cycle: shortest (s)": 30.1666667,
-      "search cycle: longest (s)": 31.1666667,
+      "search cycle: longest (s)": 40.1666667,
       "ellipse: contains the shooter at 1 sigma (%)": 38.75,
       "ellipse: contains the shooter at 2 sigma (%)": 88.5,
       "ellipse in the world: contains the perch at 1 sigma (%)": 36.0824742,
@@ -96,7 +96,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       "re-found within 25 s (of 8): plain": 6,
       "re-found within 25 s (of 8): staleness": 4,
       "re-found within 25 s (of 8): omniscient": 8,
-      "reactions (in the scripted scenarios)": 68,
+      "reactions (in the scripted scenarios)": 60,
       "reactions unexplained": 0
     },
     "runs": {}

@@ -93,3 +93,32 @@ describe('minimal combat', () => {
     expect(Math.hypot(g.body.x, g.body.z)).toBeGreaterThan(0.5);
   });
 });
+
+describe('working round (flank)', () => {
+  it('a guard who has held cover without a sight of the target moves up to one side', () => {
+    const fast = structuredClone(T);
+    fast.brain.combat.holdAfter = 0.5;
+    let systems = SYSTEMS;
+    for (const s of [...PERCEPTION, commsVoice, campCommander]) systems = withSystem(systems, s);
+    const world = worldWith([wall(5, 6, 1, 1)]);
+    const sim = new Simulation(world, fast, systems);
+    giveSenses(sim);
+    giveBrains(sim);
+    giveCommander(sim);
+    const g = sim.guards[0]!;
+    const a = g.senses!.awareness;
+    a.state = 'combat';
+    a.since = 0;
+    a.fallAt = 99999;
+    a.focus = true;
+    a.fx = 30;
+    a.fz = 0;
+    g.senses!.belief = { x: 30, y: 1.2, z: 0, radius: 2, tick: 0, seen: true, cause: 0 };
+    const raw = neutralInput();
+    const ev: SimEvent[] = [];
+    for (let i = 0; i < 16 * 30; i++) ev.push(...sim.step(raw).map((e) => ({ ...e })));
+    expect(ev.some((e) => e.type === 'act' && e.to === 'flank')).toBe(true);
+    // He ended up well away from where he started: he moved up.
+    expect(Math.hypot(g.body.x, g.body.z)).toBeGreaterThan(8);
+  });
+});

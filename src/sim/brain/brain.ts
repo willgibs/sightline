@@ -29,7 +29,7 @@ import { choose, response, type Option } from './utility';
  * percept, an awareness, a belief.
  */
 
-export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm'] as const;
+export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank'] as const;
 export type ActName = (typeof ACTS)[number];
 
 /** Why a guard changed what he's doing: A's reasons for a change of state, and the brain's own. */
@@ -234,6 +234,9 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
   b.routed = -1;
   b.points = 0;
   b.until = -1;
+  b.fireAt = -1;
+  b.covered = false;
+  b.useUntil = -1;
   b.route.points.length = 0;
   b.route.next = 0;
   const focus = focusOf(m);
@@ -371,6 +374,8 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       out.push({ act: 'report', rank: 5, weight: callable > 0 ? 1 : 0 });
       out.push({ act: 'engage', rank: 5, weight: sees && dist <= m.tuning.brain.combat.range[m.post.role] ? role.fight : 0 });
       out.push({ act: 'cover', rank: 5, weight: sees || elevated ? 0 : role.fight });
+      // Having held cover without a sight of him, he works round to where he can.
+      out.push({ act: 'flank', rank: 5, weight: !sees && !elevated && b.ended.cover !== undefined ? role.flank : 0 });
       out.push({ act: 'hold', rank: 5, weight: 0.25 });
       break;
     }
@@ -473,6 +478,9 @@ function perform(m: GuardMind, out: Order): void {
       break;
     case 'alarm':
       performAlarm(m, out);
+      break;
+    case 'flank':
+      performFlank(m, out);
       break;
   }
 }
@@ -715,6 +723,35 @@ function performEngage(m: GuardMind, out: Order): void {
 function focusOf3(m: GuardMind): { x: number; y: number; z: number } {
   const a = m.awareness;
   return { x: a.fx, y: a.fy, z: a.fz };
+}
+
+/** Works round to one side of where he believes the target is, then stands to see. */
+function performFlank(m: GuardMind, out: Order): void {
+  const b = m.brain!;
+  const C = m.tuning.brain.combat;
+  const hz = m.tuning.sim.tickHz;
+  if (b.linger >= 0) {
+    stand(m, out, true);
+    if (m.tick >= b.linger) b.done = true;
+    return;
+  }
+  if (!b.covered) {
+    const f = focusOf(m);
+    const dx = f.x - m.self.x;
+    const dz = f.z - m.self.z;
+    const d = Math.sqrt(dx * dx + dz * dz) || 1;
+    // A point to the side of the target, on his own side of it, by who he is: left or right.
+    const side = m.id % 2 === 0 ? 1 : -1;
+    b.coverX = f.x + (-dz / d) * C.flankDistance * side;
+    b.coverZ = f.z + (dx / d) * C.flankDistance * side;
+    b.covered = true;
+    b.routed = -1;
+  }
+  const w = walk(m, out, b.coverX, b.coverZ, m.tuning.brain.paces.search, 'walk', b.x, b.z);
+  if (w === 'arrived' || w === 'stuck') {
+    b.linger = m.tick + Math.round(3 * hz);
+    stand(m, out, true);
+  }
 }
 
 /** Runs for the alarm box and throws the switch: an interruptible journey through the motor. */

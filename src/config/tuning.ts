@@ -326,6 +326,7 @@ export const defaultTuning = {
       coverPoints: 12, // spots per ring
       coverAfter: 2.5, // seconds without a sight of the target before he looks for cover
       holdAfter: 6, // seconds he holds cover without seeing anything before moving up
+      flankDistance: 18, // metres to the side of the believed position he works toward, moving up
       chest: 1.2, // height of the line he has to break
     },
     roles: {
