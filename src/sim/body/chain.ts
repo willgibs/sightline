@@ -78,7 +78,7 @@ export interface FootCircle {
   r: number;
   rise: number;
   at: number;
-  /** How far the ground may rise under it, beyond a step, before that's a wall, not a slope. */
+  /** How far the terrain may rise under it, beyond a step, before that's a wall, not a slope (colliders: body.ts, restBelow). */
   allow: number;
 }
 

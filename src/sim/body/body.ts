@@ -275,7 +275,23 @@ export function poseAt(b: BodyState, lag: number, out: PoseSample): PoseSample {
  * headroom and sight all use this, so the body can't slip under a slab its eye is above.
  */
 export function bodyHeight(b: BodyState, spec: BodySpec): number {
-  return Math.max(spec.height[b.stance], b.eyeHeight + (spec.height[b.stance] - spec.eyeHeight[b.stance]));
+  // Above the eye, the least of what any stance has: lying down from a crouch must not make a body
+  // taller than it is, by a prone head's bigger clearance, under a slab just over its head.
+  const H = spec.height;
+  const E = spec.eyeHeight;
+  const above = Math.min(H.stand - E.stand, H.crouch - E.crouch, H.prone - E.prone);
+  return Math.max(H[b.stance], b.eyeHeight + above);
+}
+
+/**
+ * What a circle of a lying body rests on, for feet at `feet`. As groundBelow, but a
+ * collider counts only within a step of the feet or of the terrain under that circle:
+ * `allow` stretches over ground that slopes, not up the side of a wall, so a heel doesn't
+ * take a waist-high bank for the ground and lift onto it in a tick.
+ */
+export function restBelow(world: World, solids: Solids, x: number, z: number, feet: number, allow: number, step: number, radius: number): Ground {
+  const t = world.terrain.heightAt(x, z);
+  return groundBelow(world, solids, x, z, Math.min(feet + allow + step, (t > feet ? t : feet) + step), radius);
 }
 
 /** True if a solid collider overlaps the vertical band [y0, y1) of a body at (x, z). */

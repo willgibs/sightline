@@ -33,7 +33,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       "runs with a broken promise (of 4)": 0,
       "bodies under the terrain": 0,
       "bodies inside something solid": 0,
-      "worst overlap (m)": 0.00006895972494837255,
+      "worst overlap (m)": 0.00009741367780091714,
       "worst rise in a tick (m)": 0.05733444956180733,
       "worst gain on steep ground (m)": 0,
       "lean: eye-to-head lines that differ by direction (of 2000)": 0,
@@ -42,12 +42,12 @@ export const BENCH_GOLDEN: PinnedBench = {
       "mantle: ticks inside someone walking across the landing": 0,
       "seed · mantle checked once: ticks inside him": 15,
       "prone: fuzzing bot on the course and in two valleys, lying poses checked": 16869,
-      "prone: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 398,
+      "prone: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 548,
       "seed · single circle: fuzzing bot on the course and in two valleys, lying poses checked": 16869,
       "seed · single circle: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 3258,
       "prone: turning between walls a metre apart, poses with a part inside something solid": 0,
       "seed · single circle: turning between walls a metre apart, poses with a part inside something solid": 259,
-      "prone: deepest any part goes into something solid (m)": 0.267231692,
+      "prone: deepest any part goes into something solid (m)": 0.15625,
       "seed · single circle: deepest any part goes into something solid (m)": 0.490337132
     },
     "runs": {

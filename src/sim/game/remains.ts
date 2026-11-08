@@ -39,7 +39,7 @@ export function gameBodies(state: SimState, tuning: Tuning, out: QueryBody[]): Q
   let n = out.length;
   const t = state.tick / tuning.sim.tickHz;
   for (const e of state.entities) {
-    if (e.kind !== 'remains' || e.remains.hidden) continue;
+    if (e.kind !== 'remains' || e.remains.hidden || e.remains.carriedBy !== 0) continue; // carried, it goes where its carrier goes: what's seen or hit is the carrier
     const q = (out[n++] ??= { id: 0, shape: emptyShape() });
     q.id = e.id;
     remainsShape(e.remains, t, tuning, q.shape);
@@ -65,7 +65,7 @@ export function bodiesAt(state: SimState, tuning: Tuning, now: number, t: number
     }
   }
   for (const e of state.entities) {
-    if (e.kind !== 'remains' || e.remains.hidden) continue;
+    if (e.kind !== 'remains' || e.remains.hidden || e.remains.carriedBy !== 0) continue; // carried, it goes where its carrier goes: what's seen or hit is the carrier
     const q = (out[n++] ??= { id: 0, shape: emptyShape() });
     q.id = e.id;
     remainsShape(e.remains, t, tuning, q.shape);

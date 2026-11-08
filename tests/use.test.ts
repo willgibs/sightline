@@ -47,7 +47,7 @@ describe('the use action', () => {
   it('picks a body up, carries it on the shoulder at a walk, and puts it down', () => {
     const { sim, body } = withBody(world());
     const input = neutralInput(sim.player.yaw);
-    expect(usePrompt(sim.index.get(sim.playerId) as never, sim.index, T)).toBe('carry');
+    expect(usePrompt(sim.index.get(sim.playerId) as never, sim.index, T, sim.solids)).toBe('carry');
     press(input, 'use');
     sim.step(input);
     input.commands = [];
@@ -150,6 +150,7 @@ describe('the use action', () => {
   it('puts a body down on what the carrier stands on, not the terrain beneath it', () => {
     const deck: ColliderInput = { kind: 'box', x: 0, z: 0, y0: -0.3, y1: 0.3, hx: 6, hz: 6, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Wood };
     const { sim, body } = withBody(world(undefined, [], [deck]));
+    body.remains.y = 0.3;
     const input = neutralInput(sim.player.yaw);
     press(input, 'use');
     sim.step(input);
@@ -159,6 +160,49 @@ describe('the use action', () => {
     sim.step(input);
     expect(sim.player.y).toBeCloseTo(0.3, 3);
     expect(body.remains.y).toBeCloseTo(0.3, 3);
+  });
+
+  it('takes a carried body out of everything that looks or shoots, and puts it back', () => {
+    const { sim, body } = withBody(world());
+    const input = neutralInput(sim.player.yaw);
+    press(input, 'use');
+    sim.step(input);
+    input.commands = [];
+    sim.step(input);
+    expect(body.remains.carriedBy).not.toBe(0);
+    expect(sim.game.bodies(sim.state, T, []).find((q) => q.id === body.id)).toBeUndefined();
+    press(input, 'use');
+    sim.step(input);
+    expect(sim.game.bodies(sim.state, T, []).find((q) => q.id === body.id)).toBeDefined();
+  });
+
+  it('reaches neither a body on a deck overhead nor one through a wall', () => {
+    const deck: ColliderInput = { kind: 'box', x: 0, z: 0, y0: 4.75, y1: 5, hx: 3, hz: 3, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Wood };
+    const above = withBody(world(undefined, [], [deck]));
+    above.body.remains.y = 5;
+    expect(usePrompt(above.sim.index.get(above.sim.playerId) as never, above.sim.index, T, above.sim.solids)).toBe('');
+    const wall: ColliderInput = { kind: 'box', x: 0, z: -0.55, y0: -0.3, y1: 3, hx: 5, hz: 0.15, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Wood };
+    const beyond = withBody(world(undefined, [], [wall]));
+    expect(usePrompt(beyond.sim.index.get(beyond.sim.playerId) as never, beyond.sim.index, T, beyond.sim.solids)).toBe('');
+  });
+
+  it('drags a body no further than the first thing behind the carrier', () => {
+    const wall: ColliderInput = { kind: 'box', x: 0, z: 0.55, y0: -0.3, y1: 3, hx: 5, hz: 0.15, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Wood };
+    const { sim, body } = withBody(world(undefined, [], [wall]));
+    const input = neutralInput(sim.player.yaw);
+    press(input, 'use');
+    sim.step(input);
+    input.commands = [];
+    input.crouch = true;
+    sim.step(input);
+    input.crouch = false;
+    for (let t = 0; t < 10; t++) sim.step(input);
+    expect(sim.player.stance).toBe('crouch');
+    expect(body.remains.z).toBeLessThan(0.4);
+    press(input, 'use');
+    sim.step(input);
+    expect(body.remains.carriedBy).toBe(0);
+    expect(body.remains.z).toBeLessThan(0.4);
   });
 
   it('keeps the hands free for it: nothing is picked up while lying down', () => {

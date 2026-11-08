@@ -1,6 +1,6 @@
 import { Blocks, circleOverlaps, pushOutCircle } from '../kernel/world/colliders';
 import type { Solids } from '../kernel/world/solids';
-import { bodyHeight, groundBelow, type BodySpec, type BodyState, type Stance } from './body';
+import { bodyHeight, restBelow, type BodySpec, type BodyState, type Stance } from './body';
 import { footprint, type FootCircle } from './chain';
 import type { MotorContext } from './motor';
 
@@ -53,7 +53,7 @@ function chainHasHeadroom(b: BodyState, height: number, spec: BodySpec, ctx: Sta
     const C = circles[k]!;
     const cx = b.x + C.x;
     const cz = b.z + C.z;
-    const base = Math.max(b.y - C.allow, groundBelow(ctx.world, ctx.solids, cx, cz, b.y + C.allow + spec.stepHeight, C.r).height);
+    const base = Math.max(b.y - C.allow, restBelow(ctx.world, ctx.solids, cx, cz, b.y, C.allow, spec.stepHeight, C.r).height);
     ctx.solids.query(cx - C.r, cz - C.r, cx + C.r, cz + C.r, ids);
     for (let q = 0; q < ids.length; q++) {
       const c = ctx.solids.get(ids[q]!);

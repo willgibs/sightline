@@ -80,7 +80,7 @@ export function poseClear(x: number, y: number, z: number, height: number, spec:
 
 /** Where a mantle is at `t` seconds along its path. */
 /** A path can cross rising ground while reaching for the ledge: its feet stay on top of it. */
-function keepOnGround(world: MotorContext['world'], p: MantlePose): void {
+export function keepOnGround(world: MotorContext['world'], p: MantlePose): void {
   const ground = world.terrain.heightAt(p.x, p.z);
   if (p.y < ground) p.y = ground;
 }
@@ -122,9 +122,9 @@ const planned: MantleState = { t: 0, waited: 0, points: [], legs: [], grabAt: 0,
  * checked pose by pose against the world as it stands now. False if nothing can be
  * mantled here. Reads the world and writes only `out`.
  */
-function plan(b: Pick<BodyState, 'x' | 'y' | 'z' | 'yaw' | 'motor' | 'sliding' | 'proneTransition' | 'stance' | 'eyeHeight'>, spec: BodySpec, ctx: MotorContext, out: MantleState): boolean {
+function plan(b: Pick<BodyState, 'x' | 'y' | 'z' | 'yaw' | 'motor' | 'sliding' | 'proneTransition' | 'stance' | 'eyeHeight' | 'lying'>, spec: BodySpec, ctx: MotorContext, out: MantleState): boolean {
   const M = spec.mantle;
-  if (b.motor !== 'ground' || b.sliding || b.proneTransition || b.stance === 'prone') return false;
+  if (b.motor !== 'ground' || b.sliding || b.proneTransition || b.stance === 'prone' || b.lying > 0) return false;
   const { world, solids } = ctx;
   const r = spec.radius;
   const y0 = b.y;
@@ -259,7 +259,7 @@ function plan(b: Pick<BodyState, 'x' | 'y' | 'z' | 'yaw' | 'motor' | 'sliding' |
   return true;
 }
 
-const scratchPose = { x: 0, y: 0, z: 0, yaw: 0, motor: 'ground' as const, sliding: false, proneTransition: false, stance: 'crouch' as const, eyeHeight: 0 };
+const scratchPose = { x: 0, y: 0, z: 0, yaw: 0, motor: 'ground' as const, sliding: false, proneTransition: false, stance: 'crouch' as const, eyeHeight: 0, lying: 0 };
 
 /**
  * A mantle from a ladder's top pose: from (x, y, z), facing (fx, fz), or, for getting on

@@ -1,5 +1,5 @@
 import { dcos, dsin, dtanDeg } from '../kernel/core/detmath';
-import { bodyHeight, groundBelow, hasBody, type BodySpec, type BodyState } from './body';
+import { bodyHeight, hasBody, restBelow, type BodySpec, type BodyState } from './body';
 import type { Simulation } from '../kernel/sim';
 import type { EntityId } from '../kernel/state';
 import { Blocks, pushOutCircle } from '../kernel/world/colliders';
@@ -13,7 +13,8 @@ import { bodyShape } from './shape';
  * never under the terrain, never inside anything solid (the world's colliders and
  * entities' shapes), never more than one step up in a tick, never any height gained on
  * ground too steep to stand on, a lean that never grows faster than its rate with the
- * head and shoulders always clear, and never a NaN. The invariant tests and the long fuzz
+ * head and shoulders always clear, no end of a lying body rising more than a step in a
+ * tick, no mantle or ladder moving into another body, and never a NaN. The invariant tests and the long fuzz
  * run (`npm run fuzz`) both watch with this, so they check the same promises.
  *
  * The audit that hardened the controller showed an older check passing two deliberately
@@ -47,6 +48,12 @@ interface Before {
   y: number;
   onSteep: boolean;
   lean: number;
+  x: number;
+  z: number;
+  /** Lying: how high its head, pelvis and feet rest; NaN if it isn't. */
+  head: number;
+  pelvis: number;
+  feet: number;
 }
 
 export class InvariantWatch {
@@ -57,6 +64,7 @@ export class InvariantWatch {
   private readonly ids: number[] = [];
   private readonly shape = emptyShape();
   private readonly circles: FootCircle[] = [];
+  private readonly others: FootCircle[] = [];
 
   constructor(private readonly sim: Simulation) {}
 
@@ -69,7 +77,8 @@ export class InvariantWatch {
       const b = e.body;
       world.terrain.sample(b.x, b.z, this.sample);
       const tanMax = dtanDeg(tuning.bodies[e.kind].maxSlopeDeg);
-      this.before.set(e.id, { y: b.y, onSteep: b.motor === 'ground' && b.standingOn < 0 && this.sample.slopeTan > tanMax, lean: b.lean });
+      const lying = b.lying > 0;
+      this.before.set(e.id, { y: b.y, onSteep: b.motor === 'ground' && b.standingOn < 0 && this.sample.slopeTan > tanMax, lean: b.lean, x: b.x, z: b.z, head: lying ? b.y + b.riseHead : NaN, pelvis: lying ? b.y + b.risePelvis : NaN, feet: lying ? b.y + b.riseFeet : NaN });
     }
   }
 
@@ -111,7 +120,7 @@ export class InvariantWatch {
     r.worstRise = Math.max(r.worstRise, rise);
     if (rise > spec.stepHeight + 1e-9) broke(`rose ${rise.toFixed(4)} m in a tick`);
     // On a ladder, its own rate, up or down (a fall begins only by letting go).
-    if (b.motor === 'ladder' && Math.abs(rise) > spec.ladder.downRate * this.sim.dt + 1e-9) broke(`moved ${rise.toFixed(4)} m on a ladder in a tick`);
+    if (b.motor === 'ladder' && b.ladder!.t >= spec.ladder.reachTime && Math.abs(rise) > spec.ladder.downRate * this.sim.dt + 1e-9) broke(`moved ${rise.toFixed(4)} m on a ladder in a tick`);
     if (was.onSteep && b.standingOn < 0) {
       r.steepGain = Math.max(r.steepGain, rise);
       if (rise >= STEEP_TOLERANCE) broke(`gained ${rise.toFixed(4)} m on ground too steep to stand on`);
@@ -132,15 +141,25 @@ export class InvariantWatch {
         broke(`inside collider ${cid} by ${depth.toFixed(4)} m`);
       }
     }
+    // In a mode with a path of its own, every pose is clear of every other body too.
+    if ((b.motor === 'mantle' || b.motor === 'ladder') && (b.x !== was.x || b.y !== was.y || b.z !== was.z)) this.apart(id, b, spec, height, broke);
     // Lying down: every circle of the chain, and every part of the shape along it (chain.ts).
     if (b.lying > 0) {
+      // Each end rises no more in a tick than a body may: nothing lifts it onto a wall.
+      for (const [name, before, now] of [
+        ['head', was.head, b.y + b.riseHead],
+        ['pelvis', was.pelvis, b.y + b.risePelvis],
+        ['feet', was.feet, b.y + b.riseFeet],
+      ] as const) {
+        if (now - before > spec.stepHeight + 1e-6) broke(`lying, the ${name} rose ${(now - before).toFixed(4)} m in a tick`);
+      }
       const foot = footprint(b, spec, this.circles);
       for (let k = 0; k < foot.length; k++) {
         const C = foot[k]!;
         const cx = b.x + C.x;
         const cz = b.z + C.z;
         solids.query(cx - C.r, cz - C.r, cx + C.r, cz + C.r, this.ids);
-        const g = this.groundUnder(cx, cz, b.y + C.allow + spec.stepHeight, C.r);
+        const g = this.restUnder(cx, cz, b.y, C.allow, spec.stepHeight, C.r);
         const base = Math.max(b.y - C.allow, g);
         for (const cid of this.ids) {
           const c = solids.get(cid);
@@ -173,7 +192,7 @@ export class InvariantWatch {
         }
         let over = -Infinity;
         for (const N of [aft, fore]) {
-          const base = Math.max(b.y - N.allow, this.groundUnder(b.x + N.x, b.z + N.z, b.y + N.allow + spec.stepHeight, N.r));
+          const base = Math.max(b.y - N.allow, this.restUnder(b.x + N.x, b.z + N.z, b.y, N.allow, spec.stepHeight, N.r));
           over = Math.max(over, base + spec.stepHeight);
         }
         // A body going over an edge is dragged across it: only the terrain's rise under its rest counts.
@@ -197,13 +216,38 @@ export class InvariantWatch {
     if (b.lean !== 0 && !(b.lying > 0)) {
       const s = bodyShape(b, spec, this.shape);
       this.part('head', id, s.head.x, s.head.y, s.head.z, s.head.r, broke);
-      this.part('shoulders', id, s.torso.bx, s.torso.by, s.torso.bz, s.torso.r, broke);
+      // Below a crouch a lean moves only the head (shape.ts).
+      if (b.eyeHeight >= spec.eyeHeight.crouch) this.part('shoulders', id, s.torso.bx, s.torso.by, s.torso.bz, s.torso.r, broke);
     }
   }
 
-  /** The ground under a circle within reach, as the motor finds it. */
-  private groundUnder(x: number, z: number, maxTop: number, radius: number): number {
-    return groundBelow(this.sim.world, this.sim.solids, x, z, maxTop, radius).height;
+  /**
+   * Whether a body on a path of its own has moved clear of every other body, lying ones
+   * along their chains: where each was as the tick began, which is what the path was
+   * checked against, for a body that moved. (Walking into one holding still on a ladder is the walker's move.)
+   */
+  private apart(id: EntityId, b: BodyState, spec: BodySpec, height: number, broke: (what: string) => void): void {
+    for (const e of this.sim.state.entities) {
+      if (e.id === id || !hasBody(e)) continue;
+      const o = e.body;
+      const before = this.before.get(e.id);
+      if (!before) continue;
+      const ospec = this.sim.tuning.bodies[e.kind];
+      if (o.y >= b.y + height || o.y + bodyHeight(o, ospec) <= b.y) continue;
+      const foot = footprint(o, ospec, this.others);
+      for (let k = 0; k < foot.length; k++) {
+        const C = foot[k]!;
+        const dx = b.x - (before.x + C.x);
+        const dz = b.z - (before.z + C.z);
+        const depth = spec.radius + C.r - Math.sqrt(dx * dx + dz * dz);
+        if (depth > OVERLAP_TOLERANCE * 10) broke(`${b.motor} inside body ${e.id} by ${depth.toFixed(4)} m`);
+      }
+    }
+  }
+
+  /** What a circle rests on, as the motor finds it. */
+  private restUnder(x: number, z: number, feet: number, allow: number, step: number, radius: number): number {
+    return restBelow(this.sim.world, this.sim.solids, x, z, feet, allow, step, radius).height;
   }
 
   /**
