@@ -62,18 +62,107 @@ export interface LandEvent extends EventBase, SoundFields {
 }
 
 /**
- * A shot leaves the muzzle: from the eye at the moment the player fired, along their aim.
- * Lab B adds the bullet's flight, its sounds and what it hits.
+ * A shot leaves the muzzle: from the eye at the moment the player fired. With a rifle
+ * (ballistics lane) the event is the bullet's whole path, the crack's included: its
+ * launch point, time and direction (the bore's line), its muzzle speed and drag in the
+ * mission's air, and the wind it flies in, so anyone can evaluate where it was at any
+ * instant (ballistics/trajectory.ts, flightAt) with the gravity from the tuning. Its
+ * strike is an 'impact' event caused by it. A shot with no bullet (no rifle carried) has
+ * speed 0, and its direction is the aim.
  */
 export interface ShotEvent extends EventBase {
   type: 'shot';
   x: number;
   y: number;
   z: number;
-  /** Unit direction of the aim. */
+  /** Unit direction the bullet left in, or the aim. */
   dx: number;
   dy: number;
   dz: number;
+  /** Muzzle speed, m/s; 0 for a shot with no bullet. */
+  speed: number;
+  /** The load's drag constant in the mission's air, per metre. */
+  drag: number;
+  /** The wind's velocity the bullet flies in, m/s. */
+  wx: number;
+  wz: number;
+}
+
+/** A shot's muzzle report: a sound at the muzzle, as loud as the suppressor and the load allow. */
+export interface ReportEvent extends EventBase, SoundFields {
+  type: 'report';
+  /** 1 if the suppressor was fitted. */
+  suppressed: number;
+}
+
+/** What a bullet struck. */
+export type StrikeKind = 'terrain' | 'collider' | 'body';
+/** Where on a body a bullet struck, or none. */
+export type PartName = 'none' | 'head' | 'torso' | 'legs';
+
+/**
+ * A bullet's strike: a sound where it struck, by what it struck (the thump of a body, the
+ * ring of steel). Caused by its shot. The shooter hears it after the flight and the way
+ * back: about 1.28 s at 300 m.
+ */
+export interface ImpactEvent extends EventBase, SoundFields {
+  type: 'impact';
+  what: StrikeKind;
+  /** The body's entity id or the collider's id; −1 for the terrain. */
+  target: number;
+  part: PartName;
+  /** The bullet's speed at the strike, m/s. */
+  speed: number;
+  /** The struck surface's outward normal. */
+  nx: number;
+  ny: number;
+  nz: number;
+}
+
+/**
+ * Someone was killed by a strike (its cause): `source` fired, `victim` fell and is gone,
+ * and `remains` is the body he left, spawned in the same tick.
+ */
+export interface DeathEvent extends EventBase {
+  type: 'death';
+  victim: number;
+  remains: number;
+  /** The victim's camp post (world.camp.guards), or −1. */
+  post: number;
+  part: Exclude<PartName, 'none'>;
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** A hit guard's cry before he falls: a sound at his head. */
+export interface CryEvent extends EventBase, SoundFields {
+  type: 'cry';
+}
+
+/** The rangefinder's reading: where its laser found something, and how far, to the metre. */
+export interface RangedEvent extends EventBase {
+  type: 'ranged';
+  /** Metres, or −1 if nothing was within reach. */
+  range: number;
+  x: number;
+  y: number;
+  z: number;
+  what: 'none' | StrikeKind;
+}
+
+/** The bolt worked, chambering the next round: a small sound by the shooter. */
+export interface BoltEvent extends EventBase, SoundFields {
+  type: 'bolt';
+}
+
+/** A thrown thing landing, or bouncing: a sound where it touched, as loud as it hit (ballistics lane). */
+export interface ClatterEvent extends EventBase, SoundFields {
+  type: 'clatter';
+  /** The thrown entity's id. */
+  thrown: number;
+  /** Its speed at the touch, m/s. */
+  speed: number;
 }
 
 export interface StanceEvent extends EventBase {
@@ -205,7 +294,14 @@ export type SimEvent =
   | AlertEvent
   | BarkEvent
   | NoiseEvent
-  | ActEvent;
+  | ActEvent
+  | ReportEvent
+  | ImpactEvent
+  | DeathEvent
+  | CryEvent
+  | RangedEvent
+  | BoltEvent
+  | ClatterEvent;
 export type EventType = SimEvent['type'];
 export type EventOf<K extends EventType> = Extract<SimEvent, { type: K }>;
 
@@ -241,12 +337,19 @@ const STANCES = ['stand', 'crouch', 'prone'] as const satisfies readonly StanceN
 const SOUND = { x: 'f32', y: 'f32', z: 'f32', surface: 'u8', loudness: 'f32', radius: 'f32' } as const;
 const ACT_NAMES = ['routine', 'return', 'look', 'investigate', 'search', 'hold'] as const satisfies readonly ActCode[];
 const ACT_WHY_NAMES = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost'] as const satisfies readonly ActReason[];
+const STRIKES = ['terrain', 'collider', 'body'] as const satisfies readonly StrikeKind[];
+const PARTS = ['none', 'head', 'torso', 'legs'] as const satisfies readonly PartName[];
 
 export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   footstep: { code: 1, range: 'foundation', sound: true, fields: { ...SOUND, gait: { enum: GAITS } } },
   stance: { code: 2, range: 'foundation', sound: false, fields: { from: { enum: STANCES }, to: { enum: STANCES } } },
   land: { code: 3, range: 'foundation', sound: true, fields: { ...SOUND, speed: 'f32' } },
-  shot: { code: 4, range: 'foundation', sound: false, fields: { x: 'f64', y: 'f64', z: 'f64', dx: 'f64', dy: 'f64', dz: 'f64' } },
+  shot: {
+    code: 4,
+    range: 'foundation',
+    sound: false,
+    fields: { x: 'f64', y: 'f64', z: 'f64', dx: 'f64', dy: 'f64', dz: 'f64', speed: 'f64', drag: 'f64', wx: 'f64', wz: 'f64' },
+  },
   outcome: { code: 5, range: 'foundation', sound: false, fields: { status: { enum: ['succeeded', 'failed'] } } },
   noticed: { code: 10, range: 'perception', sound: false, fields: { target: 'u32', x: 'f32', y: 'f32', z: 'f32', distance: 'f32', zone: { enum: ZONES } } },
   detected: {
@@ -274,6 +377,23 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   alert: { code: 13, range: 'perception', sound: false, fields: { from: { enum: AWARE }, to: { enum: AWARE }, reason: { enum: REASONS } } },
   bark: { code: 14, range: 'perception', sound: true, fields: { ...SOUND, line: 'u8' } },
   noise: { code: 15, range: 'perception', sound: true, fields: { ...SOUND } },
+  report: { code: 30, range: 'ballistics', sound: true, fields: { ...SOUND, suppressed: 'u8' } },
+  impact: {
+    code: 31,
+    range: 'ballistics',
+    sound: true,
+    fields: { ...SOUND, what: { enum: STRIKES }, target: 'i32', part: { enum: PARTS }, speed: 'f32', nx: 'f32', ny: 'f32', nz: 'f32' },
+  },
+  death: {
+    code: 32,
+    range: 'ballistics',
+    sound: false,
+    fields: { victim: 'u32', remains: 'u32', post: 'i32', part: { enum: ['head', 'torso', 'legs'] }, x: 'f32', y: 'f32', z: 'f32' },
+  },
+  cry: { code: 33, range: 'ballistics', sound: true, fields: { ...SOUND } },
+  ranged: { code: 34, range: 'ballistics', sound: false, fields: { range: 'f32', x: 'f32', y: 'f32', z: 'f32', what: { enum: ['none', ...STRIKES] } } },
+  bolt: { code: 35, range: 'ballistics', sound: true, fields: { ...SOUND } },
+  clatter: { code: 36, range: 'ballistics', sound: true, fields: { ...SOUND, thrown: 'u32', speed: 'f32' } },
   act: { code: 90, range: 'brain', sound: false, fields: { from: { enum: ACT_NAMES }, to: { enum: ACT_NAMES }, why: { enum: ACT_WHY_NAMES }, x: 'f32', z: 'f32', weight: 'f32' } },
 };
 

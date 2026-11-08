@@ -1,3 +1,5 @@
+import { ASSISTS, type Assists } from './scope';
+
 /**
  * The player's own settings: how the mouse feels, how wide the view is, how loud. They
  * belong to the person, not the game, so they live in this browser (localStorage) and
@@ -14,9 +16,15 @@ export interface Settings {
   volume: number;
   /** Raw mouse movement, without the system's acceleration, where the browser offers it. */
   rawMouse: boolean;
+  /**
+   * What the instruments tell you (app/scope.ts, taste call 3): the reticle and the range
+   * only (sim), a dope card too (lite, realistic-lite), or the holds read out and the
+   * landing marked (arcade). Never the physics: it changes no recording.
+   */
+  assists: Assists;
 }
 
-export const DEFAULT_SETTINGS: Readonly<Settings> = { sensitivity: 1, fov: 0, invertY: false, volume: 0.8, rawMouse: false };
+export const DEFAULT_SETTINGS: Readonly<Settings> = { sensitivity: 1, fov: 0, invertY: false, volume: 0.8, rawMouse: false, assists: 'lite' };
 
 const KEY = 'sightline.settings.v1';
 
@@ -41,6 +49,7 @@ export function cleanSettings(v: Record<string, unknown>): Settings {
     invertY: v.invertY === true,
     volume: num(v.volume, 0, 1, DEFAULT_SETTINGS.volume),
     rawMouse: v.rawMouse === true,
+    assists: ASSISTS.includes(v.assists as Assists) ? (v.assists as Assists) : DEFAULT_SETTINGS.assists,
   };
 }
 

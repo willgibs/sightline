@@ -98,7 +98,7 @@ function loopSeam(d: Float32Array, fade: number): void {
 const SILENT = 1e-4;
 
 /** A filtered noise burst with a fast attack and an exponential decay. Returns its end time. */
-function burst(
+export function burst(
   ctx: BaseAudioContext,
   out: AudioNode,
   noise: AudioBuffer,
@@ -127,7 +127,7 @@ function burst(
 }
 
 /** A heel strike: a sine that drops in pitch, gone in tens of milliseconds. */
-function thump(ctx: BaseAudioContext, out: AudioNode, when: number, freq: number, decay: number, gain: number): number {
+export function thump(ctx: BaseAudioContext, out: AudioNode, when: number, freq: number, decay: number, gain: number): number {
   if (gain <= 0) return when;
   const end = when + decay + 0.02;
   const osc = new OscillatorNode(ctx, { type: 'sine', frequency: freq * 1.7 });
@@ -144,7 +144,7 @@ function thump(ctx: BaseAudioContext, out: AudioNode, when: number, freq: number
 }
 
 /** A struck resonant body (metal sheet, plank): a click exciting high-Q band-passes. */
-function ring(
+export function ring(
   ctx: BaseAudioContext,
   out: AudioNode,
   noise: AudioBuffer,

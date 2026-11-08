@@ -58,6 +58,34 @@ const BOUNDS: ReadonlyArray<readonly [path: string, min: number, max: number, in
   ['brain.nav.pullAhead', 1, 4000, true],
   ['brain.nav.snapRadius', 0, 64],
   ['brain.nav.sampleStep', 0.05, 2],
+  // Ballistics: what sizes a bullet's life and the zero dial's steps, and what the flight divides by.
+  ['ballistics.rifle.rounds', 0, 1000, true],
+  ['ballistics.rifle.boltTime', 0, 30],
+  ['ballistics.rifle.raiseTime', 0, 10],
+  ['ballistics.rifle.zero.min', 1, 5000],
+  ['ballistics.rifle.zero.max', 1, 5000],
+  ['ballistics.rifle.zero.step', 1, 5000],
+  ['ballistics.rifle.zero.start', 1, 5000],
+  ['ballistics.maxFlight', 0.1, 20],
+  ['ballistics.airDensity', 0.1, 5],
+  ['ballistics.scope.fieldDeg', 0.2, 60],
+  ['ballistics.binoculars.fieldDeg', 0.2, 60],
+  ['ballistics.binoculars.rangeMax', 1, 10000],
+  ['ballistics.throwable.count', 0, 100, true],
+  ['ballistics.throwable.maxFlight', 0.1, 60],
+  ['ballistics.sway.tremorRate', 0, 100],
+  ...Object.keys(defaultTuning.ballistics.loads).flatMap((load) =>
+    (
+      [
+        ['muzzleSpeed', 50, 3000],
+        ['drag', 0, 0.05],
+      ] as const
+    ).map(([path, min, max]) => [`ballistics.loads.${load}.${path}`, min, max] as const),
+  ),
+  ['vitals.restingHr', 20, 250],
+  ['vitals.maxHr', 20, 250],
+  ['vitals.holdTime', 0, 120],
+  ['vitals.recoverTime', 0.1, 600],
   // Every kind of body: sizes that set how far collision looks, and limits whose tangent is taken.
   ...Object.keys(defaultTuning.bodies).flatMap((kind) =>
     (
@@ -95,6 +123,9 @@ export function tuningProblems(t: unknown): string[] {
   if (size / tuning.gen.world.cellSize > 2048) problems.push('gen.world.size / cellSize exceeds 2048 cells per side');
   if (tuning.gen.world.playMargin * 2 >= size - 20) problems.push('gen.world.playMargin leaves no play area');
   if (tuning.sim.tickHz % tuning.sim.recordHz !== 0) problems.push('sim.recordHz must divide sim.tickHz');
+  const Z = tuning.ballistics.rifle.zero;
+  if (Z.min > Z.max || Z.start < Z.min || Z.start > Z.max) problems.push('ballistics.rifle.zero must run from min to max, with start between');
+  if (!(tuning.ballistics.rifle.load in tuning.ballistics.loads)) problems.push(`ballistics.rifle.load '${tuning.ballistics.rifle.load}' names no load`);
   return problems;
 }
 

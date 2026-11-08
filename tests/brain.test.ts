@@ -33,7 +33,7 @@ function noiseAt(tick: number, x: number, z: number, radius: number): System {
   return {
     name: 'test-noise',
     phase: 'commands',
-    after: ['player-commands'],
+    after: ['player-commands', 'rifle'],
     reads: [],
     writes: [],
     emits: ['noise'],

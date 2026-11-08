@@ -3,7 +3,7 @@ import { dcos, dsin } from '../kernel/core/detmath';
 import type { Entity } from '../kernel/state';
 import type { QueryBody } from '../kernel/world/query';
 import { emptyShape, type BodyShape, type Capsule, type Sphere } from '../kernel/world/shape';
-import { hasBody, type BodySpec, type BodyState } from './body';
+import { hasBody, poseAt, type BodySpec, type BodyState, type PoseSample } from './body';
 
 /**
  * A body's shape, for everything that asks what can be seen or hit (kernel/world/shape.ts):
@@ -22,8 +22,11 @@ type Parts = BodySpec['parts'];
 const upright = emptyShape();
 const lying = emptyShape();
 
-/** The shape of a body as it stands now, written to `out`. */
-export function bodyShape(b: BodyState, spec: BodySpec, out: BodyShape): BodyShape {
+/** What a body's shape follows: where its feet are, its facing and its eye height (a body's state, or a pose from its history). */
+export type ShapePose = Pick<BodyState, 'x' | 'y' | 'z' | 'yaw' | 'eyeHeight'>;
+
+/** The shape of a body as it stands now, or in any pose, written to `out`. */
+export function bodyShape(b: ShapePose, spec: BodySpec, out: BodyShape): BodyShape {
   const B = spec.parts;
   const E = spec.eyeHeight;
   const e = b.eyeHeight;
@@ -54,7 +57,7 @@ function uprightShape(x: number, y: number, z: number, eye: number, hip: number,
   return out;
 }
 
-function lyingShape(b: BodyState, eye: number, B: Parts, out: BodyShape): BodyShape {
+function lyingShape(b: ShapePose, eye: number, B: Parts, out: BodyShape): BodyShape {
   // Along the facing, centred on the body: head at the front, heels at the back.
   const fx = -dsin(b.yaw);
   const fz = -dcos(b.yaw);
@@ -101,6 +104,16 @@ function mixCapsule(a: Capsule, b: Capsule, t: number, out: Capsule): void {
     a.bz + (b.bz - a.bz) * t,
     a.r + (b.r - a.r) * t,
   );
+}
+
+const posed: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
+
+/**
+ * A body's shape `lag` ticks before now (0 to 2), between its samples (body.ts, poseAt):
+ * where a shot resolved against what the player saw finds it.
+ */
+export function bodyShapeAt(b: BodyState, spec: BodySpec, lag: number, out: BodyShape): BodyShape {
+  return bodyShape(poseAt(b, lag, posed), spec, out);
 }
 
 /** Every body's shape as it stands now, in entity order, for queries (kernel/world/query.ts). Reuses `out` and its shapes. */

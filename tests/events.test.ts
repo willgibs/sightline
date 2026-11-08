@@ -15,9 +15,15 @@ import { PLAYER_ID, player } from '../src/sim/game/entities';
 import { Blocks } from '../src/sim/kernel/world/colliders';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testWorld } from './fixtures';
+import { sceneOver, sceneTicks, startScene } from '../src/sim/kernel/scene';
+import { SCENES } from '../src/sim/game/scenes';
 
-/** A minute of the fuzzing bot (footsteps and stance changes from the player and guards), then a drop off a roof (a landing), a shot and an outcome. */
-function events(): { sim: Simulation; all: SimEvent[] } {
+/**
+ * A minute of the fuzzing bot (footsteps and stance changes from the player and guards),
+ * then a drop off a roof (a landing), a bare shot and an outcome, then the shooting
+ * range's marksman (a rifle's shots, reports, strikes, deaths, a cry, the bolt, a range).
+ */
+function events(): { sim: Simulation; all: SimEvent[]; valley: number; range: Simulation } {
   const sim = new Simulation(generateWorld(missionSpec('TAL-4471'), defaultTuning), defaultTuning);
   const bot = new ChaosBot('TAL-4471');
   const raw = neutralInput();
@@ -75,17 +81,28 @@ function events(): { sim: Simulation; all: SimEvent[] } {
     { type: 'act', id: 0, tick, t: tick / 30, source: guard, cause: 1, from: 'routine', to: 'look', why: 'heard', x: 3, z: -4, weight: 0.65 },
   ];
   perceived.forEach((e) => all.push({ ...e, id: all.length + 1 }));
-  return { sim, all };
+  const valley = all.length;
+  // The range, live: the events as the simulation made them, before any codec.
+  const scene = SCENES['shooting-range']!();
+  const range = startScene(scene, defaultTuning);
+  const driver = scene.driver!();
+  const still = scene.game.still(range);
+  const shooting: SimEvent[] = [];
+  while (!sceneOver(scene, range, sceneTicks(scene, defaultTuning))) for (const e of range.step(driver.next(range, still))) shooting.push({ ...e });
+  shooting.forEach((e, k) => all.push({ ...e, id: valley + k + 1 }));
+  return { sim, all, valley, range };
 }
 
+/** Events of a timed command, and what it caused at once: they happened when the player saw them, before their tick began. */
+const TIMED = new Set<EventType>(['shot', 'report', 'ranged', 'impact', 'death', 'cry']);
+
 describe('events', () => {
-  const { sim, all } = events();
+  const { sim, all, valley, range } = events();
 
   it('are numbered in order, stamped with their tick and a time inside it', () => {
     expect(all.length).toBeGreaterThan(100);
     all.forEach((e) => {
-      // A shot happened when the player saw it, before its tick began.
-      expect(e.t).toBeGreaterThan((e.tick - (e.type === 'shot' ? 3 : 1)) / 30);
+      expect(e.t).toBeGreaterThan((e.tick - (TIMED.has(e.type) ? 3 : 1)) / 30);
       expect(e.t).toBeLessThanOrEqual(e.tick / 30);
     });
     const fromBot = all.slice(0, sim.state.nextEventId - 1);
@@ -95,11 +112,16 @@ describe('events', () => {
 
   it('name the entity that made them', () => {
     const ids = new Set(sim.state.entities.map((e) => e.id));
-    for (const e of all) expect(ids.has(e.source)).toBe(true);
-    const types = new Set(all.filter((e) => e.source === PLAYER_ID).map((e) => e.type));
+    for (const e of all.slice(0, valley)) expect(ids.has(e.source)).toBe(true);
+    const types = new Set(all.slice(0, valley).filter((e) => e.source === PLAYER_ID).map((e) => e.type));
     // The player drops noises from the sandbox (A10).
     expect([...types].sort()).toEqual(['footstep', 'land', 'noise', 'outcome', 'shot', 'stance']);
     expect(all.some((e) => e.source !== PLAYER_ID && e.type === 'footstep')).toBe(true);
+    // On the range the guards who cry out are gone by the end: every source was an entity of that run.
+    for (const e of all.slice(valley)) expect(e.source >= 1 && e.source < range.state.nextId).toBe(true);
+    const shooter = new Set(all.slice(valley).filter((e) => e.source === PLAYER_ID).map((e) => e.type));
+    expect([...shooter].sort()).toEqual(['bolt', 'clatter', 'death', 'impact', 'ranged', 'report', 'shot', 'stance']);
+    expect(all.slice(valley).some((e) => e.type === 'cry' && e.source !== PLAYER_ID)).toBe(true);
   });
 
   it('say what the legs were doing when they make a step', () => {

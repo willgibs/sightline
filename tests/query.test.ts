@@ -119,6 +119,10 @@ describe('the world query', () => {
     // Sound goes through bodies; so does a ray that ignores this one.
     expect(raycast({ world, solids: sim.solids, bodies }, g.body.x + 20, g.body.y + 1, g.body.z, -1, 0, 0, 25, Blocks.Sound, hit).what).not.toBe('body');
     expect(raycast({ world, solids: sim.solids, bodies }, g.body.x + 20, g.body.y + 1, g.body.z, -1, 0, 0, 25, Blocks.Bullet, hit, g.id).id).not.toBe(g.id);
+    // A body beyond the ray's reach isn't hit, any more than the terrain or a collider would be.
+    expect(from(s.head.y - g.body.y).dist).toBeLessThan(20);
+    const short = raycast({ world, solids: sim.solids, bodies }, g.body.x + 20, s.head.y, g.body.z, -1, 0, 0, 5, Blocks.Bullet, hit);
+    expect(short.what).toBe('none');
   });
 
   it('gives the point, an outward normal and the surface of the terrain and of colliders', () => {

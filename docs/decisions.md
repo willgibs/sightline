@@ -2,6 +2,28 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · Lab B, shooting
+
+Built on its branch as `docs/phase-1-plan.md`, section B, plans it. Its seed, the seed's shortfall and its targets are recorded there.
+
+### How the lab is built
+
+**Decision:**
+- **One ballistic function.** The closed form for one quadratic drag constant per load, worked in the bore's frame (drop on g·cos θ, ½·g·sin θ·t² along the bore), with the lag rule for wind: drift = wind × (time of flight − distance ÷ muzzle speed). The bullet, the zero dial, the reticle's holds, the rangefinder's readout and every assist evaluate it; none integrates.
+- **A bullet is its launch.** Its state is where and when it left, its direction, its muzzle speed and drag (at the mission's air), and the time up to which it has been swept; its position at any instant follows exactly. It is an entity, spawned when fired and despawned when it lands.
+- **A shot resolves against what the player saw.** The `fire` command already carries the frame's instant and angles; the rifle sweeps the bullet from that instant to the tick's start against the bodies' two ticks of history, in 'commands', then 'projectiles' sweeps each tick's segment against every body part between its two poses, the terrain and the colliders.
+- **The rifle and vitals are components a run's setup gives** (the player's `rifle` and `vitals`). The range scene gives them; the valley gets them in Phase 2, when the labs are joined. A click in the valley stays the bare `shot` it was.
+- **Sway is sampled at every tick's end** (`rifle.sway`, with two ticks of history, as a body keeps its pose), from pure functions of the state and the time. The camera and the shot read it through one interpolation at the frame's instant.
+- **Assist layers are view-only.** Arcade, realistic-lite and simulation differ in what the instruments show, never in the physics, so taste call 3 never changes a recording.
+
+**Why:**
+- The research's measurements (`docs/research/notes/labs/ballistics_and_shooting.md`): one Euler step per tick lands 18.5 cm low at 500 m, nearly a head, so a reticle drawn from an exact formula over an integrating bullet would lie. A function with no integration state can't drift from its instruments.
+- Resolving the shot against history is the single-player form of lag compensation; the bodies already keep the two poses it needs.
+- Giving the valley a rifle now would move every valley golden's state for a feature no bot uses, while labs A and D land beside this one. A loadout given by the setup keeps the valley still until Phase 2 joins the labs on purpose.
+- Sway that changes every tick can't be re-evaluated exactly between ticks unless both sides read the same samples; two ticks of history is what the pose already does, so the shot and the drawn reticle agree by construction.
+- **The binoculars' wind readout is arcade's only.** The plan's B6 lists a wind readout with the rangefinder; the design doc has the wind read "from flags, grass and smoke, or from the rangefinder on easier settings". So realistic-lite reads the flags, and arcade's readout gives the wind beside the hold. If the owner wants the readout on realistic-lite too, it is one condition in `app/scope.ts`.
+- **Bullets and stones survive a save and a restore.** A synctest over the whole range run, saving every 5 ticks, puts saves inside every flight (`tests/shooting.test.ts`): a bullet in the state is only its launch, so nothing else needs keeping.
+- **A thrown stone explains itself** (rule 8): the debug view draws the arc it is on, from its last touch to where it next meets the ground, and every touch's `clatter` is already a sound ring at its radius.
 ## 2026-11-08 · Public
 
 ### The repository is public, under MIT
@@ -117,6 +139,54 @@ Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the gener
 **What moved:** `GEN_VERSION` 4. TAL-4471's fingerprint is `f555512c33daea22` (`GOLDEN.world`, `GOLDEN_TAL_4471`). Two plays moved because their bots met different trees and rocks: MUD-9031 wander (`67964675cb39477e`, state `4002c5b682b8bcc8`) and TAL-4471 chaos (`fe623d33389a2f21`, state `e8037411190fc911`). TAL-4471 wander, the scenes and the math golden held. The golden recording is rewritten. The body bench's worst rise in a tick is now 0.29 m (a rock, under the 0.45 m step), and its worst overlap 2e-14 m.
 
 **Why:** the foundation pass left both changes for one deliberate bump (`docs/foundation-plan.md`, Deliberately later), so seeds change once, not twice. Lab D's repairs need scatter that stays put around them, and the camp generator adds a great deal to the world that a hand-kept list would have missed.
+
+### The bullet, its strike and the body left behind (B2–B4)
+
+**Decision:**
+- **Content in `tuning.ballistics` and `tuning.vitals`:** the rifle (15 rounds, a 1.2 s bolt, a zero dial from 100 to 600 m in 100 m steps), two loads (the published .308 168 gr match at 823 m/s and k = 0.000756; an illustrative subsonic at 320 m/s), the report, crack, bolt and impact radii, the hit rules, the optics, the throwable and the sway's starting values. Drag constants are given at sea-level air and scaled by the mission's density.
+- **The shot event is the bullet's path:** launch point and time, the bore's line, muzzle speed, drag and wind (`RECORDING_VERSION` 11). Labs A and E follow a bullet's path, its crack's included, from the event alone; its strike is an `impact` it caused.
+- **New events (codes 30–35):** `report`, `impact` and `cry` (sounds), `death` (who fired, who fell, the body left), `ranged`, and `bolt` (a sound). **New commands (30–34):** `range`, `throw`, `zeroUp`, `zeroDown`, `suppressor`.
+- **What a strike does:** a headshot kills silently; a torso shot kills, with a cry first as often as the guard's own stream says (35%); a leg shot kills, always with a cry. The guard's entity goes, and a `remains` entity takes his place in the same tick, collapsing over 0.7 s as a pure function of time; queries see it, the motor doesn't collide with it (lab C decides, with carrying).
+- **Systems:** `rifle` in 'commands' after `player-commands`, `bullets` then `aim` in 'projectiles'. The spawn-timing scene's commands system now names `rifle` in its `after`.
+
+**What moved:** `RECORDING_VERSION` 11, so the golden recording is rewritten; the tuning gained sections, so it would have been anyway. The shooting range joins the pinned runs (`411196f29915b2ee` / `5b191832e76a9bc8`, lane `ballistics`), which moves the behaviour digest. No valley or scene value moved: the bots never fire, and without a rifle a click is the bare shot it was. `SIM_VERSION` stays: nothing an earlier build could record behaves differently here, and such a recording is refused by its format anyway.
+
+**Why:** a lab is an isolated scene until Phase 2 joins them; keeping the valley's goldens still lets labs A and D land beside this one without rebasing onto moved values.
+
+### Sway, vitals and the instruments (B6, B7)
+
+**Decision:**
+- **Sway samples with history.** The aim system samples the sway at every tick's end (`rifle.sway`, two ticks kept). The renderer draws the camera along `viewLine` (the line of sight moved by the sway, as far as the scope is up), interpolating the samples as it does the body; the rifle fires along the same interpolation at the click's lag. With the scope down, the barrel points only roughly where you look: 25 mil of pointing error, drawn from the player's own stream.
+- **The ladder, measured, not asserted:** standing 1.64 mil, crouched 0.99, prone 0.69, prone on a rest 0.255, with the breath held 0.046 (95th-percentile radius over 20 s). A rest is found by geometry, never declared: the ground under a bipod prone, a sandbag or a wall top under the fore-end upright.
+- **Vitals live in the body lane** (`body/vitals.ts`), a component the run's setup gives with the rifle; lab C extends them. A held breath stills the chest over half a second and lasts 4 s calm, 1.5 s at the top of the heart rate; a long one ends in a gasp. `startle()` is the close call lab E calls when guards shoot back.
+- **The reticle is drawn in mils as tangent offsets** in the camera's projection, the same offsets the hold solver works in, so a hold names the mark the target sits on exactly. The scope's field is 3.6° across its glass; the binoculars' 6.5°.
+- **Assists are a setting, not tuning:** sim (the reticle and the range), lite (a dope card too: the hold at each 100 m for the dialled zero, and the wind's hold per m/s), arcade (the binoculars read the hold and the wind out, and the scope marks where a shot lands at the ranged distance). The default is lite. None touches the simulation.
+- **Glint** is a pure function of the aim, the sun and the observer (the mirror's half-way condition), for lab A to ask per guard; the scope's glass flares when it faces the sun, so the player can tell.
+- **The flags' and the grass's motion** is presentation only: it changes nothing that can be seen or hit.
+
+**What moved:** the shooting range's fingerprints (tuning its own sway), and the tuning's shape, so the golden recording is rewritten. No valley value.
+
+**Why:** the plan's B6 and B7. The research found no game that publishes sway numbers, so the bench pins Sightline's, and the sweep pins the claim that a reticle and its bullet can't disagree.
+
+### The shot's sound, the throwable, and a query that reached too far (B8, B9)
+
+**Decision:**
+- **The crack is a function of the path,** not an event per listener (`ballistics/crack.ts`): the first arrival is where t + |L − P(t)|/c is least, found by a fixed golden-section search over the flight, which lands on the Mach cone's point. The speakers use it for the camera; lab A's hearing uses it per guard, scheduling the percept at the arrival.
+- **The shot's own sounds are events:** `report` (the suppressor's and the load's radius), `impact` by what was struck, `cry`, `bolt`, and the throwable's `clatter`. Voices are procedural (`audio/shotVoices.ts`); the shooter hears his report at his ears and no crack of his own.
+- **Sandbox shots** are a command (`shotDrop`, J in the debug view): a match round solved to land where you look, from the eye, rifle or not, so a recording replays it. Lab A's sandbox (A10) can call it from its own UI.
+- **The throwable** is an entity on an exact arc (no drag), its chord swept per tick against the world and bodies, bouncing until it settles. Its landing is loud enough to reach the guard it lands by (31–40 m at a full throw); drawing exactly one guard is perception's and the brain's call, since guards in the test camp stand in pairs.
+- **The miss breakdown** (`game/telemetry.ts`) solves what each shot needed with the instruments' own function (drop, lead, wind) from where its target's head was at the shot's instant, compares what was held and what the sway added, and names which sideways decision was most nearly left out. The playtest summary prints it per shot; the range's expectations check it reads the marksman's deliberate miss as "lead left out".
+- **A kernel fix:** `raycast` (`kernel/world/query.ts`) accepted a body beyond `maxDist` when nothing else was within reach, so a short ray could return a guard 60 m away (a thrown stone found one). Bodies now count only within reach, like the terrain and colliders. No golden moved: nothing relied on it, and sight lines (`sightLine`) already treated a far hit as clear. Lab A's rays get the bound for free.
+
+**What moved:** the shooting range's fingerprints (its script gained a throw), the golden recording. No valley value.
+
+### Bob, hit confirmation and the end of a run (B5, B10)
+
+**Decision:**
+- **B5: walking bodies don't bob in the simulation, and a shot leaves from the simulation's eye.** Measured at 300 m (`tests/bob.test.ts`): a walking guard's 2.6 cm dip is 0.087 mil, under a quarter of the head's radius and a fifth of the smallest decision a 300 m shot needs, and under a pixel and a half through the scope. The camera's own bob fades out as the scope comes up, so the scoped shot and the drawn eye are the same point; unscoped, the barrel's pointing error is a hundred times larger than any dip. Bobbing bodies would cost a change to the body lane's shape, and through it every sight line, for nothing a player could see. Phase 3's walk cycles, which come with art, are the time to revisit it.
+- **B10: confirmation is physical.** Dust where a shot strikes, darker than the ground so it reads at range; a flash on steel; the trace along the simulated path; the body's collapse; the thump heard after the flight and the way back. No kill cam: a replay already plays a shot back slowly, and nothing rations a reward that the physics hands out on its own.
+- **The end of a run lists every rifle shot's breakdown** (range, lead, wind and sway in mils, and what it needed), from the same function `npm run playtest` prints, so the owner's verdict on a sitting can be checked against what decided each shot without a tool.
+- **Optics belong to the body's own eyes:** the fly camera and the benchmark draw no scope, no sway and no zoom.
 
 ## 2026-11-07 · Wave 0
 
