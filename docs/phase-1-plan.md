@@ -292,6 +292,8 @@ The statistics behind these protocols are in `docs/research/foundations.md`. A p
 
   What each sitting asks is in its lab's section. Lab A's questions wait until after its first sitting.
 
+  The four trial sets were pre-screened on Nov 8 by two agents who first passed a perception check against the simulation's record. No cue is drawn against the record, nothing on screen gives an outcome away, and no trial changed (`docs/decisions.md`, After the labs).
+
 ## Milestones
 
 ### Wave 0 · Seams

@@ -28,6 +28,8 @@ The night's review point, checked against the code the next afternoon.
 - **D9 doesn't wait on the owner.** Lab D held it for a go-ahead. It's in the plan, it is mechanical, and it can be undone; the owner has said sessions handle landing and versioning. The owner's spot check of three camps waits for E13 instead, because today those camps can only be walked.
 - **`npm run land` looks past one failure:** Vercel's rate limit, recognized by its link to the upgrade page. CI builds the game itself, and the owner approved this default on Nov 8. Previews stay on and the plan stays free; any other failed deploy still stops a landing.
 - **A9's doors go in with the use key.** Lab D's doors are on `main`, but they are generated open and nothing changes them, so there's no open door to notice until something can shut one.
+- **The long runs passed on the merged `main`** (6e6d5f0, dispatched Nov 8): the 40-hour fuzz and the synctest, with every platform's check and the same hash on all three.
+- **The pre-screen of the owner's four sets** (`OWNER-A1`, `A2`, `C1`, `C2`): two agents, each passing its perception check (8 of 8, and 7 of 8). The edge mark matches the record on all 140 frames, and nothing on screen gives an outcome away. Noted and left, since `Trial.legible` feeds only the probe's statistics and no trial or score moves: one frame's head is visible where the record calls it unreadable; a voice at exactly the bark radius is recorded as legible and not captioned; a noise trial's `legible` is all false by construction. Worth a look after the sittings: crawling in a bush, a pale band shows at the bottom of the screen where the foliage tint stops.
 
 ## 2026-11-08 · Lab E: the camp brain
 
