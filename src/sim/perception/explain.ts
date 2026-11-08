@@ -60,6 +60,26 @@ export function describe(e: SimEvent): string {
       return `something thrown landed, heard to ${m(e.radius)} m`;
     case 'outcome':
       return `the run ${e.status}`;
+    case 'act':
+      return e.to === 'routine' || e.to === 'return' ? `${e.from} → ${e.to}: ${e.why}` : `${e.from} → ${e.to}, toward (${m(e.x)}, ${m(e.z)}): ${e.why}`;
+    case 'call':
+      return `spoke${e.radio ? ' on the radio' : ''}, heard to ${m(e.radius)} m`;
+    case 'radio':
+      return `the radio: ${e.kind} near (${m(e.x)}, ${m(e.z)}) ± ${m(e.radius)} m`;
+    case 'order':
+      return `ordered to ${e.task} at (${m(e.x)}, ${m(e.z)})`;
+    case 'level':
+      return `the camp: ${e.from} → ${e.to}`;
+    case 'checkin':
+      return `check-in, post ${e.post}: ${e.stage}`;
+    case 'hurt':
+      return `the player was hit in the ${e.part} (${e.hits})`;
+    case 'alarm':
+      return `alarm box ${e.box}: ${e.stage}`;
+    case 'siren':
+      return `the siren, heard to ${m(e.radius)} m`;
+    case 'reinforce':
+      return `${e.count} reinforcements arrived at (${m(e.x)}, ${m(e.z)})`;
   }
 }
 

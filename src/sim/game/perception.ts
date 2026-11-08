@@ -209,7 +209,7 @@ export function deliverSound(ctx: TickContext, e: Extract<SimEvent, SoundFields>
     });
     const arrives = Math.max(ctx.tick, Math.ceil((e.t + heard.length / air(ctx.world.spec.env).speedOfSound) * T.sim.tickHz - 1e-9));
     const voice = e.type === 'bark' ? (BARKS[e.line]?.level ?? 0) : e.type === 'cry' ? T.perception.awareness.cry : 0;
-    s.heard.push({ arrives, cause: e.id, kind, clarity: heard.clarity, voice, x: heard.fromX + ox, y: heard.fromY, z: heard.fromZ + oz, radius });
+    s.heard.push({ arrives, cause: e.id, kind, sound: e.type, clarity: heard.clarity, voice, x: heard.fromX + ox, y: heard.fromY, z: heard.fromZ + oz, radius });
   }
 }
 
@@ -275,7 +275,7 @@ function deliverCrack(ctx: TickContext, e: Extract<SimEvent, { type: 'shot' }>):
       return [r * dcos(a), r * dsin(a)] as const;
     });
     const arrives = Math.max(ctx.tick, Math.ceil(crack.t * T.sim.tickHz - 1e-9));
-    s.heard.push({ arrives, cause: e.id, kind: 'shot', clarity: T.ballistics.sound.crack / Math.max(crack.distance, 1), voice: 0, x: crack.x + ox, y: crack.y, z: crack.z + oz, radius });
+    s.heard.push({ arrives, cause: e.id, kind: 'shot', sound: 'crack', clarity: T.ballistics.sound.crack / Math.max(crack.distance, 1), voice: 0, x: crack.x + ox, y: crack.y, z: crack.z + oz, radius });
   }
 }
 
@@ -438,7 +438,7 @@ export const perceptionAwareness: System = {
         }
         s.heard.splice(k, 1);
         const id = ctx.emit({ type: 'heard', source: g.id, cause: h.cause, kind: h.kind, clarity: h.clarity, x: h.x, y: h.y, z: h.z, radius: h.radius });
-        const p: Percept = { kind: h.kind, x: h.x, y: h.y, z: h.z, radius: h.radius, strength: h.clarity, tick, expires: tick + Math.round(T.perception.hearing.keep * hz), cause: id };
+        const p: Percept = { kind: h.kind, x: h.x, y: h.y, z: h.z, radius: h.radius, strength: h.clarity, tick, expires: tick + Math.round(T.perception.hearing.keep * hz), cause: id, sound: h.sound };
         s.percepts.push(p);
         if (h.kind !== 'voice') believe(s, p, false, tick, T);
         const reason = h.kind === 'shot' ? 'shot' : h.kind === 'voice' ? 'voice' : 'heard';
