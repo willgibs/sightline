@@ -6,7 +6,10 @@ The design doc is the source of truth: [Sightline · Game Design & Build Plan](h
 
 Phase 0 (Foundations) is complete, and the owner passed its gate on Nov 7, 2026; see `docs/phase-0-report.md`. The owner approved the wireframe look as the canvas for the next phases.
 
-**Now: the foundation pass.** Before the labs start, the owner asked for the foundation to be pushed close to its full potential. `docs/foundation-plan.md` is the working plan: milestones M1–M10 with their status, every audit finding not yet fixed, and the Horizons (futures that may shape interfaces, never add features). Read it before starting work, and keep its checkboxes current as work lands.
+**Now: the foundation pass is done, and waits for the owner's check on his Mac.** Before the labs start, the owner asked for the foundation to be pushed close to its full potential.
+- `docs/foundation-plan.md` is the record: milestones M1–M10 and their status, what is deliberately left to the labs, and the Horizons (futures that may shape interfaces, never add features).
+- Read it before starting work, and keep its checkboxes current as work lands.
+- An independent review of the last stretch found two high and four medium defects, all fixed (`docs/decisions.md`).
 
 **Then Phase 1:** five labs, each an isolated wireframe scene built to its exit test.
 
