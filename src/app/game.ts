@@ -41,6 +41,7 @@ import { air, windAt } from '../sim/kernel/env';
 import { Optic } from '../sim/kernel/input';
 import { player as playerOf } from '../sim/game/entities';
 import type { RifleView } from '../sim/game/sim';
+import { analyzeShot, describeShot, type ShotReport } from '../sim/game/telemetry';
 
 /**
  * The browser game loop: real time in, fixed simulation ticks out, interpolated frames
@@ -102,6 +103,8 @@ export class Game {
   private readonly instruments: Instruments;
   /** The rangefinder's last reading, and when (performance time, seconds). */
   private ranged: { range: number; at: number } | null = null;
+  /** Every rifle shot of the run, broken down (sim/game/telemetry.ts), for the end of the run. */
+  private shotLog: Array<{ report: ShotReport; result: string; impact: number; hit: boolean }> = [];
   /** The dope card for the dialled zero, load and air, computed when they change. */
   private dope: { key: string; rows: DopeRow[] } = { key: '', rows: [] };
   private readonly rifleNow: RifleView = { up: 0, right: 0, raise: 0, rest: 0, rounds: 0, zero: 0, bolt: 0, fitting: 0, suppressed: false, load: '', heartRate: 0, held: 0, air: 0, glint: 0, steady: 1 };
@@ -361,10 +364,12 @@ export class Game {
       this.resume();
     };
     const when = clock(o.tick / this.tuning.sim.tickHz);
+    // A run with rifle shots ends with what decided each (sim/game/telemetry.ts).
+    const shots = this.shotLog.map((s, k) => `${String(k + 1).padStart(2)}  ${describeShot(s.report, s.result, s.hit)}`);
     this.overlay.showMessage(
       'outcome',
       o.status === 'succeeded' ? `Done · ${when}` : `Failed · ${when}`,
-      `${o.reason.charAt(0).toUpperCase()}${o.reason.slice(1)}.`,
+      `${o.reason.charAt(0).toUpperCase()}${o.reason.slice(1)}.${shots.length ? `\n\nEach shot, in mils: what it got wrong, and what it needed.\n${shots.join('\n')}` : ''}`,
       'Play again',
     );
     this.input.releaseLock();
@@ -471,6 +476,7 @@ export class Game {
     this.curr = this.sim.snapshot();
     this.input.armed = playerOf(this.sim.index).rifle !== undefined;
     this.ranged = null;
+    this.shotLog = [];
     this.input.yaw = this.sim.player.yaw;
     // Start looking at the camp so the first frame frames the valley.
     const p = this.sim.player;
@@ -751,8 +757,10 @@ export class Game {
 
     // The optics: the scope comes up as the simulation raises it; the binoculars (and, with
     // no rifle, the zoom) ease here. A replay looks through what the player did.
-    const optic = this.replay ? (this.detached ? Optic.None : this.replay.opticAt(this.sim.tick)) : this.paused ? Optic.None : this.input.opticHeld;
-    const rifle = this.interpolatedRifle();
+    // The fly camera and the benchmark aren't anyone's eyes: no optic, no sway.
+    const ownEyes = !this.detached && !this.bench;
+    const optic = !ownEyes ? Optic.None : this.replay ? this.replay.opticAt(this.sim.tick) : this.paused ? Optic.None : this.input.opticHeld;
+    const rifle = ownEyes ? this.interpolatedRifle() : null;
     this.zoom = moveTowards(this.zoom, optic === Optic.Binoculars || (optic === Optic.Scope && !rifle) ? 1 : 0, dt / Math.max(V.zoomTime, 1e-3));
     const eased = this.zoom * this.zoom * (3 - 2 * this.zoom);
     const scoped = rifle ? rifle.raise * rifle.raise * (3 - 2 * rifle.raise) : 0;
@@ -843,6 +851,22 @@ export class Game {
     for (const e of events) {
       if (e.type === 'outcome') this.decided = true;
       else if (e.type === 'ranged') this.ranged = { range: e.range, at: performance.now() / 1000 };
+      else if (e.type === 'shot' && e.speed > 0 && e.source === this.sim.playerId) {
+        const fire = this.sim.lastInput.commands.find((c) => c.kind === 'fire');
+        if (fire?.kind === 'fire') this.shotLog.push({ report: analyzeShot(this.sim, e, fire), result: 'no strike', impact: -1, hit: false });
+      } else if (e.type === 'impact') {
+        const s = this.shotLog.find((x) => x.report.shot === e.cause);
+        if (s) {
+          s.impact = e.id;
+          s.result = e.what === 'body' ? `struck the ${e.part}` : e.what === 'collider' && e.surface === Surface.Metal ? 'rang the steel' : `missed, into the ${e.what === 'terrain' ? surfaceName(e.surface) : 'cover'}`;
+        }
+      } else if (e.type === 'death') {
+        const s = this.shotLog.find((x) => x.impact === e.cause);
+        if (s) {
+          s.result = `${e.part}, down`;
+          s.hit = s.report.target?.id === e.victim;
+        }
+      }
     }
     if (events.length > 0) {
       this.renderer.addEvents(events, this.time);

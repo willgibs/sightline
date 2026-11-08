@@ -195,7 +195,7 @@ export function shootingRange(): Scene {
     version: 1,
     title: 'Shooting range',
     description:
-      'Guards walk and stand at 100–500 m in a 4 m/s crosswind; 15 rounds. Range them with the binoculars, dial or hold for drop, read the flags for wind, lead the walkers, and go prone for a rest.',
+      '15 rounds at guards walking and standing 100–500 m out, in a crosswind the flags show. Go prone (Z) for a rest; range with the binoculars (F, then click); dial the zero (↑ ↓) or hold over; lead the walkers; hold your breath with Shift while scoped. H changes what the instruments tell you.',
     game: SIGHTLINE,
     world: (tuning) => {
       const { list, flags } = colliders();

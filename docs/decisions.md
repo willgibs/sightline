@@ -177,6 +177,14 @@ Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the gener
 
 **What moved:** the shooting range's fingerprints (its script gained a throw), the golden recording. No valley value.
 
+### Bob, hit confirmation and the end of a run (B5, B10)
+
+**Decision:**
+- **B5: walking bodies don't bob in the simulation, and a shot leaves from the simulation's eye.** Measured at 300 m (`tests/bob.test.ts`): a walking guard's 2.6 cm dip is 0.087 mil, under a quarter of the head's radius and a fifth of the smallest decision a 300 m shot needs, and under a pixel and a half through the scope. The camera's own bob fades out as the scope comes up, so the scoped shot and the drawn eye are the same point; unscoped, the barrel's pointing error is a hundred times larger than any dip. Bobbing bodies would cost a change to the body lane's shape, and through it every sight line, for nothing a player could see. Phase 3's walk cycles, which come with art, are the time to revisit it.
+- **B10: confirmation is physical.** Dust where a shot strikes, darker than the ground so it reads at range; a flash on steel; the trace along the simulated path; the body's collapse; the thump heard after the flight and the way back. No kill cam: a replay already plays a shot back slowly, and nothing rations a reward that the physics hands out on its own.
+- **The end of a run lists every rifle shot's breakdown** (range, lead, wind and sway in mils, and what it needed), from the same function `npm run playtest` prints, so the owner's verdict on a sitting can be checked against what decided each shot without a tool.
+- **Optics belong to the body's own eyes:** the fly camera and the benchmark draw no scope, no sway and no zoom.
+
 ## 2026-11-07 · Wave 0
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.

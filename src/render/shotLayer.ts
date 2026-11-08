@@ -85,13 +85,14 @@ export class ShotLayer {
       if (e.type !== 'impact') continue;
       const water = e.surface === Surface.Water && e.what === 'terrain';
       const steel = e.surface === Surface.Metal && e.what !== 'body';
-      const color = e.what === 'body' ? '#5b5049' : water ? '#eef3f6' : steel ? '#fff4c2' : e.surface === Surface.Rock ? '#b9b6ae' : e.surface === Surface.Grass ? '#b8ad8c' : '#c4a982';
+      // Darker than the ground it rises from, so it reads against it at 500 m; steel flashes.
+      const color = e.what === 'body' ? '#4a403a' : water ? '#f4f7f9' : steel ? '#fffbe0' : e.surface === Surface.Rock ? '#8d8a82' : e.surface === Surface.Grass ? '#7b7558' : '#8a7154';
       const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8, depthWrite: false, fog: true });
       const mesh = new THREE.Mesh(this.puffGeometry, material);
       mesh.position.set(e.x, e.y, e.z);
       mesh.visible = false;
       this.group.add(mesh);
-      this.puffs.push({ mesh, at: e.t, life: steel ? 0.25 : e.what === 'body' ? 0.6 : 1.6, size: steel ? 0.35 : e.what === 'body' ? 0.25 : water ? 0.9 : 0.75 });
+      this.puffs.push({ mesh, at: e.t, life: steel ? 0.3 : e.what === 'body' ? 0.6 : 2.2, size: steel ? 0.45 : e.what === 'body' ? 0.25 : water ? 1.1 : 1.2 });
     }
   }
 
