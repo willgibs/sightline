@@ -62,7 +62,9 @@ export function tell(ctx: TickContext, g: GuardEntity, r: Report, via: Via, caus
   for (const x of b.told) if (x.heard >= cutoff) b.told[w++] = x;
   b.told.length = w;
   if (b.told.length > T.maxTold) b.told.splice(0, b.told.length - T.maxTold);
-  const level = T.level[r.kind];
+  // An unverified report only stirs a guard if it's near him; farther ones just know of it.
+  const near = (r.x - g.body.x) * (r.x - g.body.x) + (r.z - g.body.z) * (r.z - g.body.z) <= T.heardReach * T.heardReach;
+  const level = r.kind === 'heard' && !near ? 0 : T.level[r.kind];
   if (level > 0) {
     const draw = (): number => ctx.draw(g.id, 'awareness', (rng) => rng.next());
     stimulate(s.awareness, { kind: 'voice', level, x: r.x, y: r.y, z: r.z, cause, reason: 'voice' }, ctx.tick, ctx.tuning, draw);

@@ -42,7 +42,7 @@ export interface Task {
   issued: number;
 }
 
-export type TaskKind = 'investigate' | 'search' | 'check' | 'sweep';
+export type TaskKind = 'investigate' | 'search' | 'check' | 'sweep' | 'cover';
 
 /** A search under way: the camp's last known position of the intruder, and how it's going. */
 export interface SearchState {

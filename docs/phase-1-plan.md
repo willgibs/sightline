@@ -807,17 +807,17 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - **Counter-snipers hunt.** They move to overlooking posts, sweep candidate perches in the order of belief, and glint.
   - **The reaction is visible.** A shot from 300 m gets a visible reaction inside the window: Halo's playtests found that sniping makes AI look oblivious.
   - **Reinforcements** arrive by truck after a delay, as a squad that hunts.
-- [ ] E9 · Found bodies and adaptation within a mission. All of it comes through A's perception, and only from incidents the player caused and could see. Done so far: a ledger of repeated tricks and a memory of incidents (`brain/commander.ts`); body percepts wait for A's #8.
-  - A body found means alert.
-  - A ledger of habituation by stimulus and cell, so repeated tricks lose effect.
-  - Floors on decay, so posture stays up.
-  - Memory of incidents, such as a perch with casualties.
-  - Bodies in the open push guards off exposed sightlines.
+- [x] E9 · Found bodies and adaptation within a mission (`brain/commander.ts`, `brain/brain.ts`). All of it comes through A's perception, and only from incidents the player caused and could see.
+  - A body found means alert: a guard who sees a body reports it (`report` kind `body`), the camp goes on alert.
+  - A ledger of habituation by stimulus and cell, so repeated tricks lose effect: the third rock at one spot draws two guards and an unverified radio report.
+  - Floors on decay, so posture stays up: a search settles the camp one level up, and A's ladder keeps its raised floor.
+  - Memory of incidents, such as a perch with casualties: where shots and bodies were reported (`camp.incidents`).
+  - Bodies in the open push guards off exposed sightlines: guards near a found body are ordered behind cover for a while.
 - [x] E10 · Minimal combat (`game/combat.ts`, the `engage` and `cover` acts).
   - Guards engage, take cover and call support, with lab B's bullets and sounds.
   - The player's health is two or three hits (`tuning.brain.combat`), and the player can die (`game/combat.ts`, `campRules`).
   - Phase 2 only joins labs, so this is built here.
-- [ ] E11 · Sandbox body drops.
+- [x] E11 · Sandbox body drops: L in the debug view drops a body where the player looks (lab A's A9/A10 sandbox); the camp finds it as it would any body (`tests/commander.test.ts`).
 - [ ] E12 · The scenarios and the baselines (see Exit tests). Done so far: the scenario family `camp-scenario` (suspicion, search, alarm), the search-cycle and calibration benches (the ellipse contains the perch 36% and 92% of the time in the world, against a 39/86 target), and the honest brain against Xu and Verbrugge's baselines (`game/baselines.ts`, pinned in the bench). "One overlook doesn't clear the camp" waits for lab D's validated camps.
 - [ ] Exit test, the bench numbers, a note, a playable link.
 

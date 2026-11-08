@@ -367,13 +367,14 @@ export const defaultTuning = {
       keep: 25, // seconds a guard remembers what he's been told
       maxTold: 8, // reports a guard's memory holds
       reportEvery: 20, // seconds between his calls about the same thing
-      level: { contact: 0.8, heard: 0.45, shot: 0.8, body: 0.82, missing: 0.4, clear: 0, claim: 0 }, // what a report raises him to
+      level: { contact: 0.8, heard: 0.32, shot: 0.8, body: 0.82, missing: 0.4, clear: 0, claim: 0 }, // what a report raises him to
       radius: { contact: 4, heard: 18, shot: 22, body: 6, missing: 8, clear: 12, claim: 8 }, // metres of uncertainty each kind adds to the speaker's
       clearRadius: 18, // metres a searcher's "clear" report wipes from the map
       // Claims (Blacklist): "I've got it": one guard goes, those who hear him don't all pile in.
       claimWithin: 14, // metres between a claim's spot and his own for it to count
       claimFor: 15, // seconds a claim holds
       claimedWeight: 0.15, // how much a claim by someone else leaves of his own wish to go
+      heardReach: 45, // metres: an unverified report only stirs guards this near what it's about; farther ones just know of it
     },
     // The camp's search map (E4, searchMap.ts): a window of cells around the camp.
     searchMap: {
@@ -390,6 +391,7 @@ export const defaultTuning = {
       keepOrder: 25, // seconds an order stays good if nothing renews it
       noOfficerEvery: 3, // seconds between plans with no officer to run them: searches turn sloppy
       // How many guards it may send: the pacing layer's role slots, by the camp's level.
+      coverSeconds: 25, // seconds a guard told to get under cover stays there, after a body turns up in the open
       slots: {
         uneasy: { investigate: 1, search: 0 },
         alert: { investigate: 1, search: 3 },

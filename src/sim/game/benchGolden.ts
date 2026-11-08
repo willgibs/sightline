@@ -139,7 +139,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       "re-found within 25 s (of 8): plain": 6,
       "re-found within 25 s (of 8): staleness": 4,
       "re-found within 25 s (of 8): omniscient": 8,
-      "reactions (in the scripted scenarios)": 60,
+      "reactions (in the scripted scenarios)": 64,
       "reactions unexplained": 0
     },
     "runs": {}

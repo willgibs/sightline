@@ -28,6 +28,8 @@ export interface Report {
   cause: number;
   /** A shot's bearing: how sure he is of the direction, radians at one standard deviation (E8). */
   sigma?: number;
+  /** He is on his way to see it himself: the camp needn't send anyone (E5). */
+  checking?: boolean;
 }
 
 /** How a report reached someone. */

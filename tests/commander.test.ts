@@ -481,3 +481,23 @@ describe('sandbox body drops (E11)', () => {
     expect(ev.some((e) => e.type === 'act' && e.why === 'body')).toBe(true);
   });
 });
+
+describe('a body in the open (E9)', () => {
+  it('orders guards near it off the exposed ground', () => {
+    const world = worldWith(guards([0, 0], [10, 0], [-14, 4]));
+    let systems = SYSTEMS;
+    for (const s of [...PERCEPTION, commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
+    const sim = new Simulation(world, T, systems);
+    giveSenses(sim);
+    giveBrains(sim);
+    giveCommander(sim);
+    giveDevicesNone();
+    const camp = commanderOf(sim)!.camp;
+    camp.inbox.push({ kind: 'body', x: 6, y: 0, z: 6, radius: 6, tick: 0, from: 99, fromX: 6, fromZ: 6, cause: 0 });
+    const raw = neutralInput();
+    const ev: SimEvent[] = [];
+    for (let i = 0; i < 3 * 30; i++) for (const e of sim.step(raw)) ev.push({ ...e });
+    expect(ev.some((e) => e.type === 'order' && e.task === 'cover')).toBe(true);
+  });
+});
+function giveDevicesNone(): void {}

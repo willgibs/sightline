@@ -74,6 +74,14 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   }
   const wanted: AlertLevel = r.kind === 'heard' || r.kind === 'missing' ? 'uneasy' : 'alert';
   if (alertRung(wanted) > alertRung(camp.level)) raise(camp, wanted, tick);
+  // A body in the open (E9): guards near it get off exposed ground.
+  if (r.kind === 'body') addTask(camp, 'cover', r.x, r.z, 2, 3, tick);
+  // An unverified report from someone already on his way there: the camp knows, and he has it.
+  if (r.kind === 'heard' && r.checking && !camp.tasks.some((t) => t.kind === 'investigate')) {
+    const t = addTask(camp, 'investigate', r.x, r.z, 2, 1, tick);
+    t.assigned.push(r.from);
+    t.cause = r.cause;
+  }
   // A search at this level, centred on the latest report.
   if (!camp.search && alertRung(camp.level) >= alertRung('uneasy')) {
     camp.search = { started: tick, startLevel: camp.floor, x: r.x, z: r.z, radius: Math.max(r.radius, M.injectRadius) };
@@ -242,7 +250,7 @@ function assign(m: CampMind, out: CampOrder[]): void {
         const post = m.world.camp.guards[g.post]!;
         if (post.elevated && t.kind !== 'sweep') continue;
         const role = roles[post.role];
-        const suit = t.kind === 'sweep' ? (post.role === 'marksman' ? 1 : 0) : t.kind === 'search' ? role.search : role.investigate;
+        const suit = t.kind === 'sweep' ? (post.role === 'marksman' ? 1 : 0) : t.kind === 'cover' ? 1 : t.kind === 'search' ? role.search : role.investigate;
         if (suit <= 0) continue;
         const pos = whereIs(m, g);
         const dx = pos.x - t.x;

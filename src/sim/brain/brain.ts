@@ -260,7 +260,13 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
     b.z = b.task!.z;
   }
   // Going to look, or running for the alarm: he says so, and whoever hears it leaves it to him.
-  if (act === 'investigate') b.say = { report: { ...currentReport(m), kind: 'claim' }, radius: m.tuning.brain.comms.talkRadius, radio: false };
+  if (act === 'investigate') {
+    // He says so aloud, and calls it in unverified: the camp knows, and he has it.
+    b.say = { report: { ...currentReport(m), kind: 'claim' }, radius: m.tuning.brain.comms.talkRadius, radio: false };
+    if (b.ended.investigate === undefined || m.tick - b.ended.investigate > m.tuning.brain.comms.reportEvery * m.tuning.sim.tickHz) {
+      b.radio = { ...currentReport(m), kind: 'heard', checking: true };
+    }
+  }
   if (act === 'alarm' && m.alarms.length > 0) {
     const box = m.alarms[nearestAlarm(m)]!;
     b.box = nearestAlarm(m);
@@ -333,7 +339,7 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   // Worth calling in: something to report, a radio in his hands, and he hasn't just called it in.
   const task = b.task;
   const order =
-    task && (!elevated || task.kind === 'sweep') && (m.tick - task.issued) / hz < m.tuning.brain.camp.keepOrder ? (task.kind === 'sweep' ? 1 : task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
+    task && (!elevated || task.kind === 'sweep') && (m.tick - task.issued) / hz < m.tuning.brain.camp.keepOrder ? (task.kind === 'sweep' || task.kind === 'cover' ? 1 : task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
   // Worth calling in: something he sensed himself (what he was only told is already on the
   // net), a radio in his hands, and he hasn't just called it in.
   // (Once he's on his way, he finishes: a percept lapsing doesn't call him back mid-walk.)
@@ -686,6 +692,24 @@ function performTask(m: GuardMind, out: Order): void {
   }
   b.x = task.x;
   b.z = task.z;
+  // Told to get off exposed ground (a body in the open, E9): behind the nearest cover from there, for a while.
+  if (task.kind === 'cover') {
+    if (!b.covered) {
+      const spot = findCover(m, task.x, task.z);
+      b.covered = true;
+      b.coverX = spot.x;
+      b.coverZ = spot.z;
+      b.routed = -1;
+    }
+    const w = walk(m, out, b.coverX, b.coverZ, T.paces.hurry, 'walk', task.x, task.z);
+    if (w === 'arrived' || w === 'stuck') stand(m, out, false);
+    if ((m.tick - task.issued) / hz > T.camp.coverSeconds) {
+      b.task = null;
+      b.covered = false;
+      b.done = true;
+    }
+    return;
+  }
   // A sweep (a marksman on his tower): he stays and looks over the place, then calls it.
   if (task.kind === 'sweep') {
     standToward(m, out, task.x, task.z, true);
