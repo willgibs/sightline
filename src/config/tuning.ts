@@ -282,13 +282,13 @@ export const defaultTuning = {
     search: { points: 3, radius: 7, growth: 0.35 },
     roles: {
       // What each role is willing to do (0 never, 1 fully): the role column of the design doc's table.
-      sentry: { investigate: 0.65, search: 0.75, flank: 0.6 },
-      patrol: { investigate: 1, search: 1, flank: 0.85 },
-      marksman: { investigate: 0, search: 0, flank: 0 },
-      'radio-operator': { investigate: 0.1, search: 0.1, flank: 0 },
-      officer: { investigate: 0.7, search: 0.8, flank: 0.3 },
-      worker: { investigate: 0.25, search: 0, flank: 0 },
-      target: { investigate: 0, search: 0, flank: 0 },
+      sentry: { investigate: 0.65, search: 0.75, flank: 0.6, report: 0.8 },
+      patrol: { investigate: 1, search: 1, flank: 0.85, report: 0.8 },
+      marksman: { investigate: 0, search: 0, flank: 0, report: 1 },
+      'radio-operator': { investigate: 0.1, search: 0.1, flank: 0, report: 1 },
+      officer: { investigate: 0.7, search: 0.8, flank: 0.3, report: 1 },
+      worker: { investigate: 0.25, search: 0, flank: 0, report: 0.6 },
+      target: { investigate: 0, search: 0, flank: 0, report: 0 },
     },
     // Each option's weight multiplies these, each read through its response curve.
     curves: {
@@ -296,6 +296,28 @@ export const defaultTuning = {
       fresh: { from: 2, to: 25, at0: 1, at1: 0.05 }, // how fresh the belief is
     },
     lookWeight: 0.35, // the weight of standing to look, when it competes with going
+    // Reports (E4): what guards tell each other and the camp (reports.ts, game/comms.ts).
+    comms: {
+      talk: 1.6, // seconds a radio call lasts: long enough to be interrupted
+      netDelay: 1.5, // seconds from a finished call to its delivery across the net
+      talkRadius: 14, // metres his voice carries while he's on the radio
+      shoutRadius: 55, // metres a shout carries
+      keep: 25, // seconds a guard remembers what he's been told
+      maxTold: 8, // reports a guard's memory holds
+      reportEvery: 20, // seconds between his calls about the same thing
+      level: { contact: 0.8, heard: 0.45, shot: 0.8, body: 0.82, missing: 0.4, clear: 0 }, // what a report raises him to
+      radius: { contact: 4, heard: 18, shot: 22, body: 6, missing: 8, clear: 12 }, // metres of uncertainty each kind adds to the speaker's
+      clearRadius: 18, // metres a searcher's "clear" report wipes from the map
+    },
+    // The camp's search map (E4, searchMap.ts): a window of cells around the camp.
+    searchMap: {
+      cells: 64,
+      cell: 2.5,
+      spreadRate: 0.25, // share of a cell's belief that bleeds to its neighbours per update,
+      updateHz: 2, // updates a second, a rate (rule 17)
+      clearRays: 400, // cells one clearing may test
+      injectRadius: 8, // metres: the least a report can be spread over
+    },
   },
 
   // The rifle, its ammunition and suppressor, the optics and the throwable (design doc ·

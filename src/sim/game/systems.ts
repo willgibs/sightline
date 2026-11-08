@@ -1,9 +1,10 @@
 import { intentFor, motorSystem, poseAt, type PoseSample } from '../body';
 import { carryOut, type NavAllowance } from '../brain';
 import { dcos, dsin } from '../kernel/core/detmath';
-import { scheduleSystem, type ScheduleHandler, type System, type TickContext } from '../kernel/systems';
+import { scheduleSystem, type Access, type ScheduleHandler, type System, type TickContext } from '../kernel/systems';
 import { player } from './entities';
 import { drawBrain } from './brains';
+import { radioDeliver, speak } from './comms';
 import { think } from './guards';
 import { playerIntent } from './player';
 import { SHOOTING_SYSTEMS } from './shooting';
@@ -14,8 +15,10 @@ import { SHOOTING_SYSTEMS } from './shooting';
  * in a phase that touch the same data with no declared order between them.
  */
 
-/** Handlers for scheduled entries. Empty until a lab schedules its first effect. */
-export const SCHEDULE_HANDLERS: Readonly<Record<string, ScheduleHandler>> = {};
+/** Handlers for scheduled entries, by kind (kernel/schedule.ts): a radio call's delivery, and what later labs schedule. */
+export const SCHEDULE_HANDLERS: Readonly<Record<string, ScheduleHandler>> = {
+  'radio-deliver': radioDeliver,
+};
 
 const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
 
@@ -95,8 +98,8 @@ const guardBrains: System = {
   name: 'guard-brains',
   phase: 'decide',
   reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.senses', 'guard.brain'],
-  writes: ['guard.guard.order', 'guard.brain', 'rng.brain'],
-  emits: ['act'],
+  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'schedule'],
+  emits: ['act', 'call'],
   run(ctx) {
     const nav = navAllowance(ctx);
     for (const g of ctx.index.of('guard')) {
@@ -104,7 +107,10 @@ const guardBrains: System = {
       if (change) {
         g.brain!.event = ctx.emit({ type: 'act', source: g.id, cause: change.cause, from: change.from, to: change.to, why: change.why, x: change.x, z: change.z, weight: change.weight });
       }
-      if (g.brain) ctx.debug((draw) => drawBrain(draw, ctx, g));
+      if (g.brain) {
+        speak(ctx, g);
+        ctx.debug((draw) => drawBrain(draw, ctx, g));
+      }
     }
   },
 };
@@ -114,8 +120,15 @@ function navAllowance(ctx: TickContext): NavAllowance {
   return ctx.channel('nav', () => ({ work: ctx.work, searches: { left: ctx.tuning.brain.nav.searchesPerTick } }));
 }
 
+/** What the schedule's handlers touch beyond the schedule (kernel/systems.ts, scheduleSystem). */
+const SCHEDULED_ACCESS = {
+  reads: ['commander.camp', 'guard.senses', 'guard.brain', 'guard.guard.spawn'],
+  writes: ['commander.camp', 'guard.brain.told', 'guard.senses.awareness', 'guard.senses.belief', 'rng.awareness'],
+  emits: ['radio'],
+} as const satisfies Access;
+
 export const SYSTEMS: readonly System[] = [
-  scheduleSystem(SCHEDULE_HANDLERS),
+  scheduleSystem(SCHEDULE_HANDLERS, SCHEDULED_ACCESS),
   playerCommands,
   SHOOTING_SYSTEMS.rifle,
   playerIntentSystem,

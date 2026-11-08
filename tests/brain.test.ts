@@ -135,7 +135,7 @@ describe('a guard with a brain', () => {
   });
 
   it('every act it can take is one the events can record', () => {
-    expect([...ACTS]).toEqual(['routine', 'return', 'look', 'investigate', 'search', 'hold']);
+    expect([...ACTS]).toEqual(['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report']);
   });
 });
 
@@ -160,6 +160,9 @@ function hashMind(m: GuardMind, rngWords: readonly number[] | undefined): string
   h.u32(br.route.next).f64(br.route.best).u32(br.route.progressTick).f64(br.route.sideX).f64(br.route.sideZ).f64(br.route.sideUntil).u32(br.route.stalls);
   h.f64(br.goalX).f64(br.goalZ).f64(br.routed).u32(br.routeOk ? 1 : 0).f64(br.linger).u32(br.points).f64(br.angle);
   for (const k of ACTS) h.f64(br.ended[k] ?? -1);
+  h.u32(br.told.length);
+  for (const t of br.told) h.str(t.kind).f64(t.x).f64(t.z).f64(t.radius).u32(t.tick).u32(t.from).u32(t.cause).str(t.via).u32(t.heard);
+  h.f64(br.until).f64(br.toldHeard);
   if (rngWords) for (const w of rngWords) h.u32(w);
   return h.digest();
 }

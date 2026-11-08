@@ -8,6 +8,7 @@ import type { GuardMind } from './mind';
 import { emptyRoute, emptySteering, followRoute, navigatorOf, type Route, type Steering } from './nav';
 import type { Order } from './orders';
 import { keepRoutine } from './routine';
+import type { Report, ReportKind, Told } from './reports';
 import { choose, response, type Option } from './utility';
 
 /**
@@ -26,11 +27,11 @@ import { choose, response, type Option } from './utility';
  * percept, an awareness, a belief.
  */
 
-export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold'] as const;
+export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report'] as const;
 export type ActName = (typeof ACTS)[number];
 
 /** Why a guard changed what he's doing: A's reasons for a change of state, and the brain's own. */
-export const ACT_WHYS = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost'] as const;
+export const ACT_WHYS = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report'] as const;
 export type ActWhy = (typeof ACT_WHYS)[number];
 
 /** A change of what a guard is doing, for its system to emit as an 'act' event. */
@@ -79,6 +80,16 @@ export interface BrainState {
   angle: number;
   /** The tick each act last ended, for its cooldown. */
   ended: Partial<Record<ActName, number>>;
+  /** What he's been told, by voice or radio (E4), oldest first. */
+  told: Told[];
+  /** A timed act runs until this tick. */
+  until: number;
+  /** He has finished a radio call: the report for the net (E4), for its system to take. */
+  radio: Report | null;
+  /** He says something aloud this tick: the report, its reach and whether he's on the radio, for its system to take. */
+  say: { report: Report; radius: number; radio: boolean } | null;
+  /** The newest report he's acted on: to start one reaction per report. */
+  toldHeard: number;
 }
 
 export function createBrain(): BrainState {
@@ -102,6 +113,11 @@ export function createBrain(): BrainState {
     points: 0,
     angle: 0,
     ended: {},
+    told: [],
+    until: -1,
+    radio: null,
+    say: null,
+    toldHeard: -1,
   };
 }
 
@@ -119,7 +135,7 @@ export function decide(m: GuardMind, out: Order): ActChange | null {
   const T = m.tuning.brain;
   const a = m.awareness;
   let change: ActChange | null = null;
-  const newest = newestPercept(m);
+  const newest = Math.max(newestPercept(m), newestTold(b));
   if (b.done || m.tick >= b.thinkAt || a.state !== b.state || newest !== b.percept) {
     b.state = a.state;
     b.percept = newest;
@@ -139,6 +155,13 @@ export function decide(m: GuardMind, out: Order): ActChange | null {
 function newestPercept(m: GuardMind): number {
   let tick = -1;
   for (const p of m.percepts) if (p.tick > tick) tick = p.tick;
+  return tick;
+}
+
+/** The tick of the newest thing he's been told, or −1. */
+function newestTold(b: BrainState): number {
+  let tick = -1;
+  for (const r of b.told) if (r.heard > tick) tick = r.heard;
   return tick;
 }
 
@@ -170,6 +193,7 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
   b.linger = -1;
   b.routed = -1;
   b.points = 0;
+  b.until = -1;
   b.route.points.length = 0;
   b.route.next = 0;
   const focus = focusOf(m);
@@ -242,13 +266,15 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   const near = response(T.curves.near, dist);
   const age = m.belief ? (m.tick - m.belief.tick) / hz : 1e6;
   const fresh = response(T.curves.fresh, age);
-  const cool = (act: 'investigate' | 'search'): number => {
+  const cool = (act: 'investigate' | 'search' | 'report'): number => {
     const ended = b.ended[act];
     if (ended === undefined) return 1;
-    const c = T.cooldown[act];
+    const c = act === 'report' ? T.comms.reportEvery : T.cooldown[act];
     const t = (m.tick - ended) / hz;
     return t < c ? 0 : 1;
   };
+  // Worth calling in: something to report, a radio in his hands, and he hasn't just called it in.
+  const callable = role.report * (m.belief !== null || m.awareness.focus ? 1 : 0) * cool('report');
   out.push({ act: 'routine', rank: 0, weight: 1 });
   const off = offRoutine(m);
   switch (state) {
@@ -259,10 +285,12 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       out.push({ act: 'look', rank: 2, weight: 1 });
       break;
     case 'suspicious':
+      out.push({ act: 'report', rank: 3, weight: callable * 0.2 });
       out.push({ act: 'look', rank: 3, weight: T.lookWeight });
       if (!elevated) out.push({ act: 'investigate', rank: 3, weight: role.investigate * near * fresh * cool('investigate') });
       break;
     case 'searching':
+      out.push({ act: 'report', rank: 4, weight: callable });
       out.push({ act: 'hold', rank: 4, weight: 0.2 });
       if (!elevated) {
         out.push({ act: 'investigate', rank: 4, weight: role.investigate * near * fresh * cool('investigate') });
@@ -270,6 +298,7 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       }
       break;
     case 'combat':
+      out.push({ act: 'report', rank: 5, weight: callable * 0.5 });
       out.push({ act: 'hold', rank: 5, weight: 1 });
       break;
   }
@@ -304,6 +333,9 @@ function perform(m: GuardMind, out: Order): void {
       break;
     case 'search':
       performSearch(m, out);
+      break;
+    case 'report':
+      performReport(m, out);
       break;
   }
 }
@@ -393,6 +425,40 @@ function performReturn(m: GuardMind, out: Order): void {
   const w = walk(m, out, pose.x, pose.z, T.paces.hurry, 'walk', look.x, look.z);
   if (w === 'arrived') b.done = true;
   else if (w === 'stuck') keepRoutine(m, out); // no way back by the grid: his routine knows the way
+}
+
+/** A radio call: he stands and talks, facing the trouble, and the net gets it when he's done. Killed mid-call, nothing is delivered. */
+function performReport(m: GuardMind, out: Order): void {
+  const b = m.brain!;
+  const C = m.tuning.brain.comms;
+  const hz = m.tuning.sim.tickHz;
+  if (b.until < 0) {
+    b.until = m.tick + Math.round(C.talk * hz);
+    b.say = { report: currentReport(m), radius: C.talkRadius, radio: true };
+  }
+  stand(m, out, false);
+  if (m.tick >= b.until) {
+    b.radio = b.say?.report ?? currentReport(m);
+    b.until = -1;
+    b.done = true;
+  }
+}
+
+/** What he'd say about what he's sensed: the kind it was and where he believes it is. */
+function currentReport(m: GuardMind): Report {
+  const a = m.awareness;
+  const C = m.tuning.brain.comms;
+  let kind: ReportKind = 'heard';
+  let tick = -1;
+  for (const p of m.percepts) {
+    if (p.tick < tick) continue;
+    tick = p.tick;
+    kind = p.kind === 'sight' ? 'contact' : p.kind === 'shot' ? 'shot' : p.kind === 'voice' ? 'heard' : 'heard';
+  }
+  const f = focusOf(m);
+  const y = m.belief ? m.belief.y : a.focus ? a.fy : m.self.y;
+  const base = m.belief ? m.belief.radius : C.radius[kind];
+  return { kind, x: f.x, y, z: f.z, radius: Math.max(base, C.radius[kind]), tick: m.tick, from: m.id, cause: perceptCause(m) };
 }
 
 function performInvestigate(m: GuardMind, out: Order): void {

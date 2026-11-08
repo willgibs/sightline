@@ -79,6 +79,8 @@ function events(): { sim: Simulation; all: SimEvent[]; valley: number; range: Si
     { type: 'bark', id: 0, tick, t: tick / 30, source: guard, cause: 0, ...voice, line: 3 },
     { type: 'noise', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, loudness: 2, radius: 24 },
     { type: 'act', id: 0, tick, t: tick / 30, source: guard, cause: 1, from: 'routine', to: 'look', why: 'heard', x: 3, z: -4, weight: 0.65 },
+    { type: 'call', id: 0, tick, t: tick / 30, source: guard, cause: 1, ...voice, loudness: 14 / defaultTuning.noise.radiusPerUnit, radius: 14, radio: 1 },
+    { type: 'radio', id: 0, tick, t: tick / 30, source: guard, cause: 1, kind: 'contact', x: 8, z: -2, radius: 6 },
   ];
   perceived.forEach((e) => all.push({ ...e, id: all.length + 1 }));
   const valley = all.length;

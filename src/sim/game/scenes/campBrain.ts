@@ -8,6 +8,7 @@ import type { FoliageVolume } from '../../perception';
 import { WaypointDriver, type Waypoint } from '../bots/waypoints';
 import { PERCEPTION, giveSenses } from '../perception';
 import { giveBrains } from '../brains';
+import { campCommander, commsVoice, giveCommander } from '../comms';
 import { SIGHTLINE } from '../sim';
 import type { Scene } from '.';
 
@@ -266,10 +267,11 @@ export function campBrain(): Scene {
     description: 'A compound with eight guards in the design doc roles: sentries, a patrol pair, a marksman, a radio operator, an officer and a worker.',
     game: SIGHTLINE,
     world: campWorld,
-    systems: PERCEPTION,
+    systems: [...PERCEPTION, commsVoice, campCommander],
     setup: (sim) => {
       giveSenses(sim);
       giveBrains(sim);
+      giveCommander(sim);
     },
     driver: () => new WaypointDriver(ROUTE),
     seconds: 40,

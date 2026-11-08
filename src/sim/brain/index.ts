@@ -14,3 +14,6 @@ export { react } from './react';
 export { emptyRoute, emptySteering, followRoute, navigatorOf, routeLength, type Route, type RouteResult, type Steering, type Walk } from './nav';
 export { ACTS, ACT_WHYS, createBrain, decide, type ActChange, type ActName, type ActWhy, type BrainState } from './brain';
 export { choose, response, type Curve, type Option } from './utility';
+export { REPORT_KINDS, type Report, type ReportKind, type Told, type Via } from './reports';
+export { clearSeen, createSearchMap, hottestCell, injectBelief, mapMass, mapSpread, spreadBelief, type SearchMap } from './searchMap';
+export { ALERT_LEVELS, alertRung, createCamp, type AlertLevel, type CampState } from './camp';

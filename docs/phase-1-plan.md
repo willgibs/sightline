@@ -770,14 +770,14 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - A\*, with fixed tie-breaks and an iteration budget; paths string-pulled and followed through the motor.
   - Stepping around a cornered player: a stalled walk sidesteps by a fixed rule (own-body information only), comes back to its route, and tells the brain when it can't.
   - Ladder links (C5): waiting on lab C's ladders.
-- [ ] E2 · The lab scene: 5–8 guards with roles, an alarm box, a radio and a generator. It uses a handmade camp until D4–D6 are on `main`.
+- [x] E2 · The lab scene (`?scene=camp-brain`): 8 guards in the design doc's roles, an alarm box, a radio and a generator, in a handmade camp until D4–D6 are on `main`.
 - [ ] E3 · The brain.
   - A prioritized machine of awareness states.
   - Inside each state, actions (investigate, call it in, take cover, flank, search) are scored by multiplied 0–1 considerations through response curves, with cooldowns against dithering.
   - Rank-then-weight choice, drawing from the guard's own stream through the mind (rule 13).
   - A reason code on every transition.
   - It replaces A's minimal reactions.
-- [ ] E4 · Beliefs spread.
+- [x] E4 · Beliefs spread (`brain/searchMap.ts`, `brain/reports.ts`, `game/comms.ts`).
   - One camp-level search map, fed only by reports: a grid that spreads from the last known position and clears where searchers can see. Per-guard maps would put about 410,000 numbers into the hashed state.
   - Voice to guards nearby, heard through A's hearing.
   - Radio across the camp after a delay. A report is an action with a duration, and its delivery is cancelled if the speaker drops. The radio needs a working set and an operator.

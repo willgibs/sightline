@@ -163,7 +163,7 @@ const ear = { x: 0, y: 0, z: 0 };
 export function deliverSound(ctx: TickContext, e: Extract<SimEvent, SoundFields>): void {
   const T = ctx.tuning;
   const H = T.perception.hearing;
-  const kind: PendingSound['kind'] = e.type === 'bark' ? 'voice' : 'sound';
+  const kind: PendingSound['kind'] = e.type === 'bark' || e.type === 'call' ? 'voice' : 'sound';
   const maker = ctx.index.get(e.source);
   const side = maker ? maker.faction : Faction.None;
   let acoustics: Acoustics | null = null;
