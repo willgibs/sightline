@@ -55,29 +55,72 @@ export function simTuningKey(t: Tuning): string {
 }
 
 /**
- * Builds a mission's world from its spec. Generation reads only `tuning.gen`. Pass a
- * clock (milliseconds) to have the generation time reported in `genMs`.
- */
-/**
- * A fingerprint of everything generation decides: terrain, surfaces, props, camp, spawn.
- * Recordings carry it, so a valley generated differently is caught before re-simulating.
+ * A fingerprint of everything generation decides, by construction: every field of the
+ * world but what it was built from (`spec`, `seed`) and how long it took (`genMs`), so a
+ * field any lane adds to World is covered the day it is added. The terrain counts by its
+ * heights and surfaces, the colliders by their list. Recordings carry it, so a valley
+ * generated differently is caught before re-simulating.
  */
 export function worldFingerprint(w: World): string {
   const h = new Hasher();
-  w.terrain.hashInto(h);
-  for (const t of w.props.trees) h.f64(t.x).f64(t.z).f64(t.canopyH);
-  for (const r of w.props.rocks) h.f64(r.x).f64(r.z).f64(r.sy);
-  for (const b of w.props.bushes) h.f64(b.x).f64(b.z);
-  for (const g of w.camp.guards) h.f64(g.x).f64(g.y).f64(g.z);
-  h.f64(w.spawn.x).f64(w.spawn.z);
-  w.colliders.hashInto(h);
-  for (const g of w.camp.guards) {
-    const r = g.routine;
-    h.f64(r.period).f64(r.scanAmp).f64(r.scanPeriod).f64(r.scanPhase).u32(r.legs.length);
-    for (const l of r.legs) h.f64(l.t0).f64(l.t1);
-  }
+  const { spec: _spec, seed: _seed, genMs: _genMs, terrain, colliders, ...rest } = w;
+  hashGenerated(h, { ...rest, terrain: { size: terrain.size, cell: terrain.cell, heights: terrain.heights, surfaces: terrain.surfaces }, colliders: colliders.list }, 'world');
   return h.digest();
 }
+
+/**
+ * Feeds generated data to a hash: numbers by their bits, strings, booleans, arrays, typed
+ * arrays by their bytes, and plain objects with their keys sorted. Anything else (a class
+ * instance, a function, a Map) is refused by name, since its insides wouldn't be covered.
+ */
+function hashGenerated(h: Hasher, v: unknown, path: string): void {
+  switch (typeof v) {
+    case 'number':
+      h.u32(1).f64(v);
+      return;
+    case 'boolean':
+      h.u32(v ? 3 : 2);
+      return;
+    case 'string':
+      h.u32(4).str(v);
+      return;
+    case 'undefined':
+      h.u32(8);
+      return;
+    case 'object': {
+      if (v === null) {
+        h.u32(5);
+        return;
+      }
+      if (ArrayBuffer.isView(v)) {
+        const bytes = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+        h.u32(9).u32(bytes.length).bytes(bytes);
+        return;
+      }
+      if (Array.isArray(v)) {
+        h.u32(6).u32(v.length);
+        for (let k = 0; k < v.length; k++) hashGenerated(h, v[k], path);
+        return;
+      }
+      const proto = Object.getPrototypeOf(v) as unknown;
+      if (proto !== Object.prototype && proto !== null) throw new Error(`The world holds a ${(v as object).constructor?.name ?? 'class instance'} at ${path}; its fingerprint covers plain data and typed arrays only`);
+      const keys = Object.keys(v).sort();
+      h.u32(7).u32(keys.length);
+      for (const k of keys) {
+        h.str(k);
+        hashGenerated(h, (v as Record<string, unknown>)[k], `${path}.${k}`);
+      }
+      return;
+    }
+    default:
+      throw new Error(`The world holds a ${typeof v} at ${path}; its fingerprint covers plain data and typed arrays only`);
+  }
+}
+
+/**
+ * Builds a mission's world from its spec. Generation reads only `tuning.gen`. Pass a
+ * clock (milliseconds) to have the generation time reported in `genMs`.
+ */
 
 export function generateWorld(spec: MissionSpec, tuning: Tuning, clock?: () => number): World {
   if (spec.terrain.kind !== 'procedural') throw new Error(`The world '${spec.terrain.name}' is built by hand; its scene builds it (kernel/scene.ts)`);

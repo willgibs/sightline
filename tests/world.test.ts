@@ -5,6 +5,8 @@ import { generateWorld, worldFingerprint } from '../src/sim/generation/world';
 import type { World } from '../src/sim/kernel/world/world';
 import { makeTerrainSample } from '../src/sim/kernel/world/heightfield';
 import { missionSpec } from '../src/sim/kernel/mission';
+import { CellStreams } from '../src/sim/generation/scatter';
+import { Rng } from '../src/sim/kernel/core/rng';
 
 const fingerprint = worldFingerprint;
 
@@ -57,6 +59,28 @@ describe('world generation', () => {
     // Daily contracts and shared seeds depend on a seed always building the same valley.
     // If you change generation on purpose, update this value and note it in docs/decisions.md.
     expect(fingerprint(tal)).toBe(GOLDEN_TAL_4471);
+  });
+
+  it('scatters by cell: a prop depends only on the seed, its kind and its cell', () => {
+    // Half the tree cover keeps a subset of the trees, each exactly as it was: no cell's
+    // numbers depend on what its neighbours drew, so a repair touches only its own cells.
+    const sparse = structuredClone(defaultTuning);
+    sparse.gen.props.treeCover *= 0.5;
+    const w = generateWorld(missionSpec('TAL-4471'), sparse);
+    const before = new Map(tal.props.trees.map((t) => [t.cell, t]));
+    expect(w.props.trees.length).toBeLessThan(tal.props.trees.length * 0.7);
+    for (const t of w.props.trees) expect(t).toEqual(before.get(t.cell));
+    // Rocks and bushes didn't move at all.
+    expect(w.props.rocks).toEqual(tal.props.rocks);
+    expect(w.props.bushes).toEqual(tal.props.bushes);
+    // And a cell's stream is the same whatever order cells are visited in.
+    const a = new CellStreams(new Rng('TAL-4471'), 'trees');
+    const b = new CellStreams(new Rng('TAL-4471'), 'trees');
+    const first = [a.at(3, 4).next(), a.at(9, 1).next()];
+    b.at(9, 1).next();
+    b.at(100, 7).next();
+    expect([b.at(3, 4).next(), b.at(9, 1).next()]).toEqual(first);
+    expect(new CellStreams(new Rng('TAL-4471'), 'rocks').at(3, 4).next()).not.toBe(first[0]);
   });
 
   it('flattens the camp pad', () => {
@@ -114,4 +138,4 @@ describe('world generation', () => {
   });
 });
 
-const GOLDEN_TAL_4471 = '589085a8b5ce974d';
+const GOLDEN_TAL_4471 = 'f555512c33daea22';

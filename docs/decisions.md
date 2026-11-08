@@ -2,6 +2,21 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · Lab D
+
+Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the generation lane.
+
+### The one deliberate `GEN_VERSION` bump (D1)
+
+**Decision:**
+- **Scatter by cell.** Trees, rocks and bushes are scattered on jittered grids as before, but each cell now draws from its own stream: the feature's labelled fork mixed with the cell's coordinates by integer hashing (`generation/scatter.ts`). A prop depends only on the seed, its kind and its cell, and carries that cell as its id (`Tree.cell` and the others). Before, every cell drew from one stream in visiting order, so a cell that kept its prop shifted every later cell's numbers. Now a repair that clears or adds cells (D8) changes only those cells, and generated objects keep their ids, as the survival horizon asks.
+- **The fingerprint covers the world by construction.** `worldFingerprint` hashes every field of the world except what it was built from (`spec`, `seed`) and how long it took (`genMs`): the terrain by its heights and surfaces, the colliders by their list, and everything else (features, backdrop, props, camp and routines, the spatial grid, the report, the spawn) generically, keys sorted, typed arrays by their bytes. A field any lane adds to `World` is covered the day it is added, and a class instance there is refused by name. Before, it listed what it covered by hand, and missed the backdrop, the grid, the report and most of each prop.
+- **`dsin` and `dcos` reduce exactly from 10⁶ up** (`kernel/core/detmath.ts`): Payne–Hanek in 24-bit limbs, with the 66 limbs of 2/π that a double can need, each product exact in a double. Below 10⁶ the plain reduction is kept bit for bit. `tests/detmath.test.ts` recomputes 2/π from Machin's formula in integer arithmetic, holds the new path to the engine's own `sin` and `cos` within the kernels' own error (1.5e-15) from 2²⁰ to 2¹⁰²², including the double nearest a multiple of π/2, and wraps the trigonometry while generating both valleys and every pinned run: the largest argument the simulation reaches is far below 10⁶. The one input that grows with time, a guard's head sweep, needs almost thirteen days of mission to get there.
+
+**What moved:** `GEN_VERSION` 4. TAL-4471's fingerprint is `f555512c33daea22` (`GOLDEN.world`, `GOLDEN_TAL_4471`). Two plays moved because their bots met different trees and rocks: MUD-9031 wander (`67964675cb39477e`, state `4002c5b682b8bcc8`) and TAL-4471 chaos (`fe623d33389a2f21`, state `e8037411190fc911`). TAL-4471 wander, the scenes and the math golden held. The golden recording is rewritten. The body bench's worst rise in a tick is now 0.29 m (a rock, under the 0.45 m step), and its worst overlap 2e-14 m.
+
+**Why:** the foundation pass left both changes for one deliberate bump (`docs/foundation-plan.md`, Deliberately later), so seeds change once, not twice. Lab D's repairs need scatter that stays put around them, and the camp generator adds a great deal to the world that a hand-kept list would have missed.
+
 ## 2026-11-07 · Wave 0
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.

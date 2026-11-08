@@ -33,8 +33,8 @@ export const BENCH_GOLDEN: PinnedBench = {
       "runs with a broken promise (of 4)": 0,
       "bodies under the terrain": 0,
       "bodies inside something solid": 0,
-      "worst overlap (m)": 0,
-      "worst rise in a tick (m)": 0.02614027438236377,
+      "worst overlap (m)": 2.2093438190040615e-14,
+      "worst rise in a tick (m)": 0.28554800812780456,
       "worst gain on steep ground (m)": 0
     },
     "runs": {

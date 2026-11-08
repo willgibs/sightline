@@ -597,7 +597,7 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
 - **Counting, pinned before D8,** as the research asked: a perch's coverage of a guard is the share of the camp's cycle that guard is in its view, sampled every half second. Both perch rules count this way.
 
 **Milestones:**
-- [ ] D1 · The one deliberate `GEN_VERSION` bump.
+- [x] D1 · The one deliberate `GEN_VERSION` bump.
   - Scatter that depends only on seed, label and cell, so generated objects keep stable ids and a repair touches only its own cells.
   - Range reduction for `dsin` and `dcos`, for |x| ≥ 10⁶ only. Both functions drive the simulation too, so a test shows that no simulation input reaches it and that the math golden doesn't move.
   - TAL-4471 gets a new golden.

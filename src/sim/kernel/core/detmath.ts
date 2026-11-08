@@ -47,11 +47,109 @@ function cosKernel(x: number): number {
   );
 }
 
-/** Reduce x to r in [-π/4, π/4] and a quadrant q in 0..3 with x = q·π/2 + r. */
+/**
+ * Reduce x to r in [-π/4, π/4] and a quadrant q in 0..3 with x = q·π/2 + r.
+ *
+ * Below 10⁶ this is the plain reduction every recording and valley so far was made with,
+ * kept bit for bit: it loses about |x|·1e-16 to HALF_PI's rounding, which is nothing at
+ * the angles the simulation uses. From 10⁶ up it is exact (Payne–Hanek, below), so a huge
+ * argument gives the right answer instead of noise. No simulation input reaches 10⁶
+ * (tests/detmath.test.ts), so the switch moved no golden.
+ */
 function reduce(x: number): { r: number; q: number } {
+  if (!(Math.abs(x) < LARGE)) return reduceLarge(x);
   const k = Math.floor(x / HALF_PI + 0.5);
   const q = ((k % 4) + 4) % 4;
   return { r: x - k * HALF_PI, q };
+}
+
+/** Where the exact reduction takes over. */
+const LARGE = 1e6;
+
+/**
+ * 2/π in 24-bit limbs: 2/π = Σ TWO_OVER_PI[k]·2^(−24(k + 1)). Enough for every finite
+ * double; tests/detmath.test.ts recomputes them exactly from Machin's formula.
+ */
+export const TWO_OVER_PI: readonly number[] = [
+  0xa2f983, 0x6e4e44, 0x1529fc, 0x2757d1, 0xf534dd, 0xc0db62, 0x95993c, 0x439041, 0xfe5163, 0xabdebb, 0xc561b7, 0x246e3a, 0x424dd2, 0xe00649, 0x2eea09,
+  0xd1921c, 0xfe1deb, 0x1cb129, 0xa73ee8, 0x8235f5, 0x2ebb44, 0x84e99c, 0x7026b4, 0x5f7e41, 0x3991d6, 0x398353, 0x39f49c, 0x845f8b, 0xbdf928, 0x3b1ff8,
+  0x97ffde, 0x05980f, 0xef2f11, 0x8b5a0a, 0x6d1f6d, 0x367ecf, 0x27cb09, 0xb74f46, 0x3f669e, 0x5fea2d, 0x7527ba, 0xc7ebe5, 0xf17b3d, 0x0739f7, 0x8a5292,
+  0xea6bfb, 0x5fb11f, 0x8d5d08, 0x560330, 0x46fc7b, 0x6babf0, 0xcfbc20, 0x9af436, 0x1da9e3, 0x91615e, 0xe61b08, 0x659985, 0x5f14a0, 0x68408d, 0xffd880,
+  0x4d7327, 0x310606, 0x1556ca, 0x73a8c9, 0x60e27b, 0xc08c6b,
+];
+const TWO24 = 16777216;
+/** Fraction limbs kept: enough for the worst cancellation a double can show (about 62 bits) and 53 more. */
+const FRACTION_LIMBS = 8;
+const PIO2_HI = 1.5707963267948966;
+const PIO2_LO = 6.123233995736766e-17;
+
+/**
+ * Payne–Hanek: x·2/π computed exactly in 24-bit limbs, every product of two limbs exact
+ * in a double, so only the bits of 2/π that reach the quadrant and the fraction are used.
+ * Built from + − * and floor alone, like the rest of this file.
+ */
+function reduceLarge(x: number): { r: number; q: number } {
+  if (x !== x || x === Infinity || x === -Infinity) return { r: NaN, q: 0 };
+  const neg = x < 0;
+  const ax = neg ? -x : x;
+  bits.setFloat64(0, ax, false);
+  const e = ((bits.getUint32(0, false) >>> 20) & 0x7ff) - 1023; // ax in [2^e, 2^(e+1)), e ≥ 19
+  // ax = Σ xs[i]·2^(24(top − i)): four limbs hold its 53 bits wherever they fall.
+  const top = Math.floor(e / 24);
+  const xs = [0, 0, 0, 0];
+  let y = ax * pow2i(-24 * top);
+  for (let i = 0; i < 4; i++) {
+    const d = Math.floor(y);
+    xs[i] = d;
+    y = (y - d) * TWO24;
+  }
+  // Column n of the product weighs 2^(24(top − n)); columns above n = top are multiples of
+  // 2^24, so they can't change the quadrant. Column top is the integer part's last limb.
+  const q = new Array<number>(FRACTION_LIMBS + 1).fill(0);
+  for (let m = 0; m <= FRACTION_LIMBS; m++) {
+    const n = top + m;
+    let sum = 0;
+    for (let i = 0; i < 4; i++) {
+      const k = n - i; // limb k of 2/π weighs 2^(−24k), from k = 1
+      if (k >= 1 && k <= TWO_OVER_PI.length) sum += xs[i]! * TWO_OVER_PI[k - 1]!;
+    }
+    q[m] = sum;
+  }
+  for (let m = FRACTION_LIMBS; m >= 1; m--) {
+    const carry = Math.floor(q[m]! / TWO24);
+    q[m] = q[m]! - carry * TWO24;
+    q[m - 1] = q[m - 1]! + carry;
+  }
+  const whole = q[0]! - 4 * Math.floor(q[0]! / 4);
+  // The fraction f, limb by limb. Past one half, take f − 1 instead, as its distance below 1.
+  const upper = q[1]! >= TWO24 / 2;
+  const g = q.slice(1);
+  if (upper) {
+    for (let m = 0; m < FRACTION_LIMBS; m++) g[m] = TWO24 - 1 - g[m]!;
+    for (let m = FRACTION_LIMBS - 1; m >= 0; m--) {
+      g[m] = g[m]! + 1;
+      if (g[m]! < TWO24) break;
+      g[m] = 0;
+    }
+  }
+  // Leading zero limbs cancel exactly; the next two give 48 exact bits, the rest a correction.
+  let m0 = 0;
+  while (m0 < FRACTION_LIMBS && g[m0] === 0) m0++;
+  let r = 0;
+  if (m0 < FRACTION_LIMBS) {
+    const w = pow2i(-24 * (m0 + 1));
+    const hi = g[m0]! * w + (m0 + 1 < FRACTION_LIMBS ? g[m0 + 1]! * w * pow2i(-24) : 0);
+    let lo = 0;
+    for (let m = FRACTION_LIMBS - 1; m >= m0 + 2; m--) lo += g[m]! * pow2i(-24 * (m + 1));
+    r = hi * PIO2_HI + (lo * PIO2_HI + hi * PIO2_LO);
+  }
+  if (upper) r = -r;
+  let quadrant = (whole + (upper ? 1 : 0)) % 4;
+  if (neg) {
+    quadrant = (4 - quadrant) % 4;
+    r = -r;
+  }
+  return { r, q: quadrant };
 }
 
 export function dsin(x: number): number {
