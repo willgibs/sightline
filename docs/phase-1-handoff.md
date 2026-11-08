@@ -1,6 +1,6 @@
 # Phase 1: start here
 
-> **Planning is done.** The plan is `docs/phase-1-plan.md`. It holds each lab's milestones, the rules for landing on `main` and how each exit test is measured. This file still says what each lab starts from, and its gotchas hold.
+> **Planning is done.** The plan is `docs/phase-1-plan.md`. It holds each lab's milestones, the rules for landing on `main` and how each exit test is measured. Wave 0 starts with the kernel boundary in `docs/foundation-shape.md`, and each lab's seeds are in `docs/research/`. This file still says what each lab starts from, and its gotchas hold.
 
 Written on Nov 7, 2026, at the end of the session that ran the foundation pass, so that a new session can plan and build Phase 1 without it. Read `CLAUDE.md` first (Claude Code loads it by itself), then this, then the design doc's Part 2 sections for the lab at hand.
 

@@ -14,3 +14,8 @@ playtests/
 # Pictures from npm run look
 shots/
 .vitest/
+
+# Working folders of the research tool; the kept copy is docs/research/
+research_notes/
+reports/
+__pycache__/

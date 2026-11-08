@@ -1,6 +1,6 @@
 # Sightline · Game Design & Build Plan
 
-> **This is a copy.** The design doc lives at [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), and the live doc wins wherever the two differ. This is its revision 37, exported on Nov 7, 2026, for sessions that can't open it, such as a Claude Code session without the Claude Docs connector. The live doc's four diagrams are written out here as text. Don't edit this copy to change the design: change the live doc, or propose the change to the owner, then export it again over this file.
+> **This is a copy.** The design doc lives at [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), and the live doc wins wherever the two differ. This is its revision 38, exported on Nov 7, 2026, for sessions that can't open it, such as a Claude Code session without the Claude Docs connector. The live doc's four diagrams are written out here as text. Don't edit this copy to change the design: change the live doc, or propose the change to the owner, then export it again over this file.
 
 Nov 7, 2026 · @Will Gibson
 
@@ -177,12 +177,16 @@ Enemies sense the world in ways you can learn and exploit, and they never know a
 - Range: a standing, moving player in the open can be spotted out to about 150 m in daylight. A still, prone player in cover is close to invisible beyond 50 m. Marksmen with binoculars see about 400 m in a narrow cone.
 - Thresholds: below 30% nothing visible happens; from 30% the guard turns curious, then suspicious; at 100% he has seen you.
 
+**Reading the table (owner, Nov 7):** stance and light act as range caps, and peripheral vision covers only a short range, so each factor is a boundary the honest view can show. Inside each zone, time to detection grows linearly with distance, and zone edges ramp rather than cliff. The multipliers above are starting values for the caps, and the ranges stand. Your light is the light at the ground beneath you, which is what you can see.
+
 #### Hearing
 
 - Sounds are events with a loudness and a type: footstep, shot, impact, voice, object.
 - They travel along walkable paths around buildings, not through walls, and fade with distance and obstruction.
 - Ambient noise masks hearing: a guard next to a generator hears far less.
 - A heard sound gives a guess, not a fix. A shot from 300 m gives a rough direction and little sense of distance.
+
+**One law of sound (owner, Nov 7):** guards hear exactly what the player would, by the same law the player's speakers use. Anything unfair gets a cue, never a bias such as deafness off screen.
 
 #### What gives you away
 
@@ -642,6 +646,8 @@ Calls 1–3 shape the core and have working defaults; the rest are deliberately 
 
 | Date | Decision | Outcome |
 | --- | --- | --- |
+| Nov 7, 2026 | Foundation for many games | Owner: one foundation for many games and features, with each lane aiming past the best known solution and proving it on its own bench. A narrow kernel, lanes behind contracts, a bench per lane |
+| Nov 7, 2026 | Sight, hearing and light | Owner's calls: stance and light become range caps, with a short-range periphery; one law of sound, with cues rather than biases; the player's light is the light at the ground beneath them |
 | Nov 7, 2026 | Phase 1 plan | Owner's calls: the labs run in two parallel waves after a short pass of shared seams; the owner runs the blind trials; an agent reviews lab D's camps and the owner checks three; the core archetype is a compound |
 | Nov 7, 2026 | Sniping's limits | Owner: one overlook must never clear a camp. Validation gains a no-single-perch-win rule, and lab E tests it against a perfect shooter |
 | Nov 7, 2026 | Phase 0 gate | Passed. The owner played it at 120 fps on a Mac. Whether movement feels deliberate enough gets judged once there's more gameplay. |

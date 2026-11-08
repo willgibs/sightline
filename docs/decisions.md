@@ -6,6 +6,32 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The plan, with each lab's milestones and how its exit test is measured, is `docs/phase-1-plan.md`.
 
+### The foundation's shape: a kernel, lanes and benches
+
+**Decision:** `src/sim` splits into three layers:
+- a narrow **kernel**, which never imports a lane or the game, and runs with every lane switched off;
+- **lanes**, one per lab, each behind one exported contract;
+- the **game**, Sightline's own content and rules.
+
+**How it's enforced:**
+- Systems declare what they read, write and emit, and a test catches two systems in a phase touching the same path with no declared order.
+- The lane map is data, and the architecture test reads it.
+- Every lane gets a bench: pinned scenes, quality metrics and deterministic work counts.
+
+**What waits:** packages wait for a second game. The design is `docs/foundation-shape.md`, approved by the owner.
+
+**Why:**
+- **What the owner wants:** a foundation that many games and features can be built on, with each lane improving on its own.
+- **What the research found** (`docs/research/foundations.md`): shared technology works when the kernel stays narrow and its contracts are enforced by test (Sony's ICE, Ubisoft's Snowdrop). It fails when one engine is mandated across genres (Frostbite).
+- **Why now:** with five labs about to write most of the simulation, the boundary costs little now and much later.
+- **Why no per-lane version numbers:** in a bit-exact simulation, every observable bit is part of the contract.
+
+### Research is a seed, not a ceiling
+
+**Decision:** fourteen researchers gathered the prior art, kept in `docs/research/`. Each lab starts from the strongest technique found, says where it falls short, builds past it, and records its bench numbers against both before it's done.
+
+**Why:** the owner wants the pinnacle of each lane, not the best of what others have shipped. The research also shows where prior art cheated where Sightline promises not to: searches that read the player's true position, offscreen deafness, directors that know the truth. Each cheat becomes a check Sightline can run on every push.
+
 ### Seams first, then the labs in two waves
 
 **Decision:** a short Wave 0 lands on `main` before any lab branch opens:

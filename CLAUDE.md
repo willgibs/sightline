@@ -11,8 +11,15 @@ The foundation pass that followed is done.
 - Only the owner's check on his Mac is still open.
 
 **Now: Phase 1, planned on Nov 7 in `docs/phase-1-plan.md`.**
-- Wave 0 comes first: one session lands the shared seams on `main`, one change at a time. Then labs A, B and D run in parallel, each in its own session, branch and pull request. C and E follow once A's percepts land.
-- A lab session starts from this file, `docs/phase-1-handoff.md` (what each lab starts from, and the gotchas) and its lab's section of the plan. The plan's rules for landing on `main` apply to every branch.
+- Wave 0 comes first: one session lands the shared seams on `main`, one change at a time, starting with the kernel boundary and lanes (`docs/foundation-shape.md`). Then labs A, B and D run in parallel, each in its own session, branch and pull request. C and E follow once A's percepts land.
+- A lab session starts from:
+  - this file;
+  - `docs/phase-1-handoff.md`: what each lab starts from, and the gotchas;
+  - `docs/foundation-shape.md`;
+  - its lab's section of the plan;
+  - its pages in `docs/research/`.
+
+  The plan's rules for landing on `main` apply to every branch.
 - Keep the plan's checkboxes current as work lands, as the foundation plan was kept.
 
 **Phase 1:** five labs, each an isolated wireframe scene built to its exit test.
@@ -76,6 +83,8 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 - The repository is `willgibs/sightline` on GitHub. Keep `main` green: CI runs the full check on every push, and weekly on macOS and Windows with a cross-platform hash comparison.
 - Every push to `main` deploys to production on Vercel (sightline-willgibs.vercel.app, visible only to the owner's Vercel account); other branches get preview deploys.
 - Commit in small, verified steps, each with its tests passing.
+- Research is a seed, not a ceiling. A lane starts from the strongest prior art in `docs/research/`, says where it falls short, builds past it, and proves the gain on its bench.
+- The foundation is meant to carry many games. Keep the kernel narrow, keep lanes behind their contracts, and generalize at the third use (`docs/foundation-shape.md`).
 
 ## Conventions
 
