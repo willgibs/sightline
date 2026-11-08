@@ -6,6 +6,31 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The working plan, with everything still open, is `docs/foundation-plan.md`.
 
+### Every playtest is kept, and can be studied without the browser
+
+**Decision:**
+
+- **Saving:** the game keeps every run as it goes (`src/app/playtest.ts`): every minute of play, and when it pauses, the rules decide, a tick fails, the tab is hidden or a new run starts.
+- **Where it goes:** in development the dev server writes each run into `playtests/`, as its recording and a telemetry report (`src/headless/playtestInbox.ts`). The deployed game keeps the last five runs in the browser's IndexedDB, and the start and pause screens offer them for saving.
+- **The report:** it holds what the recording can't: frame-time percentiles and slow frames, the GPU and screen, the settings and the sound's state. Pauses and markers go into the recording as annotations.
+- **Reading them back:** `npm run playtest` re-simulates every session. It checks the replay is bit for bit, and that every body kept its promises. Then it summarizes the play and the machine.
+
+**Why:** a playtest you can't study afterwards is an anecdote. The recording replays exactly what happened, and the report records how it ran on that machine, which nothing else can tell us. The owner plays the deployed build, so a crash or a closed tab must not cost the run there either.
+
+### The motor's promises are watched for every body, for hours
+
+**Decision:** one watch (`src/sim/bots/invariants.ts`) checks every body after every tick: never under the terrain, never inside anything solid, never more than a step up, never gaining height on ground too steep, never a NaN. The invariant tests, `npm run playtest` and the long fuzz run (`npm run fuzz`) all use it. The weekly CI run plays 20 fresh valleys with both bots for an hour each. A broken promise stops that run and saves its recording, so the failure can be re-simulated.
+
+**Why:** the tests check a few minutes on five fixed valleys, and only the player. The guards share the motor, and fresh valleys find the corners that fixed ones never reach.
+
+### Every engine, every push
+
+**Decision:** a second workflow (`.github/workflows/engines.yml`) runs the browser tests in Chromium, Firefox and WebKit, and the self-test under Bun (JavaScriptCore), on every push. Branches named `ci/...` run it too, so a change to CI can be tried before it reaches `main`. Vite now bundles three before the browser tests start. A dependency first met mid-run made Vite reload the page under the running tests, which was the occasional first-run hang.
+
+**Why:** a recording made in Safari has to replay in Chrome, and in CI. Every engine gives the golden values.
+
+**What it found:** WebKit's high-pass filter passes 1–2 dB less than Chromium's at the same settings. Footsteps on grass, the only voice that used one, came out quieter than the simulation said. Grass now uses a wide band-pass, whose Q means the same in every engine. A calibration tool (`tests/browser/calibrate.test.ts`, run with `VITE_CALIBRATE=1`) re-derives every voice's loudness trim.
+
 ### What is drawn is what can be hit, from any camera
 
 **Decision:**

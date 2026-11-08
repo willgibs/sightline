@@ -39,9 +39,11 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 ## Checking work
 
 - `npm run check`: typecheck plus all tests. Must pass before you hand anything back.
-- `npm run test:browser`: tests that need a real browser (Web Audio, WebGL, each browser's JavaScript engine), run in Chromium through Playwright. On a new machine, install the browser once with `npx playwright install chromium`.
+- `npm run test:browser`: tests that need a real browser (Web Audio, WebGL, each browser's JavaScript engine), run in Chromium through Playwright. On a new machine, install the browser once with `npx playwright install chromium`. CI also runs them in Firefox and WebKit (`BROWSERS=chromium,firefox,webkit`), and the self-test under Bun, on every push. After changing a footstep voice, recalibrate: `VITE_CALIBRATE=1 npm run test:browser -- calibrate`.
 - `npm run sim -- --minutes 10`: bot run, recording and bit-exact re-simulation, with timing. Add `--profile` for the time each system takes.
 - `npm run seeds -- --count 100`: generation health across many seeds.
+- `npm run fuzz -- --seeds 20 --minutes 60`: bots play fresh valleys while every body's promises are checked every tick; a failure is saved as a recording.
+- `npm run playtest`: every session in `playtests/` (the dev build saves each run there as it goes), re-simulated, checked and summarized with its telemetry. `-- <file|dir>` for others.
 - `npm run scene` (or `-- <name>`, `-- --list`): every scene in `src/sim/scenes` headless, by its own driver, checking its expectations and re-simulating its recording. `?scene=<name>` plays one in the browser. A regression test that needs more than one tick belongs in a scene.
 - `npm run sim -- --replay <file>`: re-simulate a recording saved in the browser; it says where a run diverged, or why it can't re-simulate in this build.
 - In the browser, `window.sightline` exposes automation hooks for scripted screenshots and playtests: `play`, `debug(on)`, `grid(on)`, `fly(x, y, z, headingDeg, pitchDeg)`, `body()`, `hold([codes])`, `tap('KeyC' | 'KeyZ')`, `click()`, `zoom(on)`, `state()`, `dump()`, `recording()`, `sound()`, `insides()`.

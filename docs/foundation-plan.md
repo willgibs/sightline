@@ -107,10 +107,17 @@ Sources: the architecture audit (items 1–16 and extensibility seams X1–X5), 
 - [ ] With Phase 2's menus: a teardown path (the renderer's and input's disposal are never called, and the resize listener stays).
 
 ### M9 · The playtest loop
-- [ ] Every dev session saves its recording and a telemetry report into `playtests/` (the marker key, M, already records moments).
-- [ ] `npm run playtest -- <file>` re-simulates and summarizes a session.
+- [x] Every run is kept as it goes (`src/app/playtest.ts`): after every minute of play, and on pausing, an outcome, a fault, a hidden tab or a new run.
+  - In development, the dev server writes the recording and a telemetry report into `playtests/` (`headless/playtestInbox.ts`).
+  - The deployed game keeps the last five runs in the browser, and offers them on the start and pause screens.
+  - The report holds what only the browser knew: frame-time percentiles and slow frames, the GPU, the screen, the settings and the sound's state.
+  - Pauses and markers (M) are noted in the recording itself.
+- [x] `npm run playtest -- <file|dir>` re-simulates each session. It checks that the session replays bit for bit, and that every body kept the motor's promises all the way through. Then it summarizes what happened: distance, steps by surface, the loudest step, stance time, shots, the nearest guard, and each marker with where you were. From the report beside it, it adds frames, the machine and the sound.
 - [ ] A replay viewer with scrubbing.
-- [ ] Determinism checked in Chromium, Firefox and WebKit, and under Bun (JavaScriptCore), in CI. A long fuzzing-bot invariant run joins the weekly platform runs. First, find out why the first browser-test run after a source change sometimes hangs (likely Vite's dependency optimizer); a rerun passes.
+- [x] Determinism in every engine, on every push (`.github/workflows/engines.yml`): the browser tests in Chromium, Firefox and WebKit, and the self-test under Bun (JavaScriptCore). All four give the golden values.
+  - The weekly run adds 40 hours of bot play on fresh valleys, with every body checked every tick (`npm run fuzz`). A failure is saved as a recording that reproduces it.
+  - The first-run hang was Vite meeting a dependency mid-run and reloading the page under the tests; three is now bundled up front.
+  - WebKit's first run found its high-pass filter 1–2 dB quieter than other engines'. Grass, the one voice that used it, now uses a band-pass, recalibrated with `tests/browser/calibrate.test.ts`. (Firefox can't suspend an offline audio context, so only the voices test runs there.)
 
 ### M10 · Close out
 - [ ] `CLAUDE.md` gains the audit's rules as their milestones land: systems join the phase list, never `step()` directly; anything drawn between ticks that changes an outcome, such as sway, is a pure function in `src/sim` that both sides evaluate; generation works in site frames; content definitions (rifle, ammunition, optics, throwables) live in tuning, so recordings embed them; rates are per second times `dt`; repair loops and searches get iteration budgets, never time budgets.
