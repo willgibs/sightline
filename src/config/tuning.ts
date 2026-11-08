@@ -337,6 +337,13 @@ export const defaultTuning = {
         wideArea: 1200, // square metres the belief has bled over: he could be anywhere
         avoid: 12, // metres between the spots of two searchers
       },
+      // Radio check-ins (E6): the operator calls each post in turn, every few minutes.
+      checkins: {
+        every: 150, // seconds between calls to each post, spread evenly across the posts,
+        uneasyEvery: 75, // and how often once the camp is uneasy
+        reply: { min: 1, max: 3 }, // seconds a post takes to answer, drawn from its own stream
+        deadline: 12, // seconds without an answer before the post counts as silent
+      },
     },
   },
 

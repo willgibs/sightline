@@ -4,7 +4,7 @@ import { dcos, dsin } from '../kernel/core/detmath';
 import { scheduleSystem, type Access, type ScheduleHandler, type System, type TickContext } from '../kernel/systems';
 import { player } from './entities';
 import { drawBrain } from './brains';
-import { orderDeliver, radioDeliver, speak } from './comms';
+import { checkinDeadline, checkinReply, orderDeliver, radioDeliver, speak } from './comms';
 import { think } from './guards';
 import { playerIntent } from './player';
 import { SHOOTING_SYSTEMS } from './shooting';
@@ -19,6 +19,8 @@ import { SHOOTING_SYSTEMS } from './shooting';
 export const SCHEDULE_HANDLERS: Readonly<Record<string, ScheduleHandler>> = {
   'radio-deliver': radioDeliver,
   'order-deliver': orderDeliver,
+  'checkin-reply': checkinReply,
+  'checkin-deadline': checkinDeadline,
 };
 
 const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
@@ -125,7 +127,7 @@ function navAllowance(ctx: TickContext): NavAllowance {
 const SCHEDULED_ACCESS = {
   reads: ['commander.camp', 'guard.senses', 'guard.brain', 'guard.guard.spawn'],
   writes: ['commander.camp', 'guard.brain.told', 'guard.brain.task', 'guard.brain.thinkAt', 'guard.senses.awareness', 'guard.senses.belief', 'rng.awareness'],
-  emits: ['radio'],
+  emits: ['radio', 'checkin'],
 } as const satisfies Access;
 
 export const SYSTEMS: readonly System[] = [

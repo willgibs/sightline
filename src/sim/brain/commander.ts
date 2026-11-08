@@ -60,7 +60,14 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   injectBelief(camp.map, r.x, r.z, Math.max(r.radius, M.injectRadius), 1);
   camp.lastPercept = tick;
   camp.lastCause = r.cause;
-  const wanted: AlertLevel = r.kind === 'heard' ? 'uneasy' : 'alert';
+  // A post gone quiet is a job for someone: walk over and see (E6).
+  if (r.kind === 'missing') {
+    const t = addTask(camp, 'check', r.x, r.z, 2, 1, tick);
+    t.cause = r.cause;
+    const man = camp.roster.find((m) => m.id === r.from);
+    if (man) man.status = 'missing';
+  }
+  const wanted: AlertLevel = r.kind === 'heard' || r.kind === 'missing' ? 'uneasy' : 'alert';
   if (alertRung(wanted) > alertRung(camp.level)) raise(camp, wanted, tick);
   // A search at this level, centred on the latest report.
   if (!camp.search && alertRung(camp.level) >= alertRung('uneasy')) {

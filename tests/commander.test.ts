@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { digest, injectBelief, plan, type CampMind, type CampOrder, type CampState, type Report } from '../src/sim/brain';
 import { giveBrains } from '../src/sim/game/brains';
-import { campCommander, commanderOf, commsVoice, giveCommander } from '../src/sim/game/comms';
+import { campCheckins, campCommander, commanderOf, commsVoice, giveCommander } from '../src/sim/game/comms';
 import { PERCEPTION, giveSenses } from '../src/sim/game/perception';
 import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
@@ -284,5 +284,56 @@ describe('no omniscience, over the commander', () => {
       if (x.before === b[k]!.before && x.after !== b[k]!.after) caught = true;
     });
     expect(caught).toBe(true);
+  });
+});
+
+describe('radio check-ins', () => {
+  // Every few seconds, for a test that can't wait minutes.
+  const fast = structuredClone(T);
+  fast.brain.camp.checkins.every = 8;
+  fast.brain.camp.checkins.uneasyEvery = 8;
+  fast.brain.camp.checkins.deadline = 3;
+
+  function checkins(world: World, seconds: number, despawnPost?: number, removeOperator = false): { sim: Simulation; events: SimEvent[] } {
+    let systems = SYSTEMS;
+    for (const s of [...PERCEPTION, commsVoice, campCommander, campCheckins]) systems = withSystem(systems, s);
+    const sim = new Simulation(world, fast, systems);
+    giveSenses(sim);
+    giveBrains(sim);
+    giveCommander(sim);
+    if (despawnPost !== undefined) sim.despawn(sim.guards.find((g) => g.guard.spawn === despawnPost)!.id);
+    if (removeOperator) sim.despawn(sim.guards.find((g) => sim.world.camp.guards[g.guard.spawn]!.role === 'radio-operator')!.id);
+    const raw = neutralInput();
+    const events: SimEvent[] = [];
+    for (let i = 0; i < seconds * 30; i++) for (const e of sim.step(raw)) events.push({ ...e });
+    return { sim, events };
+  }
+
+  const G = (x: number, z: number, role?: string): [number, number, string?] => [x, z, role];
+
+  it('a live post answers its call and the camp stays calm', () => {
+    const world = worldWith(guards(G(0, 0), G(10, 0), G(-10, 0, 'radio-operator')));
+    const { sim, events } = checkins(world, 30);
+    expect(events.filter((e) => e.type === 'checkin' && e.stage === 'call').length).toBeGreaterThan(2);
+    expect(events.some((e) => e.type === 'checkin' && e.stage === 'silence')).toBe(false);
+    expect(commanderOf(sim)!.camp.level).toBe('calm');
+  });
+
+  it('a dead post does not answer: the camp goes uneasy and someone walks over', () => {
+    const world = worldWith(guards(G(0, 0), G(10, 0), G(-10, 0, 'radio-operator')));
+    const { sim, events } = checkins(world, 20, 0);
+    expect(events.some((e) => e.type === 'checkin' && e.stage === 'silence')).toBe(true);
+    const camp = commanderOf(sim)!.camp;
+    expect(camp.level).toBe('uneasy');
+    // An order went out to walk to the silent post.
+    const order = events.find((e): e is Extract<SimEvent, { type: 'order' }> => e.type === 'order' && e.task === 'check');
+    expect(order).toBeDefined();
+    expect(Math.hypot(order!.x - 0, order!.z - 0)).toBeLessThan(2);
+  });
+
+  it('with no operator, the calls stop', () => {
+    const world = worldWith(guards(G(0, 0), G(10, 0), G(-10, 0, 'radio-operator')));
+    const { events } = checkins(world, 20, undefined, true);
+    expect(events.some((e) => e.type === 'checkin')).toBe(false);
   });
 });

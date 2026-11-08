@@ -4,6 +4,7 @@ import { turnTowards, wrapAngle, yawFromDirection } from '../kernel/core/math';
 import type { AwarenessName } from '../kernel/events';
 import { routinePose, type RoutinePose } from '../generation';
 import type { Gait } from '../body';
+import type { TaskKind } from './camp';
 import type { GuardMind } from './mind';
 import { emptyRoute, emptySteering, followRoute, navigatorOf, type Route, type Steering } from './nav';
 import type { Order } from './orders';
@@ -97,7 +98,7 @@ export interface BrainState {
 /** An order as it reached a guard: what to do, where, when it was given, and the event behind it. */
 export interface Tasking {
   id: number;
-  kind: 'investigate' | 'search';
+  kind: TaskKind;
   x: number;
   z: number;
   issued: number;

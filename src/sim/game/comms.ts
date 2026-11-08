@@ -123,6 +123,82 @@ export const radioDeliver: ScheduleHandler = (ctx, entry) => {
   c.camp.inbox.push(report);
 };
 
+/**
+ * Radio check-ins (E6): the operator calls each post in turn, a scheduled pair: the
+ * reply after a delay from the post's own stream, the deadline after its time limit. A
+ * post that answers carries on; one that doesn't (killed, or too busy fighting) is
+ * reported silent, and the commander sends someone to look. No operator or no set: the
+ * calls stop.
+ */
+export const campCheckins: System = {
+  name: 'camp-checkins',
+  phase: 'camp',
+  after: ['camp-commander'],
+  reads: ['commander.camp', 'guard.guard.spawn', 'guard.senses'],
+  writes: ['commander.camp', 'schedule', 'rng.checkin'],
+  emits: ['checkin'],
+  run(ctx) {
+    const c = commanderOf(ctx);
+    if (!c) return;
+    const camp = c.camp;
+    const ch = camp.checkins;
+    const T = ctx.tuning.brain.camp.checkins;
+    const hz = ctx.tuning.sim.tickHz;
+    if (ctx.tick < ch.next || ch.pending) return;
+    if (!radioUp(ctx, c)) {
+      ch.next = ctx.tick + Math.round(5 * hz);
+      return;
+    }
+    // Round-robin over the camp's posts, skipping anyone it has already given up on.
+    const n = camp.roster.length;
+    let man = camp.roster[0];
+    for (let k = 0; k < n; k++) {
+      man = camp.roster[(ch.cursor + k) % n]!;
+      if (man.status === 'ok') {
+        ch.cursor = (ch.cursor + k + 1) % n;
+        break;
+      }
+    }
+    if (!man || man.status !== 'ok') return;
+    const operator = ctx.index.of('guard').find((g) => ctx.world.camp.guards[g.guard.spawn]?.role === 'radio-operator')!;
+    const seq = ch.seq++;
+    ch.pending = { post: man.post, guard: man.id, seq, answered: false };
+    const call = ctx.emit({ type: 'checkin', source: operator.id, post: man.post, stage: 'call' });
+    const reply = ctx.draw(man.id, 'checkin', (rng) => rng.range(T.reply.min, T.reply.max));
+    ctx.schedule(reply, 'checkin-reply', seq, man.id);
+    ctx.schedule(T.deadline, 'checkin-deadline', seq, call);
+    const every = camp.level === 'calm' ? T.every : T.uneasyEvery;
+    ch.next = ctx.tick + Math.round((every / n) * hz);
+  },
+};
+
+/** A post answers its call, if the man is there to answer it. */
+export const checkinReply: ScheduleHandler = (ctx, entry) => {
+  const c = commanderOf(ctx);
+  if (!c) return;
+  const pending = c.camp.checkins.pending;
+  if (!pending || pending.seq !== entry.a) return;
+  const g = ctx.index.get(entry.b);
+  // A dead man can't answer; one in a fight doesn't.
+  if (!g || g.kind !== 'guard' || g.senses?.awareness.state === 'combat') return;
+  pending.answered = true;
+  ctx.emit({ type: 'checkin', source: g.id, post: g.guard.spawn, stage: 'answer' });
+};
+
+/** The deadline: no answer, and the camp is told that post has gone quiet (a report of its own). */
+export const checkinDeadline: ScheduleHandler = (ctx, entry) => {
+  const c = commanderOf(ctx);
+  if (!c) return;
+  const pending = c.camp.checkins.pending;
+  if (!pending || pending.seq !== entry.a) return;
+  c.camp.checkins.pending = null;
+  if (pending.answered) return;
+  const post = ctx.world.camp.guards[pending.post];
+  if (!post) return;
+  const silence = ctx.emit({ type: 'checkin', source: c.id, cause: entry.b, post: pending.post, stage: 'silence' });
+  c.camp.inbox.push({ kind: 'missing', x: post.x, y: post.y, z: post.z, radius: ctx.tuning.brain.comms.radius.missing, tick: ctx.tick, from: pending.guard, fromX: post.x, fromZ: post.z, cause: silence });
+};
+
 const orders: CampOrder[] = [];
 
 /**

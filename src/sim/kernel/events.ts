@@ -193,7 +193,7 @@ export type HeardKind = 'sound' | 'shot' | 'voice';
 /** What a guard can be doing, and why he changed (brain/brain.ts, ACTS and ACT_WHYS). Stored by index: only add at the end. */
 export type ActCode = 'routine' | 'return' | 'look' | 'investigate' | 'search' | 'hold' | 'report' | 'task';
 export type ReportCode = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear';
-export type TaskCode = 'investigate' | 'search';
+export type TaskCode = 'investigate' | 'search' | 'check';
 export type LevelCode = 'calm' | 'uneasy' | 'alert' | 'lockdown';
 export type ActReason = 'start' | 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm' | 'arrived' | 'nothing' | 'stalled' | 'no-route' | 'lost' | 'told' | 'report' | 'ordered';
 
@@ -298,6 +298,14 @@ export interface OrderEvent extends EventBase {
   z: number;
 }
 
+/** A radio check-in (E6): the operator calls a post; the post answers; or it stays silent past its deadline. Source: who's speaking. */
+export interface CheckinEvent extends EventBase {
+  type: 'checkin';
+  /** The post (world.camp.guards index). */
+  post: number;
+  stage: 'call' | 'answer' | 'silence';
+}
+
 /** The camp's alert level changed (E5). Source: the commander; cause: the report behind it. */
 export interface LevelEvent extends EventBase {
   type: 'level';
@@ -335,6 +343,7 @@ export type SimEvent =
   | RadioEvent
   | OrderEvent
   | LevelEvent
+  | CheckinEvent
   | ReportEvent
   | ImpactEvent
   | DeathEvent
@@ -438,7 +447,8 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   clatter: { code: 36, range: 'ballistics', sound: true, fields: { ...SOUND, thrown: 'u32', speed: 'f32' } },
   call: { code: 91, range: 'brain', sound: true, fields: { ...SOUND, radio: 'u8' } },
   radio: { code: 92, range: 'brain', sound: false, fields: { kind: { enum: REPORT_CODES }, x: 'f32', z: 'f32', radius: 'f32' } },
-  order: { code: 93, range: 'brain', sound: false, fields: { to: 'u32', task: { enum: ['investigate', 'search'] }, x: 'f32', z: 'f32' } },
+  order: { code: 93, range: 'brain', sound: false, fields: { to: 'u32', task: { enum: ['investigate', 'search', 'check'] }, x: 'f32', z: 'f32' } },
+  checkin: { code: 95, range: 'brain', sound: false, fields: { post: 'i32', stage: { enum: ['call', 'answer', 'silence'] } } },
   level: { code: 94, range: 'brain', sound: false, fields: { from: { enum: LEVELS }, to: { enum: LEVELS } } },
   act: { code: 90, range: 'brain', sound: false, fields: { from: { enum: ACT_NAMES }, to: { enum: ACT_NAMES }, why: { enum: ACT_WHY_NAMES }, x: 'f32', z: 'f32', weight: 'f32' } },
 };

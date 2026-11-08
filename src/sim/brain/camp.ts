@@ -41,7 +41,7 @@ export interface Task {
   issued: number;
 }
 
-export type TaskKind = 'investigate' | 'search';
+export type TaskKind = 'investigate' | 'search' | 'check';
 
 /** A search under way: the camp's last known position of the intruder, and how it's going. */
 export interface SearchState {
@@ -80,6 +80,8 @@ export interface CampState {
   search: SearchState | null;
   /** When it last planned. */
   planned: number;
+  /** Radio check-ins (E6): when the next call goes out, and the one waiting for an answer. */
+  checkins: { next: number; cursor: number; pending: { post: number; guard: number; seq: number; answered: boolean } | null; seq: number };
 }
 
 export function createCamp(campX: number, campZ: number, tuning: Tuning): CampState {
@@ -101,5 +103,6 @@ export function createCamp(campX: number, campZ: number, tuning: Tuning): CampSt
     nextTask: 1,
     search: null,
     planned: -1,
+    checkins: { next: 0, cursor: 0, pending: null, seq: 1 },
   };
 }

@@ -771,22 +771,23 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - Stepping around a cornered player: a stalled walk sidesteps by a fixed rule (own-body information only), comes back to its route, and tells the brain when it can't.
   - Ladder links (C5): waiting on lab C's ladders.
 - [x] E2 · The lab scene (`?scene=camp-brain`): 8 guards in the design doc's roles, an alarm box, a radio and a generator, in a handmade camp until D4–D6 are on `main`.
-- [ ] E3 · The brain.
+- [x] E3 · The brain (`brain/brain.ts`, `brain/utility.ts`, the `act` event).
   - A prioritized machine of awareness states.
   - Inside each state, actions (investigate, call it in, take cover, flank, search) are scored by multiplied 0–1 considerations through response curves, with cooldowns against dithering.
   - Rank-then-weight choice, drawing from the guard's own stream through the mind (rule 13).
   - A reason code on every transition.
-  - It replaces A's minimal reactions.
+  - It replaces A's minimal reactions wherever the camp brain runs (a guard given a `brain`); lab A's own scenes and trials keep them, so what they measure doesn't move. Take cover and flank come with E10.
 - [x] E4 · Beliefs spread (`brain/searchMap.ts`, `brain/reports.ts`, `game/comms.ts`).
   - One camp-level search map, fed only by reports: a grid that spreads from the last known position and clears where searchers can see. Per-guard maps would put about 410,000 numbers into the hashed state.
   - Voice to guards nearby, heard through A's hearing.
   - Radio across the camp after a delay. A report is an action with a duration, and its delivery is cancelled if the speaker drops. The radio needs a working set and an operator.
-- [ ] E5 · The camp.
-  - Alert levels: calm, uneasy, alert, lockdown.
+- [x] E5 · The camp (`brain/camp.ts`, `brain/commander.ts`, `game/comms.ts`).
+  - Alert levels: calm, uneasy, alert, lockdown (the last set by E7's alarm boxes).
   - The commander assigns tasks with a priority, a condition and a capacity, in the manner of Halo 3's Objectives, over guards. Ties break by task index, then guard id.
   - The pacing layer reads only the camp's beliefs, caps convergence with role slots, and throttles rather than informs.
   - Searches end on time since the last percept and the search map's spread, never on the player's true position. Cycles run near 30–45 s, and the camp settles one level up.
-- [ ] E6 · Radio check-ins, as scheduled events. The operator calls each post every few minutes. A dead post doesn't answer, and someone walks over.
+  - The no-omniscience probe covers the commander, with a planted peek it catches.
+- [x] E6 · Radio check-ins, as scheduled events (`game/comms.ts`). The operator calls each post every few minutes. A dead post doesn't answer, the camp goes uneasy, and someone walks over.
 - [ ] E7 · Alarms.
   - After the reaction window, a guard shouts, or runs 4–8 s to an alarm box or the radio. The run is a journey through the motor, and lockdown is set only by an alarm box or radio changing state.
   - The core's sabotage, by default: hold the use key at arm's length to switch off the generator or cut the radio. Whoever passes or needs it notices the outage. The sabotage kit is Phase 3's.
