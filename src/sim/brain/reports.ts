@@ -7,9 +7,9 @@
  * across the camp after a delay, if the speaker got his words out and the set and operator
  * are working). A guard knows only what reached him; the commander knows only its inbox.
  */
-export type ReportKind = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear';
+export type ReportKind = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear' | 'claim';
 
-export const REPORT_KINDS: readonly ReportKind[] = ['contact', 'heard', 'shot', 'body', 'missing', 'clear'];
+export const REPORT_KINDS: readonly ReportKind[] = ['contact', 'heard', 'shot', 'body', 'missing', 'clear', 'claim'];
 
 export interface Report {
   kind: ReportKind;

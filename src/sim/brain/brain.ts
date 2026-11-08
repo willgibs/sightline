@@ -246,6 +246,8 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
     b.x = b.task!.x;
     b.z = b.task!.z;
   }
+  // Going to look: he says so, and whoever hears it leaves it to him.
+  if (act === 'investigate') b.say = { report: { ...currentReport(m), kind: 'claim' }, radius: m.tuning.brain.comms.talkRadius, radio: false };
   return { from: prev, to: act, why: reason, x: b.x, z: b.z, cause, weight: 1 };
 }
 
@@ -315,7 +317,8 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
     task && !elevated && (m.tick - task.issued) / hz < m.tuning.brain.camp.keepOrder ? (task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
   // Worth calling in: something he sensed himself (what he was only told is already on the
   // net), a radio in his hands, and he hasn't just called it in.
-  const own = ownEvidence(m);
+  // (Once he's on his way, he finishes: a percept lapsing doesn't call him back mid-walk.)
+  const own = ownEvidence(m) || b.act === 'investigate' || b.act === 'search';
   const callable = own ? role.report * cool('report') : 0;
   out.push({ act: 'routine', rank: 0, weight: 1 });
   const off = offRoutine(m);
@@ -332,26 +335,41 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       if (order) out.push({ act: 'task', rank: 3, weight: order });
       out.push({ act: 'report', rank: 3, weight: callable * 0.2 });
       out.push({ act: 'look', rank: 3, weight: T.lookWeight });
-      if (!elevated && own) out.push({ act: 'investigate', rank: 3, weight: role.investigate * near * fresh * cool('investigate') });
+      if (!elevated && own) out.push({ act: 'investigate', rank: 3, weight: role.investigate * near * fresh * cool('investigate') * claimed(m, focus) });
       break;
     case 'searching':
       if (order) out.push({ act: 'task', rank: 4, weight: order });
       out.push({ act: 'report', rank: 4, weight: callable });
       out.push({ act: 'hold', rank: 4, weight: 0.2 });
       if (!elevated && own) {
-        out.push({ act: 'investigate', rank: 4, weight: role.investigate * near * fresh * cool('investigate') });
+        out.push({ act: 'investigate', rank: 4, weight: role.investigate * near * fresh * cool('investigate') * claimed(m, focus) });
         out.push({ act: 'search', rank: 4, weight: role.search * (0.25 + 0.75 * fresh) * cool('search') });
       }
       break;
     case 'combat': {
       const sees = seesTarget(m);
       out.push({ act: 'report', rank: 5, weight: callable > 0 ? 1 : 0 });
-      out.push({ act: 'engage', rank: 5, weight: sees ? role.fight : 0 });
+      out.push({ act: 'engage', rank: 5, weight: sees && dist <= m.tuning.brain.combat.range[m.post.role] ? role.fight : 0 });
       out.push({ act: 'cover', rank: 5, weight: sees || elevated ? 0 : role.fight });
       out.push({ act: 'hold', rank: 5, weight: 0.25 });
       break;
     }
   }
+}
+
+/** Someone he's heard has claimed the spot he'd go to: he's not the one going (Blacklist's claiming). */
+function claimed(m: GuardMind, at: { x: number; z: number }): number {
+  const b = m.brain!;
+  const C = m.tuning.brain.comms;
+  const hz = m.tuning.sim.tickHz;
+  for (const t of b.told) {
+    if (t.kind !== 'claim' || t.from === m.id) continue;
+    if ((m.tick - t.heard) / hz > C.claimFor) continue;
+    const dx = t.x - at.x;
+    const dz = t.z - at.z;
+    if (dx * dx + dz * dz <= C.claimWithin * C.claimWithin) return C.claimedWeight;
+  }
+  return 1;
 }
 
 /** True if he's far from where his routine says he should be. */
