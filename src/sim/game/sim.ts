@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import { stridePhase, type BodyState, type Gait, type Stance } from '../body';
+import { climbPrompt, eyeOf, stridePhase, type BodyState, type Gait, type MotorContext, type Stance } from '../body';
 import { gameBodies } from './remains';
 import { generateWorld, worldFingerprint } from '../generation';
 import { groundLight, rung } from '../perception';
@@ -18,6 +18,7 @@ import { dcos, dsin } from '../kernel/core/detmath';
 import { sunDirection } from '../kernel/env';
 import type { PlayerControl } from './player';
 import { writeSample } from './samples';
+import { usePrompt } from './use';
 import { startRun } from './setup';
 import { BEHAVIOUR } from './golden';
 import { SYSTEMS } from './systems';
@@ -82,7 +83,23 @@ export interface Snapshot {
   px: number;
   py: number;
   pz: number;
+  /** The body's eye height (its stance), and where its eye actually is, from its feet: the centre of its head. */
   eye: number;
+  eyeX: number;
+  eyeY: number;
+  eyeZ: number;
+  /** How far it is leaned to the right, metres (body/lean.ts). */
+  lean: number;
+  /** What a press of climb would do now: '' nothing, 'mantle', or 'ladder': the prompt (body/ladder.ts). */
+  climb: '' | 'mantle' | 'ladder';
+  /** What a press of use would do now: '' nothing, 'carry', or 'drop' (game/use.ts). */
+  use: '' | 'carry' | 'drop';
+  /** Lying down: the body's long axis, how far along it it has grown, and how the ground runs under it (body/chain.ts). */
+  axis: number;
+  lying: number;
+  riseHead: number;
+  risePelvis: number;
+  riseFeet: number;
   yaw: number;
   pitch: number;
   speed: number;
@@ -145,6 +162,7 @@ export interface RifleView {
  * Every run has a player, always entity 1.
  */
 export class Simulation extends KernelSimulation {
+  private readonly eye = vec3();
   private readonly aimDir = vec3();
   private readonly sun = { x: 0, y: 0, z: 0 };
   /** `systems` replaces the game's own list, for tests and scenes; recordings replay with the game's. */
@@ -192,6 +210,11 @@ export class Simulation extends KernelSimulation {
     this.playerEntity();
   }
 
+  /** What the motor sees of the world, for questions asked between ticks. */
+  private motorView(): MotorContext {
+    return { world: this.world, solids: this.solids, tuning: this.tuning, dt: this.dt, tick: this.tick, source: this.playerId, others: [], emit: () => 0 };
+  }
+
   snapshot(out?: Snapshot): Snapshot {
     const guards = this.guards;
     const n = guards.length;
@@ -204,6 +227,17 @@ export class Simulation extends KernelSimulation {
             py: 0,
             pz: 0,
             eye: 0,
+            eyeX: 0,
+            eyeY: 0,
+            eyeZ: 0,
+            lean: 0,
+            climb: '',
+            use: '',
+            axis: 0,
+            lying: 0,
+            riseHead: 0,
+            risePelvis: 0,
+            riseFeet: 0,
             yaw: 0,
             pitch: 0,
             speed: 0,
@@ -227,6 +261,18 @@ export class Simulation extends KernelSimulation {
     s.py = p.y;
     s.pz = p.z;
     s.eye = p.eyeHeight;
+    const eye = eyeOf(p, this.tuning.bodies.player, this.eye);
+    s.eyeX = eye.x - p.x;
+    s.eyeY = eye.y - p.y;
+    s.eyeZ = eye.z - p.z;
+    s.lean = p.lean;
+    s.climb = climbPrompt(p, this.tuning.bodies.player, this.motorView());
+    s.use = usePrompt(this.playerEntity(), this.index, this.tuning, this.solids);
+    s.axis = p.axis;
+    s.lying = p.lying;
+    s.riseHead = p.riseHead;
+    s.risePelvis = p.risePelvis;
+    s.riseFeet = p.riseFeet;
     s.yaw = p.yaw;
     s.pitch = p.pitch;
     s.speed = p.speed;

@@ -36,7 +36,7 @@ function setup(act: (ctx: TickContext) => void, emits: System['emits'], writes: 
       fenceHalf: 0,
     },
   });
-  const drop: System = { name: 'test-stimulus', phase: 'commands', after: ['player-commands', 'rifle', 'sandbox-drops'], reads: [], writes, emits, run: act };
+  const drop: System = { name: 'test-stimulus', phase: 'commands', after: ['player-commands', 'rifle', 'sandbox-drops', 'use'], reads: [], writes, emits, run: act };
   let systems = withSystem(SYSTEMS, drop);
   const sim = new Simulation(world, T, systems);
   placePlayer(sim, 50, 0);
@@ -66,7 +66,7 @@ function bodyAt(dx: number, dz: number, fellAt = 0): (ctx: TickContext) => void 
   return (ctx) => {
     if (ctx.tick !== 15) return;
     const t = ctx.tick / hz + fellAt;
-    ctx.spawn((id) => ({ id, kind: 'remains' as const, faction: Faction.Camp, remains: { of: 99, post: 0, x: dx, y: 0, z: dz, yaw: 0, eye: T.bodies.guard.eyeHeight.prone, vx: 0, vz: 0, fell: t - 5, part: 'torso' as const } }));
+    ctx.spawn((id) => ({ id, kind: 'remains' as const, faction: Faction.Camp, remains: { of: 99, post: 0, x: dx, y: 0, z: dz, yaw: 0, eye: T.bodies.guard.eyeHeight.prone, vx: 0, vz: 0, fell: t - 5, part: 'torso' as const, carriedBy: 0, hidden: false } }));
   };
 }
 

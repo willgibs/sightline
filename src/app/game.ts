@@ -7,7 +7,8 @@ import type { ReportCode } from '../sim/kernel/events';
 import { BARKS, beliefRadius, explainChain, groundLight, lightName, movementVisibility, stanceVisibility } from '../sim/perception';
 import { EventLog } from '../sim/kernel/eventlog';
 import { Cues } from './cues';
-import { TrialSitting, type TrialHost } from './trials';
+import { MOVEMENT_SITTING } from '../sim/game/movementTrials';
+import { MOVEMENT_PLAN, SIGHT_PLAN, TrialSitting, type TrialHost } from './trials';
 import { campMission, generateWorld, simTuningKey, worldTuningKey, type CampSpec } from '../sim/generation';
 import type { World } from '../sim/kernel/world/world';
 import { neutralInput } from '../sim/kernel/input';
@@ -198,7 +199,7 @@ export class Game {
   /** The scene being played, if any (sim/kernel/scene.ts): its world, systems and setup. */
   private scene: Scene | null;
   /** What the last drawn frame showed, so a paused screen isn't drawn again unchanged. */
-  private readonly drawnPose: CameraPose = { x: NaN, y: 0, z: 0, yaw: 0, pitch: 0, fov: 0 };
+  private readonly drawnPose: CameraPose = { x: NaN, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0, fov: 0 };
   private drawnKey = '';
   private redraws = 0;
 
@@ -234,7 +235,7 @@ export class Game {
     this.hud = new Hud(opts.hud, this.input.map);
     this.cues = new Cues(opts.hud, this.tuning.perception.sight.cue);
     if (opts.trials) {
-      this.trial = new TrialSitting(opts.hud, this.trialHost(), opts.trials, this.tuning, opts.trialsFresh ?? false);
+      this.trial = new TrialSitting(opts.hud, this.trialHost(), opts.trials, this.tuning, opts.trialsFresh ?? false, opts.trials.startsWith(MOVEMENT_SITTING) ? MOVEMENT_PLAN : SIGHT_PLAN);
       // Every trial's run is kept, however short: each holds an answer.
       this.capture.minSeconds = 0;
     }
@@ -920,6 +921,7 @@ export class Game {
     // A click from now on is about this frame: the line of sight the player steered, before any sway.
     this.input.latch.frameShown(this.sim.tick, this.clock.alpha, pose.yaw, pose.pitch);
     this.hud.updateCompass(view.yaw);
+    this.hud.setPrompt(this.detached || this.replay ? null : this.curr.use ? `${this.input.map.describe('use')} · ${this.curr.use === 'drop' ? 'put down' : 'carry'}` : this.curr.climb ? `${this.input.map.describe('climb')} · ${this.curr.climb === 'ladder' ? 'climb' : 'mantle'}` : null);
     this.cues.draw(this.curr, view, this.time);
     this.hud.setRange(this.debug ? this.aimText : null);
 
@@ -949,7 +951,11 @@ export class Game {
     const frozen = this.detached || this.bench !== null;
     this.input.sampleTick(this.raw, frozen, this.sim.tick);
     // In trial mode the trial moves the player; the mouse only looks.
-    if (this.trial) this.trial.input(this.sim, this.raw);
+    if (this.trial) {
+      this.trial.input(this.sim, this.raw);
+      // A noise trial moves round the guard, and the view stays on him.
+      if (this.trial.followsDriver) this.input.yaw = this.raw.yaw;
+    }
     if (frozen) {
       this.raw.yaw = this.detached ? this.heldYaw : this.sim.player.yaw;
       this.raw.pitch = this.detached ? this.heldPitch : this.sim.player.pitch;
@@ -1032,12 +1038,14 @@ export class Game {
     const V = this.tuning.view;
     const bob = headBob(phase, speed, this.sim.tuning.bodies.player, V.bob) * V.headBob * (1 - optic);
     return {
-      x: lerp(a.px, b.px, t),
-      y: lerp(a.py, b.py, t) + lerp(a.eye, b.eye, t) + bob,
-      z: lerp(a.pz, b.pz, t),
+      // The eye is the centre of the head (sim/body/shape.ts), wherever a lean has put it.
+      x: lerp(a.px + a.eyeX, b.px + b.eyeX, t),
+      y: lerp(a.py + a.eyeY, b.py + b.eyeY, t) + bob,
+      z: lerp(a.pz + a.eyeZ, b.pz + b.eyeZ, t),
       // A replay looks where the player looked.
       yaw: this.replay ? lerpAngle(a.yaw, b.yaw, t) : this.input.yaw,
       pitch: this.replay ? lerp(a.pitch, b.pitch, t) : this.input.pitch,
+      roll: -lerp(a.lean, b.lean, t) * V.leanRollDeg * (Math.PI / 180),
       fov,
     };
   }
@@ -1059,7 +1067,7 @@ export class Game {
   }
 
   private readonly viewDir = vec3();
-  private readonly viewPose: CameraPose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, fov: 0 };
+  private readonly viewPose: CameraPose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0, fov: 0 };
 
   /** The camera moved by the rifle's sway, as far as the scope is up (sim/ballistics/aim.ts, viewLine). */
   private swayed(pose: CameraPose, rifle: RifleView): CameraPose {
@@ -1151,7 +1159,7 @@ export class Game {
     this.fly.z += (fz * ax.z + rz * ax.x) * speed;
     const ground = this.world.terrain.heightAt(this.fly.x, this.fly.z) + 0.3;
     if (this.fly.y < ground) this.fly.y = ground;
-    return { x: this.fly.x, y: this.fly.y, z: this.fly.z, yaw, pitch, fov };
+    return { x: this.fly.x, y: this.fly.y, z: this.fly.z, yaw, pitch, roll: 0, fov };
   }
 
   /** What systems drew in their last tick: lines in the world, labels in the HUD. */
@@ -1226,7 +1234,7 @@ export class Game {
     const lines = [
       `SIGHTLINE · PHASE 0 · DEBUG VIEW · build ${BUILD}${this.scene ? ` · scene ${this.scene.name} v${this.scene.version}` : ''}`,
       `seed ${w.seed} · tick ${this.sim.tick.toLocaleString('en-US')} · ${clock(played)} played · ${mode}`,
-      `${s.fps.toFixed(0)} fps · frame ${s.frameMs.toFixed(1)} ms (p95 ${s.p95Ms.toFixed(1)}) · cpu ${s.cpuMs.toFixed(1)} ms · sim ${(this.tickMs * 1000).toFixed(0)} µs/tick`,
+      `${this.tuning.sim.tickHz} Hz · ${s.fps.toFixed(0)} fps · frame ${s.frameMs.toFixed(1)} ms (p95 ${s.p95Ms.toFixed(1)}) · cpu ${s.cpuMs.toFixed(1)} ms · sim ${(this.tickMs * 1000).toFixed(0)} µs/tick`,
       `${r.calls} draws · ${(r.triangles / 1000).toFixed(0)}k tris · ${(r.lines / 1000).toFixed(0)}k lines`,
       `systems ${this.systemCosts.map((c) => `${c.name} ${c.usPerTick.toFixed(0)}`).join(' · ') || '—'} µs`,
       ``,
@@ -1765,7 +1773,7 @@ export class Game {
     const d = target.clone().sub(p);
     const yaw = Math.atan2(-d.x, -d.z);
     const pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
-    return { x: p.x, y: p.y, z: p.z, yaw, pitch, fov };
+    return { x: p.x, y: p.y, z: p.z, yaw, pitch, roll: 0, fov };
   }
 
   private benchFrame(now: number, dt: number, cpu: number): void {
@@ -1858,7 +1866,7 @@ function keptLabel(r: StoredRun): string {
 }
 
 function samePose(a: CameraPose, b: CameraPose): boolean {
-  return a.x === b.x && a.y === b.y && a.z === b.z && a.yaw === b.yaw && a.pitch === b.pitch && a.fov === b.fov;
+  return a.x === b.x && a.y === b.y && a.z === b.z && a.yaw === b.yaw && a.pitch === b.pitch && a.roll === b.roll && a.fov === b.fov;
 }
 
 function clock(seconds: number): string {

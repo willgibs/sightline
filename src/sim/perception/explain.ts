@@ -23,6 +23,10 @@ export function describe(e: SimEvent): string {
       return `a footstep: ${e.gait} on ${surfaceName(e.surface)}, heard to ${m(e.radius)} m`;
     case 'land':
       return `a landing at ${m(e.speed)} m/s on ${surfaceName(e.surface)}, heard to ${m(e.radius)} m`;
+    case 'mantle':
+      return `a mantle, heard to ${m(e.radius)} m`;
+    case 'drag':
+      return `something dragged on ${surfaceName(e.surface)}, heard to ${m(e.radius)} m`;
     case 'noise':
       return `a noise, heard to ${m(e.radius)} m`;
     case 'bark':

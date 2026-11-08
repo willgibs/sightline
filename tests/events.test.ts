@@ -28,7 +28,7 @@ function events(): { sim: Simulation; all: SimEvent[]; valley: number; range: Si
   const bot = new ChaosBot('TAL-4471');
   const raw = neutralInput();
   const all: SimEvent[] = [];
-  for (let i = 0; i < 60 * 30; i++) for (const e of sim.step(bot.next(sim, raw))) all.push({ ...e });
+  for (let i = 0; i < 120 * 30; i++) for (const e of sim.step(bot.next(sim, raw))) all.push({ ...e });
   const roof = { kind: 'box' as const, x: 0, z: 0, y0: -1, y1: 3, hx: 2, hz: 2, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Metal };
   const rules: System = {
     name: 'test-rules',
@@ -79,6 +79,8 @@ function events(): { sim: Simulation; all: SimEvent[]; valley: number; range: Si
     { type: 'bark', id: 0, tick, t: tick / 30, source: guard, cause: 0, ...voice, line: 3 },
     { type: 'spotted', id: 0, tick, t: tick / 30, source: guard, cause: 0, what: 'body', x: 12.5, y: 0.3, z: -40.25, distance: 42.5 },
     { type: 'noise', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, loudness: 2, radius: 24 },
+    { type: 'mantle', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, surface: Surface.Rock, loudness: 0.735, radius: 8.82 },
+    { type: 'drag', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, surface: Surface.Gravel, loudness: 1.55, radius: 18.6 },
     { type: 'act', id: 0, tick, t: tick / 30, source: guard, cause: 1, from: 'routine', to: 'look', why: 'heard', x: 3, z: -4, weight: 0.65 },
     { type: 'call', id: 0, tick, t: tick / 30, source: guard, cause: 1, ...voice, loudness: 14 / defaultTuning.noise.radiusPerUnit, radius: 14, radio: 1, say: 'contact' },
     { type: 'radio', id: 0, tick, t: tick / 30, source: guard, cause: 1, kind: 'contact', x: 8, z: -2, radius: 6 },
@@ -125,7 +127,7 @@ describe('events', () => {
     for (const e of all.slice(0, valley)) expect(ids.has(e.source)).toBe(true);
     const types = new Set(all.slice(0, valley).filter((e) => e.source === PLAYER_ID).map((e) => e.type));
     // The player drops noises from the sandbox (A10).
-    expect([...types].sort()).toEqual(['footstep', 'land', 'noise', 'outcome', 'shot', 'stance']);
+    expect([...types].sort()).toEqual(['drag', 'footstep', 'land', 'mantle', 'noise', 'outcome', 'shot', 'stance']);
     expect(all.some((e) => e.source !== PLAYER_ID && e.type === 'footstep')).toBe(true);
     // On the range the guards who cry out are gone by the end: every source was an entity of that run.
     for (const e of all.slice(valley)) expect(e.source >= 1 && e.source < range.state.nextId).toBe(true);
@@ -135,8 +137,18 @@ describe('events', () => {
   });
 
   it('say what the legs were doing when they make a step', () => {
-    const gaits = new Set(all.flatMap((e) => (e.type === 'footstep' && e.source === PLAYER_ID ? [e.gait] : [])));
-    for (const g of ['crawl', 'crouch', 'walk', 'sprint']) expect(gaits.has(g as never)).toBe(true);
+    // The player in every gait: a sprint, a walk, a crouch and a crawl, in turn.
+    const walker = new Simulation(testWorld(), defaultTuning);
+    const input = { ...neutralInput(), moveZ: 1, sprint: true };
+    const gaits = new Set<string>();
+    for (let i = 0; i < 240; i++) {
+      input.sprint = i < 60;
+      input.crouch = i === 60 || i === 120;
+      input.prone = i === 150;
+      if (i === 60) input.sprint = false;
+      for (const e of walker.step(input)) if (e.type === 'footstep' && e.source === PLAYER_ID) gaits.add(e.gait);
+    }
+    for (const g of ['crawl', 'crouch', 'walk', 'sprint']) expect(gaits.has(g)).toBe(true);
   });
 
   it('round-trip through the recording codec, every type', () => {

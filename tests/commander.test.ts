@@ -524,7 +524,7 @@ describe('bodies (E9)', () => {
     giveBrains(sim);
     giveCommander(sim);
     // A body lying in the open, in the gate sentry's view (post 0 at (28, 4.5), facing east).
-    sim.spawn((id) => ({ id, kind: 'remains' as const, faction: Faction.Camp, remains: { of: 0, post: -1, x: 40, y: 0, z: 5, yaw: 0, eye: T.bodies.guard.eyeHeight.prone, vx: 0, vz: 0, fell: -10, part: 'torso' as const } }));
+    sim.spawn((id) => ({ id, kind: 'remains' as const, faction: Faction.Camp, remains: { of: 0, post: -1, x: 40, y: 0, z: 5, yaw: 0, eye: T.bodies.guard.eyeHeight.prone, vx: 0, vz: 0, fell: -10, part: 'torso' as const, carriedBy: 0, hidden: false } }));
     const raw = neutralInput();
     const events: SimEvent[] = [];
     for (let i = 0; i < 30 * 30; i++) for (const e of sim.step(raw)) events.push({ ...e });

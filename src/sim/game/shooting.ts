@@ -27,7 +27,7 @@ import {
   type Strike,
   type SwaySample,
 } from '../ballistics';
-import { calmVitals, poseAt, stepVitals, type PoseSample } from '../body';
+import { calmVitals, eyeOf, poseAt, stepVitals, type PoseSample } from '../body';
 import type { Command } from '../kernel/commands';
 import { DEG, datan2, dcos, dsin } from '../kernel/core/detmath';
 import { air, windAt } from '../kernel/env';
@@ -68,7 +68,13 @@ export function arm(p: PlayerEntity, tuning: Tuning): void {
   p.vitals = calmVitals(tuning.vitals);
 }
 
-const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
+/** The eye the player saw from: `pose` (body.ts, poseAt) leaned as it was, to the side of the facing of that frame. */
+function eyeOfCommand(yaw: number, ctx: TickContext): void {
+  pose.yaw = yaw;
+  eyeOf(pose, ctx.tuning.bodies.player, eye);
+}
+
+const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0, lean: 0, axis: 0, lying: 0, riseHead: 0, risePelvis: 0, riseFeet: 0 };
 const eye = vec3();
 const sight = vec3();
 /** The debug view's drawing of a stone's arc: one line a step, for as long as a throw can last. */
@@ -116,9 +122,7 @@ function shoot(ctx: TickContext, p: PlayerEntity, rifle: RifleState, c: Extract<
   // The instant the player saw, the eye there, and the sway the camera showed.
   const t = (ctx.tick - 1 - c.lag) / hz;
   poseAt(p.body, c.lag, pose);
-  eye.x = pose.x;
-  eye.y = pose.y + pose.eyeHeight;
-  eye.z = pose.z;
+  eyeOfCommand(c.yaw, ctx);
   swayAt(rifle, c.lag, sway);
   // With the scope down, the barrel points only roughly where you look.
   const loose = 1 - sway.raise;
@@ -160,9 +164,7 @@ function dropShot(ctx: TickContext, p: PlayerEntity, c: Extract<Command, { kind:
   const B = T.ballistics;
   const t = (ctx.tick - 1 - c.lag) / T.sim.tickHz;
   poseAt(p.body, c.lag, pose);
-  eye.x = pose.x;
-  eye.y = pose.y + pose.eyeHeight;
-  eye.z = pose.z;
+  eyeOfCommand(c.yaw, ctx);
   lineOfSight(c.yaw, c.pitch, sight);
   const env = ctx.world.spec.env;
   const a = air(env);
@@ -196,6 +198,7 @@ function throwOne(ctx: TickContext, p: PlayerEntity, rifle: RifleState, c: Extra
   const R = T.ballistics.throwable;
   const t = (ctx.tick - 1 - c.lag) / T.sim.tickHz;
   poseAt(p.body, c.lag, pose);
+  eyeOfCommand(c.yaw, ctx);
   lineOfSight(c.yaw, c.pitch, sight);
   const lift = smallAngle(R.liftDeg * DEG);
   boreLine(sight.x, sight.y, sight.z, lift.cos, lift.sin, aim);
@@ -206,9 +209,9 @@ function throwOne(ctx: TickContext, p: PlayerEntity, rifle: RifleState, c: Extra
     faction: Faction.None,
     thrown: {
       thrower: p.id,
-      x: pose.x + sight.x * 0.35,
-      y: pose.y + pose.eyeHeight - 0.1,
-      z: pose.z + sight.z * 0.35,
+      x: eye.x + sight.x * 0.35,
+      y: eye.y - 0.1,
+      z: eye.z + sight.z * 0.35,
       vx: aim.x * R.speed + p.body.vx,
       vy: aim.y * R.speed,
       vz: aim.z * R.speed + p.body.vz,
@@ -268,9 +271,10 @@ const thrownSystem: System = {
 /** Lasers the range along the frame's line of sight: the distance to the first thing that stops light, to the metre. */
 function rangefind(ctx: TickContext, p: PlayerEntity, c: Extract<Command, { kind: 'range' }>): void {
   poseAt(p.body, c.lag, pose);
+  eyeOfCommand(c.yaw, ctx);
   lineOfSight(c.yaw, c.pitch, sight);
   const max = ctx.tuning.ballistics.binoculars.rangeMax;
-  raycast(ctx.query(), pose.x, pose.y + pose.eyeHeight, pose.z, sight.x, sight.y, sight.z, max, Blocks.Sight, hit, p.id);
+  raycast(ctx.query(), eye.x, eye.y, eye.z, sight.x, sight.y, sight.z, max, Blocks.Sight, hit, p.id);
   const t = (ctx.tick - 1 - c.lag) / ctx.tuning.sim.tickHz;
   if (hit.what === 'none') ctx.emit({ type: 'ranged', source: p.id, t, range: -1, x: 0, y: 0, z: 0, what: 'none' });
   else ctx.emit({ type: 'ranged', source: p.id, t, range: Math.round(hit.dist), x: hit.x, y: hit.y, z: hit.z, what: hit.what });
@@ -362,7 +366,7 @@ function kill(ctx: TickContext, g: GuardEntity, s: Strike, bullet: BulletEntity,
     id,
     kind: 'remains' as const,
     faction: Faction.Camp,
-    remains: { of: g.id, post: g.guard.spawn, x: pose.x, y: pose.y, z: pose.z, yaw: datan2(-f.dx, -f.dz), eye: pose.eyeHeight, vx: g.body.vx, vz: g.body.vz, fell: s.t, part },
+    remains: { of: g.id, post: g.guard.spawn, x: pose.x, y: pose.y, z: pose.z, yaw: datan2(-f.dx, -f.dz), eye: pose.eyeHeight, vx: g.body.vx, vz: g.body.vz, fell: s.t, part, carriedBy: 0, hidden: false },
   }));
   ctx.emit({ type: 'death', source: bullet.bullet.shooter, t: s.t, cause, victim: g.id, remains: remains.id, post: g.guard.spawn, part, x: pose.x, y: pose.y, z: pose.z });
   ctx.despawn(g.id);
@@ -430,13 +434,13 @@ const aimSystem: System = {
     rifle.raise = up ? Math.min(1, rifle.raise + step) : Math.max(0, rifle.raise - step);
     // Settling after moving, and onto a rest.
     rifle.steady = body.speed > S.movingSpeed ? 0 : Math.min(1, rifle.steady + dt / Math.max(S.settle, 1e-6));
-    const rested = restAvailable(ctx.world, ctx.solids, body, ctx.input.yaw, ctx.input.pitch, S);
+    const rested = restAvailable(ctx.world, ctx.solids, body, eyeOf(body, T.bodies.player, eye), ctx.input.yaw, ctx.input.pitch, S);
     // The debug view: where a rest is looked for, under the fore-end, green when there is one.
     ctx.debug((draw) => {
       const reach = body.stance === 'prone' ? S.restReach.prone : S.restReach.upright;
-      const x = body.x - dsin(ctx.input.yaw) * reach;
-      const z = body.z - dcos(ctx.input.yaw) * reach;
-      draw.point(x, body.y + body.eyeHeight - 0.15, z, 0.05, rested ? 'good' : 'muted');
+      const x = eye.x - dsin(ctx.input.yaw) * reach;
+      const z = eye.z - dcos(ctx.input.yaw) * reach;
+      draw.point(x, eye.y - 0.15, z, 0.05, rested ? 'good' : 'muted');
     });
     const restStep = dt / Math.max(S.restTime, 1e-6);
     rifle.rest = rested ? Math.min(1, rifle.rest + restStep) : Math.max(0, rifle.rest - restStep);

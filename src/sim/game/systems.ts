@@ -1,4 +1,4 @@
-import { intentFor, motorSystem, poseAt, type PoseSample } from '../body';
+import { eyeOf, intentFor, motorSystem, poseAt, type PoseSample } from '../body';
 import { carryOut, type NavAllowance } from '../brain';
 import { dcos, dsin } from '../kernel/core/detmath';
 import { Faction } from '../kernel/state';
@@ -15,6 +15,7 @@ import { think } from './guards';
 import { playerIntent } from './player';
 import { PERCEPTION } from './perception';
 import { SHOOTING_SYSTEMS } from './shooting';
+import { carriedSystem, useSystem } from './use';
 
 /**
  * Sightline's tick: which lanes' systems run, in which phase (kernel/systems.ts, PHASES).
@@ -31,7 +32,8 @@ export const SCHEDULE_HANDLERS: Readonly<Record<string, ScheduleHandler>> = {
   'reinforce-arrive': reinforceArrive,
 };
 
-const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
+const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0, lean: 0, axis: 0, lying: 0, riseHead: 0, risePelvis: 0, riseFeet: 0 };
+const eye = { x: 0, y: 0, z: 0 };
 
 /**
  * The player's commands, resolved against what was on screen when they were given. A
@@ -51,14 +53,16 @@ const playerCommands: System = {
       if (c.kind === 'fire') {
         // The moment the player saw: `lag` ticks before this tick's start state.
         poseAt(p.body, c.lag, pose);
+        pose.yaw = c.yaw; // a lean is to the side of the facing the player saw
+        eyeOf(pose, ctx.tuning.bodies.player, eye);
         const cp = dcos(c.pitch);
         ctx.emit({
           type: 'shot',
           source: p.id,
           t: (ctx.tick - 1 - c.lag) / ctx.tuning.sim.tickHz,
-          x: pose.x,
-          y: pose.y + pose.eyeHeight,
-          z: pose.z,
+          x: eye.x,
+          y: eye.y,
+          z: eye.z,
           dx: -dsin(c.yaw) * cp,
           dy: dsin(c.pitch),
           dz: -dcos(c.yaw) * cp,
@@ -102,7 +106,7 @@ const sandboxDrops: System = {
       if (c.kind === 'bodyDrop') {
         const t = ctx.tick / ctx.tuning.sim.tickHz;
         const eye = ctx.tuning.bodies.guard.eyeHeight.prone;
-        ctx.spawn((id) => ({ id, kind: 'remains' as const, faction: Faction.Camp, remains: { of: 0, post: -1, x: hit.x, y: hit.y, z: hit.z, yaw: c.yaw, eye, vx: 0, vz: 0, fell: t - ctx.tuning.ballistics.hits.collapseTime, part: 'torso' as const } }));
+        ctx.spawn((id) => ({ id, kind: 'remains' as const, faction: Faction.Camp, remains: { of: 0, post: -1, x: hit.x, y: hit.y, z: hit.z, yaw: c.yaw, eye, vx: 0, vz: 0, fell: t - ctx.tuning.ballistics.hits.collapseTime, part: 'torso' as const, carriedBy: 0, hidden: false } }));
         continue;
       }
       ctx.emit({
@@ -129,7 +133,7 @@ const playerIntentSystem: System = {
   emits: ['stance'],
   run(ctx) {
     const p = player(ctx.index);
-    const motor = { world: ctx.world, solids: ctx.solids, tick: ctx.tick, source: p.id, emit: ctx.emit };
+    const motor = { world: ctx.world, solids: ctx.solids, tick: ctx.tick, source: p.id, emit: ctx.emit, dt: ctx.dt, tuning: ctx.tuning };
     playerIntent(p.body, p.control, ctx.input, ctx.tuning.bodies.player, motor, intentFor(ctx, p.id));
   },
 };
@@ -203,9 +207,11 @@ export const SYSTEMS: readonly System[] = [
   playerCommands,
   SHOOTING_SYSTEMS.rifle,
   sandboxDrops,
+  useSystem,
   playerIntentSystem,
   guardOrders,
   motorSystem,
+  carriedSystem,
   SHOOTING_SYSTEMS.bullets,
   SHOOTING_SYSTEMS.thrown,
   SHOOTING_SYSTEMS.aim,

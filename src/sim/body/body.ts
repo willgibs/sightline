@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import { yawFromDirection } from '../kernel/core/math';
+import { wrapAngle, yawFromDirection } from '../kernel/core/math';
 import type { StanceName, StepGait } from '../kernel/events';
 import type { Entity } from '../kernel/state';
 import type { World } from '../kernel/world/world';
@@ -7,6 +7,7 @@ import { Blocks, circleOverlaps } from '../kernel/world/colliders';
 import { makeTerrainSample } from '../kernel/world/heightfield';
 import type { Solids } from '../kernel/world/solids';
 import { Surface } from '../kernel/world/surfaces';
+import type { LadderState } from './ladder';
 
 /**
  * A body: the physical state of anything that moves under its own power, walks, falls
@@ -27,9 +28,34 @@ export type Gait = 'idle' | StepGait;
 /**
  * Which motor mode owns the body. Each mode moves the body its own way and keeps its own
  * invariants (see motor.ts): on the ground it walks, steps and slides; in the air it
- * falls. Lab C adds traverse (mantle, vault, ladder); later modes could swim or glide.
+ * falls; in a mantle it follows a path of its own. Later modes could swim or glide.
  */
-export type MotorModeName = 'ground' | 'air';
+export type MotorModeName = 'ground' | 'air' | 'mantle' | 'ladder';
+
+/** A mantle under way (mantle.ts): its path, as plain data in the state tree. */
+export interface MantleState {
+  /** Seconds along the path. It advances only while the next pose is clear. */
+  t: number;
+  /** Seconds it has waited for something to get out of the way, since it last moved. */
+  waited: number;
+  /** Waypoints as x, y, z triples: the start, at the wall, above the ledge, over the landing, the landing. */
+  points: number[];
+  /** Seconds each leg between waypoints takes: reach, pull, shift, push. */
+  legs: number[];
+  /** Seconds along the path the hands take hold (the sound). */
+  grabAt: number;
+  /** The ladder (its index in the world's) this path ends on, or −1 for the ground. */
+  then: number;
+  /** It began standing: stand up again at the end, if there's room. */
+  stand: boolean;
+  /** What the hands take hold of, and what the feet land on. */
+  grip: Surface;
+  feet: Surface;
+  /** The hands have taken hold (its sound has been made). */
+  grabbed: boolean;
+  /** How far it is lowered down the far side, metres. */
+  dropped: number;
+}
 
 /** A kind of body: its sizes, limits and parts (tuning.bodies). Every kind has the same fields; a test keeps them so. */
 export type BodySpec = Tuning['bodies']['player'];
@@ -42,6 +68,12 @@ export interface PoseSample {
   yaw: number;
   pitch: number;
   eyeHeight: number;
+  lean: number;
+  axis: number;
+  lying: number;
+  riseHead: number;
+  risePelvis: number;
+  riseFeet: number;
 }
 
 export interface BodyState {
@@ -65,7 +97,21 @@ export interface BodyState {
   /** Eye height when the current stance change began. */
   eyeFrom: number;
   eyeHeight: number;
+  /** How far the head is leaned to the body's right (negative: left), metres (lean.ts). */
+  lean: number;
   motor: MotorModeName;
+  /** The mantle under way, or null (mantle.ts). */
+  mantle: MantleState | null;
+  /** The ladder it's on, or null (ladder.ts). */
+  ladder: LadderState | null;
+  /** The long axis of a lying body: a yaw, following the view by the largest turn that keeps every part clear (motor.ts). */
+  axis: number;
+  /** How far along its length a lying body has grown: 0 standing (one circle), 1 fully down (chain.ts). */
+  lying: number;
+  /** Lying, how far the ground rises under the head, the pelvis and the feet, from under the chest: the body lies along it. */
+  riseHead: number;
+  risePelvis: number;
+  riseFeet: number;
   /** On the ground but on terrain too steep to stand on: no traction, sliding down. */
   sliding: boolean;
   /** Distance walked since the last footstep (shoves from others don't count). */
@@ -94,6 +140,22 @@ export function hasBody(e: Entity): e is BodyEntity {
   return 'body' in e;
 }
 
+/** Directions for testing the body's rim against the terrain: 12 around the circle. */
+export const RIM = [
+  [1, 0],
+  [0.8660254037844387, 0.5],
+  [0.5, 0.8660254037844387],
+  [0, 1],
+  [-0.5, 0.8660254037844387],
+  [-0.8660254037844387, 0.5],
+  [-1, 0],
+  [-0.8660254037844387, -0.5],
+  [-0.5, -0.8660254037844387],
+  [0, -1],
+  [0.5, -0.8660254037844387],
+  [0.8660254037844387, -0.5],
+] as const;
+
 const ids: number[] = [];
 
 /**
@@ -112,7 +174,7 @@ export function createBody(world: World, solids: Solids, spec: BodySpec, x: numb
   const surface = ground.surface;
   const standingOn = ground.collider;
   const yaw = yawFromDirection(faceX, faceZ);
-  const pose = (): PoseSample => ({ x, y, z, yaw, pitch: 0, eyeHeight: spec.eyeHeight.stand });
+  const pose = (): PoseSample => ({ x, y, z, yaw, pitch: 0, eyeHeight: spec.eyeHeight.stand, lean: 0, axis: yaw, lying: 0, riseHead: 0, risePelvis: 0, riseFeet: 0 });
   return {
     x,
     y,
@@ -128,7 +190,15 @@ export function createBody(world: World, solids: Solids, spec: BodySpec, x: numb
     proneTransition: false,
     eyeFrom: spec.eyeHeight.stand,
     eyeHeight: spec.eyeHeight.stand,
+    lean: 0,
     motor: 'ground',
+    mantle: null,
+    ladder: null,
+    axis: yaw,
+    lying: 0,
+    riseHead: 0,
+    risePelvis: 0,
+    riseFeet: 0,
     sliding: false,
     stride: 0,
     gait: 'idle',
@@ -150,12 +220,24 @@ export function pushHistory(b: BodyState): void {
   h1.yaw = h0.yaw;
   h1.pitch = h0.pitch;
   h1.eyeHeight = h0.eyeHeight;
+  h1.lean = h0.lean;
+  h1.axis = h0.axis;
+  h1.lying = h0.lying;
+  h1.riseHead = h0.riseHead;
+  h1.risePelvis = h0.risePelvis;
+  h1.riseFeet = h0.riseFeet;
   h0.x = b.x;
   h0.y = b.y;
   h0.z = b.z;
   h0.yaw = b.yaw;
   h0.pitch = b.pitch;
   h0.eyeHeight = b.eyeHeight;
+  h0.lean = b.lean;
+  h0.axis = b.axis;
+  h0.lying = b.lying;
+  h0.riseHead = b.riseHead;
+  h0.risePelvis = b.risePelvis;
+  h0.riseFeet = b.riseFeet;
 }
 
 /**
@@ -176,6 +258,13 @@ export function poseAt(b: BodyState, lag: number, out: PoseSample): PoseSample {
   out.yaw = newer.yaw; // angles come from the command, not from history
   out.pitch = newer.pitch;
   out.eyeHeight = newer.eyeHeight + (older.eyeHeight - newer.eyeHeight) * t;
+  out.lean = newer.lean + (older.lean - newer.lean) * t;
+  // Lying is folding or unfolding through this: the axis takes the nearest way round.
+  out.axis = newer.axis + wrapAngle(older.axis - newer.axis) * t;
+  out.lying = newer.lying + (older.lying - newer.lying) * t;
+  out.riseHead = newer.riseHead + (older.riseHead - newer.riseHead) * t;
+  out.risePelvis = newer.risePelvis + (older.risePelvis - newer.risePelvis) * t;
+  out.riseFeet = newer.riseFeet + (older.riseFeet - newer.riseFeet) * t;
   return out;
 }
 
@@ -186,7 +275,23 @@ export function poseAt(b: BodyState, lag: number, out: PoseSample): PoseSample {
  * headroom and sight all use this, so the body can't slip under a slab its eye is above.
  */
 export function bodyHeight(b: BodyState, spec: BodySpec): number {
-  return Math.max(spec.height[b.stance], b.eyeHeight + (spec.height[b.stance] - spec.eyeHeight[b.stance]));
+  // Above the eye, the least of what any stance has: lying down from a crouch must not make a body
+  // taller than it is, by a prone head's bigger clearance, under a slab just over its head.
+  const H = spec.height;
+  const E = spec.eyeHeight;
+  const above = Math.min(H.stand - E.stand, H.crouch - E.crouch, H.prone - E.prone);
+  return Math.max(H[b.stance], b.eyeHeight + above);
+}
+
+/**
+ * What a circle of a lying body rests on, for feet at `feet`. As groundBelow, but a
+ * collider counts only within a step of the feet or of the terrain under that circle:
+ * `allow` stretches over ground that slopes, not up the side of a wall, so a heel doesn't
+ * take a waist-high bank for the ground and lift onto it in a tick.
+ */
+export function restBelow(world: World, solids: Solids, x: number, z: number, feet: number, allow: number, step: number, radius: number): Ground {
+  const t = world.terrain.heightAt(x, z);
+  return groundBelow(world, solids, x, z, Math.min(feet + allow + step, (t > feet ? t : feet) + step), radius);
 }
 
 /** True if a solid collider overlaps the vertical band [y0, y1) of a body at (x, z). */
@@ -197,6 +302,16 @@ export function solidAround(solids: Solids, x: number, z: number, y0: number, y1
     if ((c.flags & Blocks.Move) !== 0 && c.y1 > y0 && c.y0 < y1 && circleOverlaps(c, x, z, r)) return true;
   }
   return false;
+}
+
+/** How far the terrain inside the body's rim rises above a step, at most; 0 or less if clear. */
+export function rimExcess(world: World, x: number, z: number, feet: number, r: number, stepHeight: number): number {
+  let worst = -Infinity;
+  for (let k = 0; k < RIM.length; k++) {
+    const e = world.terrain.heightAt(x + RIM[k]![0] * r, z + RIM[k]![1] * r) - (feet + stepHeight);
+    if (e > worst) worst = e;
+  }
+  return worst;
 }
 
 export interface Ground {

@@ -216,7 +216,7 @@ export class InputController {
       if (a === 'fire') this.latch.latch(this.opticHeld === Optic.Binoculars && this.armed ? 'range' : 'fire');
       else if (a === 'throw') {
         if (this.armed) this.latch.latch('throw');
-      } else if (a === 'crouch' || a === 'prone') this.pressed.add(a);
+      } else if (a === 'crouch' || a === 'prone' || a === 'climb' || a === 'use') this.pressed.add(a);
       else if (a === 'scopeToggle') this.scopeToggled = !this.scopeToggled;
       else if (a === 'shotDrop') this.latch.latch('shotDrop');
       else if (a === 'dropNoise') this.latch.latch('noise');
@@ -254,6 +254,8 @@ export class InputController {
     out.moveZ = frozen ? 0 : (this.held('forward') ? 1 : 0) - (this.held('back') ? 1 : 0);
     out.crouch = !frozen && this.pressed.has('crouch');
     out.prone = !frozen && this.pressed.has('prone');
+    const climb = !frozen && this.pressed.has('climb');
+    const use = !frozen && this.pressed.has('use');
     this.pressed.clear();
     out.yaw = this.yaw;
     out.pitch = this.pitch;
@@ -263,6 +265,7 @@ export class InputController {
     out.breath = shift && out.optic === Optic.Scope;
     out.sprint = shift && out.optic !== Optic.Scope;
     if (out.sprint) this.scopeToggled = false;
+    out.lean = frozen ? 0 : (this.held('leanRight') ? 1 : 0) - (this.held('leanLeft') ? 1 : 0);
     if (frozen) {
       this.latch.clear();
       this.simple.length = 0;
@@ -271,6 +274,8 @@ export class InputController {
       this.latch.drain(startTick, this.commands);
       for (const c of this.simple) this.commands.push(c);
       this.simple.length = 0;
+      if (climb) this.commands.push({ kind: 'climb' });
+      if (use) this.commands.push({ kind: 'use' });
     }
     out.commands = this.commands;
     return out;

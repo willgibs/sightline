@@ -263,6 +263,45 @@ export const defaultTuning = {
       shoveMax: 0.08, // most another body shoves this one per resolve pass; small enough that walls always win
       groundSnap: 0.6, // stay glued to the ground walking downhill
       stride: { sprint: 1.7, walk: 1.25, crouch: 0.85, crawl: 0.6 }, // metres between footsteps
+      // Leaning around cover (sim/body/lean.ts): metres the eye moves aside, about the hips.
+      // No game publishes these; they are the lab's (docs/phase-1-plan.md, C3).
+      lean: {
+        peek: 0.18, // with nothing raised: an eye past the corner
+        weapon: 0.4, // with an optic up: far enough to clear it. Never past radius + headRadius, so turning can't swing the head through a wall the body is clear of
+        prone: 0.12, // lying down: rolling onto one shoulder
+        bend: 0.58, // upright: at most this share of the spine (hips to eye), so a crouch leans less than a stand
+        rate: 1.4, // m/s the eye moves aside at
+      },
+      // The mantle (sim/body/mantle.ts). No game publishes these; they are the lab's.
+      mantle: {
+        probes: 9, // forward probes, at heights up to maxHeight + 0.1 m
+        maxHeight: 1.5, // the highest ledge a body can get up onto, metres above its feet
+        reach: 0.5, // how far past its edge the hands reach for a ledge, metres
+        squareCos: 0.4, // cosine of the widest angle off square it can start from (about 66°)
+        overDepth: 0.8, // thinner than this, it goes over rather than up onto
+        maxDrop: 1.6, // the furthest it will lower itself down the far side
+        lift: 0.03, // how far above the ledge the feet clear it, metres
+        hang: 0.1, // seconds for the hands to take hold
+        pullSpeed: 4, // m/s on average, up the wall
+        shiftSpeed: 3.5, // m/s on average, across the top
+        dropSpeed: 3, // m/s on average, down the far side
+        minLeg: 0.12, // no leg of the path is quicker than this, seconds
+        holdFor: 0.4, // seconds it waits for something in the way before it gives up
+        buffer: 0.2, // a press stays good this long, so an early press still works
+      },
+      // Ladders (sim/body/ladder.ts). Again the lab's own numbers; no game publishes these.
+      ladder: {
+        standoff: 0.05, // how far off a ladder's plane the body's edge stands
+        reach: 1.05, // how far from the ladder a press takes it, at its foot, metres
+        topReach: 2.2, // and on the deck at its top, where the rungs are further off
+        footing: 0.6, // how close to its foot or its top a body must be, vertically
+        facingCos: 0.5, // cosine of the widest angle off facing it a press works at (60°)
+        reachTime: 0.25, // seconds to get onto the rungs
+        upRate: 1.8, // m/s
+        downRate: 2.2, // m/s
+        rung: 0.3, // metres between rungs: a footstep each
+        topGap: 0.65, // how far below the top a body stops, feet: the mantle over the top does the rest
+      },
       // Three parts for sight lines and hits: a head sphere at the eye, a torso capsule
       // from the hips to the shoulders, a legs capsule from the feet to the hips.
       // Heights come from the stance.
@@ -273,7 +312,15 @@ export const defaultTuning = {
         neck: 0.24, // the top of the torso sits this far below the eye
         hip: 0.5, // hips at this share of the stance's height
         proneLength: 1.75, // head to heels, lying down
+        pivot: 0.55, // the pivot a lying body turns on: this far back from the top of its head (near the chest)
+        chainSpacing: 0.25, // lying, its collision chain has a circle at least this often
       },
+      // Carrying and dragging a body (sim/game/use.ts): standing it rides the shoulder; crouched it
+      // drags behind. Slow, and dragging scrapes. The lab's own numbers.
+      carry: { reach: 1.7, speed: 1.6, dragSpeed: 0.9, shoulder: 1.15, trail: 1.1, facingCos: 0.5, underfoot: 0.4, hideBy: 1, hideBelow: 0.3, reachHeight: 1.1, grabAt: 0.2, trailGap: 0.1 },
+      // Lying down (sim/body/motor.ts): the turn the body's axis makes toward where it looks, rad/s,
+      // by the largest step that keeps every part of it clear. No game publishes this; it's the lab's.
+      prone: { turnRate: 2 },
     },
     guard: {
       // A little taller than the player, and brisker to speed up and slow down, so he
@@ -294,6 +341,24 @@ export const defaultTuning = {
       shoveMax: 0.08,
       groundSnap: 0.6,
       stride: { sprint: 1.7, walk: 0.75, crouch: 0.85, crawl: 0.6 },
+      lean: { peek: 0.18, weapon: 0.4, prone: 0.12, bend: 0.58, rate: 1.4 },
+      mantle: {
+        probes: 9,
+        maxHeight: 1.5,
+        reach: 0.5,
+        squareCos: 0.4,
+        overDepth: 0.8,
+        maxDrop: 1.6,
+        lift: 0.03,
+        hang: 0.1,
+        pullSpeed: 4,
+        shiftSpeed: 3.5,
+        dropSpeed: 3,
+        minLeg: 0.12,
+        holdFor: 0.4,
+        buffer: 0.2,
+      },
+      ladder: { standoff: 0.05, reach: 1.05, topReach: 2.2, footing: 0.6, facingCos: 0.5, reachTime: 0.25, upRate: 1.8, downRate: 2.2, rung: 0.3, topGap: 0.65 },
       parts: {
         headRadius: 0.115,
         torsoRadius: 0.22,
@@ -301,7 +366,11 @@ export const defaultTuning = {
         neck: 0.24,
         hip: 0.5,
         proneLength: 1.75,
+        pivot: 0.55,
+        chainSpacing: 0.25,
       },
+      carry: { reach: 1.7, speed: 1.6, dragSpeed: 0.9, shoulder: 1.15, trail: 1.1, facingCos: 0.5, underfoot: 0.4, hideBy: 1, hideBelow: 0.3, reachHeight: 1.1, grabAt: 0.2, trailGap: 0.1 },
+      prone: { turnRate: 2 },
     },
   },
 
@@ -314,6 +383,13 @@ export const defaultTuning = {
     // Landing from a fall or a slide: loudness grows with impact speed (m/s), from a soft
     // drop at minSpeed to the cap. A 1 m drop lands at 4.4 m/s, about a walking step.
     landing: { minSpeed: 2.5, perSpeed: 0.25, max: 3 },
+    // A mantle (sim/body/mantle.ts): the hands taking hold, and being lowered down the far side
+    // (loudness, times the surface; the drop's grows with how far, up to 1 m).
+    mantle: { grip: 0.7, drop: 0.6, minDrop: 0.3 },
+    ladder: 0.45, // a rung under a step: loudness, times the surface
+    carry: 1.8, // a loaded step, at carrying pace, is about as loud as walking (sim/game/use.ts)
+    // Dragging something: loudness of the scrape, each step, by surface. Noisy on gravel (design doc).
+    drag: { grass: 0.35, dirt: 0.6, gravel: 1.55, rock: 1.0, water: 1.1, metal: 1.4, wood: 0.9 },
     // Steady sources, as heard radii. Phase 1 makes them mask other sounds for guards too.
     ambient: { creek: 38, generator: 70 },
   },
@@ -730,6 +806,7 @@ export const defaultTuning = {
     headBob: 1, // 0 turns camera bob off
     // How far the eye dips as each foot comes down, metres, at each gait's speed (sim/body/bob.ts).
     bob: { crawl: 0.01, crouch: 0.016, walk: 0.026, sprint: 0.05 },
+    leanRollDeg: 22, // degrees the view tilts per metre of lean: 4 at a peek, 9 at a full lean
     fogDensity: 0.0012, // exp² fog: about 30% at 500 m, 75% at 1 km
   },
 };

@@ -5,7 +5,9 @@ import type { Driver } from '../sim/kernel/scene';
 import type { Scene } from '../sim/game/scenes';
 import { sightScenario } from '../sim/game/scenes/sightScenario';
 import type { Simulation } from '../sim/game/sim';
-import { FACTORS, SITTING, TOLD, probeTally, scoreSitting, sittingSteps, type ProbeTally, type Score, type Told, type Trial } from '../sim/game/trials';
+import { NOISE_PREROLL, noiseScenario } from '../sim/game/scenes/noiseScenario';
+import { MOVEMENT_CANDIDATES, movementSteps } from '../sim/game/movementTrials';
+import { ALL_FACTORS, SITTING, TOLD, answersTrial, probeTally, scoreSitting, sittingSteps, type ProbeTally, type Score, type Told, type Trial } from '../sim/game/trials';
 
 /**
  * Trial mode in the browser (A12, `?trials=<seed>`): a sitting of the exit test, run the way
@@ -32,6 +34,20 @@ import { FACTORS, SITTING, TOLD, probeTally, scoreSitting, sittingSteps, type Pr
  * page asks before leaving an unfinished or unsaved sitting; and the file can be saved
  * as often as you like.
  */
+
+/** What a sitting is made of: its trials from a seed, and the scene each runs in. */
+export interface SittingPlan {
+  /** The sitting's trials, a candidate at a time. */
+  steps(seed: string, tuning: Tuning): Generator<number, Trial[]>;
+  maxCandidates: number;
+  scene(t: Trial): Scene;
+}
+
+/** The perception lab's sittings (A12). */
+export const SIGHT_PLAN: SittingPlan = { steps: sittingSteps, maxCandidates: SITTING.maxCandidates, scene: (t) => sightScenario(t.params) };
+
+/** The movement lab's (C8): noise and visibility trials, the same protocol. */
+export const MOVEMENT_PLAN: SittingPlan = { steps: movementSteps, maxCandidates: MOVEMENT_CANDIDATES, scene: (t) => (t.kind === 'noise' ? noiseScenario(t.params) : sightScenario(t.params)) };
 
 /** What the sitting needs from the game. */
 export interface TrialHost {
@@ -104,6 +120,7 @@ export class TrialSitting {
     readonly seed: string,
     private readonly tuning: Tuning,
     private readonly fresh = false,
+    private readonly plan: SittingPlan = SIGHT_PLAN,
   ) {
     this.panel = document.createElement('div');
     this.panel.className = 'trial-panel';
@@ -114,7 +131,7 @@ export class TrialSitting {
 
   /** Prepares the sitting a few candidates at a time, so the page stays alive. */
   prepare(): void {
-    const steps = sittingSteps(this.seed, this.tuning);
+    const steps = this.plan.steps(this.seed, this.tuning);
     const pump = (): void => {
       const t0 = performance.now();
       for (;;) {
@@ -129,13 +146,13 @@ export class TrialSitting {
               ? `Sitting ${this.seed} is finished. Click to see its result.`
               : this.restored === 'resumed'
                 ? `Sitting ${this.seed}: ${shape}. Picking up where you stopped: ${this.answers.size} answered so far.`
-                : `Sitting ${this.seed}: ${shape}. For each, read what you'll do, look, and answer before it ends: Y he'll see you, N he won't.`,
+                : `Sitting ${this.seed}: ${shape}. For each, read what you'll do, look, and answer before it ends: Y if he will, N if he won't.`,
           );
           this.host.ready();
           return;
         }
         if (performance.now() - t0 > 40) {
-          this.host.status(`Preparing the trials · ${Math.round((100 * r.value) / SITTING.maxCandidates)}% of the candidates run`);
+          this.host.status(`Preparing the trials · ${Math.round((100 * r.value) / this.plan.maxCandidates)}% of the candidates run`);
           break;
         }
       }
@@ -159,6 +176,11 @@ export class TrialSitting {
     return this.phase === 'running' || this.phase === 'playing-on';
   }
 
+  /** Whether the view follows the driver: in a noise trial the player moves round the guard, facing him. */
+  get followsDriver(): boolean {
+    return this.trials[this.k]?.kind === 'noise' && (this.phase === 'running' || this.phase === 'playing-on');
+  }
+
   /** In trial mode the trial's driver moves the player; the mouse only looks. */
   input(sim: Simulation, out: InputFrame): void {
     if (this.driver) this.driver.next(sim, out);
@@ -168,10 +190,12 @@ export class TrialSitting {
   onTick(sim: Simulation, events: readonly SimEvent[]): void {
     const t = this.trials[this.k];
     if (!t) return;
+    // A noise trial freezes after its few steps, as he starts listening, and nothing has given it away.
+    if (t.kind === 'noise' && t.freeze === 'cue' && this.freezeAt < 0 && this.phase === 'running' && sim.tick >= Math.round(NOISE_PREROLL * this.tuning.sim.tickHz)) this.freezeAt = sim.tick;
     for (const e of events) {
       // The same hold the key was made with (trials.ts), so the freeze shows what it recorded.
-      if (e.type === 'noticed' && t.freeze === 'cue' && this.freezeAt < 0 && this.phase === 'running') this.freezeAt = sim.tick + Math.round(SITTING.cueHoldSeconds * this.tuning.sim.tickHz);
-      if (e.type === 'detected' && this.seenAt < 0) this.seenAt = e.t;
+      if (e.type === 'noticed' && t.kind === 'sight' && t.freeze === 'cue' && this.freezeAt < 0 && this.phase === 'running') this.freezeAt = sim.tick + Math.round(SITTING.cueHoldSeconds * this.tuning.sim.tickHz);
+      if (answersTrial(t.kind, e) && this.seenAt < 0) this.seenAt = e.t;
     }
     const end = sim.tick >= SITTING.seconds * this.tuning.sim.tickHz || (this.phase === 'playing-on' && this.seenAt >= 0);
     if (this.phase === 'running' && this.freezeAt >= 0 && sim.tick >= this.freezeAt) {
@@ -192,7 +216,7 @@ export class TrialSitting {
       this.finish();
       return;
     }
-    const scene = sightScenario(t.params);
+    const scene = this.plan.scene(t);
     this.host.loadTrial(scene);
     this.driver = scene.driver!() as Driver<Simulation>;
     this.freezeAt = -1;
@@ -216,9 +240,9 @@ export class TrialSitting {
     if (!t || this.phase !== 'asking') return;
     this.answers.set(t.k, yes);
     // With the key it was answered against: the answer scores even if later builds can't re-run the trial.
-    this.host.annotate('trial-answer', JSON.stringify({ sitting: this.seed, k: t.k, warmup: t.warmup, freeze: t.freeze, answer: yes, params: t.params, seen: t.seen, borderline: t.borderline, rules: t.rules, flips: t.flips, cueAt: t.cueAt, legible: t.legible }));
+    this.host.annotate('trial-answer', JSON.stringify({ sitting: this.seed, k: t.k, warmup: t.warmup, kind: t.kind, freeze: t.freeze, answer: yes, params: t.params, seen: t.seen, borderline: t.borderline, rules: t.rules, flips: t.flips, cueAt: t.cueAt, legible: t.legible }));
     this.persist();
-    if (t.freeze === 'cue') {
+    if (t.freeze === 'cue' && t.kind === 'sight') {
       // What told you? It diagnoses, and never gates.
       this.phase = 'probe';
       this.render();
@@ -238,7 +262,7 @@ export class TrialSitting {
     }
     // Scored: the rest happens out of sight, and stays in the recording.
     const hz = this.tuning.sim.tickHz;
-    this.host.runOut(Math.max(0, SITTING.seconds * hz - this.host.sim.tick), (events) => events.some((e) => e.type === 'detected'));
+    this.host.runOut(Math.max(0, SITTING.seconds * hz - this.host.sim.tick), (events) => events.some((e) => answersTrial(t.kind, e)));
     this.next();
   }
 
@@ -273,7 +297,7 @@ export class TrialSitting {
       return;
     }
     this.k = k;
-    const scene = sightScenario(this.trials[k]!.params);
+    const scene = this.plan.scene(this.trials[k]!);
     this.host.loadTrial(scene);
     this.driver = scene.driver!() as Driver<Simulation>;
     this.freezeAt = -1;
@@ -333,14 +357,15 @@ export class TrialSitting {
     const warmups = this.trials.length - scored;
     const title = this.reviewing ? `Reviewing miss ${this.reviewAt + 1} of ${this.reviewing.length}` : t.warmup ? `Warm-up ${t.k + 1} of ${warmups}` : `Trial ${t.k - warmups + 1} of ${scored}`;
     const said = `You said ${this.answers.get(t.k) ? 'he would' : "he wouldn't"}.`;
+    const heard = t.kind === 'noise';
     let prompt: string;
-    if (this.phase === 'asking') prompt = `<b>Y</b> he'll see you · <b>N</b> he won't${t.freeze === 'cue' ? ' · frozen at the first sign he noticed something' : ' · frozen at the start'}`;
+    if (this.phase === 'asking') prompt = `<b>Y</b> he'll ${heard ? 'hear' : 'see'} you · <b>N</b> he won't${t.freeze === 'cue' ? (heard ? ' · frozen after a few steps, as he starts listening' : ' · frozen at the first sign he noticed something') : ' · frozen at the start'}`;
     else if (this.phase === 'probe') prompt = `What told you? <b>1</b> the mark · <b>2</b> his head · <b>3</b> his voice · <b>4</b> the situation alone · <b>Space</b> skip`;
     else if (this.phase === 'running') prompt = 'Watch…';
     else if (this.phase === 'playing-on') prompt = this.reviewing ? `${said} Playing it back…` : 'Playing on…';
     else {
       const why = !this.reviewing ? '' : t.flips.length ? ` One step of ${t.flips.join(' or ')} would have changed it.` : ' No one step would have changed it.';
-      prompt = `${this.seenAt >= 0 ? `<b>Seen</b> at ${this.seenAt.toFixed(1)} s.` : `<b>Not seen</b> in ${SITTING.seconds} s.`} ${said}${why} <b>Space</b> for the next.`;
+      prompt = `${this.seenAt >= 0 ? `<b>${heard ? 'Heard' : 'Seen'}</b> at ${this.seenAt.toFixed(1)} s.` : `<b>Not ${heard ? 'heard' : 'seen'}</b> in ${SITTING.seconds} s.`} ${said}${why} <b>Space</b> for the next.`;
     }
     this.panel.innerHTML = `<div class="trial-title">${title}</div><div class="trial-brief"></div><div class="trial-prompt">${prompt}</div>`;
     this.panel.querySelector('.trial-brief')!.textContent = t.brief;
@@ -418,7 +443,7 @@ export class TrialSitting {
     const s = this.score!;
     const misses = this.trials.filter((t) => !t.warmup && this.answers.has(t.k) && this.answers.get(t.k) !== t.seen).length;
     this.host.results(resultsHtml(this.seed, s, probeTally(this.trials, this.answers, this.probes), misses), () => {
-      this.host.download(`sitting-${this.seed}.json`, this.report(s));
+      this.host.download(`sitting-${this.seed.replace(/[^A-Za-z0-9-]/g, '-')}.json`, this.report(s));
       this.saved = true;
       this.persist();
     });
@@ -448,7 +473,7 @@ function probeLine(p: ProbeTally): string | null {
 /** The sitting's result, for the overlay. */
 export function resultsHtml(seed: string, s: Score, probes: ProbeTally, misses: number): string {
   const freeze = (k: 'start' | 'cue'): string => `${s.byFreeze[k].right} of ${s.byFreeze[k].of} right, balanced ${pct(s.byFreeze[k].balanced)}`;
-  const factors = FACTORS.filter((f) => s.byFactor[f])
+  const factors = ALL_FACTORS.filter((f) => s.byFactor[f])
     .map((f) => `${f} ${s.byFactor[f]!.right} of ${s.byFactor[f]!.of} (table ${s.byFactor[f]!.rules})`)
     .join(' · ');
   const bar = s.balanced >= 0.7 ? '✓ at or above this sitting’s 70% bar' : '✗ under this sitting’s 70% bar';
@@ -456,7 +481,7 @@ export function resultsHtml(seed: string, s: Score, probes: ProbeTally, misses: 
     `Sitting ${seed}`,
     ``,
     `Balanced accuracy ${pct(s.balanced)} (${s.right} of ${s.answers} right) · ${bar}`,
-    `Borderline trials: ${s.borderlineRight} of ${s.borderline} right · the sight table alone: ${s.rulesBorderlineRight} of ${s.borderline}`,
+    `Borderline trials: ${s.borderlineRight} of ${s.borderline} right · the table alone: ${s.rulesBorderlineRight} of ${s.borderline}`,
     `Frozen at the start: ${freeze('start')} · at the first sign: ${freeze('cue')}`,
     `The rules-only predictor on all the same trials: ${pct(s.rulesBalanced)}`,
     `By each factor that flips a borderline trial: ${factors || '—'}`,
@@ -464,6 +489,6 @@ export function resultsHtml(seed: string, s: Score, probes: ProbeTally, misses: 
     ...(misses > 0 ? [`Press R to watch the ${misses} you got wrong, with what happened and what would have changed it.`] : []),
     ``,
     `The exit test passes over two sittings: 80% balanced accuracy across both, 70% in each,`,
-    `21 of the 30 borderline answers, and 3 more of them than the sight table alone.`,
+    `21 of the 30 borderline answers, and 3 more of them than the table alone.`,
   ].join('\n');
 }

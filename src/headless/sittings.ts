@@ -17,7 +17,8 @@
  * isn't a failure; a recording that contradicts the key is.
  */
 import type { Tuning } from '../config/tuning';
-import { SITTING, FACTORS, TOLD, generateSitting, probeTally, scoreSitting, verdict, type Score, type Told, type Trial } from '../sim/game/trials';
+import { MOVEMENT_SITTING, generateAnySitting } from '../sim/game/movementTrials';
+import { ALL_FACTORS, SITTING, TOLD, answersTrial, probeTally, scoreSitting, verdict, type Score, type Told, type Trial, type TrialKind } from '../sim/game/trials';
 import type { Annotation } from '../sim/kernel/record/recording';
 import type { SimEvent } from '../sim/kernel/events';
 
@@ -34,7 +35,9 @@ export interface KeptAnswer {
   key?: AnswerKey;
   /** When the recording was made (ISO), or ''. */
   at: string;
-  /** What the recording shows: the guard saw the player within the trial's time. */
+  /** Which question it answered. Recordings from before there were two have none: a sight trial. */
+  kind: TrialKind;
+  /** What the recording shows: the guard saw (or, in a noise trial, heard) the player within the trial's time. */
   seen: boolean;
   file: string;
   tuning: Tuning;
@@ -60,7 +63,6 @@ interface SittingFile {
 export function answersIn(file: string, annotations: readonly Annotation[], events: readonly SimEvent[], tuning: Tuning, at = ''): KeptAnswer[] {
   const out: KeptAnswer[] = [];
   const limit = SITTING.seconds;
-  const seen = events.some((e) => e.type === 'detected' && e.t <= limit + 1e-9);
   const told = new Map<number, Told>();
   for (const a of annotations) {
     if (a.kind !== 'trial-probe') continue;
@@ -74,11 +76,13 @@ export function answersIn(file: string, annotations: readonly Annotation[], even
   for (const a of annotations) {
     if (a.kind !== 'trial-answer') continue;
     try {
-      const j = JSON.parse(a.text ?? '') as { sitting: string; k: number; warmup: boolean; answer: boolean; params: string } & Partial<AnswerKey>;
+      const j = JSON.parse(a.text ?? '') as { sitting: string; k: number; warmup: boolean; answer: boolean; params: string; kind?: TrialKind } & Partial<AnswerKey>;
+      const kind = j.kind ?? 'sight';
+      const seen = events.some((e) => answersTrial(kind, e) && e.t <= limit + 1e-9);
       const t = told.get(j.k);
       // An answer with its key can be scored by any build; an older one needs this build to make the same sitting.
       const key: AnswerKey | undefined = j.seen !== undefined && j.freeze !== undefined && j.borderline !== undefined && j.rules !== undefined && j.flips !== undefined ? { freeze: j.freeze, seen: j.seen, borderline: j.borderline, rules: j.rules, flips: j.flips, cueAt: j.cueAt ?? -1, legible: j.legible ?? { indicator: false, head: false, voice: false } } : undefined;
-      out.push({ sitting: j.sitting, k: j.k, warmup: j.warmup, answer: j.answer, params: j.params, seen, file, tuning, at, ...(t ? { told: t } : {}), ...(key ? { key } : {}) });
+      out.push({ sitting: j.sitting, k: j.k, warmup: j.warmup, kind, answer: j.answer, params: j.params, seen, file, tuning, at, ...(t ? { told: t } : {}), ...(key ? { key } : {}) });
     } catch {
       // An annotation that isn't an answer's JSON is not an answer.
     }
@@ -123,7 +127,7 @@ export function reportSittings(
   kept: readonly KeptAnswer[],
   files: readonly { name: string; text: string }[],
   fallback: Tuning,
-  generate: (seed: string, tuning: Tuning) => Trial[] = generateSitting,
+  generate: (seed: string, tuning: Tuning) => Trial[] = generateAnySitting,
 ): boolean {
   const sittings: Sitting[] = [];
   let order = 0;
@@ -149,7 +153,7 @@ export function reportSittings(
         continue;
       }
       if (!same) s.notes.push(`trial ${a.k} (${a.file}): this build makes a different trial from the seed: scored from the answer's own key`);
-      const t: Trial | null = a.key ? { k: a.k, warmup: a.warmup, params: a.params, brief: '', seenAt: -1, ...a.key } : (made ?? null);
+      const t: Trial | null = a.key ? { k: a.k, warmup: a.warmup, kind: a.kind, params: a.params, brief: '', seenAt: -1, ...a.key } : (made ?? null);
       if (!t) {
         s.problems.push(`trial ${a.k} (${a.file}): no key in the recording, and this build can't make the sitting`);
         continue;
@@ -188,7 +192,7 @@ export function reportSittings(
     const sc = scoreSitting(s.trials, s.answers);
     console.log(`\nSitting ${s.seed} · from ${s.from} · ${answered} of ${scored} scored trials answered${answered < scored ? ' (incomplete)' : ''}`);
     console.log(`  score     ${line(sc)}`);
-    const factors = FACTORS.filter((f) => sc.byFactor[f]).map((f) => `${f} ${sc.byFactor[f]!.right} of ${sc.byFactor[f]!.of} (table ${sc.byFactor[f]!.rules})`);
+    const factors = ALL_FACTORS.filter((f) => sc.byFactor[f]).map((f) => `${f} ${sc.byFactor[f]!.right} of ${sc.byFactor[f]!.of} (table ${sc.byFactor[f]!.rules})`);
     if (factors.length) console.log(`  factors   ${factors.join(' · ')}`);
     const p = probeTally(s.trials, s.answers, s.probes);
     const told = TOLD.filter((t) => p.by[t].said > 0).map((t) => `${t} ${p.by[t].said} (${p.by[t].right} right)`);
@@ -199,17 +203,23 @@ export function reportSittings(
     if (s.problems.length) ok = false;
   }
 
-  // The latest two by when they were played; those with no time (older files) count as earliest.
-  const done = sittings
-    .filter((s) => s.trials.filter((t) => !t.warmup && s.answers.has(t.k)).length === s.scored)
-    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.order - b.order));
-  if (done.length >= 2) {
-    const [a, b] = done.slice(-2);
+  // Each lab's exit test apart: the latest two by when they were played, those with no time (older files) as earliest.
+  for (const [name, inLab] of [
+    ['perception', (s: Sitting) => !s.seed.startsWith(MOVEMENT_SITTING)],
+    ['movement', (s: Sitting) => s.seed.startsWith(MOVEMENT_SITTING)],
+  ] as const) {
+    const done = sittings
+      .filter((s) => inLab(s) && s.trials.filter((t) => !t.warmup && s.answers.has(t.k)).length === s.scored)
+      .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.order - b.order));
+    if (done.length === 0 && name === 'movement') continue;
+    if (done.length >= 2) {
+      const [a, b] = done.slice(-2);
     const v = verdict(a!, b!);
     console.log(`\nThe exit test over sittings ${a!.seed} and ${b!.seed}: ${v.pass ? '✓ passes' : '✗ doesn’t pass'}`);
     console.log(`  ${pct(v.balanced)} balanced over both (${pct(v.each[0])}, ${pct(v.each[1])}) · borderline ${v.borderlineRight} of ${v.borderline}, the table alone ${v.rulesBorderlineRight} · rules-only ${pct(v.rulesBalanced)} overall`);
     for (const why of v.shortfalls) console.log(`  · ${why}`);
-  } else console.log(`\n${done.length} complete sitting${done.length === 1 ? '' : 's'}: the exit test's verdict needs two.`);
+    } else console.log(`\n${done.length} complete ${name} sitting${done.length === 1 ? '' : 's'}: the exit test's verdict needs two.`);
+  }
   return ok;
 }
 

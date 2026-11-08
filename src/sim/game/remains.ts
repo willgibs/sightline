@@ -25,7 +25,9 @@ export function collapse(r: RemainsEntity['remains'], t: number, tuning: Tuning)
 export function remainsShape(r: RemainsEntity['remains'], t: number, tuning: Tuning, out: BodyShape): BodyShape {
   const spec = tuning.bodies.guard;
   const eye = r.eye + (spec.eyeHeight.prone - r.eye) * collapse(r, t, tuning);
-  return bodyShape({ x: r.x, y: r.y, z: r.z, yaw: r.yaw, eyeHeight: eye }, spec, out);
+  // Over a shoulder it lies across it (the carried system puts it there), upright or not, it's the lying shape.
+  const lying = r.carriedBy !== 0 ? 1 : collapse(r, t, tuning);
+  return bodyShape({ x: r.x, y: r.y, z: r.z, yaw: r.yaw, eyeHeight: r.carriedBy !== 0 ? spec.eyeHeight.prone : eye, lean: 0, axis: r.yaw, lying, riseHead: 0, risePelvis: 0, riseFeet: 0 }, spec, out);
 }
 
 /**
@@ -37,7 +39,7 @@ export function gameBodies(state: SimState, tuning: Tuning, out: QueryBody[]): Q
   let n = out.length;
   const t = state.tick / tuning.sim.tickHz;
   for (const e of state.entities) {
-    if (e.kind !== 'remains') continue;
+    if (e.kind !== 'remains' || e.remains.hidden || e.remains.carriedBy !== 0) continue; // carried, it goes where its carrier goes: what's seen or hit is the carrier
     const q = (out[n++] ??= { id: 0, shape: emptyShape() });
     q.id = e.id;
     remainsShape(e.remains, t, tuning, q.shape);
@@ -63,7 +65,7 @@ export function bodiesAt(state: SimState, tuning: Tuning, now: number, t: number
     }
   }
   for (const e of state.entities) {
-    if (e.kind !== 'remains') continue;
+    if (e.kind !== 'remains' || e.remains.hidden || e.remains.carriedBy !== 0) continue; // carried, it goes where its carrier goes: what's seen or hit is the carrier
     const q = (out[n++] ??= { id: 0, shape: emptyShape() });
     q.id = e.id;
     remainsShape(e.remains, t, tuning, q.shape);

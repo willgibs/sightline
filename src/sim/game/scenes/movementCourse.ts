@@ -89,7 +89,7 @@ const ROUTE: Waypoint[] = [
   { x: COURSE.ceiling[0] - 1.5, z: 0, stance: 'stand' }, // over the ramps
   { x: COURSE.ceiling[1] + 1, z: 0, stance: 'crouch' }, // under the ceiling
   { x: COURSE.crawl[0] - 1, z: 0, stance: 'crouch' },
-  { x: COURSE.crawl[1] + 1, z: 0, stance: 'prone' }, // through the crawl space
+  { x: COURSE.crawl[1] + 1.8, z: 0, stance: 'prone' }, // through the crawl space, until the legs are out too
   { x: COURSE.drop2 + 2.5, z: 0, stance: 'stand' }, // up the stairs and off the 2 m drop
   { x: COURSE.finish + 1, z: 0, stance: 'stand' }, // across the surfaces
 ];

@@ -590,37 +590,69 @@ Playable at `?scene=movement-lab`; the movement course stays as a regression tes
   - a surface-tag audit;
   - trial accuracy by factor.
 
+**Recorded before building (Nov 8), so the exit note can be read against it:**
+- **The seed, as the bench runs it.** The body lane's bench (`src/sim/game/benches.ts`) keeps the seed beside the lab's work, as lab A's does:
+  - **Prone:** today's motor, a single 0.3 m circle standing in for a body lying 1.75 m along its facing.
+  - **Lean:** a camera moved beside the head while the shape that guards see stays where it was (Dishonored's hidden lean; Siege before 2019 had the eye at the far side of the head).
+  - **Mantle:** the endpoint validated once, as The Dark Mod's was (its bug 4509); the path runs on after that whatever walks into it.
+  - **Ladders:** Source's ladder with fixed dismount points, checked when placed.
+- **Where the seed falls short, in the bench's terms** (the prone figures are measured on `main` at `e92acd1`, with the fuzzing bot):
+  - **Prone clips.** The lying shape goes up to 0.17 m into solids in TAL-4471, 0.55 m in MUD-9031, and 0.58 m on the movement course (702 of 8,376 prone ticks).
+  - **Turning prone between walls 1 m apart** leaves 303 of 360 ticks with a body part inside a wall, up to 0.32 m deep.
+  - **The eye isn't where the head is:** a camera-only lean sees guards who can't see the player's head.
+  - **Mantles and dismounts** are checked once, so anything that moves in afterwards clips.
+- **The target, in the bench's metrics:**
+  - **Zero broken promises** over the weekly fuzz run (40 hours of play), with bots that lean into walls, mantle into moving guards and turn prone between walls. Every pose of every motor mode is checked every tick.
+  - **Prone:** zero pose-ticks with any part of the body's shape inside something solid, under the fuzzing bot and in a scripted turn between walls 1 m apart; the worst overlap stays under the watch's 0.1 mm.
+    - *Measured after building (Nov 8), and short of this for the shape:* the chain itself stays within the watch's 0.1 mm, with no broken promise in the fuzz, and the turn between walls is clean (0 poses, against 259 for the seed). The straight capsules along it can still cut a corner they lie over, a leg down a stair or across a ledge. With the fuzzing bot, ten minutes on the course and five each in two valleys: 548 of 16,869 lying poses have a part over 2 cm inside something, the deepest 16 cm; the seed has 3,258 and 49 cm. (A review moved this from 398 and 27 cm: a lying body no longer takes a waist-high wall for the ground, which costs more shallow cuts and removes the deepest ones.) Bending the legs, or lifting the body over the corner, would close it. It's left until the body has a real pose.
+  - **Lean:** the eye is the centre of the head guards target, so a line from the player's eye to a guard's head and the line back agree, bit for bit, over 2,000 sampled lean poses at corners.
+  - **Mantle:** zero ticks inside a guard who walks into the landing, where the validated-once seed runs through him.
+  - **Surface tags:** zero cells whose tag differs from their drawn material.
+  - **Trials (C8):** A's protocol and pass mark, 80% balanced accuracy over two sittings, with accuracy reported by the factor that flips each outcome: surface, gait, distance, masking, light.
+
 **Milestones:**
-- [ ] C1 · The lab scene: the course grown into an arena with:
+- [x] C1 · The lab scene: the course grown into an arena with:
   - lit and shaded ground, and every surface;
   - a guard listening and one watching;
   - walls to mantle, a window, a ladder, and a body to carry.
-- [ ] C2 · The prone body's real shape.
+  - It stands at `?scene=movement-lab` (`game/scenes/movementLab.ts`): the noise yard, the wall garden and the field.
+- [x] C2 · The prone body's real shape.
   - A chain of circles along the facing, or a capsule, for collision, in place of a 0.3 m circle. It grows over the transition, so it never ends a tick inside anything.
   - It turns by the largest yaw that keeps every part clear, found with a fixed number of bisections, pivoting near the chest.
   - It's pitched from the terrain under head and feet.
   - It moves every golden (the fuzzing bot goes prone, `game/bots/chaos.ts`), so it lands alone.
-- [ ] C3 · Lean.
+- [x] C3 · Lean.
   - The eye sits at the centre of the simulated head that guards target.
   - A peek exposes one eye; a lean with the weapon goes far enough to clear the corner (Ground Branch).
   - Rate-limited and swept against solids and bodies.
   - A property test: whenever the player can see a guard past a corner, the guard has a line to the player's eye.
-- [ ] C4 · Mantle: a motor mode onto and over low walls, and through windows.
+- [x] C4 · Mantle: a motor mode onto and over low walls, and through windows.
   - Three probes find the ledge: forward at several heights, down for the top, and an overlap at the landing pose.
   - Eased phases: hang, pull, shift, push.
   - Every pose is re-checked every tick. A 1.2 m mantle over 0.6 s rises 0.067 m per tick.
-- [ ] C5 · Ladders: a motor mode, with validated dismount poses, on D's towers, and with links for E's navigation. Each new mode states its invariants in the motor's header and joins the invariant run (rule 10). The fuzz bots learn to lean into walls, mantle into moving guards and turn prone between walls.
-- [ ] C6 · The use action.
+- [x] C5 · Ladders: a motor mode, with validated dismount poses, on D's towers, and with links for E's navigation. Each new mode states its invariants in the motor's header and joins the invariant run (rule 10). The fuzz bots learn to lean into walls, mantle into moving guards and turn prone between walls.
+- [x] C6 · The use action.
   - Carry or drag a body: slow, and noisy on gravel. The body reuses the prone chain.
+    - Landed differently: a dragged body trails the carrier and stops short of what's behind it, but it isn't a collider of its own, and carried it is out of every sight line and bullet (its carrier is what's seen). A chain of its own would need a body that collides while it isn't one.
   - Hide it in foliage or a container, where guards don't see it.
   - E's sabotage uses the same action.
-- [ ] C7 · The player's own light and noise, read from the world.
-  - The drawn shade and your own footsteps, at their simulated loudness.
-  - An audit that every cell's surface tag matches its drawn material. Hunt shipped silent footsteps from mis-tagged surfaces.
-  - A small cue on the body, only for what the world can't show (ambient masking and light from behind), and only if the trials fail without it.
-- [ ] C8 · Noise and visibility trials, with A's trial mode.
+- [x] C7 · The player's own light and noise, read from the world.
+  - The drawn shade and your own footsteps, at their simulated loudness. Landed: the lab's shade is drawn as simulated, held to `groundLight` by a test; your own footsteps play at their radius (the browser audio test).
+  - An audit that every cell's surface tag matches its drawn material (`tests/surface-audit.test.ts`). Hunt shipped silent footsteps from mis-tagged surfaces.
+  - A small cue on the body, only for what the world can't show (ambient masking and light from behind), and only if the trials fail without it. Not built: it waits for the sittings.
+- [x] C8 · Noise and visibility trials, with A's trial mode.
+  - Landed: `?trials=<seed>&lab=movement`, 5 warm-ups and 30 scored, 15 noise and 15 visibility, scored by lab A's protocol (`game/movementTrials.ts`, `scenes/noiseScenario.ts`). The factors reported are the surface, the gait, the distance, the masking, the light and the skyline. The owner's two sittings are the exit test, below.
 - [ ] C9 · Feel: whether 30 Hz interpolation is responsive enough, and whether moving feels deliberate. Since every rate is per second, a blind comparison of 30 and 60 Hz is possible in the owner's sitting.
+  - Built: `?hz=<n>` and `?hz=blind`; the debug view says which rate it picked. The judgement is the owner's.
 - [ ] Exit test, the bench numbers, a note, a playable link.
+  - The bench against the seed, as it stands (Nov 8):
+    - Zero broken promises over the weekly-size fuzz: 44 hours of play in 20 valleys, the lab and the course, both bots, and 100 generated ladder towers with a bot that climbs them. Every body is checked every tick, but the valleys and the lab mostly exercise walking, lying and leaning; ladders and mantles over ladder tops come from the towers. The save, restore and re-step synctest passes over all of it.
+    - Lean: 0 of 2,000 lines from the eye to a guard's head differ by direction; the seed's camera-only lean, 19.
+    - Mantle: 0 ticks inside someone walking across the landing; the seed's once-checked path, 15.
+    - Prone: 0 poses inside a wall turning between walls a metre apart, against 259 for the seed. Under the fuzzing bot the drawn shape is short of its target (see above): 548 of 16,869 lying poses over 2 cm, 16 cm at worst, against 3,258 and 49 cm.
+    - Surface tags: 0 cells whose tag differs from their drawn material.
+    - Trial accuracy by factor comes from the owner's two sittings.
+  - Playable at `?scene=movement-lab`, and a sitting at `?trials=<seed>&lab=movement`.
 
 ### D · Camp generator
 

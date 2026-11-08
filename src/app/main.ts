@@ -1,8 +1,9 @@
-import { defaultTuning } from '../config/tuning';
+import { defaultTuning, type Tuning } from '../config/tuning';
 import { knownAnswerProblems } from '../sim/kernel/core/known';
 import { normalizeSeed, randomSeed } from '../sim/kernel/core/seed';
 import type { SpawnKind } from '../sim/kernel/mission';
 import { Game } from './game';
+import { MOVEMENT_SITTING } from '../sim/game/movementTrials';
 import { Explorer } from './explore';
 import { defaultCampSpec, type CampSpec } from '../sim/generation';
 import { SCENES } from '../sim/game/scenes';
@@ -13,12 +14,15 @@ import './styles.css';
  *   ?seed=TAL-4471   which valley to generate
  *   ?scene=movement-course   play a scene instead (sim/game/scenes/index.ts)
  *   &params=...              with these parameters (a scenario: game/scenes/sightScenario.ts)
+ *   ?trials=<seed>&lab=movement  a sitting of the movement lab's exit test instead (C8): noise and visibility
  *   ?trials=<seed>           a sitting of trial mode, the perception lab's exit test (A12); any seed, or none for a fresh one (&fresh forgets a sitting kept in this browser)
  *   ?view=debug      start in the debug view
  *   ?spawn=edge      start where the road leaves the map instead of on an overlook
  *   ?bench           run the 20-second performance flythrough and report
  *   ?dpr=2           render resolution multiplier, 0.5 to 3 (default: device ratio, capped at 1.5)
  *   ?replay=playtests/<name>.slrec   watch a recording (in development, any session in playtests/)
+ *   ?hz=60           run the simulation at another tick rate (every rate is per second); ?hz=blind
+ *                    flips a coin between 30 and 60, for a blind comparison (the debug panel says which)
  *   ?explore         the seed explorer instead of the game: a grid of camps and their validation
  *                    (&series=<name> &count=<n>; explore.ts)
  *   ?camp            a generated camp (lab D) instead of Phase 0's valley, until D9 makes it the
@@ -49,6 +53,22 @@ if (mathProblems.length > 0) {
   );
 }
 
+/**
+ * ?hz=<n> runs the simulation at another tick rate, since every rate in tuning is per second
+ * (rule 17); ?hz=blind flips a coin between 30 and 60 for a blind comparison of feel (C9).
+ * Recordings carry their tuning, so such a run replays as what it was.
+ */
+function tickRateChoice(tuning: Tuning, hz: string | null): Tuning {
+  const n = hz === 'blind' ? (Math.random() < 0.5 ? 30 : 60) : Number(hz);
+  if (!hz || !Number.isFinite(n) || n < 15 || n > 240 || !Number.isInteger(n) || n % tuning.sim.recordHz !== 0) return tuning;
+  const out = structuredClone(tuning);
+  out.sim.tickHz = n;
+  return out;
+}
+
+const movementTrials = params.get('lab') === 'movement';
+const trialScene = movementTrials ? 'noise' : 'perception-lab';
+
 if (params.has('explore')) {
   // The seed explorer draws in 2D and generates in workers: no game, no WebGL.
   new Explorer(document.body, defaultTuning, params).start();
@@ -64,16 +84,16 @@ function startGame(): void {
       hud: document.querySelector<HTMLElement>('#hud')!,
       overlay,
       seed: normalizeSeed(params.get('seed')),
-      tuning: defaultTuning,
+      tuning: tickRateChoice(defaultTuning, params.get('hz')),
       debug: params.get('view') === 'debug',
       spawn: (params.get('spawn') === 'edge' ? 'edge' : 'overlook') as SpawnKind,
       bench: params.has('bench'),
       pixelRatio: dprParam > 0 ? Math.min(3, Math.max(0.5, dprParam)) : Math.min(window.devicePixelRatio || 1, 1.5),
       pixelRatioFollowsScreen: !(dprParam > 0),
-      // Trial mode (A12) plays in the perception lab.
-      sceneName: params.has('trials') ? 'perception-lab' : sceneName,
-      scene: params.has('trials') ? SCENES['perception-lab']!() : sceneName ? SCENES[sceneName]?.(params.get('params') ?? undefined) : null,
-      trials: params.has('trials') ? normalizeSeed(params.get('trials') || randomSeed()) : null,
+      // Trial mode plays in a lab's own scenes: the perception lab's (A12), or the movement lab's (C8, &lab=movement).
+      sceneName: params.has('trials') ? trialScene : sceneName,
+      scene: params.has('trials') ? SCENES[trialScene]!() : sceneName ? SCENES[sceneName]?.(params.get('params') ?? undefined) : null,
+      trials: params.has('trials') ? (movementTrials ? MOVEMENT_SITTING : '') + normalizeSeed(params.get('trials') || randomSeed()) : null,
       trialsFresh: params.has('fresh'),
       replayUrl: params.get('replay'),
       camp: params.has('camp') ? campFromParams(params) : null,

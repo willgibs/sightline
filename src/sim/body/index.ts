@@ -11,19 +11,24 @@
 export {
   bodyHeight,
   createBody,
+  groundBelow,
   hasBody,
   poseAt,
   type BodyEntity,
   type BodySpec,
   type BodyState,
   type Gait,
+  type MantleState,
   type MotorModeName,
   type PoseSample,
   type Stance,
 } from './body';
-export { idleIntent, requestStance, stepMotor, type Cylinder, type MotorContext, type MoveIntent } from './motor';
+export { idleIntent, stepMotor, type Cylinder, type MotorContext, type MoveIntent } from './motor';
+export { canMantle, mantleAt } from './mantle';
+export { climbPrompt, ladderInReach, ladderLine, ladderLinks, ladderTop, laddersOf, type Ladder, type LadderLink, type LadderState } from './ladder';
+export { requestStance } from './stance';
 export { intentFor, intents, motorSystem } from './system';
-export { bodyShape, bodyShapeAt, queryBodies, type ShapePose } from './shape';
+export { bodyShape, bodyShapeAt, eyeOf, hipHeight, queryBodies, type ShapePose } from './shape';
 export { bobDepth, headBob, stridePhase, type BobDepths } from './bob';
 export { InvariantWatch, OVERLAP_TOLERANCE, STEEP_TOLERANCE, type InvariantReport } from './invariants';
 export { breathRate, calmVitals, holding, holdLength, startle, stepVitals, type VitalsState } from './vitals';

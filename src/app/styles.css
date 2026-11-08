@@ -173,6 +173,25 @@ body {
   white-space: nowrap;
 }
 
+.prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 22%;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  background: var(--panel);
+  color: var(--panel-ink);
+  font: 11px/1.4 var(--mono);
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+
+.prompt.on {
+  opacity: 0.88;
+}
+
 .toast {
   position: absolute;
   left: 50%;

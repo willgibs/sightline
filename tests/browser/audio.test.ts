@@ -152,6 +152,11 @@ describe.runIf(canSuspend)('the sound engine', () => {
     expect((await render((e) => e.play([stance], 1.65, undefined, false))).onset).toBe(-1);
   });
 
+  it('plays the scrape of a body you drag', async () => {
+    const drag = { type: 'drag' as const, id: 1, tick: 1, t: 1 / 30, source: PLAYER_ID, cause: 0, x: 0, y: 0, z: 0, surface: 2 as Surface, loudness: 1.55, radius: 18.6 };
+    expect((await render((e) => e.play([drag], 1.65))).onset).toBeGreaterThanOrEqual(0);
+  });
+
   it('plays your own footsteps as loud as the simulation says they are', async () => {
     // Movement × surface from the tuning table: sprint on gravel vs crouch on grass.
     const N = defaultTuning.noise;

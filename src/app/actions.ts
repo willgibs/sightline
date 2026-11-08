@@ -20,6 +20,10 @@ export type Action =
   | 'binoculars'
   | 'crouch'
   | 'prone'
+  | 'leanLeft'
+  | 'leanRight'
+  | 'climb'
+  | 'use'
   | 'fire'
   | 'scopeToggle'
   | 'zeroUp'
@@ -78,6 +82,10 @@ export const DEFAULT_ACTIONS: Readonly<Record<Action, ActionSpec>> = {
   binoculars: { context: 'play', kind: 'held', inputs: ['KeyF'], label: 'binoculars' },
   crouch: { context: 'play', kind: 'pressed', inputs: ['KeyC'], label: 'crouch' },
   prone: { context: 'play', kind: 'pressed', inputs: ['KeyZ'], label: 'prone' },
+  leanLeft: { context: 'play', kind: 'held', inputs: ['KeyQ'], label: 'lean left' },
+  leanRight: { context: 'play', kind: 'held', inputs: ['KeyE'], label: 'lean right' },
+  climb: { context: 'play', kind: 'pressed', inputs: ['Space'], label: 'climb' },
+  use: { context: 'play', kind: 'pressed', inputs: ['KeyG'], label: 'use' },
   // Fire the rifle; with the binoculars up, laser the range.
   fire: { context: 'play', kind: 'pressed', inputs: ['Mouse0'], label: 'fire' },
   scopeToggle: { context: 'play', kind: 'pressed', inputs: ['KeyV'], label: 'scope' },
@@ -90,7 +98,7 @@ export const DEFAULT_ACTIONS: Readonly<Record<Action, ActionSpec>> = {
   debugView: { context: 'always', kind: 'pressed', inputs: ['F3', 'Backquote'], label: 'debug view' },
   colliders: { context: 'debug', kind: 'pressed', inputs: ['KeyB'], label: 'colliders' },
   overwatch: { context: 'debug', kind: 'pressed', inputs: ['KeyO'], label: 'overwatch' },
-  grid: { context: 'debug', kind: 'pressed', inputs: ['KeyG'], label: 'grid' },
+  grid: { context: 'debug', kind: 'pressed', inputs: ['KeyU'], label: 'grid' },
   flyCamera: { context: 'debug', kind: 'pressed', inputs: ['KeyN'], label: 'fly camera' },
   slower: { context: 'debug', kind: 'pressed', inputs: ['BracketLeft'], label: 'slower' },
   faster: { context: 'debug', kind: 'pressed', inputs: ['BracketRight'], label: 'faster' },

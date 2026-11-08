@@ -52,14 +52,27 @@ export const BENCH_GOLDEN: PinnedBench = {
       "runs with a broken promise (of 4)": 0,
       "bodies under the terrain": 0,
       "bodies inside something solid": 0,
-      "worst overlap (m)": 2.2093438190040615e-14,
-      "worst rise in a tick (m)": 0.28554800812780456,
-      "worst gain on steep ground (m)": 0
+      "worst overlap (m)": 0.00009741367780091714,
+      "worst rise in a tick (m)": 0.05733444956180733,
+      "worst gain on steep ground (m)": 0,
+      "lean: eye-to-head lines that differ by direction (of 2000)": 0,
+      "lean: pairs in view (of 2000)": 1496,
+      "seed · lean: pairs where the camera sees a guard who has no line to the head (of 2000)": 18,
+      "mantle: ticks inside someone walking across the landing": 0,
+      "seed · mantle checked once: ticks inside him": 15,
+      "prone: fuzzing bot on the course and in two valleys, lying poses checked": 16869,
+      "prone: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 548,
+      "seed · single circle: fuzzing bot on the course and in two valleys, lying poses checked": 16869,
+      "seed · single circle: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 3258,
+      "prone: turning between walls a metre apart, poses with a part inside something solid": 0,
+      "seed · single circle: turning between walls a metre apart, poses with a part inside something solid": 259,
+      "prone: deepest any part goes into something solid (m)": 0.15625,
+      "seed · single circle: deepest any part goes into something solid (m)": 0.490337132
     },
     "runs": {
       "movement-course": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 1418 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 1445 }
         }
       }
     }
@@ -92,32 +105,32 @@ export const BENCH_GOLDEN: PinnedBench = {
       "crack at 300 m: least degrees off the shooter": 55.438591,
       "crack at 300 m: most degrees off the shooter": 57.2126615,
       "seed · crack at 300 m: degrees off the shooter": 0,
-      "trials: candidates run for two sittings": 1759,
+      "trials: candidates run for two sittings": 1816,
       "trials: scored trials in two sittings": 60,
       "trials: pairs of factor levels the first sitting covers": 192,
       "seed · trials: pairs of factor levels covered, taken first come": 165,
       "trials: borderline right by the sight table alone (of 30)": 14,
-      "trials: the rules-only predictor's balanced accuracy, first sitting (%)": 58.9285714,
+      "trials: the rules-only predictor's balanced accuracy, first sitting (%)": 55.3571429,
       "trials: frozen at the first cue (of 60)": 30,
       "trials: cue-frozen trials where his head can be read": 23,
-      "trials: borderline trials distance flips": 4,
-      "trials: borderline trials stance flips": 18,
-      "trials: borderline trials movement flips": 14,
-      "trials: borderline trials light flips": 4,
+      "trials: borderline trials distance flips": 3,
+      "trials: borderline trials stance flips": 15,
+      "trials: borderline trials movement flips": 15,
+      "trials: borderline trials light flips": 2,
       "trials: borderline trials cover flips": 8,
-      "trials: borderline trials sky flips": 3,
-      "trials: borderline trials gaze flips": 12,
+      "trials: borderline trials sky flips": 4,
+      "trials: borderline trials gaze flips": 9,
       "trials: seen among those frozen at the first cue (%)": 53.3333333,
       "trials: seen among those frozen at the start (%)": 53.3333333,
       "trials: a reader who says yes only at a first-cue freeze: balanced over both (%)": 50,
       "trials: a reader who says yes only at a first-cue freeze: passes (0 or 1)": 0,
-      "trials: a reader by the first cue's time, and the table otherwise: balanced over both (%)": 73.2142857,
+      "trials: a reader by the first cue's time, and the table otherwise: balanced over both (%)": 74.7767857,
       "trials: a reader by the first cue's time, and the table otherwise: passes (0 or 1)": 0,
-      "seed · trials: seen among those frozen at the first cue (%)": 76.6666667,
-      "seed · trials: seen among those frozen at the start (%)": 30,
-      "seed · trials: a reader who says yes only at a first-cue freeze: balanced over both (%)": 73.4375,
-      "seed · trials: a reader who says yes only at a first-cue freeze: passes (0 or 1)": 0,
-      "seed · trials: a reader by the first cue's time, and the table otherwise: balanced over both (%)": 79.4642857,
+      "seed · trials: seen among those frozen at the first cue (%)": 83.3333333,
+      "seed · trials: seen among those frozen at the start (%)": 23.3333333,
+      "seed · trials: a reader who says yes only at a first-cue freeze: balanced over both (%)": 80.1339286,
+      "seed · trials: a reader who says yes only at a first-cue freeze: passes (0 or 1)": 1,
+      "seed · trials: a reader by the first cue's time, and the table otherwise: balanced over both (%)": 75.8928571,
       "seed · trials: a reader by the first cue's time, and the table otherwise: passes (0 or 1)": 0,
       "trials: a reader right on every clear trial, guessing the borderline: passes (% of 4000)": 1.975,
       "seed · trials: a reader right on every clear trial, guessing the borderline: passes (% of 4000)": 17.4,
@@ -130,15 +143,15 @@ export const BENCH_GOLDEN: PinnedBench = {
       "perception-lab": {
         "work": {
           "motor": { "rays": 0, "nodes": 0, "bodies": 10800 },
-          "perception-sight": { "rays": 26033, "nodes": 0, "bodies": 0 },
+          "perception-sight": { "rays": 26396, "nodes": 0, "bodies": 0 },
           "perception-awareness": { "rays": 0, "nodes": 60480, "bodies": 0 }
         }
       },
       "perception-crowd": {
         "work": {
           "motor": { "rays": 0, "nodes": 0, "bodies": 45900 },
-          "perception-sight": { "rays": 92825, "nodes": 0, "bodies": 0 },
-          "perception-awareness": { "rays": 0, "nodes": 371207, "bodies": 0 }
+          "perception-sight": { "rays": 91778, "nodes": 0, "bodies": 0 },
+          "perception-awareness": { "rays": 0, "nodes": 371126, "bodies": 0 }
         }
       }
     }
