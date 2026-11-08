@@ -28,6 +28,16 @@ export interface FireCommand {
   pitch: number;
 }
 
+/** Mantle or take a ladder, if one is in front (lab C, body/mantle.ts). */
+export interface ClimbCommand {
+  kind: 'climb';
+}
+
+/** The use action: pick up what's in reach, or put it down (lab C, game/use.ts). */
+export interface UseCommand {
+  kind: 'use';
+}
+
 /**
  * Sandbox (A10): drop a noise where the player looks, from the debug view. It carries the
  * moment and the view of the frame clicked, like a shot, so it lands where the aim was.
@@ -85,7 +95,7 @@ export interface SuppressorCommand {
   kind: 'suppressor';
 }
 
-export type Command = FireCommand | NoiseCommand | BodyDropCommand | RangeCommand | ThrowCommand | ZeroUpCommand | ZeroDownCommand | SuppressorCommand | ShotDropCommand;
+export type Command = FireCommand | NoiseCommand | BodyDropCommand | RangeCommand | ThrowCommand | ZeroUpCommand | ZeroDownCommand | SuppressorCommand | ShotDropCommand | ClimbCommand | UseCommand;
 export type CommandKind = Command['kind'];
 
 /** How a command field is stored and quantized. */
@@ -109,6 +119,8 @@ export const COMMANDS: { readonly [K in CommandKind]: CommandSpec<Extract<Comman
   zeroDown: { code: 33, range: 'ballistics', fields: {} },
   suppressor: { code: 34, range: 'ballistics', fields: {} },
   shotDrop: { code: 35, range: 'ballistics', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
+  climb: { code: 50, range: 'body', fields: {} },
+  use: { code: 51, range: 'body', fields: {} },
 };
 
 /** The most commands one tick carries; more are dropped, oldest kept. */

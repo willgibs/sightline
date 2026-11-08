@@ -1,8 +1,9 @@
 import type { Tuning } from '../../config/tuning';
 import { dcos, dsin } from '../kernel/core/detmath';
 import type { World } from '../kernel/world/world';
-import type { InputFrame } from '../kernel/input';
+import { Optic, type InputFrame } from '../kernel/input';
 import { createBody, requestStance, type BodySpec, type BodyState, type Gait, type MotorContext, type MoveIntent } from '../body';
+import type { EntityId } from '../kernel/state';
 import type { Solids } from '../kernel/world/solids';
 
 /**
@@ -15,6 +16,7 @@ import type { Solids } from '../kernel/world/solids';
  *   then release sprint first.
  * - Sprint needs standing, moving forward, and not being mid-way through a prone change.
  * - Walking backwards is slower, by up to backwardFactor.
+ * - A lean is held (body/lean.ts), and sprinting gives it up.
  *
  * Numbers come from the player's body, tuning.bodies.player (design doc · Player · Movement).
  */
@@ -25,13 +27,17 @@ export interface PlayerControl {
   queuedStance: 'crouch' | 'prone' | null;
   /** Crouched or went prone while holding sprint: don't auto-stand until sprint is released. */
   sprintSuppressed: boolean;
+  /** Seconds a press of climb stays good, for a press made just early. */
+  climbWait: number;
+  /** The body being carried or dragged (an entity id), or 0. Hands full: no climbing. */
+  carrying: EntityId;
 }
 
 export function createPlayer(world: World, solids: Solids, tuning: Tuning): { body: BodyState; control: PlayerControl } {
   const { spawn } = world;
   return {
     body: createBody(world, solids, tuning.bodies.player, spawn.x, spawn.z, spawn.faceX, spawn.faceZ),
-    control: { queuedStance: null, sprintSuppressed: false },
+    control: { queuedStance: null, sprintSuppressed: false, climbWait: 0, carrying: 0 },
   };
 }
 
@@ -41,12 +47,12 @@ export function playerIntent(
   c: PlayerControl,
   input: InputFrame,
   spec: BodySpec,
-  ctx: Pick<MotorContext, 'world' | 'solids' | 'tick' | 'source' | 'emit'>,
+  ctx: Pick<MotorContext, 'world' | 'solids' | 'tick' | 'source' | 'emit' | 'dt' | 'tuning'>,
   out: MoveIntent,
 ): MoveIntent {
   updateStance(b, c, input, spec, ctx);
   const busy = b.proneTransition;
-  const wantsSprint = input.sprint && input.moveZ > 0.5 && b.stance === 'stand' && !busy;
+  const wantsSprint = input.sprint && input.moveZ > 0.5 && b.stance === 'stand' && !busy && c.carrying === 0;
 
   let mx = input.moveX;
   let mz = input.moveZ;
@@ -61,6 +67,9 @@ export function playerIntent(
   else if (b.stance === 'crouch') gait = 'crouch';
   else gait = wantsSprint ? 'sprint' : 'walk';
   let speed = gait === 'idle' ? 0 : spec.speed[gait];
+  // Carrying a body is slow; dragging one, crouched, slower still (design doc · Player · Movement).
+  const carrying = c.carrying !== 0;
+  if (carrying && speed > 0) speed = Math.min(speed, b.stance === 'stand' ? spec.carry.speed : spec.carry.dragSpeed);
   // The backward share of the (already normalized) direction slows you, up to backwardFactor.
   if (mz < 0) speed *= 1 - (1 - spec.backwardFactor) * Math.min(1, -mz / Math.max(Math.min(len, 1), 1e-6));
 
@@ -72,11 +81,24 @@ export function playerIntent(
   out.gait = gait;
   out.yaw = input.yaw;
   out.pitch = input.pitch;
+  out.lean = gait === 'sprint' || carrying ? 0 : (input.lean ?? 0);
+  out.raised = input.optic !== undefined && input.optic !== Optic.None;
+  // A press is good for a moment, so one made just before reaching the wall still works.
+  if (input.commands?.some((c) => c.kind === 'climb')) c.climbWait = spec.mantle.buffer;
+  else if (c.climbWait > 0) c.climbWait = c.climbWait > ctx.dt ? c.climbWait - ctx.dt : 0;
+  out.climb = b.motor !== 'mantle' && c.climbWait > 0 && !carrying; // hands full
+  if (b.motor === 'mantle' || b.motor === 'ladder') c.climbWait = 0; // spent: a press that let go mustn't grab again on landing
+  out.load = carrying ? ctx.tuning.noise.carry : 1;
+  out.scrape = carrying && b.stance !== 'stand';
+  // On a ladder a press lets go, so it mustn't linger: only the press itself counts there.
+  if (b.motor === 'ladder') out.climb = input.commands?.some((k) => k.kind === 'climb') ?? false;
+  out.climbAxis = len < 0.05 ? 0 : mz > 0 ? 1 : mz < 0 ? -1 : 0;
   return out;
 }
 
-function updateStance(b: BodyState, c: PlayerControl, input: InputFrame, spec: BodySpec, ctx: Pick<MotorContext, 'solids' | 'source' | 'emit'>): void {
+function updateStance(b: BodyState, c: PlayerControl, input: InputFrame, spec: BodySpec, ctx: Pick<MotorContext, 'world' | 'solids' | 'source' | 'emit'>): void {
   if (!input.sprint) c.sprintSuppressed = false;
+  if (b.motor === 'mantle' || b.motor === 'ladder') return; // the hands are busy
   let request: 'crouch' | 'prone' | null = input.prone ? 'prone' : input.crouch ? 'crouch' : null;
   if (b.proneTransition) {
     if (request) c.queuedStance = request;
@@ -86,6 +108,8 @@ function updateStance(b: BodyState, c: PlayerControl, input: InputFrame, spec: B
     request = c.queuedStance;
     c.queuedStance = null;
   }
+  // Carrying, a body can't lie down; crouching drags it.
+  if (request === 'prone' && c.carrying !== 0) return;
   if (request === 'prone') {
     requestStance(b, b.stance === 'prone' ? 'crouch' : 'prone', spec, ctx);
     if (input.sprint) c.sprintSuppressed = true;

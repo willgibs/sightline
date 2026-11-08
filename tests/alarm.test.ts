@@ -165,7 +165,7 @@ describe('the target at lockdown (E7)', () => {
     const shoot: System = {
       name: 'test-drop-target',
       phase: 'commands',
-      after: ['player-commands', 'rifle', 'sandbox-drops'],
+      after: ['player-commands', 'rifle', 'sandbox-drops', 'use'],
       reads: ['guard.body', 'commander.camp'],
       writes: ['entities'],
       emits: ['death'],

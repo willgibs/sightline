@@ -81,7 +81,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
   - **World:** `generate(seed)`, `fog(density)`.
   - **Reading:** `state()`, `dump()`, `recording()`, `sound()`, `insides()`, `playtest()`, `perception()` (each perceiving guard's state, meter and belief), `explain(id)` (an event back to its causes, in words).
   - **Replays:** `replay(base64)`, `replayState()`, `seek(tick)`.
-  - **Trial mode** (`?trials=<seed>`, A12; `&fresh` forgets a sitting kept in this browser): `trial()` (where the sitting stands), `answer(yes)`, `onScreen(x, y, z)` (where a world point is drawn).
+  - **Trial mode** (`?trials=<seed>`, A12; `&lab=movement` for the movement lab's, C8; `&fresh` forgets a sitting kept in this browser): `trial()` (where the sitting stands), `answer(yes)`, `onScreen(x, y, z)` (where a world point is drawn).
 - To drive the hooks from a script, use `openGame()` in `src/headless/browser.ts`. It starts its own server and browser and evaluates expressions with the hooks in scope.
 - `?replay=playtests/<name>.slrec` watches a kept session in the dev build.
 - Look at the result. Render the honest and debug views and judge them, rather than trusting that code which compiles also reads well. A headless browser draws at a few frames a second, so judge feel and frame rate on a real machine.

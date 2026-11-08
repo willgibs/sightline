@@ -34,6 +34,8 @@ export interface CameraPose {
   z: number;
   yaw: number;
   pitch: number;
+  /** The view's tilt about where it looks, radians: positive tilts left (a lean's). */
+  roll: number;
   fov: number;
 }
 
@@ -208,7 +210,7 @@ export class GameRenderer {
   render(prev: Snapshot, curr: Snapshot, alpha: number, time: number, pose: CameraPose, aim: THREE.Vector3 | null): void {
     const cam = this.camera;
     cam.position.set(pose.x, pose.y, pose.z);
-    cam.rotation.set(pose.pitch, pose.yaw, 0, 'YXZ');
+    cam.rotation.set(pose.pitch, pose.yaw, pose.roll, 'YXZ');
     if (Math.abs(cam.fov - pose.fov) > 1e-4) {
       cam.fov = pose.fov;
       cam.updateProjectionMatrix();

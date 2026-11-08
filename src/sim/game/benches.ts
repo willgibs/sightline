@@ -1,7 +1,7 @@
 import type { World } from '../kernel/world/world';
 import { defaultTuning } from '../../config/tuning';
-import { InvariantWatch } from '../body';
-import { analyzeCamp, campMission, generateWorld, infiltrate, spaceTimeSearch } from '../generation';
+import { InvariantWatch, bodyHeight, bodyShape, createBody, eyeOf, mantleAt, stepMotor, type Cylinder, type MotorContext } from '../body';
+import { analyzeCamp, buildWorld, campMission, generateWorld, infiltrate, spaceTimeSearch } from '../generation';
 import type { LayerName } from '../lanes';
 import { LAYERS } from '../lanes';
 import { Hasher } from '../kernel/core/hash';
@@ -17,7 +17,7 @@ import { Solids } from '../kernel/world/solids';
 import { datan2, dcos, dexp, dlog, dsin } from '../kernel/core/detmath';
 import { air, defaultEnv } from '../kernel/env';
 import { Rng } from '../kernel/core/rng';
-import { runScene, sceneOver, sceneTicks, startScene } from '../kernel/scene';
+import { runScene, sceneOver, sceneTicks, startScene, type Scene as KernelScene } from '../kernel/scene';
 import { emptyEstimate, fuseBearings, inEllipse, type Bearing, type FuseGrid } from '../brain';
 import { POLICIES, pursuit } from './baselines';
 import { campScenario } from './scenes/campScenario';
@@ -31,6 +31,11 @@ import { placePlayer } from './setup';
 import { SYSTEMS } from './systems';
 import { campHeight, campWorld } from './scenes/campBrain';
 import { labWorld } from './scenes/perceptionLab';
+import { arenaWorld } from './scenes/movementLab';
+import { SCENES } from './scenes';
+import { Blocks, pushOutCircle } from '../kernel/world/colliders';
+import { sightLine, type QueryView } from '../kernel/world/query';
+import { emptyShape } from '../kernel/world/shape';
 import { SIGHT_TABLE, sightScenario } from './scenes/sightScenario';
 import { FACTORS, SITTING, generateSitting, pairsCovered, scoreSitting, verdict, type Trial } from './trials';
 import { SWAY_RUNGS, decisionSensitivity, swayRadius, sweepCases, sweepWorst } from './ballisticsBench';
@@ -155,7 +160,8 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
     },
   },
   body: {
-    about: "Lab C: the motor's promises under the person-like and the fuzzing bot, a minute each in two valleys, and the closest calls.",
+    about:
+      "Lab C: the motor's promises under the person-like and the fuzzing bot, a minute each in two valleys, the closest calls, and the eye at the head: every lean's line of sight, both ways, beside the seed's camera-only lean.",
     metrics() {
       const m = {
         'body-ticks checked': 0,
@@ -187,7 +193,7 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
           m['worst gain on steep ground (m)'] = Math.max(m['worst gain on steep ground (m)'], r.steepGain);
         }
       }
-      return m;
+      return { ...m, ...eyeToHead(), ...mantleMeetsWalker(), ...proneBench() };
     },
   },
   perception: {
@@ -217,6 +223,191 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
   },
   game: { about: "The valley's plays, which exercise every lane together: pinned by their fingerprints and work.", metrics: () => ({}) },
 };
+
+/**
+ * Prone (C2): how far a lying body's shape goes into what's solid, with the chain and with
+ * the seed's single 0.3 m circle standing in for it: the fuzzing bot on the movement course
+ * for ten minutes and in two valleys for five each (long enough to outweigh where the bot
+ * happens to wander), and a body turning right round between two walls a metre apart.
+ * Measured independently of the motor, as a part's penetration in three dimensions (the
+ * least of how far it is in horizontally, under the top and over the bottom), allowing
+ * 2 cm. The shape is straight, so a leg lying up over a ledge can cut its corner: the
+ * chain doesn't (the invariant watch), but the capsules that stand for it here can.
+ */
+function proneBench(): Record<string, number> {
+  const seed = structuredClone(defaultTuning);
+  seed.bodies.player.parts.chainSpacing = 0;
+  const walls = [
+    { kind: 'box' as const, x: 0, z: -0.6, y0: -0.3, y1: 2, hx: 8, hz: 0.1, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Rock },
+    { kind: 'box' as const, x: 0, z: 0.6, y0: -0.3, y1: 2, hx: 8, hz: 0.1, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Rock },
+  ];
+  const trench = buildWorld({ name: 'bench-trench', size: 40, cell: 0.5, colliders: walls, spawn: { x: 0, z: 0, faceX: 1, faceZ: 0 } }, defaultTuning.gen);
+  const ids: number[] = [];
+  const push = { x: 0, z: 0 };
+  const shape = emptyShape();
+  const depth = (sim: Simulation, x: number, y: number, z: number, r: number): number => {
+    let worst = 0;
+    sim.solids.query(x - r - 0.1, z - r - 0.1, x + r + 0.1, z + r + 0.1, ids);
+    for (const id of ids) {
+      const c = sim.solids.get(id);
+      if ((c.flags & Blocks.Move) === 0 || c.y1 <= y - r || c.y0 >= y + r || !pushOutCircle(c, x, z, r, push)) continue;
+      worst = Math.max(worst, Math.min(Math.sqrt(push.x * push.x + push.z * push.z), c.y1 - (y - r), y + r - c.y0));
+    }
+    return worst;
+  };
+  const measure = (sim: Simulation, tally: { inside: number; deepest: number; poses: number }): void => {
+    const b = sim.player;
+    if (!(b.lying > 0.99)) return;
+    tally.poses++;
+    const s = bodyShape(b, sim.tuning.bodies.player, shape);
+    let worst = depth(sim, s.head.x, s.head.y, s.head.z, s.head.r);
+    for (const c of [s.torso, s.legs]) {
+      for (let k = 0; k <= 8; k++) {
+        const f = k / 8;
+        worst = Math.max(worst, depth(sim, c.ax + (c.bx - c.ax) * f, c.ay + (c.by - c.ay) * f, c.az + (c.bz - c.az) * f, c.r));
+      }
+    }
+    if (worst > 0.02) tally.inside++;
+    tally.deepest = Math.max(tally.deepest, worst);
+  };
+  const course = (tuning: typeof defaultTuning): { inside: number; deepest: number; poses: number } => {
+    const tally = { inside: 0, deepest: 0, poses: 0 };
+    const play = (sim: Simulation, botSeed: string, minutes: number): void => {
+      const bot = new ChaosBot(botSeed);
+      const raw = neutralInput();
+      for (let i = 0; i < minutes * 60 * 30; i++) {
+        sim.step(bot.next(sim, raw));
+        measure(sim, tally);
+      }
+    };
+    play(startScene(SCENES['movement-course']!() as unknown as KernelScene<Simulation>, tuning), 'BENCH-COURSE', 10);
+    for (const valley of ['TAL-4471', 'MUD-9031']) play(new Simulation(generateWorld(missionSpec(valley), tuning), tuning), valley, 5);
+    return tally;
+  };
+  const between = (tuning: typeof defaultTuning): { inside: number; deepest: number; poses: number } => {
+    const tally = { inside: 0, deepest: 0, poses: 0 };
+    const sim = new Simulation(trench, tuning);
+    const input = neutralInput(sim.player.yaw);
+    for (let i = 0; i < 12 * 30; i++) {
+      input.prone = i === 0;
+      if (i > 30) {
+        input.yaw += 0.08;
+        input.moveZ = i % 60 < 30 ? 1 : -1;
+      }
+      sim.step(input);
+      measure(sim, tally);
+    }
+    return tally;
+  };
+  const a = course(defaultTuning);
+  const b = course(seed);
+  const c = between(defaultTuning);
+  const d = between(seed);
+  return {
+    'prone: fuzzing bot on the course and in two valleys, lying poses checked': a.poses,
+    'prone: fuzzing bot on the course and in two valleys, poses with a part inside something solid': a.inside,
+    'seed · single circle: fuzzing bot on the course and in two valleys, lying poses checked': b.poses,
+    'seed · single circle: fuzzing bot on the course and in two valleys, poses with a part inside something solid': b.inside,
+    'prone: turning between walls a metre apart, poses with a part inside something solid': c.inside,
+    'seed · single circle: turning between walls a metre apart, poses with a part inside something solid': d.inside,
+    'prone: deepest any part goes into something solid (m)': round(Math.max(a.deepest, c.deepest)),
+    'seed · single circle: deepest any part goes into something solid (m)': round(Math.max(b.deepest, d.deepest)),
+  };
+}
+
+/**
+ * Lean, and the eye at the head (C3): for 2,000 lean poses around the movement lab's walls
+ * and a guard somewhere beyond, the line from the eye to the guard's head and the line
+ * back. They are one segment, so they agree, bit for bit. Beside it the seed: a lean that
+ * moves the camera and leaves the body's shape where it was, Dishonored's hidden lean, and
+ * how often it sees a guard who has no line to the head he would aim at.
+ */
+function eyeToHead(): Record<string, number> {
+  const world = arenaWorld(defaultTuning);
+  const solids = new Solids(world.colliders);
+  const view: QueryView = { world, solids, bodies: [] };
+  const rng = new Rng('BENCH-C', 'lean');
+  const P = defaultTuning.bodies.player;
+  const G = defaultTuning.bodies.guard;
+  const shape = emptyShape();
+  const eye = { x: 0, y: 0, z: 0 };
+  let differ = 0;
+  let inView = 0;
+  let unseen = 0;
+  const pairs = 2000;
+  for (let k = 0; k < pairs; k++) {
+    const x = rng.range(-56, 56);
+    const z = rng.range(-5, 2);
+    const b = createBody(world, solids, P, x, z, 0, -1);
+    b.yaw = rng.range(-Math.PI, Math.PI);
+    b.lean = (rng.chance(0.5) ? 1 : -1) * rng.range(P.lean.peek * 0.5, P.lean.weapon);
+    const head = bodyShape(b, P, shape).head;
+    const g = createBody(world, solids, G, x + rng.range(-25, 25), z + rng.range(-20, 20), 0, 1);
+    eyeOf(g, G, eye);
+    const sees = sightLine(view, head.x, head.y, head.z, eye.x, eye.y, eye.z, Blocks.Sight);
+    const seen = sightLine(view, eye.x, eye.y, eye.z, head.x, head.y, head.z, Blocks.Sight);
+    if (sees !== seen) differ++;
+    if (sees) inView++;
+    // The seed: the camera moved aside, the head he aims at left over the feet.
+    if (sees && !sightLine(view, eye.x, eye.y, eye.z, b.x, b.y + b.eyeHeight, b.z, Blocks.Sight)) unseen++;
+  }
+  return {
+    [`lean: eye-to-head lines that differ by direction (of ${pairs})`]: differ,
+    [`lean: pairs in view (of ${pairs})`]: inView,
+    [`seed · lean: pairs where the camera sees a guard who has no line to the head (of ${pairs})`]: unseen,
+  };
+}
+
+/**
+ * The mantle's every pose, checked every tick (C4): over a wall, as someone walks across
+ * where it lands, timed to reach it just as the mantle does. The seed, The Dark Mod's
+ * mantle, validated its endpoint once, and goes through him.
+ */
+function mantleMeetsWalker(): Record<string, number> {
+  const P = defaultTuning.bodies.player;
+  const dt = 1 / defaultTuning.sim.tickHz;
+  const wall = { kind: 'box' as const, x: 0, z: -0.15, y0: -0.3, y1: 1, hx: 3, hz: 0.15, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Rock };
+  const world = buildWorld({ name: 'bench-mantle', size: 30, cell: 0.5, colliders: [wall], spawn: { x: 0, z: 2 } }, defaultTuning.gen);
+  const solids = new Solids(world.colliders);
+  const speed = defaultTuning.bodies.guard.speed.walk;
+  const walker: Cylinder = { x: 0, y: 0, z: -0.62, radius: 0.3, height: 1.85 };
+  const crossing = 0.62; // seconds until he is where the mantle lands
+  const placed = (t: number): void => {
+    walker.x = (t - crossing) * speed;
+  };
+  const body = createBody(world, solids, P, 0, 0.4, 0, -1);
+  const ctx: MotorContext = { world, solids, tuning: defaultTuning, dt, tick: 1, source: 1, others: [walker], emit: () => 0 };
+  const inside = (x: number, y: number, z: number, height: number): boolean => {
+    const dx = x - walker.x;
+    const dz = z - walker.z;
+    const rr = P.radius + walker.radius - 1e-3;
+    return dx * dx + dz * dz < rr * rr && y < walker.y + walker.height && walker.y < y + height;
+  };
+  // The mantle as it runs: it waits for him.
+  let ours = 0;
+  let plan: { points: number[]; legs: number[] } | null = null;
+  placed(0);
+  for (let t = 1; t <= 90; t++) {
+    ctx.tick = t;
+    placed((t - 1) * dt);
+    stepMotor(body, { tick: t, wishX: 0, wishZ: 0, gait: 'idle', yaw: body.yaw, pitch: 0, lean: 0, raised: false, climb: t === 1, climbAxis: 0, load: 1, scrape: false }, P, ctx);
+    plan ??= body.mantle ? { points: [...body.mantle.points], legs: [...body.mantle.legs] } : null;
+    if (inside(body.x, body.y, body.z, bodyHeight(body, P))) ours++;
+  }
+  // The seed: the same path, checked when it starts and never again.
+  let seed = 0;
+  const pose = { x: 0, y: 0, z: 0 };
+  if (plan) {
+    const total = plan.legs.reduce((a, b) => a + b, 0);
+    for (let t = 1; t <= 90; t++) {
+      placed((t - 1) * dt);
+      const when = Math.min(t * dt, total);
+      mantleAt({ ...plan, t: 0, waited: 0, stand: false, grip: Surface.Rock, feet: Surface.Grass, grabbed: false, dropped: 0, grabAt: 0, then: -1 }, when, pose);
+      if (when < total && inside(pose.x, pose.y, pose.z, P.height.crouch)) seed++;
+    }
+  }
+  return { 'mantle: ticks inside someone walking across the landing': ours, 'seed · mantle checked once: ticks inside him': seed };
+}
 
 /** Lab E's bench (brain lane): docs/phase-1-plan.md, E · recorded before building. */
 function brainMetrics(): Record<string, number> {

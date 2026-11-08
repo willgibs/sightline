@@ -18,7 +18,15 @@ import type { World } from '../kernel/world/world';
  *
  * A body changing stance has no rest until the change is done.
  */
-export function restAvailable(world: World, solids: Solids, body: Pick<BodyState, 'x' | 'y' | 'z' | 'stance' | 'eyeHeight' | 'stanceTimer' | 'proneTransition'>, yaw: number, pitch: number, S: Tuning['ballistics']['sway']): boolean {
+export function restAvailable(
+  world: World,
+  solids: Solids,
+  body: Pick<BodyState, 'x' | 'y' | 'z' | 'stance' | 'eyeHeight' | 'stanceTimer' | 'proneTransition'>,
+  eye: { x: number; y: number; z: number },
+  yaw: number,
+  pitch: number,
+  S: Tuning['ballistics']['sway'],
+): boolean {
   if (body.stanceTimer > 0 || body.proneTransition) return false;
   const prone = body.stance === 'prone';
   if (prone && Math.abs(pitch) > S.bipodPitchDeg * DEG) return false;
@@ -26,10 +34,10 @@ export function restAvailable(world: World, solids: Solids, body: Pick<BodyState
   const [lo, hi] = prone ? S.restBand.prone : S.restBand.upright;
   const cp = dcos(pitch);
   if (cp < 0.2) return false;
-  const fx = body.x - dsin(yaw) * reach;
-  const fz = body.z - dcos(yaw) * reach;
+  const fx = eye.x - dsin(yaw) * reach;
+  const fz = eye.z - dcos(yaw) * reach;
   // The line of sight's height over the fore-end.
-  const sight = body.y + body.eyeHeight + (reach * dsin(pitch)) / cp;
+  const sight = eye.y + (reach * dsin(pitch)) / cp;
   const top = supportBelow(world, solids, fx, fz, sight - lo);
   const gap = sight - top;
   return gap >= lo && gap <= hi;

@@ -96,6 +96,86 @@ Built on its branch as `docs/phase-1-plan.md`, section B, plans it. Its seed, th
 
 **Why:** The owner wants people to be able to read the code and play the build, while the project stays the owner's own. MIT is the simplest, most familiar license for that. Art and sound, when they arrive, can carry their own terms.
 
+## 2026-11-08 · Lab C: movement and body
+
+Built on the `lab-c-movement` branch to `docs/phase-1-plan.md`, section C. Lean and the mantle use input the bots never give, so the valley's behaviour is untouched until the prone body (C2).
+
+### The noise and visibility trials (C8), and the player's own light and noise (C7)
+
+**Decision:**
+- The exit test's protocol is lab A's, whole (`game/trials.ts`): the four cells, the borderline split by a rules-only predictor, the pairwise spread, the freezes, balanced accuracy, and the verdict over two sittings. It became generic at this second use: a `TrialSpace` supplies the draw, the run, the factor steps, the rule and the words. Lab A's sight trials are one space, and a seed draws exactly what it drew before.
+- A noise trial (`scenes/noiseScenario.ts`) is one guard with his back turned and the player on a flat field of one surface, moving for 8 s at one gait along an arc about him, so every step comes from the same distance. A generator hums 5 m or 2.5 m from him in half the trials. "Will he hear you within 8 seconds?" The key comes from running it. A scenario table pins each gait either side of the edge of hearing, and the masking.
+- The rule of thumb for noise knows how far a gait carries and the distance. It leaves out the surface and the hum, which are what the world has to show: the ground underfoot, the generator, your own footsteps. Its mistakes go both ways, so reading the gait and the distance alone gets about half the borderline trials.
+- Half the noise trials freeze at the start and half after a few steps (2 s), so you have heard yourself on that ground. He only starts listening there: the pre-screen showed that freezing on the first footstep gave the answer away, with his "What was that?" already on screen. A sprint always freezes at the start, since running along the arc you aren't looking at him.
+- The visibility half is lab A's sight scenario, drawn for what your own body and light do: one sentry, open ground, shade or the skyline, stance and movement together, distance.
+- A sitting is 5 warm-ups and 30 scored, 15 of each kind shuffled together, at `?trials=<seed>&lab=movement`. `npm run playtest` scores it and keeps each lab's verdict apart. `npm run trials -- <seed> --movement --shots` pictures one for the pre-screen.
+- C7: the lab's shade is drawn as simulated (lab A's shade map over the arena, held to `groundLight` by a test). Your own footsteps play at their simulated loudness (the browser audio test), and every surface tag matches its drawn material (`tests/surface-audit.test.ts`). The small cue on the body for ambient masking and light from behind isn't built: the plan wants it only if the trials fail without it.
+
+**Why:** Two protocols would mean two ways of scoring that can disagree, and the owner would be sitting two different tests under one name. The rule of thumb is the honest baseline, because "people judge by distance" (the research behind lab A's protocol), and the surface and the hum are what this lab has to make readable.
+
+### The use action (C6): carry, drag, hide
+
+**Decision:**
+- G (the `use` command, code 51; the debug view's grid moved to L) picks up the body in reach and puts it down. Standing it rides the shoulder, crouched it drags behind (`carry.speed` 1.6 m/s, `dragSpeed` 0.9): lab B's `remains` gains `carriedBy` and `hidden`. Lab E's sabotage and doors take their place on the same press.
+- Carrying is slow and loud: a loaded step at carrying pace is as loud as walking (`noise.carry`); dragging also scrapes each step, by surface, loudest on gravel and metal (`noise.drag`), a new sound event (`drag`, code 51).
+- Put down inside foliage or by a container it's hidden: `gameBodies` leaves it out, so guards' eyes and bullets find nothing there. (Lab A's body-finding reads the same flag.)
+- Hands full: no mantling, ladders or lying down while carrying; crouching drags it.
+- Carried, a body is out of every sight line and bullet: what's seen and hit is its carrier. It's reached on about the carrier's level, with a clear line from the eye. Dragged, it stops short of what's behind the carrier.
+- A body is picked up standing or crouched, on the ground, and can be taken out of hiding again. Off the shoulder it comes down at the carrier's feet; dragged, it stays where it trails. Either way it lies on what's under it, not only the terrain.
+
+**Why:** The design doc's "slow, and noisy on gravel" is a choice the player makes when they pick the route; the numbers (no shipped game publishes them) are starting values for the sittings.
+
+### Ladders (C5), and fuzz bots that go looking for trouble
+
+**Decision:**
+- A ladder is a motor mode (`body/ladder.ts`): the climb press takes it from its foot or its top, forward and back move up and down it (1.8 m/s up, 2.2 m/s down), and a press lets go. The world's ladders are data (`world.ladders`, same shape as lab D's `LadderSpec`); `ladderLinks()` gives navigation (lab E) the two places each one joins, and how long it takes.
+- Getting off the top is a mantle over the edge, checked pose by pose before it starts and every tick after (Half-Life 2's validated dismounts, without the fixed points); getting on from the top runs that same way backwards.
+- A world's ladders are its own or its camp's (`laddersOf`): lab D's towers work as built, through the 0.8 m gap lab D left in the rail at the ladder's head. A test climbs every tower of a generated camp to its deck.
+- A long fuzz in valleys says little about ladders: three hours of the chaos bot in the lab took a ladder six times. So the fuzz run also plays towers drawn from a seed, ground and clutter varied, with a bot that climbs them (`scene:ladder-tower`, `bots/ladderBot.ts`), and the watch checks that a mantle or a ladder doesn't move into another body.
+- The fuzzing bot learned to lean hard into walls, press climb at walls and guards again and again, swing the body around while prone, and pump a ladder. The fuzz run also plays the movement lab (`movement-lab`), where the walls, windows, ladder and moving guards are.
+- The chaos bot's new behaviours move `TAL-4471 chaos` and the benches' fuzz numbers; lean, mantle and ladders stay out of every other golden.
+
+**Why:** "No motor mode gets an exception" only means something if the adversarial bots actually exercise each mode, every tick, for hours.
+
+### The prone body (C2): a chain of circles, and the eye at the head
+
+**Decision:**
+- A lying body is a chain of circles along its axis (`body/chain.ts`, derived from `parts`: head, torso, legs), pivoting at a point near the chest (`pivot` 0.55 m back from the top of the head), so turning swings the legs and steadies the view. The circles' radii and spacing are chosen so they cover the capsules everything else sees: nothing clear of the chain can be inside the head, torso or legs.
+- It grows out of the single standing circle over the stance change (`lying`, 0 to 1), pushing the body away from what it would meet, and stops if it can't; shrinking back is always free. It turns toward the view at `prone.turnRate` (2 rad/s), by the largest step that keeps every part clear, found with 6 bisections.
+- It lies along the ground: the head, pelvis and feet rise with what's under them, within what a walkable slope allows, so the body pitches over rocks and banks. Parts within the pivot's own circle can't rise more than the pivot can step.
+- The eye is the head's centre when prone too (`eyeOf`), so the camera moves to the head as a body goes down and the rifle's rest is found from the eye. `SIM_VERSION` 8: prone bodies collide as long as they are, and a prone shot leaves from the eye. The pinned runs that lie down moved: `movement-course`, `perception-lab` and `perception-crowd` (the walker ends prone in a bush), `shooting-range` (the marksman shoots prone), and `TAL-4471 chaos` (the bot learned new moves too). The valley's wander runs held, and lab A's trial metrics shifted slightly with the body. Every `state` fingerprint moved with `STATE_SCHEMA` 8.
+- Measured with the fuzzing bot, ten minutes on the course and five each in two valleys (`npm run bench`): 548 of 16,869 lying poses have a part of the drawn shape more than 2 cm inside something solid, at worst 16 cm, against 3,258 and 49 cm for the seed's 0.3 m circle. Turning right round between walls a metre apart: 0 poses, against 259 (up to 0.25 m deep).
+- Those 548 are the shape's limit, not the chain's. The chain's circles stay within the invariant watch's 0.1 mm, but the head, torso and legs are straight capsules, so a leg lying down a stair or across a ledge cuts the corner it lies over. The plan's target was zero, and it isn't met for the shape; the plan says so. Bending the legs, or lifting the body over the corner, would close it, and is left until the body has a real pose.
+- What a circle of a lying body may rest on (a review of #11): `allow` is for ground that slopes. A collider counts as rest only within a step of the feet or of the terrain under that circle (`restBelow`), so a heel no longer takes a 0.8 m bank for the ground and lifts onto it in a tick, nor does crawling into a 0.5 m wall lift the eye 0.5 m. No end of a lying body rises more than a step in a tick, and the invariant watch now holds it to that. The cost is more shallow corner cuts (398 poses over 2 cm to 548) against a shallower worst (27 cm to 16 cm). Rule 10 is a promise and the bench is a measure of the drawn shape, so the promise wins.
+- Getting up is checked as going down is. The 40-hour fuzz found the gap (PIF-1492): a lying body's reach onto the rock under its legs shrank as it drew in, so the ledge became a wall it was inside. Now a circle keeps its full-length reach while getting up; a body needs headroom along its whole length to start getting up (legs under a shelf refuse it, so the course's walker crawls on until its legs are out); and it draws in only as far as it ends the tick clear, waiting, eye and timer too, in a slot too narrow to stand in, and able to crawl out of it. The fuzz run also plays the course now, where the crawl space and low ceiling are.
+
+**Why:** A 0.3 m circle standing in for a 1.75 m body is how prone clips in every shipped game that reported it (Arma, Hell Let Loose, Battlefield 2042); the chain makes the body as long as it is, for every promise the motor keeps.
+
+### The mantle (C4): every pose, every tick, and no noise you didn't choose
+
+**Decision:**
+- A press of Space (the `climb` command, code 50) starts a mantle, if one can be found; it's never automatic, so its noise is one the player chose (Tarkov's automatic vault is the counter-example). A press stays good for 0.2 s, so one made just early still works.
+- **Three probes find the ledge** (The Dark Mod's): forward at nine heights for the face, down for its top, an overlap at the landing pose. Only colliders can be mantled, so the rule that nothing gains height on too-steep terrain holds here as well.
+- **Over or onto.** Shallower than `overDepth` (0.8 m) it goes over, if the far side is within `maxDrop` (1.6 m); deeper, or with nowhere to land beyond, it stands on top. The body squares up to the wall it faces, up to about 66° off square.
+- **Four eased legs:** reach for the ledge, pull, shift, push down. It goes crouched, so a window that fits a crouch fits a mantle. Heights up to 1.5 m, about 0.6 s for 1.2 m, a little over 0.2 m of rise a tick at most.
+- **Every pose is re-checked every tick** against everything solid (no step allowance) and every other body; a pose that isn't clear holds the body where it is, and after 0.4 s of waiting the mantle gives up and the body drops where it is. The Dark Mod validated its endpoint once, and clipped whatever moved in afterwards: on the bench, a walker crossing the landing is met 0 times; the seed path goes through him for 15 ticks.
+- **Sounds:** the hands taking hold (a new sound event, `mantle`, code 50), by what they grip: 0.7 × surface × 12 m. Lowered down the far side is quieter than falling from there (`noise.mantle.drop`).
+- `STATE_SCHEMA` 8 (taken with the lean, this is the same unmerged bump): bodies keep their mantle; the player's controls keep `climbWait`. No behaviour golden moved: the bots don't press climb.
+
+**Why:** Mantles in shipped games fail by clipping and by surprising the player. Checking every pose, every tick, in every mode is the lab's claim (no motor mode gets an exception); making it a press rather than an automatic vault keeps the noise deliberate.
+
+### The lean (C3): the eye is the centre of the head that's hit
+
+**Decision:**
+- A lean moves the head aside about the hips, the shoulders part way with it, and the arc takes the head down a little: `peek` 0.18 m with nothing raised, `weapon` 0.40 m with an optic up (Ground Branch's distinction), `bend` 0.58 of the spine, so a crouch leans less than a stand, `prone` 0.12 m.
+- The eye is the centre of the head sphere in `bodyShape`, always, so the camera, a shot and a guard's rays all use the same point. A line from the eye to a guard's head and the line back are one segment and agree bit for bit.
+- It grows at 1.4 m/s (`rate`), and a blocked lean goes as far as stays clear, found with 8 bisections. The world can force it back at any speed (a wall the body walks into), but it can't grow faster: a flick of the mouse can't throw the head out, and nothing is hidden.
+- Sprinting gives it up. Turning carries the lean with the view; the weapon lean stays below `radius + headRadius`, so a head on a turning body can't pass through a wall the body is clear of.
+- Lean is a held input (`input.lean`, recorded since the input's first format): the bots never give it, so no behaviour fingerprint moves.
+- `STATE_SCHEMA` 8: bodies keep their lean. Every state golden moved; no behaviour golden did.
+
+**Why:** The lean's reported failures are all about where the eye is: Siege moved the camera to the centre of the head to stop lean-spam, Dishonored hides the lean. Putting the eye at the head that guards target makes every lean honest by construction; the rate limit closes the flick (Siege patched a melee-and-lean input that moved the head almost instantly).
+
 ## 2026-11-08 · Lab A: perception and awareness
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.

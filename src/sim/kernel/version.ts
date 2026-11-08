@@ -18,6 +18,8 @@ export const GEN_VERSION = 4;
  * and gaits. 4: guards keep to routines and move with the shared motor. 5: falls follow
  * constant gravity exactly, and land at the speed of touchdown. 6: a footstep happens
  * where and when the stride runs out within its tick, not at the tick's end. 7: on ground
- * too steep to stand on, a body's own speed no longer carries it uphill.
+ * too steep to stand on, a body's own speed no longer carries it uphill. 8: a body lying
+ * down is a chain of circles along its axis, and the eye is the centre of the head wherever a
+ * lean or lying down puts it (lab C, C2).
  */
-export const SIM_VERSION = 7;
+export const SIM_VERSION = 8;

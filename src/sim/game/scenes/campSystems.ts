@@ -42,7 +42,7 @@ export function campSystems(): Scene {
   const take: System = {
     name: 'take-the-target',
     phase: 'commands',
-    after: ['rifle', 'cut-the-generator', 'player-commands', 'sandbox-drops'],
+    after: ['rifle', 'cut-the-generator', 'player-commands', 'sandbox-drops', 'use'],
     reads: ['objective.objective'],
     writes: ['entities'],
     emits: [],

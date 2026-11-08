@@ -189,6 +189,16 @@ export type StanceName = 'stand' | 'crouch' | 'prone';
 /** The gaits a step can be taken in: every gait a body moves in (body/body.ts, Gait) but standing still. */
 export type StepGait = 'crawl' | 'crouch' | 'walk' | 'sprint';
 
+/** A body's hands take hold of a ledge (lab C, body/mantle.ts): a sound, by what they take hold of. */
+export interface MantleEvent extends EventBase, SoundFields {
+  type: 'mantle';
+}
+
+/** Something dragged along the ground scrapes with every step (lab C, game/use.ts). */
+export interface DragEvent extends EventBase, SoundFields {
+  type: 'drag';
+}
+
 /** The rules decided the run (state.ts, Outcome): the reason is in the state. */
 export interface OutcomeEvent extends EventBase {
   type: 'outcome';
@@ -398,7 +408,9 @@ export type SimEvent =
   | CryEvent
   | RangedEvent
   | BoltEvent
-  | ClatterEvent;
+  | ClatterEvent
+  | MantleEvent
+  | DragEvent;
 export type EventType = SimEvent['type'];
 export type EventOf<K extends EventType> = Extract<SimEvent, { type: K }>;
 
@@ -495,6 +507,8 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   ranged: { code: 34, range: 'ballistics', sound: false, fields: { range: 'f32', x: 'f32', y: 'f32', z: 'f32', what: { enum: ['none', ...STRIKES] } } },
   bolt: { code: 35, range: 'ballistics', sound: true, fields: { ...SOUND } },
   clatter: { code: 36, range: 'ballistics', sound: true, fields: { ...SOUND, thrown: 'u32', speed: 'f32' } },
+  mantle: { code: 50, range: 'body', sound: true, fields: { ...SOUND } },
+  drag: { code: 51, range: 'body', sound: true, fields: { ...SOUND } },
   call: { code: 91, range: 'brain', sound: true, fields: { ...SOUND, radio: 'u8', say: { enum: REPORT_CODES } } },
   radio: { code: 92, range: 'brain', sound: false, fields: { kind: { enum: REPORT_CODES }, x: 'f32', z: 'f32', radius: 'f32' } },
   order: { code: 93, range: 'brain', sound: false, fields: { to: 'u32', task: { enum: ['investigate', 'search', 'check', 'sweep', 'cover'] }, x: 'f32', z: 'f32' } },

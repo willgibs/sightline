@@ -252,9 +252,10 @@ export class SoundEngine {
             footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), gait, amp), lead,
           );
         }
-      } else if (e.type === 'land') {
-        // A landing is a heavy footfall: the sprint voice at the landing's own loudness.
-        const gait = 1.5;
+      } else if (e.type === 'land' || e.type === 'mantle' || e.type === 'drag') {
+        // A landing is a heavy footfall: the sprint voice at its own loudness. Hands taking
+        // hold of a ledge are lighter, a walking step's voice; a dragged body, a soft one.
+        const gait = e.type === 'land' ? 1.5 : e.type === 'mantle' ? 1 : 0.6;
         if (own) {
           const amp = THRESHOLD * audibility(e.radius, earToFeet);
           this.voice(amp, lead, (when) => footstep(this.ctx, this.body, this.noise, this.rand, when, surfaceName(e.surface), gait, amp));
