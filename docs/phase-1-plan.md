@@ -503,12 +503,13 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
   - A killed guard leaves a body, spawned within the tick (W0.4).
   - Landed: bullets are entities (`ballistics/bullet.ts`), resolved in 'commands' against the poses the player saw and flown in 'projectiles' (`game/shooting.ts`). A leg shot kills too, always with a cry; lab E may make it a wound. The body left behind collapses as a pure function of time (`game/remains.ts`), and sight lines and bullets see it.
 - [ ] B5 · Bob: whether walking bodies bob in the simulation, and whether a shot leaves from the bobbing eye. Decided by measuring at 300 m; `body/bob.ts` is ready.
-- [ ] B6 · Instruments in the honest view, which today has no crosshair.
+- [x] B6 · Instruments in the honest view, which today has no crosshair.
   - The scope, with its mil reticle and a zero dial in 100 m steps, and mil holds between steps. A target 50 m from the nearest step sits 11–34 cm off.
   - Binoculars with the rangefinder and a wind readout.
   - Lens glint toward the sun.
   - A sweep test holds the drawn hold to the simulated impact within 1 cm.
   - Marking waits for Phase 2, with the model of what the player has observed.
+  - Landed: `app/scope.ts` draws the scope (a mil reticle in the camera's own projection, the zero, the rounds, rest and breath marks, a flare when facing the sun) and the binoculars (a mil scale and the rangefinder); the right button raises the scope, F the binoculars, the arrows click the zero, Shift holds the breath while scoped, H changes the assists. The sweep (`tests/reticle.test.ts`, `game/ballisticsBench.ts`): 160 shots through the whole simulation, worst 0.136 cm; each hold drawn within 0.001 mil of where three.js projects the point, on three screen shapes. Glint is a pure function (`ballistics/glint.ts`) for lab A's A9.
 - [x] B7 · Sway, breath and heart rate.
   - Sway is a pure function of state and time in the simulation (rule 14), so the shot goes where the drawn reticle points at the click's instant. Its parts:
     - incommensurate sines;

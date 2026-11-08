@@ -150,6 +150,21 @@ Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the gener
 
 **Why:** a lab is an isolated scene until Phase 2 joins them; keeping the valley's goldens still lets labs A and D land beside this one without rebasing onto moved values.
 
+### Sway, vitals and the instruments (B6, B7)
+
+**Decision:**
+- **Sway samples with history.** The aim system samples the sway at every tick's end (`rifle.sway`, two ticks kept). The renderer draws the camera along `viewLine` (the line of sight moved by the sway, as far as the scope is up), interpolating the samples as it does the body; the rifle fires along the same interpolation at the click's lag. With the scope down, the barrel points only roughly where you look: 25 mil of pointing error, drawn from the player's own stream.
+- **The ladder, measured, not asserted:** standing 1.64 mil, crouched 0.99, prone 0.69, prone on a rest 0.255, with the breath held 0.046 (95th-percentile radius over 20 s). A rest is found by geometry, never declared: the ground under a bipod prone, a sandbag or a wall top under the fore-end upright.
+- **Vitals live in the body lane** (`body/vitals.ts`), a component the run's setup gives with the rifle; lab C extends them. A held breath stills the chest over half a second and lasts 4 s calm, 1.5 s at the top of the heart rate; a long one ends in a gasp. `startle()` is the close call lab E calls when guards shoot back.
+- **The reticle is drawn in mils as tangent offsets** in the camera's projection, the same offsets the hold solver works in, so a hold names the mark the target sits on exactly. The scope's field is 3.6° across its glass; the binoculars' 6.5°.
+- **Assists are a setting, not tuning:** sim (the reticle and the range), lite (a dope card too: the hold at each 100 m for the dialled zero, and the wind's hold per m/s), arcade (the binoculars read the hold and the wind out, and the scope marks where a shot lands at the ranged distance). The default is lite. None touches the simulation.
+- **Glint** is a pure function of the aim, the sun and the observer (the mirror's half-way condition), for lab A to ask per guard; the scope's glass flares when it faces the sun, so the player can tell.
+- **The flags' and the grass's motion** is presentation only: it changes nothing that can be seen or hit.
+
+**What moved:** the shooting range's fingerprints (tuning its own sway), and the tuning's shape, so the golden recording is rewritten. No valley value.
+
+**Why:** the plan's B6 and B7. The research found no game that publishes sway numbers, so the bench pins Sightline's, and the sweep pins the claim that a reticle and its bullet can't disagree.
+
 ## 2026-11-07 · Wave 0
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.
