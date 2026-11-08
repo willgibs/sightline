@@ -28,6 +28,14 @@ export class InputController {
   rawMouse = false;
   /** How far the view can tilt up or down (tuning.bodies.player.pitchLimit, set by the game). */
   pitchLimit = 1.45;
+  /**
+   * The player carries a rifle (the run gave one): the right button raises its scope, Shift
+   * holds the breath while it's up, and the dial and suppressor keys mean something. The
+   * game keeps it current.
+   */
+  armed = false;
+  /** The scope raised by its toggle key (V), for a trackpad; cleared when the rifle is lowered otherwise. */
+  private scopeToggled = false;
   /** Actions that happen once per press, outside the tick: the debug keys, the marker. */
   onAction: ((action: Action) => void) | null = null;
   onLockChange: ((locked: boolean) => void) | null = null;
@@ -114,9 +122,16 @@ export class InputController {
     return false;
   }
 
-  /** Zoom (binoculars) is held: the right button or F. */
+  /** The right button is held: the scope with a rifle, a zoomed view without. */
   get zoomHeld(): boolean {
     return this.held('zoom');
+  }
+
+  /** The optic the player holds up now: the binoculars (F), the scope (the right button or its toggle), or none. */
+  get opticHeld(): Optic {
+    if (this.held('binoculars')) return Optic.Binoculars;
+    if (this.held('zoom') || (this.armed && this.scopeToggled)) return this.armed ? Optic.Scope : Optic.Binoculars;
+    return Optic.None;
   }
 
   /** Automation: hold or release the zoom. */
@@ -198,15 +213,24 @@ export class InputController {
     this.down.add(input);
     for (const a of actions) {
       if (this.map.actions[a].kind !== 'pressed') continue;
-      if (a === 'fire') this.latch.latch('fire');
-      else if (a === 'crouch' || a === 'prone') this.pressed.add(a);
-      else this.onAction?.(a);
+      if (a === 'fire') this.latch.latch(this.opticHeld === Optic.Binoculars && this.armed ? 'range' : 'fire');
+      else if (a === 'throw') {
+        if (this.armed) this.latch.latch('throw');
+      } else if (a === 'crouch' || a === 'prone') this.pressed.add(a);
+      else if (a === 'scopeToggle') this.scopeToggled = !this.scopeToggled;
+      else if (a === 'shotDrop') this.latch.latch('shotDrop');
+      else if (a === 'zeroUp' || a === 'zeroDown' || a === 'suppressor') {
+        if (this.armed) this.simple.push({ kind: a });
+      } else this.onAction?.(a);
     }
   }
 
-  /** Automation: click, as if the left button were pressed now. */
+  /** Commands with no moment of their own (the dial, the suppressor), waiting for the next tick. */
+  private readonly simple: Command[] = [];
+
+  /** Automation: click, as if the left button were pressed now (with the binoculars up, a range). */
   click(): void {
-    this.latch.latch('fire');
+    this.latch.latch(this.opticHeld === Optic.Binoculars && this.armed ? 'range' : 'fire');
   }
 
   /**
@@ -216,18 +240,25 @@ export class InputController {
   sampleTick(out: InputFrame, frozen: boolean, startTick: number): InputFrame {
     out.moveX = frozen ? 0 : (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0);
     out.moveZ = frozen ? 0 : (this.held('forward') ? 1 : 0) - (this.held('back') ? 1 : 0);
-    out.sprint = !frozen && this.held('sprint');
     out.crouch = !frozen && this.pressed.has('crouch');
     out.prone = !frozen && this.pressed.has('prone');
     this.pressed.clear();
     out.yaw = this.yaw;
     out.pitch = this.pitch;
-    out.optic = !frozen && this.zoomHeld ? Optic.Binoculars : Optic.None;
+    out.optic = frozen ? Optic.None : this.opticHeld;
+    // Sprinting lowers the scope; with it up, Shift holds the breath instead.
+    const shift = !frozen && this.held('sprint');
+    out.breath = shift && out.optic === Optic.Scope;
+    out.sprint = shift && out.optic !== Optic.Scope;
+    if (out.sprint) this.scopeToggled = false;
     if (frozen) {
       this.latch.clear();
+      this.simple.length = 0;
       this.commands.length = 0;
     } else {
       this.latch.drain(startTick, this.commands);
+      for (const c of this.simple) this.commands.push(c);
+      this.simple.length = 0;
     }
     out.commands = this.commands;
     return out;

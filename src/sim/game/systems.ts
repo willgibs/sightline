@@ -5,6 +5,7 @@ import { scheduleSystem, type ScheduleHandler, type System } from '../kernel/sys
 import { player } from './entities';
 import { think } from './guards';
 import { playerIntent } from './player';
+import { SHOOTING_SYSTEMS } from './shooting';
 
 /**
  * Sightline's tick: which lanes' systems run, in which phase (kernel/systems.ts, PHASES).
@@ -17,15 +18,20 @@ export const SCHEDULE_HANDLERS: Readonly<Record<string, ScheduleHandler>> = {};
 
 const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
 
-/** The player's commands, resolved against what was on screen when they were given. */
+/**
+ * The player's commands, resolved against what was on screen when they were given. A
+ * player with no rifle (the valley, until Phase 2) fires a bare shot, a line with no
+ * bullet; a rifle's commands are the 'rifle' system's (shooting.ts).
+ */
 const playerCommands: System = {
   name: 'player-commands',
   phase: 'commands',
-  reads: ['input', 'player.body'],
+  reads: ['input', 'player.body', 'player.rifle'],
   writes: [],
   emits: ['shot'],
   run(ctx) {
     const p = player(ctx.index);
+    if (p.rifle) return;
     for (const c of ctx.input.commands) {
       if (c.kind === 'fire') {
         // The moment the player saw: `lag` ticks before this tick's start state.
@@ -41,6 +47,10 @@ const playerCommands: System = {
           dx: -dsin(c.yaw) * cp,
           dy: dsin(c.pitch),
           dz: -dcos(c.yaw) * cp,
+          speed: 0,
+          drag: 0,
+          wx: 0,
+          wz: 0,
         });
       }
     }
@@ -89,4 +99,15 @@ const guardBrains: System = {
   },
 };
 
-export const SYSTEMS: readonly System[] = [scheduleSystem(SCHEDULE_HANDLERS), playerCommands, playerIntentSystem, guardOrders, motorSystem, guardBrains];
+export const SYSTEMS: readonly System[] = [
+  scheduleSystem(SCHEDULE_HANDLERS),
+  playerCommands,
+  SHOOTING_SYSTEMS.rifle,
+  playerIntentSystem,
+  guardOrders,
+  motorSystem,
+  SHOOTING_SYSTEMS.bullets,
+  SHOOTING_SYSTEMS.thrown,
+  SHOOTING_SYSTEMS.aim,
+  guardBrains,
+];

@@ -35,6 +35,13 @@ import type { Scene } from '../sim/game/scenes';
 import { SystemProfile } from '../sim/kernel/profile';
 import { BUILD } from './build';
 import { tuningProblems } from '../config/validate';
+import { Instruments, ASSISTS, ASSIST_NAMES, opticFov, scopeDiameter, type DopeRow, type InstrumentState } from './scope';
+import { ballisticOf, holdBetween, landing, lineOfSight, solveAim, unit, vec3, viewLine, zeroOf, type Hold } from '../sim/ballistics';
+import { air, windAt } from '../sim/kernel/env';
+import { Optic } from '../sim/kernel/input';
+import { player as playerOf } from '../sim/game/entities';
+import type { RifleView } from '../sim/game/sim';
+import { analyzeShot, describeShot, type ShotReport } from '../sim/game/telemetry';
 
 /**
  * The browser game loop: real time in, fixed simulation ticks out, interpolated frames
@@ -92,6 +99,15 @@ export class Game {
   private readonly renderer: GameRenderer;
   private readonly input: InputController;
   private readonly hud: Hud;
+  /** The scope and the binoculars in the honest view (scope.ts). */
+  private readonly instruments: Instruments;
+  /** The rangefinder's last reading, and when (performance time, seconds). */
+  private ranged: { range: number; at: number } | null = null;
+  /** Every rifle shot of the run, broken down (sim/game/telemetry.ts), for the end of the run. */
+  private shotLog: Array<{ report: ShotReport; result: string; impact: number; hit: boolean }> = [];
+  /** The dope card for the dialled zero, load and air, computed when they change. */
+  private dope: { key: string; rows: DopeRow[] } = { key: '', rows: [] };
+  private readonly rifleNow: RifleView = { up: 0, right: 0, raise: 0, rest: 0, rounds: 0, zero: 0, bolt: 0, fitting: 0, suppressed: false, load: '', heartRate: 0, held: 0, air: 0, glint: 0, steady: 1 };
   private readonly overlay: Overlay;
   private readonly sound: GameSound;
   /** Every run kept as it goes: in playtests/ in development, in this browser when deployed (playtest.ts). */
@@ -190,6 +206,7 @@ export class Game {
       this.input.map,
     );
     this.hud = new Hud(opts.hud, this.input.map);
+    this.instruments = new Instruments(opts.hud);
     this.overlay = new Overlay(opts.overlay, {
       onResume: () => this.resume(),
       onGenerate: (seed) => {
@@ -347,10 +364,12 @@ export class Game {
       this.resume();
     };
     const when = clock(o.tick / this.tuning.sim.tickHz);
+    // A run with rifle shots ends with what decided each (sim/game/telemetry.ts).
+    const shots = this.shotLog.map((s, k) => `${String(k + 1).padStart(2)}  ${describeShot(s.report, s.result, s.hit)}`);
     this.overlay.showMessage(
       'outcome',
       o.status === 'succeeded' ? `Done · ${when}` : `Failed · ${when}`,
-      `${o.reason.charAt(0).toUpperCase()}${o.reason.slice(1)}.`,
+      `${o.reason.charAt(0).toUpperCase()}${o.reason.slice(1)}.${shots.length ? `\n\nEach shot, in mils: what it got wrong, and what it needed.\n${shots.join('\n')}` : ''}`,
       'Play again',
     );
     this.input.releaseLock();
@@ -455,6 +474,9 @@ export class Game {
     this.clock = new FixedStepClock(this.tuning.sim.tickHz);
     this.prev = this.sim.snapshot();
     this.curr = this.sim.snapshot();
+    this.input.armed = playerOf(this.sim.index).rifle !== undefined;
+    this.ranged = null;
+    this.shotLog = [];
     this.input.yaw = this.sim.player.yaw;
     // Start looking at the camp so the first frame frames the valley.
     const p = this.sim.player;
@@ -598,6 +620,13 @@ export class Game {
         this.replay.playing = false;
         this.seekReplay(this.sim.tick + (action === 'replayStepBack' ? -1 : 1));
         break;
+      case 'assists': {
+        const next = ASSISTS[(ASSISTS.indexOf(this.settings.assists) + 1) % ASSISTS.length]!;
+        this.applySettings({ ...this.settings, assists: next });
+        this.overlay.showSettings(this.settings, this.tuning.view.fov);
+        this.hud.toast(`Instruments: ${ASSIST_NAMES[next]}`);
+        break;
+      }
       case 'mark': {
         // A marker in the recording: "look at this moment" for a playtest or a bug report.
         if (!this.recorder) break;
@@ -699,18 +728,6 @@ export class Game {
     this.frameSpan = frameSpan(this.frameSpan, dt);
 
     const V = this.tuning.view;
-    // A replay zooms when the player did.
-    const zoomed = this.replay ? !this.detached && this.replay.opticAt(this.sim.tick) : this.input.zoomHeld && !this.paused;
-    this.zoom = moveTowards(this.zoom, zoomed ? 1 : 0, dt / Math.max(V.zoomTime, 1e-3));
-    const eased = this.zoom * this.zoom * (3 - 2 * this.zoom);
-    // The window's shape sets the view, within limits; zooming keeps its magnification.
-    const chosen = this.settings.fov || V.fov;
-    const base = fitFov(chosen, window.innerWidth / Math.max(1, window.innerHeight));
-    const fov = zoomFov(base, scaleFov(V.zoomFov, Math.tan((base * Math.PI) / 360) / Math.tan((V.fov * Math.PI) / 360)), eased);
-    this.input.sensitivity = V.lookSensitivity * this.settings.sensitivity;
-    this.input.sensitivityScale = Math.tan((fov * Math.PI) / 360) / Math.tan((base * Math.PI) / 360);
-    this.input.pitchLimit = this.tuning.bodies.player.pitchLimit;
-
     let frameTicks = 0;
     let frameTickMs = 0;
     if (this.replay) this.replayTicks(dt);
@@ -738,28 +755,55 @@ export class Game {
       }
     }
 
+    // The optics: the scope comes up as the simulation raises it; the binoculars (and, with
+    // no rifle, the zoom) ease here. A replay looks through what the player did.
+    // The fly camera and the benchmark aren't anyone's eyes: no optic, no sway.
+    const ownEyes = !this.detached && !this.bench;
+    const optic = !ownEyes ? Optic.None : this.replay ? this.replay.opticAt(this.sim.tick) : this.paused ? Optic.None : this.input.opticHeld;
+    const rifle = ownEyes ? this.interpolatedRifle() : null;
+    this.zoom = moveTowards(this.zoom, optic === Optic.Binoculars || (optic === Optic.Scope && !rifle) ? 1 : 0, dt / Math.max(V.zoomTime, 1e-3));
+    const eased = this.zoom * this.zoom * (3 - 2 * this.zoom);
+    const scoped = rifle ? rifle.raise * rifle.raise * (3 - 2 * rifle.raise) : 0;
+    // The window's shape sets the view, within limits; zooming keeps its magnification.
+    const chosen = this.settings.fov || V.fov;
+    const w = window.innerWidth;
+    const h = Math.max(1, window.innerHeight);
+    const base = fitFov(chosen, w / h);
+    const B = this.tuning.ballistics;
+    const glass = scopeDiameter(w, h);
+    const zoomed = rifle ? opticFov(B.binoculars.fieldDeg, glass, h) : scaleFov(V.zoomFov, Math.tan((base * Math.PI) / 360) / Math.tan((V.fov * Math.PI) / 360));
+    const fov = zoomFov(zoomFov(base, opticFov(B.scope.fieldDeg, glass, h), scoped), zoomed, eased);
+    this.input.sensitivity = V.lookSensitivity * this.settings.sensitivity;
+    this.input.sensitivityScale = Math.tan((fov * Math.PI) / 360) / Math.tan((base * Math.PI) / 360);
+    this.input.pitchLimit = this.tuning.bodies.player.pitchLimit;
+
     let pose: CameraPose;
     if (this.bench) pose = this.benchPose(now, fov);
     else if (this.detached) pose = this.flyPose(dt, fov);
-    else pose = this.bodyPose(fov, eased);
+    else pose = this.bodyPose(fov, Math.max(eased, scoped));
+    // Through the scope the view sways with the rifle (sim/ballistics/sway.ts): the camera
+    // looks where a shot would go. The click is about the line of sight the player steered.
+    const view = this.detached || this.bench || !rifle ? pose : this.swayed(pose, rifle);
     // The listener is the camera: your eyes, or the fly camera wherever it is.
     this.sound.setPaused(this.paused);
-    this.sound.frame(dt, pose);
+    this.sound.frame(dt, view);
 
     if (this.debug) {
-      this.updateAim(pose);
+      this.updateAim(view);
       this.showDrawn();
     }
     // While paused, draw only when the picture would change: a view toggled, a new valley, the window resized.
-    const still = this.paused && !this.bench && samePose(pose, this.drawnPose) && this.drawnKey === this.viewKey();
+    const still = this.paused && !this.bench && samePose(view, this.drawnPose) && this.drawnKey === this.viewKey();
     if (!still) {
-      this.renderer.render(this.prev, this.curr, this.clock.alpha, this.time, pose, this.debug ? this.aim : null);
-      Object.assign(this.drawnPose, pose);
+      this.renderer.render(this.prev, this.curr, this.clock.alpha, this.time, view, this.debug ? this.aim : null);
+      Object.assign(this.drawnPose, view);
       this.drawnKey = this.viewKey();
     }
-    // A click from now on is about this frame.
+    // The instruments come with the rifle: with none (the valley, until Phase 2) the zoom stays a bare zoom.
+    this.instruments.draw(this.instrumentState(view, scoped, optic === Optic.Binoculars && rifle ? eased : 0, rifle));
+    // A click from now on is about this frame: the line of sight the player steered, before any sway.
     this.input.latch.frameShown(this.sim.tick, this.clock.alpha, pose.yaw, pose.pitch);
-    this.hud.updateCompass(pose.yaw);
+    this.hud.updateCompass(view.yaw);
     this.hud.setRange(this.debug ? this.aimText : null);
 
     if (!this.paused) this.tickWindow += dt;
@@ -805,7 +849,26 @@ export class Game {
     this.recorder?.record(this.sim, events);
     // A fresh snapshot when guards came or went (snapshot() reuses `swap` only when they match).
     this.curr = this.sim.snapshot(swap);
-    for (const e of events) if (e.type === 'outcome') this.decided = true;
+    for (const e of events) {
+      if (e.type === 'outcome') this.decided = true;
+      else if (e.type === 'ranged') this.ranged = { range: e.range, at: performance.now() / 1000 };
+      else if (e.type === 'shot' && e.speed > 0 && e.source === this.sim.playerId) {
+        const fire = this.sim.lastInput.commands.find((c) => c.kind === 'fire');
+        if (fire?.kind === 'fire') this.shotLog.push({ report: analyzeShot(this.sim, e, fire), result: 'no strike', impact: -1, hit: false });
+      } else if (e.type === 'impact') {
+        const s = this.shotLog.find((x) => x.report.shot === e.cause);
+        if (s) {
+          s.impact = e.id;
+          s.result = e.what === 'body' ? `struck the ${e.part}` : e.what === 'collider' && e.surface === Surface.Metal ? 'rang the steel' : `missed, into the ${e.what === 'terrain' ? surfaceName(e.surface) : 'cover'}`;
+        }
+      } else if (e.type === 'death') {
+        const s = this.shotLog.find((x) => x.impact === e.cause);
+        if (s) {
+          s.result = `${e.part}, down`;
+          s.hit = s.report.target?.id === e.victim;
+        }
+      }
+    }
     if (events.length > 0) {
       this.renderer.addEvents(events, this.time);
       this.sound.play(events, this.sim.player.eyeHeight, this.soundTiming, !this.detached);
@@ -837,6 +900,100 @@ export class Game {
       pitch: this.replay ? lerp(a.pitch, b.pitch, t) : this.input.pitch,
       fov,
     };
+  }
+
+  /** The player's rifle as the frame shows it: between the last two ticks, like the body. Null without one. */
+  private interpolatedRifle(): RifleView | null {
+    const a = this.prev?.rifle;
+    const b = this.curr?.rifle;
+    if (!b) return null;
+    const r = Object.assign(this.rifleNow, b);
+    if (!a) return r;
+    const t = this.clock.alpha;
+    r.up = lerp(a.up, b.up, t);
+    r.right = lerp(a.right, b.right, t);
+    r.raise = lerp(a.raise, b.raise, t);
+    r.rest = lerp(a.rest, b.rest, t);
+    r.air = lerp(a.air, b.air, t);
+    return r;
+  }
+
+  private readonly viewDir = vec3();
+  private readonly viewPose: CameraPose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, fov: 0 };
+
+  /** The camera moved by the rifle's sway, as far as the scope is up (sim/ballistics/aim.ts, viewLine). */
+  private swayed(pose: CameraPose, rifle: RifleView): CameraPose {
+    const d = viewLine(pose.yaw, pose.pitch, rifle, this.viewDir);
+    const v = Object.assign(this.viewPose, pose);
+    v.yaw = Math.atan2(-d.x, -d.z);
+    v.pitch = Math.asin(Math.max(-1, Math.min(1, d.y)));
+    return v;
+  }
+
+  private readonly instrumentScratch: InstrumentState = { scope: 0, binoculars: 0, fovDeg: 0, rifle: null, ranged: null, assists: 'lite', dope: [], dot: null, readout: null };
+  private readonly eyeAt = vec3();
+  private readonly landed = vec3();
+  private readonly toLanding = vec3();
+  private readonly hold: Hold = { up: 0, right: 0 };
+
+  /** What the scope and the binoculars show this frame: the reticle, the rifle, the range, and the assists' numbers. */
+  private instrumentState(view: CameraPose, scope: number, binoculars: number, rifle: RifleView | null): InstrumentState {
+    const s = this.instrumentScratch;
+    s.scope = rifle ? scope : 0;
+    s.binoculars = binoculars;
+    s.fovDeg = view.fov;
+    s.rifle = rifle;
+    s.assists = this.settings.assists;
+    s.ranged = this.ranged ? { range: this.ranged.range, age: performance.now() / 1000 - this.ranged.at } : null;
+    s.dot = null;
+    s.readout = null;
+    s.dope = [];
+    if (!rifle || (scope <= 0 && binoculars <= 0) || s.assists === 'sim') return s;
+    const T = this.tuning;
+    const env = this.world.spec.env;
+    const density = air(env).density;
+    const t = this.sim.tick / T.sim.tickHz;
+    const wind = windAt(env, t, { x: 0, z: 0 });
+    const zero = zeroOf(rifle, T, density);
+    const still = ballisticOf(rifle, T, density, { x: 0, z: 0 });
+    const key = `${rifle.zero}|${rifle.load}|${density}`;
+    if (this.dope.key !== key) {
+      const rows: DopeRow[] = [];
+      const eye = vec3();
+      const sight = vec3();
+      for (let range = 100; range <= 600; range += 100) {
+        const target = { x: 0, y: 0, z: -range };
+        solveAimInto(eye, target, zero, still, T.ballistics.maxFlight, sight);
+        const up = holdBetween(sight, unit(0, 0, -1, vec3()), { up: 0, right: 0 }).up;
+        solveAimInto(eye, target, zero, { ...still, wx: 1 }, T.ballistics.maxFlight, sight);
+        const windPerMs = Math.abs(holdBetween(sight, unit(0, 0, -1, vec3()), { up: 0, right: 0 }).right);
+        rows.push({ range, up, windPerMs });
+      }
+      this.dope = { key, rows };
+    }
+    s.dope = this.dope.rows;
+    if (s.assists !== 'arcade' || !this.ranged || this.ranged.range < 0) return s;
+    // Arcade: where a shot along the view lands at the ranged distance, wind and all.
+    const cam = lineOfSight(view.yaw, view.pitch, this.viewDir);
+    const eye = this.eyeAt;
+    eye.x = view.x;
+    eye.y = view.y;
+    eye.z = view.z;
+    const windy = ballisticOf(rifle, T, density, wind);
+    if (Number.isFinite(landing(eye, cam, cam, this.ranged.range, zero, windy, T.ballistics.maxFlight, this.landed))) {
+      unit(this.landed.x - eye.x, this.landed.y - eye.y, this.landed.z - eye.z, this.toLanding);
+      holdBetween(cam, this.toLanding, this.hold);
+      s.dot = { up: -this.hold.up, right: -this.hold.right };
+      // The binoculars read the hold out: the drop at this range, and the wind's push across the view.
+      const r = this.ranged.range;
+      const k = Math.min(this.dope.rows.length - 1, Math.max(0, Math.floor(r / 100) - 1));
+      const lo = this.dope.rows[k]!;
+      const hi = this.dope.rows[Math.min(this.dope.rows.length - 1, k + 1)]!;
+      const f = hi.range > lo.range ? Math.min(1, Math.max(0, (r - lo.range) / (hi.range - lo.range))) : 0;
+      const across = wind.x * Math.cos(view.yaw) - wind.z * Math.sin(view.yaw);
+      s.readout = { hold: lo.up + (hi.up - lo.up) * f, wind: -across * (lo.windPerMs + (hi.windPerMs - lo.windPerMs) * f), windFrom: compass(env.wind.fromDeg) };
+    }
+    return s;
   }
 
   private flyPose(dt: number, fov: number): CameraPose {
@@ -940,6 +1097,7 @@ export class Game {
       `noise ${p.loudness.toFixed(2)} → heard within ${(p.loudness * T.noise.radiusPerUnit).toFixed(1)} m`,
       `outcome ${this.sim.state.outcome.status}${this.sim.state.outcome.reason ? ` · ${this.sim.state.outcome.reason}` : ''}`,
       `seen ×${exp.toFixed(2)} = ${p.stance} ${V.stance[p.stance]} × ${p.gait === 'idle' ? 'still' : 'moving'} ${moveFactor} × ${lightName} ${light}`,
+      ...this.rifleLines(),
       `aim ${this.aimText ?? '—'}`,
       ``,
       `WORLD`,
@@ -958,6 +1116,17 @@ export class Game {
       `PLAYTEST · ${this.capture.status}`,
     ];
     return lines.join('\n');
+  }
+
+  /** The rifle and the vitals in the debug panel (sim/ballistics, sim/body/vitals.ts). */
+  private rifleLines(): string[] {
+    const r = this.curr?.rifle;
+    if (!r) return [];
+    return [
+      `rifle ${r.load}${r.suppressed ? ' suppressed' : ''} · zero ${r.zero} m · ${r.rounds} rounds · bolt ${r.bolt.toFixed(1)} s · scope ${r.raise.toFixed(2)}`,
+      `sway ${r.up.toFixed(2)} up ${r.right.toFixed(2)} right mil · rest ${r.rest.toFixed(2)} · steady ${r.steady.toFixed(2)} · glint ${r.glint.toFixed(2)}`,
+      `heart ${r.heartRate.toFixed(0)} bpm · breath ${r.held > 0 ? `held ${r.held.toFixed(1)} s` : 'breathing'} · air ${r.air.toFixed(2)}${this.ranged ? ` · ranged ${this.ranged.range} m` : ''}`,
+    ];
   }
 
   // --- Replays. ------------------------------------------------------------------------
@@ -1463,3 +1632,14 @@ function colliderLabel(c: Collider): string {
 }
 
 /** Ray against an upright cylinder standing at (x, y, z). */
+
+/** The line of sight that puts a still shot from `eye` on `target`, for the dope card. */
+function solveAimInto(eye: { x: number; y: number; z: number }, target: { x: number; y: number; z: number }, zero: ReturnType<typeof zeroOf>, b: ReturnType<typeof ballisticOf>, maxFlight: number, out: { x: number; y: number; z: number }): void {
+  solveAim(eye, target, 0, 0, zero, b, maxFlight, out);
+}
+
+/** A compass point for a bearing, degrees. */
+function compass(deg: number): string {
+  const names = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  return names[Math.round((((deg % 360) + 360) % 360) / 45) % 8]!;
+}
