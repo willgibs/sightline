@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative as relativeTo, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -13,6 +13,8 @@ import { describe, expect, it } from 'vitest';
  */
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+/** A path from the repository root, with forward slashes on every platform (Windows gives backslashes). */
+const relative = (from: string, to: string): string => relativeTo(from, to).split(sep).join('/');
 
 function files(dir: string): string[] {
   const out: string[] = [];
