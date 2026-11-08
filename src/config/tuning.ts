@@ -250,6 +250,26 @@ export const defaultTuning = {
     catchUp: 1.5, // how much faster than walking a guard may hurry back to his routine
   },
 
+  // The camp brain (lab E, src/sim/brain).
+  brain: {
+    // Navigation (E1): A* over the map and site layers of the spatial grid (nav.ts).
+    nav: {
+      siteExpansions: 40000, // site-layer cells one search may expand (rule 18)
+      mapExpansions: 20000, // map-layer cells one search may expand (rule 18)
+      searchesPerTick: 4, // routes searched in one tick, across every guard
+      snapRadius: 4, // metres: how far a blocked point looks for the nearest walkable cell
+      pullAhead: 200, // cells a straight segment may skip in string-pulling
+      sampleStep: 0.2, // metres between clearance samples along a pulled segment
+      arrive: 0.6, // metres: close enough to a waypoint to move on
+      slowDown: 1.2, // metres before the last waypoint where he eases off
+      minSpeed: 0.5, // m/s: never slower than this while walking a route
+      progress: 0.02, // metres he must gain on a waypoint to count as progress
+      stallSeconds: 0.9, // no progress for this long: something's in the way
+      stallsMax: 4, // stalls a route may take before the brain is told
+      sideSeconds: 0.7, // how long a sidestep around something in the way lasts
+    },
+  },
+
   view: {
     fov: 58, // vertical degrees, about 91° horizontal at 16:9
     zoomFov: 9, // binocular-style zoom while holding the right mouse button

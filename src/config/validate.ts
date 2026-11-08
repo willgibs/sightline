@@ -51,6 +51,13 @@ const BOUNDS: ReadonlyArray<readonly [path: string, min: number, max: number, in
   ['gen.props.bushSpacing', 1, 1000],
   ['gen.props.treeCover', 0, 1],
   ['gen.walkableSlopeDeg', 1, 89],
+  // Budgets that size searches inside a tick (rule 18), so a hostile recording can't hang a guard's brain.
+  ['brain.nav.siteExpansions', 1, 500000, true],
+  ['brain.nav.mapExpansions', 1, 500000, true],
+  ['brain.nav.searchesPerTick', 1, 64, true],
+  ['brain.nav.pullAhead', 1, 4000, true],
+  ['brain.nav.snapRadius', 0, 64],
+  ['brain.nav.sampleStep', 0.05, 2],
   // Every kind of body: sizes that set how far collision looks, and limits whose tangent is taken.
   ...Object.keys(defaultTuning.bodies).flatMap((kind) =>
     (

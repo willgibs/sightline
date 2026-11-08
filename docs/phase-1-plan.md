@@ -718,11 +718,11 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - **Seen to react.** A shot from 300 m gets a reaction a watcher can see inside the design's window: at most 2 s.
 
 **Milestones:**
-- [ ] E1 · Navigation on the grid search (W0.5).
+- [x] E1 · Navigation on the grid search (W0.5) (`brain/nav.ts`, `tests/nav.test.ts`).
   - Coarse routes over the map layer and a fine local grid over the camp.
   - A\*, with fixed tie-breaks and an iteration budget; paths string-pulled and followed through the motor.
-  - Stepping around a cornered player.
-  - Ladder links (C5).
+  - Stepping around a cornered player: a stalled walk sidesteps by a fixed rule (own-body information only), comes back to its route, and tells the brain when it can't.
+  - Ladder links (C5): waiting on lab C's ladders.
 - [ ] E2 · The lab scene: 5–8 guards with roles, an alarm box, a radio and a generator. It uses a handmade camp until D4–D6 are on `main`.
 - [ ] E3 · The brain.
   - A prioritized machine of awareness states.
