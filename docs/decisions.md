@@ -6,6 +6,21 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
 
+### The budget: sixteen guards perceiving (A11)
+
+**Decision:**
+- **The perception crowd** (`perception-crowd`): the lab with sixteen guards perceiving (the camp's most: eight sentries, seven on patrol and the tower, two marksmen, a worker), pinned in the perception bench, so its work is a budget: 34 rays a tick for sight and, over the 90 s walk in, 371,207 grid nodes for hearing.
+- **Measured:**
+  - in Node, per tick: median 0.14 ms, 99th percentile 1.9 ms, worst 5.5–7.8 ms (a burst of barks);
+  - with `npm run scene -- perception-crowd --profile`: sight 107 µs, awareness and hearing 35 µs, the motor 37 µs;
+  - in headless Chromium: 131 µs a tick, from `tests/browser/budget.test.ts`, which CI also runs in Firefox and WebKit;
+  - against a 33 ms tick, and about 10 ms of a 60 Hz frame's own work.
+- **One fast path, because it was needed:** a sound's flood goes no farther than 25 m along its path (`hearing.floodReach`). Beyond it a sound arrives by the straight line alone, which in the open is the same answer, and through walls loses 12 dB each. A shout's whole 60 m flood took 12 ms, and two in a tick 24 ms; now about 2 ms.
+- **Fast paths already there:** a distant guard skips perception, because a body beyond every zone's farthest possible reach costs no rays. The world's steady sounds are flooded once, at the scene's setup, outside any tick.
+- **Not needed:** a still body skipping the motor (lab C's), since the motor costs 37 µs for 17 bodies.
+
+**Why:** rule 18's budgets are counts, pinned; time is a trend, reported.
+
 ### Sandbox drops and the time scale (A10), and where other stimuli plug in (A9)
 
 **Decision:**

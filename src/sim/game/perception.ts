@@ -48,9 +48,13 @@ import type { Simulation } from './sim';
  * every body that isn't.
  */
 
-/** Gives every guard senses: a scene's setup, where perception runs. Marksmen get the far zone. */
+/**
+ * Gives every guard senses: a scene's setup, where perception runs. Marksmen get the far
+ * zone. The world's steady sounds are flooded now, between ticks, so no tick pays for them.
+ */
 export function giveSenses(sim: Simulation): void {
   for (const g of sim.guards) g.senses ??= createSenses(sim.world.camp.guards[g.guard.spawn]?.role === 'marksman');
+  acousticsOf(sim.world, sim.tuning).warm();
 }
 
 /** The eye a guard looks from, written to `out`. */

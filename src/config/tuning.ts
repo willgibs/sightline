@@ -201,6 +201,9 @@ export const defaultTuning = {
     },
     hearing: {
       maxExpansions: 120000, // site-grid cells one sound's flood may expand (rule 18)
+      // The flood carries a sound round buildings this far along its path; beyond, it
+      // arrives by the straight line only (A11: a shout's whole flood cost a frame).
+      floodReach: 25,
       wallLossDb: 12, // the straight route loses this much per wall it passes through (as Rainbow Six Siege's does)
       terrainLossDb: 15, // and this much where the ground is in the way
       maxWalls: 4, // through more walls than this, the straight route is silent

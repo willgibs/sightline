@@ -435,7 +435,7 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - lens glint (B6);
   - open doors (D4).
 - [x] A10 · Sandbox mode: noise drops, and the time-scale hook.
-- [ ] A11 · The budget: 16 guards perceiving within the frame budget, measured by work counts as well as `npm run sim -- --profile`, in Chromium, Firefox and WebKit. Fast paths come only if it needs them: a still body skips the motor, and a distant guard skips perception.
+- [x] A11 · The budget: 16 guards perceiving within the frame budget, measured by work counts as well as `npm run sim -- --profile`, in Chromium, Firefox and WebKit. Fast paths come only if it needs them: a still body skips the motor, and a distant guard skips perception.
 - [ ] A12 · Trial mode, with the protocol in Exit tests, and the agents' pre-screen.
 - [ ] A13 · Perception joins the valley (`SYSTEMS`), announced, with the version bump.
 - [ ] Exit test, the bench numbers, a note, a playable link.
