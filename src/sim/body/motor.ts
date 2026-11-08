@@ -6,7 +6,7 @@ import type { World } from '../kernel/world/world';
 import { Blocks, pushOutCircle } from '../kernel/world/colliders';
 import { makeTerrainSample } from '../kernel/world/heightfield';
 import type { Solids } from '../kernel/world/solids';
-import { surfaceLoudness } from '../kernel/world/surfaces';
+import { surfaceLoudness, surfaceName, type Surface } from '../kernel/world/surfaces';
 import { RIM, bodyHeight, groundBelow, pushHistory, rimExcess, type BodySpec, type BodyState, type Gait, type MotorModeName } from './body';
 import { footprint, restRadius, type FootCircle } from './chain';
 import { footfall } from './footfall';
@@ -79,6 +79,10 @@ export interface MoveIntent {
   climb: boolean;
   /** Up (1) or down (−1) a ladder, while on one. */
   climbAxis: number;
+  /** How much louder its steps are: 1, or more with a load (game/use.ts). */
+  load: number;
+  /** It's dragging something: a scrape with each step (game/use.ts). */
+  scrape: boolean;
 }
 
 export function idleIntent(b: BodyState, tick: number, out: MoveIntent): MoveIntent {
@@ -92,6 +96,8 @@ export function idleIntent(b: BodyState, tick: number, out: MoveIntent): MoveInt
   out.raised = false;
   out.climb = false;
   out.climbAxis = 0;
+  out.load = 1;
+  out.scrape = false;
   return out;
 }
 
@@ -173,6 +179,14 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
   // --- Move and collide, the body as long as it will be this tick. ---------------------
   const feet = b.y;
   const was = b.lying;
+  // Where it starts: a lying body that can't end the tick clear goes back to here.
+  const startX = b.x;
+  const startZ = b.z;
+  const startAxis = b.axis;
+  const startLying = b.lying;
+  const startSurface = b.surface;
+  const startOn = b.standingOn;
+  const startSlope = b.slopeTan;
   const grew = growLying(b, spec, ctx.dt);
   if (!resolveMove(b, b.x + b.vx * dt, b.z + b.vz * dt, spec, ctx, dest) && grew) {
     // No room to grow into: it stays as long as it was.
@@ -249,7 +263,7 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
   b.standingOn = ground.collider;
   b.slopeTan = destSlope;
   const step = footfall(b.speed, spec, tuning.noise);
-  b.loudness = b.speed < 0.05 ? 0 : step.loudness * surfaceLoudness(ground.surface, tuning);
+  b.loudness = b.speed < 0.05 ? 0 : step.loudness * surfaceLoudness(ground.surface, tuning) * i.load;
   // Steps are what the legs did: the body's own speed over the tick, never more than it
   // actually moved. Another body shoving a still one moves it without a single step.
   const walked = Math.min(movedDist, Math.sqrt(b.vx * b.vx + b.vz * b.vz) * dt);
@@ -276,12 +290,34 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
         radius: b.loudness * tuning.noise.radiusPerUnit,
         gait: soundGait(b, spec),
       });
+      if (i.scrape) {
+        // Dragging something, a scrape with every step: loudest on gravel and metal.
+        const loudness = dragLoudness(ground.surface, tuning);
+        ctx.emit({ type: 'drag', source: ctx.source, x: b.x, y: b.y, z: b.z, surface: ground.surface, loudness, radius: loudness * tuning.noise.radiusPerUnit });
+      }
     }
   }
-  // Lying: the body turns, by what it can, and settles along the ground under it.
+  // Lying: the body turns, by what it can, and settles along the ground under it. The
+  // final pose is checked exactly as the invariant watch will check it: the circles were
+  // cleared against heights the settling may since have changed, and a promise that holds
+  // only most of the time isn't one.
   if (b.lying > 0) {
     turnAxis(b, spec, ctx, tanMax);
     lieAlongGround(b, spec, ctx);
+    if (b.motor === 'ground' && !b.sliding && !chainEndClear(b, spec, ctx)) {
+      b.x = startX;
+      b.z = startZ;
+      b.y = feet;
+      b.axis = startAxis;
+      b.lying = startLying;
+      b.vx = 0;
+      b.vz = 0;
+      b.vy = 0;
+      b.surface = startSurface;
+      b.standingOn = startOn;
+      b.slopeTan = startSlope;
+      lieAlongGround(b, spec, ctx);
+    }
   }
   const L = tuning.noise.landing;
   if (impact >= L.minSpeed) {
@@ -328,6 +364,11 @@ function drawController(d: DebugDraw, b: BodyState, spec: BodySpec, world: World
     d.line(b.x, eye.y, b.z, eye.x, eye.y, eye.z, 'info');
     d.circle(eye.x, eye.y, eye.z, spec.parts.headRadius, 'info');
   }
+}
+
+/** How loud dragging something over this surface is, each step. */
+function dragLoudness(surface: Surface, tuning: Tuning): number {
+  return tuning.noise.drag[surfaceName(surface)];
 }
 
 /**
@@ -729,6 +770,25 @@ function restFloor(b: BodyState, x: number, z: number, spec: BodySpec, ctx: Moto
     if (needed > floor) floor = needed;
   }
   return floor;
+}
+
+/** True if every circle of a lying body is clear at this very pose, judged as the invariant watch judges it. */
+function chainEndClear(b: BodyState, spec: BodySpec, ctx: MotorContext): boolean {
+  const height = bodyHeight(b, spec);
+  const circles = footprint(b, spec, feetCircles);
+  for (let k = 0; k < circles.length; k++) {
+    const C = circles[k]!;
+    const cx = b.x + C.x;
+    const cz = b.z + C.z;
+    const base = Math.max(b.y - C.allow, groundBelow(ctx.world, ctx.solids, cx, cz, b.y + C.allow + spec.stepHeight, C.r).height);
+    ctx.solids.query(cx - C.r, cz - C.r, cx + C.r, cz + C.r, ids);
+    for (let q = 0; q < ids.length; q++) {
+      const c = ctx.solids.get(ids[q]!);
+      if ((c.flags & Blocks.Move) === 0 || c.y1 <= base + spec.stepHeight || c.y0 >= base + height) continue;
+      if (pushOutCircle(c, cx, cz, C.r, tmpPush) && tmpPush.x * tmpPush.x + tmpPush.z * tmpPush.z > 1e-8) return false;
+    }
+  }
+  return true;
 }
 
 /** A lying body settles along the ground under its head and feet, within what its slope limit allows. */

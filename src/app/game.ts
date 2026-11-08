@@ -804,7 +804,7 @@ export class Game {
     // A click from now on is about this frame: the line of sight the player steered, before any sway.
     this.input.latch.frameShown(this.sim.tick, this.clock.alpha, pose.yaw, pose.pitch);
     this.hud.updateCompass(view.yaw);
-    this.hud.setPrompt(this.curr.climb && !this.detached && !this.replay ? `${this.input.map.describe('climb')} · ${this.curr.climb === 'ladder' ? 'climb' : 'mantle'}` : null);
+    this.hud.setPrompt(this.detached || this.replay ? null : this.curr.use ? `${this.input.map.describe('use')} · ${this.curr.use === 'drop' ? 'put down' : 'carry'}` : this.curr.climb ? `${this.input.map.describe('climb')} · ${this.curr.climb === 'ladder' ? 'climb' : 'mantle'}` : null);
     this.hud.setRange(this.debug ? this.aimText : null);
 
     if (!this.paused) this.tickWindow += dt;

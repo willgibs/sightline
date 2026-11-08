@@ -161,6 +161,7 @@ describe('a run that ends in a fault', () => {
   const faulty: System = {
     name: 'faulty',
     phase: 'world',
+    after: ['carried'],
     reads: ['player.body'],
     writes: ['player.body.x'],
     emits: [],

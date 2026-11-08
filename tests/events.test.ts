@@ -79,6 +79,7 @@ function events(): { sim: Simulation; all: SimEvent[]; valley: number; range: Si
     { type: 'bark', id: 0, tick, t: tick / 30, source: guard, cause: 0, ...voice, line: 3 },
     { type: 'noise', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, loudness: 2, radius: 24 },
     { type: 'mantle', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, surface: Surface.Rock, loudness: 0.735, radius: 8.82 },
+    { type: 'drag', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, surface: Surface.Gravel, loudness: 1.55, radius: 18.6 },
   ];
   perceived.forEach((e) => all.push({ ...e, id: all.length + 1 }));
   const valley = all.length;
@@ -115,7 +116,7 @@ describe('events', () => {
     for (const e of all.slice(0, valley)) expect(ids.has(e.source)).toBe(true);
     const types = new Set(all.slice(0, valley).filter((e) => e.source === PLAYER_ID).map((e) => e.type));
     // The player drops noises from the sandbox (A10).
-    expect([...types].sort()).toEqual(['footstep', 'land', 'mantle', 'noise', 'outcome', 'shot', 'stance']);
+    expect([...types].sort()).toEqual(['drag', 'footstep', 'land', 'mantle', 'noise', 'outcome', 'shot', 'stance']);
     expect(all.some((e) => e.source !== PLAYER_ID && e.type === 'footstep')).toBe(true);
     // On the range the guards who cry out are gone by the end: every source was an entity of that run.
     for (const e of all.slice(valley)) expect(e.source >= 1 && e.source < range.state.nextId).toBe(true);

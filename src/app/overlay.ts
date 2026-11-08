@@ -47,6 +47,7 @@ export class Overlay {
       [['prone'], 'prone'],
       [['leanLeft', 'leanRight'], 'lean'],
       [['climb'], 'mantle'],
+      [['use'], 'carry a body'],
       [['fire'], 'fire'],
       [['zoom'], 'scope'],
       [['scopeToggle'], 'scope on or off'],

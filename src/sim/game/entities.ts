@@ -68,6 +68,10 @@ export interface RemainsEntity extends EntityBase {
     /** When he was hit, mission seconds. */
     fell: number;
     part: BodyPart;
+    /** Who carries him now (an entity id), or 0 (lab C, game/use.ts). */
+    carriedBy: EntityId;
+    /** Put down in foliage or by a container: where guards don't see him. */
+    hidden: boolean;
   };
 }
 

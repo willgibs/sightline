@@ -26,6 +26,7 @@ function snapshot(tick: number, extra: Partial<Snapshot> = {}): Snapshot {
     eyeZ: 0,
     lean: 0,
     climb: '',
+    use: '',
     axis: 0,
     lying: 0,
     riseHead: 0,
@@ -78,7 +79,7 @@ describe('the shot layer', () => {
 
   it("draws a body where the simulation has its shape, collapsing at the frame's instant", () => {
     const l = layer();
-    const r = { id: 9, of: 4, post: 2, x: 10, y: 1, z: -50, yaw: 0.3, eye: 1.71, vx: 1.35, vz: 0, fell: 1, part: 'head' as const };
+    const r = { id: 9, of: 4, post: 2, x: 10, y: 1, z: -50, yaw: 0.3, eye: 1.71, vx: 1.35, vz: 0, fell: 1, part: 'head' as const, carriedBy: 0, hidden: false };
     const prev = snapshot(35, { remains: [r] });
     const curr = snapshot(36, { remains: [r] });
     l.update(prev, curr, 0.5);

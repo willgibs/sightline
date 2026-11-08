@@ -2,12 +2,14 @@ import type { Tuning } from '../../../config/tuning';
 import { buildRoutine, buildWorld, type Camp, type GuardRole, type GuardSpawn, type Routine, type Structure, type StructureKind } from '../../generation';
 import { TWO_PI, datan2, dcos, dsin } from '../../kernel/core/detmath';
 import { Rng } from '../../kernel/core/rng';
+import { Faction } from '../../kernel/state';
 import type { SimEvent } from '../../kernel/events';
 import { Blocks, type ColliderInput } from '../../kernel/world/colliders';
 import { SURFACE_NAMES, Surface, surfaceName } from '../../kernel/world/surfaces';
 import type { World } from '../../kernel/world/world';
 import { createSenses, type FoliageVolume } from '../../perception';
 import { WaypointDriver, type Waypoint } from '../bots/waypoints';
+import type { RemainsEntity } from '../entities';
 import { PERCEPTION } from '../perception';
 import { SIGHTLINE } from '../sim';
 import type { Scene } from '.';
@@ -19,6 +21,7 @@ import type { Scene } from '.';
  * - **The noise yard:** a guard in a canvas tent that stops sight, not sound, listens from
  *   the middle of a disc cut into wedges, one for every surface. Walk any wedge, at any
  *   gait and distance, and you find out what he hears.
+ * - **A body to carry** lies on the dirt in front of the garden (C6).
  * - **The wall garden:** free-standing walls from a stride's height to out of reach, a
  *   platform to climb onto, windows you fit through and windows you don't, a tower with
  *   a ladder. A guard who neither sees nor hears walks the far side of the walls, back and
@@ -81,6 +84,9 @@ export const WINDOWS: readonly WindowSpec[] = [
 /** A platform to climb onto (1.2 m), 3 m deep, south of the row; a tower with a deck at 5 m beyond it. */
 export const PLATFORM = { x: 34, half: 2.5, height: 1.2, depth: 3 };
 export const TOWER = { x: 44, deck: 5 };
+/** A body to carry or drag (lab B's `remains`), lying on the dirt in front of the walls. */
+export const BODY = { x: -16, z: 6 } as const;
+
 /** The tower's ladder, on its open south side: its foot, the deck it reaches, and away from the tower. */
 export const LADDER = { x: TOWER.x, z: ARENA.garden.z + 3 + 0.08, y0: 0, y1: TOWER.deck, ox: 0, oz: 1 } as const;
 
@@ -323,6 +329,15 @@ export function movementLab(): Scene {
     setup: (sim) => {
       seen = fresh();
       for (const k of SENSING) sim.guards[k]!.senses ??= createSenses(false);
+      // A body to carry, or drag: lying on the dirt south of the garden's walls.
+      sim.spawn(
+        (id): RemainsEntity => ({
+          id,
+          kind: 'remains',
+          faction: Faction.Camp,
+          remains: { of: 0, post: -1, x: BODY.x, y: 0, z: BODY.z, yaw: 1.2, eye: sim.tuning.bodies.guard.eyeHeight.stand, vx: 0, vz: 0, fell: -5, part: 'torso', carriedBy: 0, hidden: false },
+        }),
+      );
     },
     driver: () => new WaypointDriver(route(), 1),
     seconds: 180,

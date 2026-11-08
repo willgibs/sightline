@@ -181,6 +181,11 @@ export interface MantleEvent extends EventBase, SoundFields {
   type: 'mantle';
 }
 
+/** Something dragged along the ground scrapes with every step (lab C, game/use.ts). */
+export interface DragEvent extends EventBase, SoundFields {
+  type: 'drag';
+}
+
 /** The rules decided the run (state.ts, Outcome): the reason is in the state. */
 export interface OutcomeEvent extends EventBase {
   type: 'outcome';
@@ -290,7 +295,8 @@ export type SimEvent =
   | RangedEvent
   | BoltEvent
   | ClatterEvent
-  | MantleEvent;
+  | MantleEvent
+  | DragEvent;
 export type EventType = SimEvent['type'];
 export type EventOf<K extends EventType> = Extract<SimEvent, { type: K }>;
 
@@ -382,6 +388,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   bolt: { code: 35, range: 'ballistics', sound: true, fields: { ...SOUND } },
   clatter: { code: 36, range: 'ballistics', sound: true, fields: { ...SOUND, thrown: 'u32', speed: 'f32' } },
   mantle: { code: 50, range: 'body', sound: true, fields: { ...SOUND } },
+  drag: { code: 51, range: 'body', sound: true, fields: { ...SOUND } },
 };
 
 export function isSound(e: SimEvent): e is Extract<SimEvent, SoundFields> {

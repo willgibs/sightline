@@ -40,6 +40,16 @@ Built on its branch as `docs/phase-1-plan.md`, section B, plans it. Its seed, th
 
 Built on the `lab-c-movement` branch to `docs/phase-1-plan.md`, section C. Lean and the mantle use input the bots never give, so the valley's behaviour is untouched until the prone body (C2).
 
+### The use action (C6): carry, drag, hide
+
+**Decision:**
+- G (the `use` command, code 51; the debug view's grid moved to L) picks up the body in reach and puts it down. Standing it rides the shoulder, crouched it drags behind (`carry.speed` 1.6 m/s, `dragSpeed` 0.9): lab B's `remains` gains `carriedBy` and `hidden`. Lab E's sabotage and doors take their place on the same press.
+- Carrying is slow and loud: a loaded step at carrying pace is as loud as walking (`noise.carry`); dragging also scrapes each step, by surface, loudest on gravel and metal (`noise.drag`), a new sound event (`drag`, code 51).
+- Put down inside foliage or by a container it's hidden: `gameBodies` leaves it out, so guards' eyes and bullets find nothing there. (Lab A's body-finding reads the same flag.)
+- Hands full: no mantling, ladders or lying down while carrying; crouching drags it.
+
+**Why:** The design doc's "slow, and noisy on gravel" is a choice the player makes when they pick the route; the numbers (no shipped game publishes them) are starting values for the sittings.
+
 ### Ladders (C5), and fuzz bots that go looking for trouble
 
 **Decision:**

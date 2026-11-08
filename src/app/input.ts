@@ -216,7 +216,7 @@ export class InputController {
       if (a === 'fire') this.latch.latch(this.opticHeld === Optic.Binoculars && this.armed ? 'range' : 'fire');
       else if (a === 'throw') {
         if (this.armed) this.latch.latch('throw');
-      } else if (a === 'crouch' || a === 'prone' || a === 'climb') this.pressed.add(a);
+      } else if (a === 'crouch' || a === 'prone' || a === 'climb' || a === 'use') this.pressed.add(a);
       else if (a === 'scopeToggle') this.scopeToggled = !this.scopeToggled;
       else if (a === 'shotDrop') this.latch.latch('shotDrop');
       else if (a === 'zeroUp' || a === 'zeroDown' || a === 'suppressor') {
@@ -243,6 +243,7 @@ export class InputController {
     out.crouch = !frozen && this.pressed.has('crouch');
     out.prone = !frozen && this.pressed.has('prone');
     const climb = !frozen && this.pressed.has('climb');
+    const use = !frozen && this.pressed.has('use');
     this.pressed.clear();
     out.yaw = this.yaw;
     out.pitch = this.pitch;
@@ -262,6 +263,7 @@ export class InputController {
       for (const c of this.simple) this.commands.push(c);
       this.simple.length = 0;
       if (climb) this.commands.push({ kind: 'climb' });
+      if (use) this.commands.push({ kind: 'use' });
     }
     out.commands = this.commands;
     return out;

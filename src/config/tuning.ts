@@ -146,6 +146,9 @@ export const defaultTuning = {
         pivot: 0.55, // the pivot a lying body turns on: this far back from the top of its head (near the chest)
         chainSpacing: 0.25, // lying, its collision chain has a circle at least this often
       },
+      // Carrying and dragging a body (sim/game/use.ts): standing it rides the shoulder; crouched it
+      // drags behind. Slow, and dragging scrapes. The lab's own numbers.
+      carry: { reach: 1.7, speed: 1.6, dragSpeed: 0.9, shoulder: 1.15, trail: 1.1 },
       // Lying down (sim/body/motor.ts): the turn the body's axis makes toward where it looks, rad/s,
       // by the largest step that keeps every part of it clear. No game publishes this; it's the lab's.
       prone: { turnRate: 2 },
@@ -197,6 +200,7 @@ export const defaultTuning = {
         pivot: 0.55,
         chainSpacing: 0.25,
       },
+      carry: { reach: 1.7, speed: 1.6, dragSpeed: 0.9, shoulder: 1.15, trail: 1.1 },
       prone: { turnRate: 2 },
     },
   },
@@ -214,6 +218,9 @@ export const defaultTuning = {
     // (loudness, times the surface; the drop's grows with how far, up to 1 m).
     mantle: { grip: 0.7, drop: 0.6, minDrop: 0.3 },
     ladder: 0.45, // a rung under a step: loudness, times the surface
+    carry: 1.8, // a loaded step, at carrying pace, is about as loud as walking (sim/game/use.ts)
+    // Dragging something: loudness of the scrape, each step, by surface. Noisy on gravel (design doc).
+    drag: { grass: 0.35, dirt: 0.6, gravel: 1.55, rock: 1.0, water: 1.1, metal: 1.4, wood: 0.9 },
     // Steady sources, as heard radii. Phase 1 makes them mask other sounds for guards too.
     ambient: { creek: 38, generator: 70 },
   },

@@ -13,8 +13,8 @@ import { Blocks } from '../../kernel/world/colliders';
  * input, so everything it does a player could do.
  */
 
-type Behaviour = 'toggles' | 'jitter' | 'reverse' | 'sprint' | 'wall' | 'crawl' | 'steep' | 'wander' | 'leanWall' | 'mantle' | 'proneTurn' | 'rungs';
-const BEHAVIOURS: readonly Behaviour[] = ['toggles', 'jitter', 'reverse', 'sprint', 'wall', 'crawl', 'steep', 'wander', 'leanWall', 'mantle', 'proneTurn', 'rungs'];
+type Behaviour = 'toggles' | 'jitter' | 'reverse' | 'sprint' | 'wall' | 'crawl' | 'steep' | 'wander' | 'leanWall' | 'mantle' | 'proneTurn' | 'rungs' | 'haul';
+const BEHAVIOURS: readonly Behaviour[] = ['toggles', 'jitter', 'reverse', 'sprint', 'wall', 'crawl', 'steep', 'wander', 'leanWall', 'mantle', 'proneTurn', 'rungs', 'haul'];
 
 export class ChaosBot {
   private readonly rng: Rng;
@@ -25,7 +25,7 @@ export class ChaosBot {
   private phase = 0;
   private readonly ids: number[] = [];
   /** Ticks spent in each behaviour, for reporting. */
-  readonly ticks: Record<Behaviour, number> = { toggles: 0, jitter: 0, reverse: 0, sprint: 0, wall: 0, crawl: 0, steep: 0, wander: 0, leanWall: 0, mantle: 0, proneTurn: 0, rungs: 0 };
+  readonly ticks: Record<Behaviour, number> = { toggles: 0, jitter: 0, reverse: 0, sprint: 0, wall: 0, crawl: 0, steep: 0, wander: 0, leanWall: 0, mantle: 0, proneTurn: 0, rungs: 0, haul: 0 };
 
   constructor(seed: string, label = 'chaos') {
     this.rng = new Rng(seed, `bot/${label}`);
@@ -114,6 +114,14 @@ export class ChaosBot {
         out.moveZ = this.phase % 80 < 40 ? 1 : -0.6;
         out.moveX = this.phase % 50 < 25 ? 0.5 : -0.5;
         yaw = datan2(-(t.x - p.x), -(t.z - p.z)) + this.rng.range(-1.6, 1.6);
+        break;
+      }
+      case 'haul': {
+        // Picking up whatever's about and putting it down, crouching and standing as it goes.
+        out.moveZ = this.phase % 60 < 45 ? 1 : 0;
+        if (this.phase % 37 === 1) out.commands = [{ kind: 'use' }];
+        out.crouch = this.phase % 83 === 2;
+        yaw += this.rng.range(-0.3, 0.3);
         break;
       }
       case 'rungs': {

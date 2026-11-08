@@ -22,9 +22,9 @@ export const GOLDEN = {
   world: 'f555512c33daea22',
   /** 60 s of play: the person-like bot in two valleys, the fuzzing bot in one. */
   play: {
-    'TAL-4471 wander': { behaviour: '688ae4eddeadae3a', state: 'f38263b4db0b8d8d' },
-    'MUD-9031 wander': { behaviour: '67964675cb39477e', state: 'ac11a86df7329997' },
-    'TAL-4471 chaos': { behaviour: '038d4fbd418b5ef8', state: '43bbf88a8de44125' },
+    'TAL-4471 wander': { behaviour: '688ae4eddeadae3a', state: '82b1bcb90b5a2eb0' },
+    'MUD-9031 wander': { behaviour: '67964675cb39477e', state: 'd5b89a98d2fea5b5' },
+    'TAL-4471 chaos': { behaviour: 'f3bd13f84383adec', state: 'c4c1b68e920c1c9e' },
   },
   /**
    * Scenes run by their own drivers, each pinning its lane (benches.ts): the movement
@@ -34,10 +34,10 @@ export const GOLDEN = {
    * bodies spawned inside a tick; the kernel alone, a run with every lane switched off.
    */
   scenes: {
-    'movement-course': { behaviour: '780d178074ec33ce', state: 'acf6a01aacb1b3e1' },
-    'perception-lab': { behaviour: 'ec9629090f983b90', state: '4096a8cd18b3208e' },
-    'shooting-range': { behaviour: '8cc3e0f7a274c3c5', state: '566b20cf81a2181e' },
-    'spawn-tick': { behaviour: 'f5e93112e48134bb', state: 'e51529d3a5dc44b2' },
+    'movement-course': { behaviour: '780d178074ec33ce', state: '8aeb62ad1b153b7b' },
+    'perception-lab': { behaviour: 'ec9629090f983b90', state: '8c078d3b1b2a4e23' },
+    'shooting-range': { behaviour: '8cc3e0f7a274c3c5', state: '4545cb7eb41540f3' },
+    'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '42c55f2958b14cf0' },
     'kernel-alone': { behaviour: '0698e581024f5b35', state: '7797e5bc3b7451dc' },
   },
 } as const;

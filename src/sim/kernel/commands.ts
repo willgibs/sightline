@@ -33,6 +33,11 @@ export interface ClimbCommand {
   kind: 'climb';
 }
 
+/** The use action: pick up what's in reach, or put it down (lab C, game/use.ts). */
+export interface UseCommand {
+  kind: 'use';
+}
+
 /** Laser the range along the frame's line of sight, with the binoculars up (ballistics lane). */
 export interface RangeCommand {
   kind: 'range';
@@ -71,7 +76,7 @@ export interface SuppressorCommand {
   kind: 'suppressor';
 }
 
-export type Command = FireCommand | RangeCommand | ThrowCommand | ZeroUpCommand | ZeroDownCommand | SuppressorCommand | ShotDropCommand | ClimbCommand;
+export type Command = FireCommand | RangeCommand | ThrowCommand | ZeroUpCommand | ZeroDownCommand | SuppressorCommand | ShotDropCommand | ClimbCommand | UseCommand;
 export type CommandKind = Command['kind'];
 
 /** How a command field is stored and quantized. */
@@ -94,6 +99,7 @@ export const COMMANDS: { readonly [K in CommandKind]: CommandSpec<Extract<Comman
   suppressor: { code: 34, range: 'ballistics', fields: {} },
   shotDrop: { code: 35, range: 'ballistics', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
   climb: { code: 50, range: 'body', fields: {} },
+  use: { code: 51, range: 'body', fields: {} },
 };
 
 /** The most commands one tick carries; more are dropped, oldest kept. */

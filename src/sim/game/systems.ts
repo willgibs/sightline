@@ -6,6 +6,7 @@ import { player } from './entities';
 import { think } from './guards';
 import { playerIntent } from './player';
 import { SHOOTING_SYSTEMS } from './shooting';
+import { carriedSystem, useSystem } from './use';
 
 /**
  * Sightline's tick: which lanes' systems run, in which phase (kernel/systems.ts, PHASES).
@@ -69,7 +70,7 @@ const playerIntentSystem: System = {
   emits: ['stance'],
   run(ctx) {
     const p = player(ctx.index);
-    const motor = { world: ctx.world, solids: ctx.solids, tick: ctx.tick, source: p.id, emit: ctx.emit, dt: ctx.dt };
+    const motor = { world: ctx.world, solids: ctx.solids, tick: ctx.tick, source: p.id, emit: ctx.emit, dt: ctx.dt, tuning: ctx.tuning };
     playerIntent(p.body, p.control, ctx.input, ctx.tuning.bodies.player, motor, intentFor(ctx, p.id));
   },
 };
@@ -106,11 +107,13 @@ export const SYSTEMS: readonly System[] = [
   scheduleSystem(SCHEDULE_HANDLERS),
   playerCommands,
   SHOOTING_SYSTEMS.rifle,
+  useSystem,
   playerIntentSystem,
   guardOrders,
   motorSystem,
   SHOOTING_SYSTEMS.bullets,
   SHOOTING_SYSTEMS.thrown,
   SHOOTING_SYSTEMS.aim,
+  carriedSystem,
   guardBrains,
 ];

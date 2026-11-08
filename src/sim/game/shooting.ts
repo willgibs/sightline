@@ -364,7 +364,7 @@ function kill(ctx: TickContext, g: GuardEntity, s: Strike, bullet: BulletEntity,
     id,
     kind: 'remains' as const,
     faction: Faction.Camp,
-    remains: { of: g.id, post: g.guard.spawn, x: pose.x, y: pose.y, z: pose.z, yaw: datan2(-f.dx, -f.dz), eye: pose.eyeHeight, vx: g.body.vx, vz: g.body.vz, fell: s.t, part },
+    remains: { of: g.id, post: g.guard.spawn, x: pose.x, y: pose.y, z: pose.z, yaw: datan2(-f.dx, -f.dz), eye: pose.eyeHeight, vx: g.body.vx, vz: g.body.vz, fell: s.t, part, carriedBy: 0, hidden: false },
   }));
   ctx.emit({ type: 'death', source: bullet.bullet.shooter, t: s.t, cause, victim: g.id, remains: remains.id, post: g.guard.spawn, part, x: pose.x, y: pose.y, z: pose.z });
   ctx.despawn(g.id);

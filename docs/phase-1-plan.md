@@ -605,11 +605,11 @@ Playable at `?scene=movement-lab`; the movement course stays as a regression tes
   - **Trials (C8):** A's protocol and pass mark, 80% balanced accuracy over two sittings, with accuracy reported by the factor that flips each outcome: surface, gait, distance, masking, light.
 
 **Milestones:**
-- [ ] C1 · The lab scene: the course grown into an arena with:
+- [x] C1 · The lab scene: the course grown into an arena with:
   - lit and shaded ground, and every surface;
   - a guard listening and one watching;
   - walls to mantle, a window, a ladder, and a body to carry.
-  - It stands at `?scene=movement-lab` (`game/scenes/movementLab.ts`): the noise yard, the wall garden and the field. The tower's ladder comes with C5, the body with C6 once B4 lands.
+  - It stands at `?scene=movement-lab` (`game/scenes/movementLab.ts`): the noise yard, the wall garden and the field.
 - [x] C2 · The prone body's real shape.
   - A chain of circles along the facing, or a capsule, for collision, in place of a 0.3 m circle. It grows over the transition, so it never ends a tick inside anything.
   - It turns by the largest yaw that keeps every part clear, found with a fixed number of bisections, pivoting near the chest.
@@ -625,7 +625,7 @@ Playable at `?scene=movement-lab`; the movement course stays as a regression tes
   - Eased phases: hang, pull, shift, push.
   - Every pose is re-checked every tick. A 1.2 m mantle over 0.6 s rises 0.067 m per tick.
 - [x] C5 · Ladders: a motor mode, with validated dismount poses, on D's towers, and with links for E's navigation. Each new mode states its invariants in the motor's header and joins the invariant run (rule 10). The fuzz bots learn to lean into walls, mantle into moving guards and turn prone between walls.
-- [ ] C6 · The use action.
+- [x] C6 · The use action.
   - Carry or drag a body: slow, and noisy on gravel. The body reuses the prone chain.
   - Hide it in foliage or a container, where guards don't see it.
   - E's sabotage uses the same action.

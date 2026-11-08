@@ -70,6 +70,7 @@ export function spawnTick(): Scene {
   const arriveAfterMotor: System = {
     name: 'arrive-after-motor',
     phase: 'world',
+    after: ['carried'],
     reads: [],
     writes: ['entities'],
     emits: [],
@@ -81,7 +82,7 @@ export function spawnTick(): Scene {
     reads: [],
     writes: ['entities'],
     emits: [],
-    after: ['player-commands', 'rifle'],
+    after: ['player-commands', 'rifle', 'use'],
     run: (ctx) => void (ctx.tick === ARRIVALS[1].tick && arrive(ctx, 1)),
   };
   const watchMotor: System = {
