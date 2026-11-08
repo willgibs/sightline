@@ -328,6 +328,14 @@ export interface AlarmEvent extends EventBase {
   stage: 'raised' | 'dead';
 }
 
+/** A reinforcement squad arrives (E8). Source: the commander; cause: the lockdown behind it. */
+export interface ReinforceEvent extends EventBase {
+  type: 'reinforce';
+  count: number;
+  x: number;
+  z: number;
+}
+
 /** The camp's siren, as lockdown begins (E7): a sound everyone in the valley hears. */
 export interface SirenEvent extends EventBase, SoundFields {
   type: 'siren';
@@ -367,6 +375,7 @@ export type SimEvent =
   | HurtEvent
   | AlarmEvent
   | SirenEvent
+  | ReinforceEvent
   | ReportEvent
   | ImpactEvent
   | DeathEvent
@@ -472,6 +481,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   radio: { code: 92, range: 'brain', sound: false, fields: { kind: { enum: REPORT_CODES }, x: 'f32', z: 'f32', radius: 'f32' } },
   order: { code: 93, range: 'brain', sound: false, fields: { to: 'u32', task: { enum: ['investigate', 'search', 'check', 'sweep'] }, x: 'f32', z: 'f32' } },
   alarm: { code: 97, range: 'brain', sound: false, fields: { box: 'u8', stage: { enum: ['raised', 'dead'] } } },
+  reinforce: { code: 99, range: 'brain', sound: false, fields: { count: 'u8', x: 'f32', z: 'f32' } },
   siren: { code: 98, range: 'brain', sound: true, fields: { ...SOUND } },
   hurt: { code: 96, range: 'brain', sound: false, fields: { part: { enum: ['head', 'torso', 'legs'] }, hits: 'u8' } },
   checkin: { code: 95, range: 'brain', sound: false, fields: { post: 'i32', stage: { enum: ['call', 'answer', 'silence'] } } },

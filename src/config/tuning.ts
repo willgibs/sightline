@@ -288,6 +288,13 @@ export const defaultTuning = {
       role: { sentry: 0.6, patrol: 0.5, marksman: 0, 'radio-operator': 0.3, officer: 0.5, worker: 1, target: 0 },
       sirenRadius: 1200,
     },
+    // Reinforcements (E8): called at lockdown, arriving after a delay as a squad that hunts.
+    reinforce: {
+      delay: 90, // seconds from lockdown to their arrival
+      count: 3, // guards in the squad
+      spread: 3.5, // metres between them when they arrive
+      edgeMargin: 14, // metres inside the map's edge where they arrive, up the camp's road
+    },
     // Counter-sniper (E8): triangulating shots from bearings (triangulate.ts) and hunting the shooter.
     sniper: {
       fusion: { half: 720, cells: 120, rangeMin: 80, rangeMax: 650 }, // the commander's grid around the camp, metres, and its ring of plausible perches

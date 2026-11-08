@@ -102,3 +102,27 @@ describe('alarms', () => {
     expect(ev.some((e) => e.type === 'act' && e.to === 'alarm')).toBe(false);
   });
 });
+
+describe('reinforcements (E8)', () => {
+  it('lockdown calls a squad that arrives after its delay, and hunts', () => {
+    const fast = structuredClone(T);
+    fast.brain.reinforce.delay = 3;
+    let systems = SYSTEMS;
+    for (const s of [...PERCEPTION, commsVoice, campCommander]) systems = withSystem(systems, s);
+    const world = worldWith();
+    const sim = new Simulation(world, fast, systems);
+    giveSenses(sim);
+    giveBrains(sim);
+    giveCommander(sim);
+    giveDevices(sim, [{ x: -18, z: 5 }]);
+    combat(sim);
+    const before = sim.guards.length;
+    const ev = run(sim, 14);
+    expect(ev.some((e) => e.type === 'reinforce')).toBe(true);
+    expect(sim.guards.length).toBe(before + fast.brain.reinforce.count);
+    const arrived = sim.guards.filter((g) => !commanderOf(sim)!.camp.roster.slice(0, before).some((m) => m.id === g.id));
+    expect(arrived.length).toBe(fast.brain.reinforce.count);
+    // They came up the road from the edge, and they have orders.
+    expect(arrived.every((g) => g.brain!.task !== null || g.brain!.act === 'task')).toBe(true);
+  });
+});

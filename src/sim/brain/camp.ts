@@ -81,6 +81,8 @@ export interface CampState {
   /** The last tick a report of something suspicious came in, and its cause. */
   lastPercept: number;
   lastCause: number;
+  /** Reinforcements called (E8): when they were called, or −1. */
+  reinforceCalled: number;
   /** The men it knows it has. */
   roster: RosterEntry[];
   /** Orders in force, and the next task's id. */
@@ -108,6 +110,7 @@ export function createCamp(campX: number, campZ: number, tuning: Tuning): CampSt
     airwaves: [],
     nextAir: 1,
     netWorking: true,
+    reinforceCalled: -1,
     lastPercept: -1,
     lastCause: 0,
     roster: [],

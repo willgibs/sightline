@@ -5,7 +5,7 @@ import { scheduleSystem, type Access, type ScheduleHandler, type System, type Ti
 import { player } from './entities';
 import { drawBrain } from './brains';
 import { guardFire } from './combat';
-import { checkinDeadline, checkinReply, commanderOf, orderDeliver, radioDeliver, speak, raiseAlarm } from './comms';
+import { checkinDeadline, checkinReply, commanderOf, orderDeliver, radioDeliver, raiseAlarm, reinforceArrive, speak } from './comms';
 import { think } from './guards';
 import { playerIntent } from './player';
 import { SHOOTING_SYSTEMS } from './shooting';
@@ -22,6 +22,7 @@ export const SCHEDULE_HANDLERS: Readonly<Record<string, ScheduleHandler>> = {
   'order-deliver': orderDeliver,
   'checkin-reply': checkinReply,
   'checkin-deadline': checkinDeadline,
+  'reinforce-arrive': reinforceArrive,
 };
 
 const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
@@ -135,9 +136,9 @@ function navAllowance(ctx: TickContext): NavAllowance {
 
 /** What the schedule's handlers touch beyond the schedule (kernel/systems.ts, scheduleSystem). */
 const SCHEDULED_ACCESS = {
-  reads: ['commander.camp', 'guard.senses', 'guard.brain', 'guard.guard.spawn'],
-  writes: ['commander.camp', 'guard.brain.told', 'guard.brain.task', 'guard.brain.thinkAt', 'guard.senses.awareness', 'guard.senses.belief', 'rng.awareness'],
-  emits: ['radio', 'checkin'],
+  reads: ['commander.camp', 'guard', 'solid.solid'],
+  writes: ['commander.camp', 'guard.brain.told', 'guard.brain.task', 'guard.brain.thinkAt', 'guard.senses.awareness', 'guard.senses.belief', 'rng.awareness', 'entities', 'guard.body'],
+  emits: ['radio', 'checkin', 'reinforce'],
 } as const satisfies Access;
 
 export const SYSTEMS: readonly System[] = [

@@ -1,10 +1,11 @@
-import { REPORT_KINDS, alertRung, createCamp, digest, mapMass, plan, spreadCamp, type CampMind, type CampOrder, type CampState, type Report, type Task, type Told, type Via } from '../brain';
+import { REPORT_KINDS, alertRung, createBrain, createCamp, digest, mapMass, plan, spreadCamp, standStill, type CampMind, type CampOrder, type CampState, type Report, type Task, type Told, type Via } from '../brain';
 import type { DebugDraw } from '../kernel/debugDraw';
 import type { SimEvent } from '../kernel/events';
+import { createBody } from '../body';
 import { Faction, type EntityBase } from '../kernel/state';
 import type { ScheduleHandler, System, TickContext } from '../kernel/systems';
 import { Surface } from '../kernel/world/surfaces';
-import { believe, stimulate, type Percept } from '../perception';
+import { believe, createSenses, stimulate, type Percept } from '../perception';
 import type { GuardEntity } from './entities';
 import { deliverSound } from './perception';
 import type { Simulation } from './sim';
@@ -201,6 +202,44 @@ export const checkinDeadline: ScheduleHandler = (ctx, entry) => {
 
 const orders: CampOrder[] = [];
 
+/**
+ * Lockdown calls reinforcements (E8): a squad arrives up the camp's road after a delay, as
+ * guards with senses and brains who hunt what the camp believes. Called once, by the
+ * commander's system, at the first lockdown.
+ */
+export const reinforceArrive: ScheduleHandler = (ctx, entry) => {
+  const c = commanderOf(ctx);
+  if (!c) return;
+  const T = ctx.tuning.brain.reinforce;
+  const site = ctx.world.camp.site;
+  const half = ctx.world.playHalf - T.edgeMargin;
+  // Up the road from the gate: the site's first axis, to the edge of the map.
+  const reach = Math.max(10, half);
+  const ex = site.x + site.ux * reach;
+  const ez = site.z + site.uz * reach;
+  const faceX = -site.ux;
+  const faceZ = -site.uz;
+  const post = ctx.world.camp.guards.findIndex((g) => g.role === 'patrol');
+  for (let k = 0; k < T.count; k++) {
+    const x = ex + -site.uz * (k - (T.count - 1) / 2) * T.spread;
+    const z = ez + site.ux * (k - (T.count - 1) / 2) * T.spread;
+    ctx.spawn((id): GuardEntity => {
+      const body = createBody(ctx.world, ctx.solids, ctx.tuning.bodies.guard, x, z, faceX, faceZ);
+      const senses = createSenses(false);
+      const brain = createBrain();
+      return { id, kind: 'guard', faction: Faction.Camp, body, guard: { spawn: post >= 0 ? post : 0, headYaw: 0, order: standStill() }, senses, brain };
+    });
+  }
+  const event = ctx.emit({ type: 'reinforce', source: c.id, cause: entry.b, count: T.count, x: ex, z: ez });
+  // They hunt: the camp's latest belief, by radio, as an order to go and search there.
+  for (const g of ctx.index.of('guard')) {
+    if (!g.brain || g.guard.order.tick !== 0 || g.brain.act !== 'routine' || c.camp.roster.some((m) => m.id === g.id)) continue;
+    c.camp.roster.push({ id: g.id, post: g.guard.spawn, x: g.body.x, z: g.body.z, tick: ctx.tick, status: 'ok' });
+    const target = c.camp.search ?? (c.camp.shots.estimate ? { x: c.camp.shots.estimate.x, z: c.camp.shots.estimate.z } : { x: site.x, z: site.z });
+    g.brain.task = { id: c.camp.nextTask++, kind: 'search', x: target.x, z: target.z, issued: ctx.tick, cause: event };
+  }
+};
+
 /** Gives the camp its devices, from where they stand: the lab's handmade camp; lab D's camps give them by world.camp.devices. */
 export function giveDevices(sim: Simulation, alarms: ReadonlyArray<{ x: number; z: number }>): void {
   const c = sim.index.of('commander')[0];
@@ -275,6 +314,11 @@ export const campCommander: System = {
       for (const o of orders) sendOrder(ctx, c, o.guard, o.task);
     }
     if (camp.level !== before) ctx.emit({ type: 'level', source: c.id, cause: camp.lastCause, from: before, to: camp.level });
+    // Lockdown calls reinforcements, once.
+    if (camp.level === 'lockdown' && camp.reinforceCalled < 0) {
+      camp.reinforceCalled = ctx.tick;
+      ctx.schedule(ctx.tuning.brain.reinforce.delay, 'reinforce-arrive', 0, camp.lastCause);
+    }
     ctx.debug((draw) => drawCamp(draw, ctx, camp));
   },
 };
