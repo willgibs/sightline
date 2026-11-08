@@ -36,6 +36,7 @@ import type { System, TickContext } from '../kernel/systems';
 import { Blocks } from '../kernel/world/colliders';
 import { emptyHit, raycast } from '../kernel/world/query';
 import { SURFACE_NAMES, Surface } from '../kernel/world/surfaces';
+import { hurtPlayer } from './combat';
 import { player, type GuardEntity, type PlayerEntity } from './entities';
 import { bodiesAt } from './remains';
 
@@ -331,6 +332,7 @@ function struck(ctx: TickContext, bullet: BulletEntity, s: Strike, now: number):
     nz: s.nz,
   });
   if (target?.kind === 'guard') kill(ctx, target, s, bullet, impact, now);
+  else if (target?.kind === 'player') hurtPlayer(ctx, target, s.part ?? 'torso', b.shooter, impact);
 }
 
 /** A guard struck: he may cry out, falls where he was hit, and leaves his body. */
@@ -371,8 +373,8 @@ const bulletsSystem: System = {
   name: 'bullets',
   phase: 'projectiles',
   reads: ['bullet.bullet', '*.body', 'guard.guard.spawn', 'remains.remains', 'solid.solid'],
-  writes: ['bullet.bullet', 'entities', 'rng.wound'],
-  emits: ['impact', 'death', 'cry'],
+  writes: ['bullet.bullet', 'entities', 'rng.wound', 'player.health'],
+  emits: ['impact', 'death', 'cry', 'hurt'],
   run(ctx) {
     const now = ctx.tick / ctx.tuning.sim.tickHz;
     // Bullets in id order; striking despawns them, so go through a copy.

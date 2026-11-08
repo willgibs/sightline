@@ -351,9 +351,15 @@ describe('declared data access', () => {
       const raw = neutralInput();
       for (let i = 0; i < 900; i++) sim.step({ ...bot.next(sim, raw), commands: i % 100 === 50 ? [{ kind: 'fire', lag: 0.5, yaw: 0, pitch: 0 }] : [] });
     }
+    // Cloning the state around every system is slow, so long scenes run shortened, without their expectations.
     const scenes = [...Object.values(SCENES).map((make) => make()), kernelAloneScene()];
     for (const scene of scenes) {
-      const run = runScene({ ...scene, setup: (sim) => (scene.setup?.(sim as never), watchWrites(sim, found)) } as typeof scene, defaultTuning);
+      const long = (scene.seconds ?? 10) > 20;
+      const run = runScene(
+        { ...scene, ...(long ? { expect: [] } : {}), setup: (sim) => (scene.setup?.(sim as never), watchWrites(sim, found)) } as typeof scene,
+        defaultTuning,
+        long ? { seconds: 20 } : {},
+      );
       expect(run.failures).toEqual([]);
     }
     expect([...found]).toEqual([]);

@@ -30,7 +30,7 @@ export function campSystems(): Scene {
   const cut: System = {
     name: 'cut-the-generator',
     phase: 'commands',
-    after: ['rifle'],
+    after: ['rifle', 'sandbox-drops'],
     reads: [],
     writes: ['generator.generator.running'],
     emits: [],
@@ -42,7 +42,7 @@ export function campSystems(): Scene {
   const take: System = {
     name: 'take-the-target',
     phase: 'commands',
-    after: ['rifle', 'cut-the-generator', 'player-commands'],
+    after: ['rifle', 'cut-the-generator', 'player-commands', 'sandbox-drops'],
     reads: ['objective.objective'],
     writes: ['entities'],
     emits: [],

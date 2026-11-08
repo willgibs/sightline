@@ -17,6 +17,7 @@ export default defineConfig({
     // Browser tests need a real browser: npm run test:browser.
     exclude: ['tests/browser/**', 'node_modules/**'],
     environment: 'node',
-    testTimeout: 60_000,
+    // Windows' runner is the slowest, and the heaviest tests (a sitting generated headless) pass 60 s there.
+    testTimeout: 180_000,
   },
 });

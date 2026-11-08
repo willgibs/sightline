@@ -17,6 +17,10 @@ import { createLook, type LookUniforms } from './materials';
 import { palette } from './palette';
 import { createSky } from './sky';
 import { buildBackdrop, buildCamp, buildProps, buildTerrain } from './worldMeshes';
+import { setTerrainShade } from './terrainMaterial';
+import { FoliageMeshes } from './foliageMeshes';
+import { shadeMap } from '../sim/perception';
+import { Solids } from '../sim/kernel/world/solids';
 
 /**
  * Draws the simulation. It reads snapshots and never writes to the simulation, so the
@@ -53,6 +57,8 @@ export class GameRenderer {
   private guards: GuardMeshes | null = null;
   private solids: SolidMeshes | null = null;
   private interiors: FoliageInteriors | null = null;
+  private foliage: FoliageMeshes | null = null;
+  private shade: THREE.DataTexture | null = null;
   private player: PlayerMesh | null = null;
   /** The bodies shots leave, their traces and their dust (lab B). */
   private shots: ShotLayer | null = null;
@@ -89,7 +95,13 @@ export class GameRenderer {
   setWorld(world: World, tuning: Tuning): void {
     this.clearWorld();
     this.setSun(sunDirection(world.spec.env, 0, { x: 0, y: 0, z: 0 }));
-    this.worldGroup.add(buildTerrain(world, this.look), buildBackdrop(world, this.look), buildProps(world, this.look), buildCamp(world, this.look));
+    const terrain = buildTerrain(world, this.look);
+    // The ground's shade, as the simulation finds it (A4): where the world draws it.
+    const area = world.shadeArea;
+    this.shade = setTerrainShade([terrain.userData.material as THREE.ShaderMaterial], area ? shadeMap(world, new Solids(world.colliders), world.spec.env, 0, area, tuning) : null);
+    this.worldGroup.add(terrain, buildBackdrop(world, this.look), buildProps(world, this.look), buildCamp(world, this.look));
+    this.foliage = new FoliageMeshes(world, this.look);
+    this.worldGroup.add(this.foliage.group);
     this.guards = new GuardMeshes((spawn) => world.camp.guards[spawn]?.role ?? 'patrol', this.look, tuning);
     this.worldGroup.add(this.guards.group);
     this.solids = new SolidMeshes(this.look);
@@ -113,6 +125,10 @@ export class GameRenderer {
   }
 
   private clearWorld(): void {
+    this.shade?.dispose();
+    this.shade = null;
+    this.foliage?.dispose();
+    this.foliage = null;
     this.guards?.dispose();
     this.debug?.dispose();
     this.interiors?.dispose();

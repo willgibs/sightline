@@ -145,7 +145,7 @@ describe('the minimal reactions', () => {
     const drop: System = {
       name: 'test-noise',
       phase: 'commands',
-      after: ['player-commands', 'rifle'],
+      after: ['player-commands', 'rifle', 'sandbox-drops'],
       reads: [],
       writes: [],
       emits: ['noise'],

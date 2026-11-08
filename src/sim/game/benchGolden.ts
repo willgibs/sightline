@@ -87,21 +87,83 @@ export const BENCH_GOLDEN: PinnedBench = {
       "sight scenarios as expected (of 15)": 15,
       "foliage: pairs that differ by direction (of 2000)": 0,
       "hearing: speakers and a guard at the same place differ (of 200)": 0,
+      "shade: drawn as simulated, of 20000 points": 19982,
+      "shade: drawn as simulated within 1.5 m of a shadow, of 6000 points": 5810,
       "crack at 300 m: least degrees off the shooter": 55.438591,
       "crack at 300 m: most degrees off the shooter": 57.2126615,
-      "seed · crack at 300 m: degrees off the shooter": 0
+      "seed · crack at 300 m: degrees off the shooter": 0,
+      "trials: candidates run for two sittings": 1759,
+      "trials: scored trials in two sittings": 60,
+      "trials: pairs of factor levels the first sitting covers": 192,
+      "seed · trials: pairs of factor levels covered, taken first come": 165,
+      "trials: borderline right by the sight table alone (of 30)": 14,
+      "trials: the rules-only predictor's balanced accuracy, first sitting (%)": 58.9285714,
+      "trials: frozen at the first cue (of 60)": 30,
+      "trials: cue-frozen trials where his head can be read": 23,
+      "trials: borderline trials distance flips": 4,
+      "trials: borderline trials stance flips": 18,
+      "trials: borderline trials movement flips": 14,
+      "trials: borderline trials light flips": 4,
+      "trials: borderline trials cover flips": 8,
+      "trials: borderline trials sky flips": 3,
+      "trials: borderline trials gaze flips": 12,
+      "trials: seen among those frozen at the first cue (%)": 53.3333333,
+      "trials: seen among those frozen at the start (%)": 53.3333333,
+      "trials: a reader who says yes only at a first-cue freeze: balanced over both (%)": 50,
+      "trials: a reader who says yes only at a first-cue freeze: passes (0 or 1)": 0,
+      "trials: a reader by the first cue's time, and the table otherwise: balanced over both (%)": 73.2142857,
+      "trials: a reader by the first cue's time, and the table otherwise: passes (0 or 1)": 0,
+      "seed · trials: seen among those frozen at the first cue (%)": 76.6666667,
+      "seed · trials: seen among those frozen at the start (%)": 30,
+      "seed · trials: a reader who says yes only at a first-cue freeze: balanced over both (%)": 73.4375,
+      "seed · trials: a reader who says yes only at a first-cue freeze: passes (0 or 1)": 0,
+      "seed · trials: a reader by the first cue's time, and the table otherwise: balanced over both (%)": 79.4642857,
+      "seed · trials: a reader by the first cue's time, and the table otherwise: passes (0 or 1)": 0,
+      "trials: a reader right on every clear trial, guessing the borderline: passes (% of 4000)": 1.975,
+      "seed · trials: a reader right on every clear trial, guessing the borderline: passes (% of 4000)": 17.4,
+      "trials: a reader right 80% of the time: passes (% of 4000)": 50.9,
+      "seed · trials: a reader right 80% of the time: passes (% of 4000)": 58.625,
+      "trials: a reader right 90% of the time: passes (% of 4000)": 99.025,
+      "seed · trials: a reader right 90% of the time: passes (% of 4000)": 99.475
     },
     "runs": {
       "perception-lab": {
         "work": {
           "motor": { "rays": 0, "nodes": 0, "bodies": 10800 },
-          "perception-sight": { "rays": 25723, "nodes": 0, "bodies": 0 }
+          "perception-sight": { "rays": 26033, "nodes": 0, "bodies": 0 },
+          "perception-awareness": { "rays": 0, "nodes": 60480, "bodies": 0 }
+        }
+      },
+      "perception-crowd": {
+        "work": {
+          "motor": { "rays": 0, "nodes": 0, "bodies": 45900 },
+          "perception-sight": { "rays": 92825, "nodes": 0, "bodies": 0 },
+          "perception-awareness": { "rays": 0, "nodes": 371207, "bodies": 0 }
         }
       }
     }
   },
   "brain": {
-    "metrics": {},
+    "metrics": {
+      "search map: numbers": 4096,
+      "search cycle: shortest (s)": 30.2666667,
+      "search cycle: longest (s)": 30.2666667,
+      "ellipse: contains the shooter at 1 sigma (%)": 38.75,
+      "ellipse: contains the shooter at 2 sigma (%)": 88.5,
+      "relocation: 26–30 m across the line of fire, outside 2 sigma (%)": 50.5,
+      "relocation: 26–30 m in any direction, outside 2 sigma (%)": 29.5,
+      "ellipse in the world: contains the perch at 1 sigma (%)": 41.2371134,
+      "ellipse in the world: contains the perch at 2 sigma (%)": 86.5979381,
+      "ellipse in the world: mean bearings fused per shot": 5.30927835,
+      "re-found within 60 s (of 16): honest": 15,
+      "re-found within 60 s (of 16): random": 2,
+      "re-found within 60 s (of 16): plain": 13,
+      "re-found within 60 s (of 16): staleness": 13,
+      "re-found within 60 s (of 16): omniscient": 16,
+      "re-found within 60 s (of 16): honest, unpaced": 16,
+      "reactions (in the scripted scenarios)": 62,
+      "reactions unexplained": 0
+    },
     "runs": {}
   },
   "ballistics": {

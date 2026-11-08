@@ -197,10 +197,34 @@ function guards(tuning: Tuning): GuardSpawn[] {
   ];
 }
 
-/** Builds the lab's world: the terrain, the camp and the field, and its foliage. */
-export function labWorld(tuning: Tuning): World {
+/**
+ * The crowd (A11): sixteen guards perceiving at once, the most a camp has (the design's
+ * guard budget): the lab's three, five more sentries round the camp's edge, six on the
+ * perimeter loop at intervals, a marksman watching from the ridge's foot, and a worker.
+ */
+function crowd(tuning: Tuning): GuardSpawn[] {
+  const C = LAB.camp;
+  const out = guards(tuning);
+  let id = out.length;
+  const ring = [
+    [C.x - 26, C.z - 10, -1, 0],
+    [C.x - 10, C.z - 27, 0, -1],
+    [C.x + 8, C.z + 27, 0, 1],
+    [C.x - 20, C.z + 26, -0.7, 0.7],
+    [C.x + 26, C.z - 16, 0.8, -0.6],
+  ] as const;
+  for (const [x, z, fx, fz] of ring) out.push(post(id++, 'sentry', x, 0, z, fx, fz, tuning, { scanPhase: (id * 0.37) % 1 }));
+  const loop = out[1]!.route!;
+  for (let k = 0; k < 6; k++) out.push(post(id++, 'patrol', loop[k % 4]!.x, 0, loop[k % 4]!.z, 1, 0, tuning, { route: loop, routeStart: (k * 2 + 1) % 4 }));
+  out.push(post(id++, 'marksman', -150, 0, -45, 1, -0.3, tuning, { scanScale: 0.4, scanPhase: 0.2 }));
+  out.push(post(id++, 'worker', C.x - 6, 0, C.z + 10, 0, 1, tuning, { scanScale: 0.35 }));
+  return out;
+}
+
+/** Builds the lab's world: the terrain, the camp and the field, and its foliage; with sixteen guards for the crowd. */
+export function labWorld(tuning: Tuning, many = false): World {
   const { colliders, structures } = layout();
-  const camp: Omit<Camp, 'site'> = { structures, guards: guards(tuning), fenceHalf: 0 };
+  const camp: Omit<Camp, 'site'> = { structures, guards: many ? crowd(tuning) : guards(tuning), fenceHalf: 0 };
   const world = buildWorld(
     {
       name: NAME,
@@ -215,6 +239,8 @@ export function labWorld(tuning: Tuning): World {
     tuning.gen,
   );
   world.foliage = labFoliage(tuning);
+  // The ground's shade is drawn where the guards' eyes can reach: the camp, the field and the ridge.
+  world.shadeArea = { x0: -215, z0: -110, x1: 215, z1: 70, cell: 0.5 };
   return world;
 }
 
@@ -247,5 +273,22 @@ export function perceptionLab(): Scene {
         during: () => undefined,
       },
     ],
+  };
+}
+
+/**
+ * The perception crowd (A11): the lab with sixteen guards perceiving, the camp's most, and
+ * the same walk in. Its bench pins the rays and grid nodes perception spends per tick.
+ */
+export function perceptionCrowd(): Scene {
+  const lab = perceptionLab();
+  return {
+    ...lab,
+    name: 'perception-crowd',
+    version: 1,
+    title: 'Perception crowd',
+    description: 'The perception lab with sixteen guards seeing and hearing at once: the budget.',
+    world: (tuning) => labWorld(tuning, true),
+    expect: [],
   };
 }

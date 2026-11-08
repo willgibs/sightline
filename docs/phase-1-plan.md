@@ -188,6 +188,7 @@ The statistics behind these protocols are in `docs/research/foundations.md`. A p
   - At least 70% in each sitting.
   - At least 21 of the 30 borderline answers right. Guessing reaches that only 2% of the time.
   - Clearly better than a rules-only predictor scored on the same trials: distance and the sight table, with no cues. Beating it is the evidence that the cues are readable.
+    - (Nov 8, A12: on the borderline trials, by 3 of 30, as the research advises; the table proved strong, so the borderline cells are split evenly by whether it gets them right.)
 - **Item analysis:** accuracy is reported by the factor that flips each borderline outcome. A factor near chance needs a cue, or a simpler rule, before the second sitting.
 - **Blind** means the honest view only, no outcomes or parameters ahead of time, and fresh trials.
 - **Agents pre-screen** each trial set for cues the simulation shows to be missing, after passing a perception check against the simulation's own record. Today's vision-language agents are unreliable judges of timing and detail, so their findings never count toward the pass.
@@ -400,7 +401,7 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
 - [x] A3 · The scenario runner (see The three tools).
   - Scenes take no parameters today, and a recording's header names its scene by exactly `{name, version}` (`kernel/record/recording.ts`). Parameters therefore join the scene's identity.
   - Its first table sweeps the design doc's ranges over the factor grid, asserting monotonicity and the minimum interval from cue to detection.
-- [ ] A4 · Shade and foliage, drawn as simulated.
+- [x] A4 · Shade and foliage, drawn as simulated.
   - Each body's lit state comes from the simulation, in the snapshot.
   - World shade comes from one static shadow map over the play area, rendered once.
   - A test holds the drawing to `lightAt` at sampled points; 99.5% is the starting bar.
@@ -424,20 +425,24 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - About 1.5 s to react to something alarming, always telegraphed: Bungie found an untelegraphed delay read as a bug.
   - Stand-downs start near 20 s.
   - Minimal reactions show each state: look, walk to the believed spot, go back. E's brain replaces them.
-- [ ] A8 · Cues in the honest view.
+- [x] A8 · Cues in the honest view.
   - Head and body turn, and weapon raised.
   - The bark vocabulary, started now (Alien: Isolation's took most of its cycle). Barks run from specific to generic.
   - The detection indicator at the screen edge.
   - Then the fairness checks.
-- [ ] A9 · The other stimuli, each wired in when its source is on `main`:
-  - bodies and a comrade dropping (B4);
-  - impacts (B4);
-  - thrown objects (B9);
-  - lens glint (B6);
-  - open doors (D4).
-- [ ] A10 · Sandbox mode: noise drops, and the time-scale hook.
-- [ ] A11 · The budget: 16 guards perceiving within the frame budget, measured by work counts as well as `npm run sim -- --profile`, in Chromium, Firefox and WebKit. Fast paths come only if it needs them: a still body skips the motor, and a distant guard skips perception.
-- [ ] A12 · Trial mode, with the protocol in Exit tests, and the agents' pre-screen.
+- [ ] A9 · The other stimuli, each wired in when its source is on `main` (`docs/decisions.md`, A9):
+  - [x] bodies and a comrade dropping (B4);
+  - [x] impacts (B4), and the crack from the bullet's path;
+  - [x] thrown objects (B9);
+  - [x] lens glint (B6);
+  - [ ] open doors (D4, when lab D's code is on `main`).
+- [x] A10 · Sandbox mode: noise drops, and the time-scale hook.
+- [x] A11 · The budget: 16 guards perceiving within the frame budget, measured by work counts as well as `npm run sim -- --profile`, in Chromium, Firefox and WebKit. Fast paths come only if it needs them: a still body skips the motor, and a distant guard skips perception.
+- [x] A12 · Trial mode, with the protocol in Exit tests, and the agents' pre-screen.
+  - `?trials=<seed>` plays a sitting; `npm run playtest` scores it from its recordings or its saved file; `npm run trials -- <seed> --shots` prints it and draws its freeze frames for the pre-screen.
+  - Each borderline cell is split evenly between trials the sight table gets right and wrong, so the table alone scores 7 of 15 there, and the comparison with it is on the borderline trials (`docs/decisions.md`, A12).
+  - The trials are spread over the factors by a greedy pairwise covering; a one-tap probe asks what told you; R on the results plays back the misses (the research's list for before the first sitting).
+  - The freeze kind says nothing about the outcome: each kind holds the same share of seen and not seen, and they're scored apart. Answers survive a reload, and each carries its key, so later builds can still score the sitting.
 - [ ] A13 · Perception joins the valley (`SYSTEMS`), announced, with the version bump.
 - [ ] Exit test, the bench numbers, a note, a playable link.
 
@@ -789,55 +794,77 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - the perfect shooter fails and a planner succeeds on every camp;
   - zero unexplained reactions.
 
+**Recorded before building (Nov 8), so the exit note can be read against it:**
+- **The seed, as the bench runs it.** The bench keeps the seed's policies as brains of their own, run on the same camps, beside the real one:
+  - **The seed search:** The Last of Us's shape without its cheat (close on the last known position; after 10 s unseen one guard goes to check; a timed sweep; a timer ends it, with no map and no check of the truth).
+  - **Xu and Verbrugge's four baselines:** a random walk, a plain state machine, a staleness search and an omniscient chaser.
+- **Where the seed falls short, in the bench's terms:**
+  - **Search cycles.** The seed's honest cycle runs far past the target: The Last of Us's focus tests averaged nearly 2 minutes (about 120 s), and it reached 30 s only by checking the player's true position.
+  - **Truth.** The omniscient chaser, and any director or search that reads the truth, fails the no-omniscience probe at its first decision.
+  - **State.** Per-guard maps over the valley would put about 410,000 numbers into the hashed state.
+  - **Budgets.** The seed's are milliseconds; nothing about them can be pinned.
+  - **Counter-snipers.** No published model is calibrated: nothing says how often a stated ellipse contains the shooter.
+- **The target, in the bench's metrics:**
+  - **No-omniscience, over the whole brain.** Zero leaks: every guard's mind, the commander's input and the pacing layer's are hashed, in runs with the player at two places beyond every sense; every layer has a planted peek the probe catches.
+  - **Search cycles.** From the last percept to the end of the search, 30–45 s in at least 90% of the seeded runs of the search scenario, with the same length to the bit wherever the unsensed player is (ended by belief, never truth).
+  - **The camp's memory.** One search map of at most 5,000 numbers, against the seed's 410,000.
+  - **Calibration.** Over at least 400 seeded shots, the fused ellipse contains the true perch 39% ± 5 points of the time at one standard deviation and 86% ± 5 points at two, and it shrinks with repeated shots from one place.
+  - **Relocation emerges.** At ±5° and 300 m, a shooter who moves 26–30 m between shots is outside the camp's two-sigma ellipse at least half the time, with no meter anywhere.
+  - **Competence.** On the same camps, the honest brain re-finds an evading bot at least 80% as often as the omniscient chaser, ahead of the staleness search, the plain machine and the random walk (their published order). Pacing then throttles it deliberately, so it is fair by design.
+  - **One overlook doesn't clear the camp.** On every validated camp, a perfect shooter on the best perch fails, and a shooter who relocates, splits clusters and times shots succeeds.
+  - **Explained.** Every reaction has a reason code and a chain of causes back to a percept: zero exceptions over the bench's runs.
+  - **Seen to react.** A shot from 300 m gets a reaction a watcher can see inside the design's window: at most 2 s.
+
 **Milestones:**
-- [ ] E1 · Navigation on the grid search (W0.5).
+- [x] E1 · Navigation on the grid search (W0.5) (`brain/nav.ts`, `tests/nav.test.ts`).
   - Coarse routes over the map layer and a fine local grid over the camp.
   - A\*, with fixed tie-breaks and an iteration budget; paths string-pulled and followed through the motor.
-  - Stepping around a cornered player.
-  - Ladder links (C5).
-- [ ] E2 · The lab scene: 5–8 guards with roles, an alarm box, a radio and a generator. It uses a handmade camp until D4–D6 are on `main`.
-- [ ] E3 · The brain.
+  - Stepping around a cornered player: a stalled walk sidesteps by a fixed rule (own-body information only), comes back to its route, and tells the brain when it can't.
+  - Ladder links (C5): waiting on lab C's ladders.
+- [x] E2 · The lab scene (`?scene=camp-brain`): 8 guards in the design doc's roles and the target, an alarm box, a radio, a generator and a truck, in a handmade camp until D4–D6 are on `main`.
+- [x] E3 · The brain (`brain/brain.ts`, `brain/utility.ts`, the `act` event).
   - A prioritized machine of awareness states.
   - Inside each state, actions (investigate, call it in, take cover, flank, search) are scored by multiplied 0–1 considerations through response curves, with cooldowns against dithering.
   - Rank-then-weight choice, drawing from the guard's own stream through the mind (rule 13).
   - A reason code on every transition.
-  - It replaces A's minimal reactions.
-- [ ] E4 · Beliefs spread.
+  - It replaces A's minimal reactions wherever the camp brain runs (a guard given a `brain`); lab A's own scenes and trials keep them, so what they measure doesn't move. Take cover and flank come with E10.
+- [x] E4 · Beliefs spread (`brain/searchMap.ts`, `brain/reports.ts`, `game/comms.ts`).
   - One camp-level search map, fed only by reports: a grid that spreads from the last known position and clears where searchers can see. Per-guard maps would put about 410,000 numbers into the hashed state.
   - Voice to guards nearby, heard through A's hearing.
   - Radio across the camp after a delay. A report is an action with a duration, and its delivery is cancelled if the speaker drops. The radio needs a working set and an operator.
-- [ ] E5 · The camp.
-  - Alert levels: calm, uneasy, alert, lockdown.
+- [x] E5 · The camp (`brain/camp.ts`, `brain/commander.ts`, `game/comms.ts`).
+  - Alert levels: calm, uneasy, alert, lockdown (the last set by E7's alarm boxes).
   - The commander assigns tasks with a priority, a condition and a capacity, in the manner of Halo 3's Objectives, over guards. Ties break by task index, then guard id.
   - The pacing layer reads only the camp's beliefs, caps convergence with role slots, and throttles rather than informs.
   - Searches end on time since the last percept and the search map's spread, never on the player's true position. Cycles run near 30–45 s, and the camp settles one level up.
-- [ ] E6 · Radio check-ins, as scheduled events. The operator calls each post every few minutes. A dead post doesn't answer, and someone walks over.
+  - The no-omniscience probe covers the commander, with a planted peek it catches.
+- [x] E6 · Radio check-ins, as scheduled events (`game/comms.ts`). The operator calls each post every few minutes. A dead post doesn't answer, the camp goes uneasy, and someone walks over.
 - [ ] E7 · Alarms.
-  - After the reaction window, a guard shouts, or runs 4–8 s to an alarm box or the radio. The run is a journey through the motor, and lockdown is set only by an alarm box or radio changing state.
+  - Done (`game/comms.ts`, `brain/brain.ts`, stand-in boxes until D's devices land): after the reaction window, a guard runs 4–8 s to an alarm box, a journey through the motor; lockdown is set only by the box changing state; dropping him or cutting the power interrupts it.
   - The core's sabotage, by default: hold the use key at arm's length to switch off the generator or cut the radio. Whoever passes or needs it notices the outage. The sabotage kit is Phase 3's.
-  - At lockdown, the target escapes by vehicle. That needs bodies to ride moving solids (with C).
-- [ ] E8 · Counter-sniper and reinforcements.
+  - At lockdown, the target runs for the vehicle when he hears the siren (`flee`); reaching it loses the mission, and dropping him first wins it. The drive away needs bodies to ride moving solids (with C).
+- [ ] E8 · Counter-sniper and reinforcements. Done so far: triangulation from real shot and crack percepts, with a calibrated ellipse (`brain/triangulate.ts`), marksmen sweeping the estimate and following newer fixes, a visible reaction inside 2 s, guards under fire taking cover, reinforcements at lockdown (a squad on foot until D's trucks land). Still to come: marksmen moving to overlooking posts (D's perches).
   - **Honest triangulation:**
     - every guard who heard the report or the crack forms a bearing, with error from his own stream;
     - reports reach the commander by voice or radio;
     - the commander fuses them, in a fixed order, into an ellipse that shrinks with repeated shots.
 
     About 26 m of relocation at ±5° and 300 m then emerges with no meter.
-  - **Counter-snipers hunt.** They move to overlooking posts, sweep candidate perches in the order of belief, and glint.
+  - **Counter-snipers hunt.** They move to overlooking posts, sweep candidate perches in the order of belief, and glint (done: a marksman on a sweep flashes at the player, by lab B's `glint`, in the honest view; `game/sim.ts`, `render/guardMeshes.ts`).
   - **The reaction is visible.** A shot from 300 m gets a visible reaction inside the window: Halo's playtests found that sniping makes AI look oblivious.
   - **Reinforcements** arrive by truck after a delay, as a squad that hunts.
-- [ ] E9 · Found bodies and adaptation within a mission. All of it comes through A's perception, and only from incidents the player caused and could see.
-  - A body found means alert.
-  - A ledger of habituation by stimulus and cell, so repeated tricks lose effect.
-  - Floors on decay, so posture stays up.
-  - Memory of incidents, such as a perch with casualties.
-  - Bodies in the open push guards off exposed sightlines.
-- [ ] E10 · Minimal combat.
-  - Guards engage, take cover and call support.
-  - The player's health is two or three hits, and the player can die.
+- [x] E9 · Found bodies and adaptation within a mission (`brain/commander.ts`, `brain/brain.ts`). All of it comes through A's perception, and only from incidents the player caused and could see.
+  - A body found means alert: a guard who sees a body reports it (`report` kind `body`), the camp goes on alert.
+  - A ledger of habituation by stimulus and cell, so repeated tricks lose effect: the third rock at one spot draws two guards and an unverified radio report.
+  - Floors on decay, so posture stays up: a search settles the camp one level up, and A's ladder keeps its raised floor.
+  - Memory of incidents, such as a perch with casualties: where shots and bodies were reported (`camp.incidents`).
+  - Bodies in the open push guards off exposed sightlines: guards near a found body are ordered behind cover for a while.
+- [x] E10 · Minimal combat (`game/combat.ts`, the `engage` and `cover` acts).
+  - Guards engage, take cover and call support, with lab B's bullets and sounds.
+  - The player's health is two or three hits (`tuning.brain.combat`), and the player can die (`game/combat.ts`, `campRules`).
   - Phase 2 only joins labs, so this is built here.
-- [ ] E11 · Sandbox body drops.
-- [ ] E12 · The scenarios and the baselines (see Exit tests).
+- [x] E11 · Sandbox body drops: L in the debug view drops a body where the player looks (lab A's A9/A10 sandbox); the camp finds it as it would any body (`tests/commander.test.ts`).
+- [ ] E12 · The scenarios and the baselines (see Exit tests). Done so far: the scenario family `camp-scenario` (suspicion, search, alarm, escape), the search-cycle and calibration benches, the relocation metric, and the honest brain against Xu and Verbrugge's baselines (`game/baselines.ts`, pinned in the bench). "One overlook doesn't clear the camp" waits for lab D's validated camps.
 - [ ] Exit test, the bench numbers, a note, a playable link.
 
 ### Gate · Labs pass

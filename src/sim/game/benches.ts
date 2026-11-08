@@ -12,13 +12,27 @@ import { ChaosBot } from './bots/chaos';
 import { WanderBot } from './bots/wander';
 import { PINNED_RUNS, behaviourInto } from './runs';
 import { Simulation } from './sim';
-import { Acoustics, SEED_LAW, SIGHT_LAW, crackHeard, emptyHeard, foliageOf, sweepSight, type CrackHeard, type FlightPoint } from '../perception';
-import { datan2, dexp } from '../kernel/core/detmath';
+import { Acoustics, SEED_LAW, SIGHT_LAW, crackHeard, drawnLit, emptyHeard, foliageOf, groundLight, shadeMap, sweepSight, type CrackHeard, type FlightPoint } from '../perception';
+import { Solids } from '../kernel/world/solids';
+import { datan2, dcos, dexp, dlog, dsin } from '../kernel/core/detmath';
 import { air, defaultEnv } from '../kernel/env';
 import { Rng } from '../kernel/core/rng';
-import { runScene } from '../kernel/scene';
+import { runScene, sceneOver, sceneTicks, startScene } from '../kernel/scene';
+import { emptyEstimate, fuseBearings, inEllipse, type Bearing, type FuseGrid } from '../brain';
+import { POLICIES, pursuit } from './baselines';
+import { campScenario } from './scenes/campScenario';
+import type { Tuning } from '../../config/tuning';
+import { withSystem, type System } from '../kernel/systems';
+import { Surface } from '../kernel/world/surfaces';
+import { giveBrains } from './brains';
+import { campCommander, commsVoice, giveCommander } from './comms';
+import { PERCEPTION, giveSenses } from './perception';
+import { placePlayer } from './setup';
+import { SYSTEMS } from './systems';
+import { campHeight, campWorld } from './scenes/campBrain';
 import { labWorld } from './scenes/perceptionLab';
 import { SIGHT_TABLE, sightScenario } from './scenes/sightScenario';
+import { FACTORS, SITTING, generateSitting, pairsCovered, scoreSitting, verdict, type Trial } from './trials';
 import { SWAY_RUNGS, decisionSensitivity, swayRadius, sweepCases, sweepWorst } from './ballisticsBench';
 
 /** A metric to four decimals: enough to see a change, and the same bits everywhere it's computed. */
@@ -181,7 +195,11 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
       "Lab A: the sight rate law swept over the factor grid against the design doc's ranges, beside the seed's (Blacklist's model with the table as rates); the sight scenarios run whole; foliage symmetric to the bit.",
     metrics: perceptionMetrics,
   },
-  brain: { about: "Lab E: search cycle length, and the calibration of the camp's estimate of where a shot came from, from E5 on.", metrics: () => ({}) },
+  brain: {
+    about:
+      "Lab E: search cycle length, the calibration of the camp's estimate of where a shot came from, the search map's size, how often the honest brain re-finds an intruder against the baselines (omniscient, staleness, plain, random), and how many reactions are explained back to a percept.",
+    metrics: brainMetrics,
+  },
   ballistics: {
     about: 'Lab B: the reticle against the impact within 1 cm over the sweep, decision sensitivity at 300 m, and the sway ladder.',
     metrics() {
@@ -199,6 +217,200 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
   },
   game: { about: "The valley's plays, which exercise every lane together: pinned by their fingerprints and work.", metrics: () => ({}) },
 };
+
+/** Lab E's bench (brain lane): docs/phase-1-plan.md, E · recorded before building. */
+function brainMetrics(): Record<string, number> {
+  const m: Record<string, number> = {};
+  const T = defaultTuning;
+  // The camp's memory.
+  m['search map: numbers'] = T.brain.searchMap.cells * T.brain.searchMap.cells;
+  // Search cycles: from the last report to the search's end, in the search scenarios.
+  const cycles: number[] = [];
+  for (let seed = 0; seed < 3; seed++) {
+    const sc = campScenario(`script=search&seed=${seed}`);
+    const sim = startScene(sc, T);
+    const driver = sc.driver?.();
+    const raw = sc.game.still(sim);
+    const ticks = sceneTicks(sc, T);
+    let cycle = -1;
+    while (!sceneOver(sc, sim, ticks) && cycle < 0) {
+      const events = sim.step(driver ? driver.next(sim, raw) : raw);
+      const camp = sim.index.of('commander')[0]!.camp;
+      for (const e of events) if (e.type === 'level' && e.to === 'uneasy' && camp.search === null) cycle = (e.tick - camp.lastPercept) / T.sim.tickHz;
+    }
+    cycles.push(cycle);
+  }
+  m['search cycle: shortest (s)'] = round(Math.min(...cycles));
+  m['search cycle: longest (s)'] = round(Math.max(...cycles));
+  // Calibration: seeded shots, bearings with the stated error, the camp's ellipse.
+  const rng = new Rng('BENCH-E', 'calibration');
+  const grid: FuseGrid = { x: 0, z: 0, half: 720, cells: 120, rangeMin: 120, rangeMax: 480 };
+  const sigma = (5 * Math.PI) / 180;
+  const est = emptyEstimate();
+  let in1 = 0;
+  let in2 = 0;
+  const N = 400;
+  for (let k = 0; k < N; k++) {
+    const a = rng.range(0, 2 * Math.PI);
+    const r = Math.sqrt(rng.next() * (grid.rangeMax * grid.rangeMax - grid.rangeMin * grid.rangeMin) + grid.rangeMin * grid.rangeMin);
+    const sx = r * dcos(a);
+    const sz = r * dsin(a);
+    const bs: Bearing[] = [];
+    for (let i = 0; i < 2 + (k % 5); i++) {
+      const x = rng.range(-30, 30);
+      const z = rng.range(-30, 30);
+      const dx = sx - x;
+      const dz = sz - z;
+      const d = Math.sqrt(dx * dx + dz * dz);
+      const err = sigma * Math.sqrt(-2 * dlog(Math.max(1e-12, rng.next()))) * dcos(2 * Math.PI * rng.next());
+      const c = dcos(err);
+      const sn = dsin(err);
+      bs.push({ x, z, ux: (dx / d) * c - (dz / d) * sn, uz: (dx / d) * sn + (dz / d) * c, sigma });
+    }
+    fuseBearings(bs, grid, est);
+    if (inEllipse(est, sx, sz, 1)) in1++;
+    if (inEllipse(est, sx, sz, 2)) in2++;
+  }
+  m['ellipse: contains the shooter at 1 sigma (%)'] = round((100 * in1) / N);
+  m['ellipse: contains the shooter at 2 sigma (%)'] = round((100 * in2) / N);
+  // Relocation emerges (E8): after a shot at 300 m heard at ±5°, how often a move of 26–30 m
+  // puts the shooter outside what the camp believes, with no meter anywhere.
+  const moved = new Rng('BENCH-E', 'relocation');
+  let across = 0;
+  let any = 0;
+  for (let k = 0; k < N; k++) {
+    const a = moved.range(0, 2 * Math.PI);
+    const sx = 300 * dcos(a);
+    const sz = 300 * dsin(a);
+    const bs: Bearing[] = [];
+    for (let i = 0; i < 2 + (k % 5); i++) {
+      const x = moved.range(-30, 30);
+      const z = moved.range(-30, 30);
+      const dx = sx - x;
+      const dz = sz - z;
+      const d = Math.sqrt(dx * dx + dz * dz);
+      const err = sigma * Math.sqrt(-2 * dlog(Math.max(1e-12, moved.next()))) * dcos(2 * Math.PI * moved.next());
+      const c = dcos(err);
+      const sn = dsin(err);
+      bs.push({ x, z, ux: (dx / d) * c - (dz / d) * sn, uz: (dx / d) * sn + (dz / d) * c, sigma });
+    }
+    fuseBearings(bs, grid, est);
+    const step = moved.range(26, 30);
+    const side = moved.next() < 0.5 ? 1 : -1;
+    // Across the line of fire, as someone moving off it would; and in any direction at all.
+    if (!inEllipse(est, sx - dsin(a) * step * side, sz + dcos(a) * step * side, 2)) across++;
+    const b = moved.range(0, 2 * Math.PI);
+    if (!inEllipse(est, sx + step * dcos(b), sz + step * dsin(b), 2)) any++;
+  }
+  m['relocation: 26–30 m across the line of fire, outside 2 sigma (%)'] = round((100 * across) / N);
+  m['relocation: 26–30 m in any direction, outside 2 sigma (%)'] = round((100 * any) / N);
+  // The same, in the world: guards hear real shots and radio their bearings, the commander fuses them.
+  const world = inWorldCalibration(T, 100);
+  m['ellipse in the world: contains the perch at 1 sigma (%)'] = world.one;
+  m['ellipse in the world: contains the perch at 2 sigma (%)'] = world.two;
+  m['ellipse in the world: mean bearings fused per shot'] = world.bearings;
+  // Competence against the baselines: re-finding an intruder who has broken contact.
+  // The window is pursuit's own: 60 s, about a search and the walk out to it.
+  const horizon = 60;
+  const seeds = 16;
+  for (const policy of POLICIES) {
+    let found = 0;
+    for (let s = 0; s < seeds; s++) if (pursuit(policy, s, T, horizon) >= 0) found++;
+    m[`re-found within ${horizon} s (of ${seeds}): ${policy}`] = found;
+  }
+  // The plan's competence target is before pacing throttles it: the same brain with every guard free to go.
+  const unpaced = structuredClone(T);
+  unpaced.brain.camp.slots.alert.search = 6;
+  let freed = 0;
+  for (let s = 0; s < seeds; s++) if (pursuit('honest', s, unpaced, horizon) >= 0) freed++;
+  m[`re-found within ${horizon} s (of ${seeds}): honest, unpaced`] = freed;
+  // Every reaction in the scripted scenarios has a chain of causes back to something sensed.
+  let reactions = 0;
+  let unexplained = 0;
+  for (const params of ['script=suspicion&seed=0', 'script=search&seed=0']) {
+    const sc = campScenario(params);
+    const sim = startScene(sc, T);
+    const driver = sc.driver?.();
+    const raw = sc.game.still(sim);
+    const ticks = sceneTicks(sc, T);
+    const byId = new Map<number, { type: string; cause: number }>();
+    while (!sceneOver(sc, sim, ticks)) {
+      for (const e of sim.step(driver ? driver.next(sim, raw) : raw)) {
+        byId.set(e.id, { type: e.type, cause: e.cause });
+        if (e.type !== 'act' || e.to === 'routine' || e.to === 'return') continue;
+        reactions++;
+        let cause = e.cause;
+        let ok = false;
+        for (let hops = 0; hops < 32 && cause !== 0; hops++) {
+          const c = byId.get(cause);
+          if (!c) break;
+          if (PERCEPT_ROOTS.has(c.type)) {
+            ok = true;
+            break;
+          }
+          cause = c.cause;
+        }
+        if (!ok) unexplained++;
+      }
+    }
+  }
+  m['reactions (in the scripted scenarios)'] = reactions;
+  m['reactions unexplained'] = unexplained;
+  return m;
+}
+
+/**
+ * The ellipse in the world (E8's exit metric): scripted shots from random perches around the
+ * lab's camp, heard by its guards through perception, radioed in, fused by the commander.
+ */
+export function inWorldCalibration(T: Tuning, shots: number): { one: number; two: number; bearings: number } {
+  const rng = new Rng('BENCH-E', 'perches');
+  let in1 = 0;
+  let in2 = 0;
+  let have = 0;
+  let bearings = 0;
+  const F = T.brain.sniper.fusion;
+  for (let k = 0; k < shots; k++) {
+    const a = rng.range(0, 2 * Math.PI);
+    const r = Math.sqrt(rng.next() * (F.rangeMax * F.rangeMax - F.rangeMin * F.rangeMin) + F.rangeMin * F.rangeMin);
+    const px = r * dcos(a);
+    const pz = r * dsin(a);
+    const shot: System = {
+      name: 'bench-shot',
+      phase: 'commands',
+      after: ['player-commands', 'rifle', 'sandbox-drops'],
+      reads: [],
+      writes: [],
+      emits: ['report'],
+      run(ctx) {
+        if (ctx.tick === 30) ctx.emit({ type: 'report', source: 1, x: px, y: campHeight(px, pz) + 1.6, z: pz, surface: Surface.Grass, loudness: 2400 / ctx.tuning.noise.radiusPerUnit, radius: 2400, suppressed: 0 });
+      },
+    };
+    let systems = SYSTEMS;
+    for (const s of [...PERCEPTION, commsVoice, campCommander, shot]) systems = withSystem(systems, s);
+    // Each shot in its own world seed: every guard's streams start from it, so his ear errs afresh.
+    const shotWorld = campWorld(T);
+    shotWorld.seed = `${shotWorld.seed}/shot${k}`;
+    const sim = new Simulation(shotWorld, T, systems);
+    placePlayer(sim, 372, 372);
+    giveSenses(sim);
+    giveBrains(sim);
+    giveCommander(sim);
+    const raw = neutralInput();
+    for (let i = 0; i < 14 * 30; i++) sim.step(raw);
+    const camp = sim.index.of('commander')[0]!.camp;
+    if (camp.shots.estimate) {
+      have++;
+      bearings += camp.shots.bearings.length;
+      if (inEllipse(camp.shots.estimate, px, pz, 1)) in1++;
+      if (inEllipse(camp.shots.estimate, px, pz, 2)) in2++;
+    }
+  }
+  return { one: round((100 * in1) / Math.max(1, have)), two: round((100 * in2) / Math.max(1, have)), bearings: round(bearings / Math.max(1, have)) };
+}
+
+/** What a chain of causes can end in: something sensed (a sound or a sighting), or an order from what was sensed. */
+const PERCEPT_ROOTS = new Set(['footstep', 'land', 'noise', 'report', 'impact', 'bark', 'heard', 'noticed', 'detected', 'radio', 'call', 'clatter', 'cry', 'bolt', 'death', 'checkin', 'order']);
 
 /** Lab A's bench (perception lane): docs/phase-1-plan.md, A · recorded before building, says what each should be. */
 function perceptionMetrics(): Record<string, number> {
@@ -256,12 +468,109 @@ function perceptionMetrics(): Record<string, number> {
     if (!Object.is(a.clarity, b.clarity) || a.fromX !== b.fromX || a.fromZ !== b.fromZ || a.length !== b.length) differ++;
   }
   m['hearing: speakers and a guard at the same place differ (of 200)'] = differ;
+  // Shade drawn as simulated (A4): the drawn map against the simulation's light, over the area and at the edges.
+  const solids = new Solids(lab.colliders);
+  const area = lab.shadeArea!;
+  const map = shadeMap(lab, solids, lab.spec.env, 0, area, defaultTuning);
+  const simLit = (x: number, z: number): boolean =>
+    groundLight(lab, solids, lab.spec.env, 0, x, lab.terrain.heightAt(x, z), z, defaultTuning) === defaultTuning.visibility.light.lit;
+  let agree = 0;
+  for (let k = 0; k < 20000; k++) {
+    const x = rng.range(area.x0, area.x1);
+    const z = rng.range(area.z0, area.z1);
+    if (drawnLit(map, x, z) === simLit(x, z)) agree++;
+  }
+  m['shade: drawn as simulated, of 20000 points'] = agree;
+  const shaded: number[] = [];
+  for (let k = 0; k < map.lit.length; k++) if (map.lit[k] === 0) shaded.push(k);
+  let edges = 0;
+  for (let k = 0; k < 6000; k++) {
+    const c = shaded[rng.int(0, shaded.length - 1)]!;
+    const x = map.x0 + ((c % map.nx) + 0.5) * map.cell + rng.range(-1.5, 1.5);
+    const z = map.z0 + (Math.floor(c / map.nx) + 0.5) * map.cell + rng.range(-1.5, 1.5);
+    if (drawnLit(map, x, z) === simLit(x, z)) edges++;
+  }
+  m['shade: drawn as simulated within 1.5 m of a shadow, of 6000 points'] = edges;
   // The crack (A5): listeners 5–15 m from a bullet's path at 300 m, its speed falling as a
   // drag constant makes it (790 m/s at the muzzle, about 650 m/s there).
   const angles = crackBias();
   m['crack at 300 m: least degrees off the shooter'] = round(Math.min(...angles));
   m['crack at 300 m: most degrees off the shooter'] = round(Math.max(...angles));
   m['seed · crack at 300 m: degrees off the shooter'] = 0;
+  Object.assign(m, trialMetrics());
+  return m;
+}
+
+/**
+ * Trial mode (A12) on two pinned sittings: what the sittings hold, and how often the
+ * protocol passes readers of known skill, against the plan's first rule (seed: 48 of 60
+ * right). docs/research/foundations.md found the seed passes a reader who is right on every
+ * clear trial and guesses the borderline ones about 18% of the time, and a true 80% reader
+ * 57%.
+ */
+function trialMetrics(): Record<string, number> {
+  const m: Record<string, number> = {};
+  let candidates = 0;
+  const seeds = ['BENCH-A-1', 'BENCH-A-2'];
+  const sittings = seeds.map((seed) => generateSitting(seed, defaultTuning, undefined, () => candidates++));
+  // The seed: trials taken as they come, freezes wherever there's a cue.
+  const firstCome = seeds.map((seed) => generateSitting(seed, defaultTuning, { ...SITTING, pool: 1, balanceFreeze: false }));
+  const scored = sittings.flatMap((ts) => ts.filter((t) => !t.warmup));
+  m['trials: candidates run for two sittings'] = candidates;
+  m['trials: scored trials in two sittings'] = scored.length;
+  m['trials: pairs of factor levels the first sitting covers'] = pairsCovered(sittings[0]!);
+  m['seed · trials: pairs of factor levels covered, taken first come'] = pairsCovered(firstCome[0]!);
+  const key = (ts: readonly Trial[], f: (t: Trial) => boolean): Map<number, boolean> => new Map(ts.map((t) => [t.k, f(t)]));
+  const rules = sittings.map((ts) => scoreSitting(ts, key(ts, (t) => t.rules)));
+  m['trials: borderline right by the sight table alone (of 30)'] = rules[0]!.borderlineRight + rules[1]!.borderlineRight;
+  m["trials: the rules-only predictor's balanced accuracy, first sitting (%)"] = round(rules[0]!.balanced * 100);
+  m['trials: frozen at the first cue (of 60)'] = scored.filter((t) => t.freeze === 'cue').length;
+  m['trials: cue-frozen trials where his head can be read'] = scored.filter((t) => t.freeze === 'cue' && t.legible.head).length;
+  for (const f of FACTORS) m[`trials: borderline trials ${f} flips`] = scored.filter((t) => t.flips.includes(f)).length;
+  // What the freeze gives away: the share seen in each kind, and readers who go by it.
+  const seenShare = (ts: readonly Trial[], kind: Trial['freeze']): number => {
+    const of = ts.filter((t) => !t.warmup && t.freeze === kind);
+    return round((100 * of.filter((t) => t.seen).length) / Math.max(1, of.length));
+  };
+  for (const [tag, set] of [
+    ['', sittings],
+    ['seed · ', firstCome],
+  ] as const) {
+    const all = set.flat();
+    m[`${tag}trials: seen among those frozen at the first cue (%)`] = seenShare(all, 'cue');
+    m[`${tag}trials: seen among those frozen at the start (%)`] = seenShare(all, 'start');
+    const read = (name: string, f: (t: Trial) => boolean): void => {
+      const [x, y] = set as [Trial[], Trial[]];
+      const v = verdict({ trials: x, answers: key(x, f) }, { trials: y, answers: key(y, f) });
+      m[`${tag}trials: ${name}: balanced over both (%)`] = round(v.balanced * 100);
+      m[`${tag}trials: ${name}: passes (0 or 1)`] = v.pass ? 1 : 0;
+    };
+    read('a reader who says yes only at a first-cue freeze', (t) => t.freeze === 'cue');
+    read('a reader by the first cue\'s time, and the table otherwise', (t) => (t.freeze === 'cue' ? t.cueAt <= 2.4 : t.rules));
+  }
+  // Readers of known skill, 4000 pairs of sittings each.
+  const rng = new Rng('BENCH-A', 'readers');
+  const [a, b] = sittings as [Trial[], Trial[]];
+  const readers: Array<[string, (t: Trial) => number]> = [
+    ['right on every clear trial, guessing the borderline', (t) => (t.borderline ? 0.5 : 1)],
+    ['right 80% of the time', () => 0.8],
+    ['right 90% of the time', () => 0.9],
+  ];
+  for (const [who, p] of readers) {
+    let ours = 0;
+    let seed = 0;
+    const draws = 4000;
+    for (let k = 0; k < draws; k++) {
+      const answers = (ts: readonly Trial[]): Map<number, boolean> => new Map(ts.map((t) => [t.k, rng.chance(p(t)) ? t.seen : !t.seen]));
+      const A = answers(a);
+      const B = answers(b);
+      if (verdict({ trials: a, answers: A }, { trials: b, answers: B }).pass) ours++;
+      const right = (ts: readonly Trial[], ans: Map<number, boolean>): number => ts.filter((t) => !t.warmup && ans.get(t.k) === t.seen).length;
+      if (right(a, A) + right(b, B) >= 48) seed++;
+    }
+    m[`trials: a reader ${who}: passes (% of ${draws})`] = round((100 * ours) / draws);
+    m[`seed · trials: a reader ${who}: passes (% of ${draws})`] = round((100 * seed) / draws);
+  }
   return m;
 }
 

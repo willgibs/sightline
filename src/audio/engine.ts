@@ -4,8 +4,9 @@ import { PLAYER_ID } from '../sim/game/entities';
 import { audibility, travelTime } from '../sim/kernel/sound';
 import type { AmbientSource } from '../sim/generation';
 import { emptyRoute, type RouteFn, type SteadyFn } from './hearing';
-import { footstep, humLoop, makeNoiseBuffers, makeRand, rustle, waterLoop, windBed, type Loop, type NoiseBuffers, type Rand } from './voices';
-import { bolt, clatter, crack, cry, impact, report } from './shotVoices';
+import { footstep, humLoop, makeNoiseBuffers, makeRand, murmur, rustle, waterLoop, windBed, type Loop, type NoiseBuffers, type Rand } from './voices';
+import { BARKS } from '../sim/perception';
+import { bolt, clatter, crack, cry, impact, report, siren } from './shotVoices';
 import { crackAt, type Crack, type Flight } from '../sim/ballistics';
 import { Surface, surfaceName } from '../sim/kernel/world/surfaces';
 
@@ -87,6 +88,8 @@ export interface SoundOptions {
   route?: RouteFn;
   /** The same law for the steady sources, by their index in the world's list. */
   steady?: SteadyFn;
+  /** Where a bullet's flight meets the world, so its crack ends there (the guards' law: ballistics' flightEnd). */
+  flightEnd?: (f: Flight, until: number) => number;
   seed?: number;
 }
 
@@ -115,6 +118,7 @@ export class SoundEngine {
   private readonly muffle: MuffleFn | null;
   private readonly route: RouteFn | null;
   private readonly steady: SteadyFn | null;
+  private readonly flightEnd: ((f: Flight, until: number) => number) | null;
   private readonly heard = emptyRoute();
   private readonly rand: Rand;
   private readonly noise: NoiseBuffers;
@@ -141,6 +145,7 @@ export class SoundEngine {
     this.muffle = opts.muffle ?? null;
     this.route = opts.route ?? null;
     this.steady = opts.steady ?? null;
+    this.flightEnd = opts.flightEnd ?? null;
     this.rand = makeRand(opts.seed ?? 0x5167);
     this.noise = makeNoiseBuffers(ctx, this.rand);
 
@@ -258,6 +263,19 @@ export class SoundEngine {
             footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), gait, amp), lead,
           );
         }
+      } else if (e.type === 'bark' || e.type === 'noise') {
+        // A guard's voice (a murmur until voiced lines), or a noise dropped from the sandbox: heard by the law, like any sound.
+        const line = e.type === 'bark' ? BARKS[e.line] : undefined;
+        const words = line ? line.text.split(' ').length : 2;
+        this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) =>
+          e.type === 'bark' ? murmur(this.ctx, out, this.noise, this.rand, when, words, line?.shout ?? false, amp) : footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), 1.6, amp), lead,
+        );
+      } else if (e.type === 'call') {
+        // A guard talking, on the radio or to whoever is near: a murmur, heard by the law like a bark.
+        this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => murmur(this.ctx, out, this.noise, this.rand, when, 5, e.radio === 0, amp), lead);
+      } else if (e.type === 'siren') {
+        // The camp's alarm: a wail anyone in the valley can hear.
+        this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => siren(this.ctx, out, when, amp), lead);
       } else if (e.type === 'report') {
         // A shot's blast: at your own ears, loud (the suppressor makes it a cough); anyone else's, placed and late.
         const suppressed = e.suppressed === 1;
@@ -283,7 +301,9 @@ export class SoundEngine {
         f.g = this.tuning.sim.gravity;
         f.wx = e.wx;
         f.wz = e.wz;
-        const c = crackAt(f, e.t + this.tuning.ballistics.maxFlight, this.listenerPose, this.speedOfSound, this.crackOut);
+        // Up to where the bullet meets the world: a wall stops the crack with the bullet, as it does for the guards.
+        const until = e.t + this.tuning.ballistics.maxFlight;
+        const c = crackAt(f, this.flightEnd ? this.flightEnd(f, until) : until, this.listenerPose, this.speedOfSound, this.crackOut);
         if (c) this.spatial(c.x, c.y, c.z, this.tuning.ballistics.sound.crack, (out, when, amp) => crack(this.ctx, out, this.noise, this.rand, when, amp), lead + (c.emitted - e.t));
       } else if (e.type === 'impact') {
         // Heard where it struck, after the way back: about 1.28 s after the trigger at 300 m.
