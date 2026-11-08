@@ -29,10 +29,17 @@ const refuse = (why: string): never => {
   process.exit(1);
 };
 
+/**
+ * GitHub reports two kinds of check: check runs (Actions' jobs: a name, a status and a
+ * conclusion) and commit statuses (Vercel's deploys: a context and a state).
+ */
 interface Check {
-  name: string;
-  status: string;
-  conclusion: string | null;
+  __typename: 'CheckRun' | 'StatusContext';
+  name?: string | null;
+  status?: string | null;
+  conclusion?: string | null;
+  context?: string | null;
+  state?: string | null;
 }
 const view = JSON.parse(sh('gh', 'pr', 'view', pr, '--json', 'state,isDraft,baseRefName,headRefName,headRefOid,statusCheckRollup')) as {
   state: string;
@@ -54,12 +61,16 @@ try {
   refuse(`${view.headRefName} is behind main (${main.slice(0, 7)}): rebase it, regenerate its goldens, push, and land it when CI is green`);
 }
 
-const checks = view.statusCheckRollup;
+const checks = view.statusCheckRollup.map((c) =>
+  c.__typename === 'StatusContext'
+    ? { name: c.context ?? 'a status', done: c.state !== 'PENDING' && c.state !== 'EXPECTED', outcome: c.state ?? '' }
+    : { name: c.name ?? 'a check', done: c.status === 'COMPLETED', outcome: c.conclusion ?? '' },
+);
 if (checks.length === 0) refuse('CI has not run on its head yet');
-const pending = checks.filter((c) => c.status !== 'COMPLETED');
+const pending = checks.filter((c) => !c.done);
 if (pending.length > 0) refuse(`CI is still running: ${pending.map((c) => c.name).join(', ')}`);
-const failed = checks.filter((c) => !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(c.conclusion ?? ''));
-if (failed.length > 0) refuse(`CI isn't green: ${failed.map((c) => `${c.name} (${(c.conclusion ?? '').toLowerCase()})`).join(', ')}`);
+const failed = checks.filter((c) => !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(c.outcome));
+if (failed.length > 0) refuse(`CI isn't green: ${failed.map((c) => `${c.name} (${c.outcome.toLowerCase()})`).join(', ')}`);
 
 console.log(`✓ ${view.headRefName} (${view.headRefOid.slice(0, 7)}) is up to date with main and green.`);
 if (checkOnly) process.exit(0);
