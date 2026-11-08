@@ -20,7 +20,8 @@
     "selftest": "tsx src/headless/selftest.ts",
     "check": "npm run typecheck && npm run test",
     "golden": "tsx src/headless/golden.ts",
-    "scene": "tsx src/headless/scene.ts"
+    "scene": "tsx src/headless/scene.ts",
+    "fuzz": "tsx src/headless/fuzz.ts"
   },
   "dependencies": {
     "three": "0.186.1"

@@ -2,7 +2,9 @@ name: CI
 
 # Every push and pull request runs the full check on Linux. Once a week (and on demand)
 # the same run repeats on macOS and Windows, and the final simulation hashes from all
-# three must match: a recording made anywhere has to replay identically everywhere.
+# three must match: a recording made anywhere has to replay identically everywhere. The
+# weekly run also plays fresh valleys for hours with bots, checking the motor's promises
+# every tick. (engines.yml runs the browsers' and Bun's engines on every push.)
 on:
   push:
     branches: [main]
@@ -61,6 +63,26 @@ jobs:
         with:
           name: hash-${{ matrix.os }}
           path: hash-${{ matrix.os }}.txt
+
+  fuzz:
+    name: Long invariant run (fresh valleys)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # 20 fresh valleys × two bots × an hour each: 40 hours of play, every body checked every tick.
+      - run: npm run fuzz -- --seeds 20 --minutes 60 --out fuzz-failures
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-failures
+          path: fuzz-failures/
 
   same-everywhere:
     name: Same hash on every platform
