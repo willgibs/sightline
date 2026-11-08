@@ -87,6 +87,11 @@ export type StanceName = 'stand' | 'crouch' | 'prone';
 /** The gaits a step can be taken in: every gait a body moves in (body/body.ts, Gait) but standing still. */
 export type StepGait = 'crawl' | 'crouch' | 'walk' | 'sprint';
 
+/** A body's hands take hold of a ledge (lab C, body/mantle.ts): a sound, by what they take hold of. */
+export interface MantleEvent extends EventBase, SoundFields {
+  type: 'mantle';
+}
+
 /** The rules decided the run (state.ts, Outcome): the reason is in the state. */
 export interface OutcomeEvent extends EventBase {
   type: 'outcome';
@@ -188,7 +193,8 @@ export type SimEvent =
   | HeardEvent
   | AlertEvent
   | BarkEvent
-  | NoiseEvent;
+  | NoiseEvent
+  | MantleEvent;
 export type EventType = SimEvent['type'];
 export type EventOf<K extends EventType> = Extract<SimEvent, { type: K }>;
 
@@ -255,6 +261,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   alert: { code: 13, range: 'perception', sound: false, fields: { from: { enum: AWARE }, to: { enum: AWARE }, reason: { enum: REASONS } } },
   bark: { code: 14, range: 'perception', sound: true, fields: { ...SOUND, line: 'u8' } },
   noise: { code: 15, range: 'perception', sound: true, fields: { ...SOUND } },
+  mantle: { code: 50, range: 'body', sound: true, fields: { ...SOUND } },
 };
 
 export function isSound(e: SimEvent): e is Extract<SimEvent, SoundFields> {

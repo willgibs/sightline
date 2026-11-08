@@ -17,11 +17,14 @@ export {
   type BodySpec,
   type BodyState,
   type Gait,
+  type MantleState,
   type MotorModeName,
   type PoseSample,
   type Stance,
 } from './body';
-export { idleIntent, requestStance, stepMotor, type Cylinder, type MotorContext, type MoveIntent } from './motor';
+export { idleIntent, stepMotor, type Cylinder, type MotorContext, type MoveIntent } from './motor';
+export { canMantle, mantleAt } from './mantle';
+export { requestStance } from './stance';
 export { intentFor, intents, motorSystem } from './system';
 export { bodyShape, eyeOf, hipHeight, queryBodies, type ShapePose } from './shape';
 export { bobDepth, headBob, stridePhase, type BobDepths } from './bob';

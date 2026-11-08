@@ -36,7 +36,7 @@ function ctxOf(world: World): MotorContext {
 }
 
 function intentAt(b: BodyState, tick: number, lean: number, raised = false, wishX = 0, wishZ = 0): MoveIntent {
-  return { tick, wishX, wishZ, gait: wishX === 0 && wishZ === 0 ? 'idle' : 'walk', yaw: b.yaw, pitch: 0, lean, raised };
+  return { tick, wishX, wishZ, gait: wishX === 0 && wishZ === 0 ? 'idle' : 'walk', yaw: b.yaw, pitch: 0, lean, raised, climb: false };
 }
 
 describe('a lean', () => {

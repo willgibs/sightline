@@ -103,6 +103,23 @@ export const defaultTuning = {
         bend: 0.58, // upright: at most this share of the spine (hips to eye), so a crouch leans less than a stand
         rate: 1.4, // m/s the eye moves aside at
       },
+      // The mantle (sim/body/mantle.ts). No game publishes these; they are the lab's.
+      mantle: {
+        probes: 9, // forward probes, at heights up to maxHeight + 0.1 m
+        maxHeight: 1.5, // the highest ledge a body can get up onto, metres above its feet
+        reach: 0.5, // how far past its edge the hands reach for a ledge, metres
+        squareCos: 0.4, // cosine of the widest angle off square it can start from (about 66°)
+        overDepth: 0.8, // thinner than this, it goes over rather than up onto
+        maxDrop: 1.6, // the furthest it will lower itself down the far side
+        lift: 0.03, // how far above the ledge the feet clear it, metres
+        hang: 0.1, // seconds for the hands to take hold
+        pullSpeed: 4, // m/s on average, up the wall
+        shiftSpeed: 3.5, // m/s on average, across the top
+        dropSpeed: 3, // m/s on average, down the far side
+        minLeg: 0.12, // no leg of the path is quicker than this, seconds
+        holdFor: 0.4, // seconds it waits for something in the way before it gives up
+        buffer: 0.2, // a press stays good this long, so an early press still works
+      },
       // Three parts for sight lines and hits: a head sphere at the eye, a torso capsule
       // from the hips to the shoulders, a legs capsule from the feet to the hips.
       // Heights come from the stance.
@@ -135,6 +152,22 @@ export const defaultTuning = {
       groundSnap: 0.6,
       stride: { sprint: 1.7, walk: 0.75, crouch: 0.85, crawl: 0.6 },
       lean: { peek: 0.18, weapon: 0.4, prone: 0.12, bend: 0.58, rate: 1.4 },
+      mantle: {
+        probes: 9,
+        maxHeight: 1.5,
+        reach: 0.5,
+        squareCos: 0.4,
+        overDepth: 0.8,
+        maxDrop: 1.6,
+        lift: 0.03,
+        hang: 0.1,
+        pullSpeed: 4,
+        shiftSpeed: 3.5,
+        dropSpeed: 3,
+        minLeg: 0.12,
+        holdFor: 0.4,
+        buffer: 0.2,
+      },
       parts: {
         headRadius: 0.115,
         torsoRadius: 0.22,
@@ -155,6 +188,9 @@ export const defaultTuning = {
     // Landing from a fall or a slide: loudness grows with impact speed (m/s), from a soft
     // drop at minSpeed to the cap. A 1 m drop lands at 4.4 m/s, about a walking step.
     landing: { minSpeed: 2.5, perSpeed: 0.25, max: 3 },
+    // A mantle (sim/body/mantle.ts): the hands taking hold, and being lowered down the far side
+    // (loudness, times the surface; the drop's grows with how far, up to 1 m).
+    mantle: { grip: 0.7, drop: 0.6, minDrop: 0.3 },
     // Steady sources, as heard radii. Phase 1 makes them mask other sounds for guards too.
     ambient: { creek: 38, generator: 70 },
   },

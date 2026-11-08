@@ -10,6 +10,8 @@ export interface Waypoint {
   z: number;
   stance: Stance;
   sprint?: boolean;
+  /** On reaching it, face the next waypoint and mantle what's between (lab C). */
+  climb?: boolean;
 }
 
 /**
@@ -20,6 +22,9 @@ export interface Waypoint {
 export class WaypointDriver {
   private next_ = 0;
   private yaw: number | null = null;
+  /** Mantling at the current waypoint: whether climb has been pressed, and whether the mantle has begun. */
+  private pressed = false;
+  private began = false;
 
   constructor(
     private readonly points: readonly Waypoint[],
@@ -41,10 +46,39 @@ export class WaypointDriver {
     out.moveZ = 0;
     out.pitch = 0;
     if (this.yaw === null) this.yaw = p.yaw;
+    out.commands = [];
+    if (p.motor === 'mantle') {
+      this.began = true;
+      out.yaw = this.yaw;
+      return out;
+    }
     while (this.next_ < this.points.length) {
       const w = this.points[this.next_]!;
-      if (Math.sqrt((w.x - p.x) * (w.x - p.x) + (w.z - p.z) * (w.z - p.z)) > this.reach) break;
-      this.next_++;
+      if (w.climb && this.began) {
+        // The mantle has been and gone.
+        this.pressed = false;
+        this.began = false;
+        this.next_++;
+        continue;
+      }
+      // A mantle starts from close by: this far from where it should start.
+      const near = w.climb ? Math.min(this.reach, 0.25) : this.reach;
+      if (Math.sqrt((w.x - p.x) * (w.x - p.x) + (w.z - p.z) * (w.z - p.z)) > near) break;
+      if (!w.climb || this.next_ + 1 >= this.points.length) {
+        this.next_++;
+        continue;
+      }
+      // Face the next waypoint, press climb, and wait until the mantle has been and gone.
+      const to = this.points[this.next_ + 1]!;
+      const face = datan2(-(to.x - p.x), -(to.z - p.z));
+      this.yaw = turnTowards(this.yaw, face, 4 * sim.dt);
+      out.yaw = this.yaw;
+      // Pressed, and pressed again every half second until the mantle begins.
+      if (!this.began && (this.pressed === false || sim.tick % 15 === 0) && Math.abs(this.yaw - face) < 1e-3) {
+        out.commands = [{ kind: 'climb' }];
+        this.pressed = true;
+      }
+      return out;
     }
     const w = this.points[this.next_];
     out.yaw = this.yaw;

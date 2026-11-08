@@ -21,6 +21,7 @@ export type Action =
   | 'prone'
   | 'leanLeft'
   | 'leanRight'
+  | 'climb'
   | 'fire'
   // Anywhere, once per press.
   | 'mark'
@@ -70,6 +71,7 @@ export const DEFAULT_ACTIONS: Readonly<Record<Action, ActionSpec>> = {
   prone: { context: 'play', kind: 'pressed', inputs: ['KeyZ'], label: 'prone' },
   leanLeft: { context: 'play', kind: 'held', inputs: ['KeyQ'], label: 'lean left' },
   leanRight: { context: 'play', kind: 'held', inputs: ['KeyE'], label: 'lean right' },
+  climb: { context: 'play', kind: 'pressed', inputs: ['Space'], label: 'climb' },
   fire: { context: 'play', kind: 'pressed', inputs: ['Mouse0'], label: 'fire' },
   mark: { context: 'play', kind: 'pressed', inputs: ['KeyM'], label: 'mark moment' },
   debugView: { context: 'always', kind: 'pressed', inputs: ['F3', 'Backquote'], label: 'debug view' },

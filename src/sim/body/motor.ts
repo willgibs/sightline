@@ -3,13 +3,14 @@ import { DEG, datan, dtanDeg } from '../kernel/core/detmath';
 import { clamp, smoothstep } from '../kernel/core/math';
 import type { EventDraft } from '../kernel/events';
 import type { World } from '../kernel/world/world';
-import { Blocks, circleOverlaps, pushOutCircle } from '../kernel/world/colliders';
+import { Blocks, pushOutCircle } from '../kernel/world/colliders';
 import { makeTerrainSample } from '../kernel/world/heightfield';
 import type { Solids } from '../kernel/world/solids';
 import { surfaceLoudness } from '../kernel/world/surfaces';
-import { bodyHeight, groundBelow, pushHistory, type BodySpec, type BodyState, type Gait, type MotorModeName, type Stance } from './body';
+import { RIM, bodyHeight, groundBelow, pushHistory, rimExcess, type BodySpec, type BodyState, type Gait, type MotorModeName } from './body';
 import { footfall } from './footfall';
 import { stepLean } from './lean';
+import { drawMantle, startMantle, stepMantle } from './mantle';
 import { eyeOf } from './shape';
 import type { DebugDraw } from '../kernel/debugDraw';
 
@@ -39,6 +40,10 @@ import type { DebugDraw } from '../kernel/debugDraw';
  *   any angle of approach;
  * - a lean (lean.ts) keeps the head and shoulders clear of anything solid, of the terrain and of
  *   other bodies, and grows by no more than its rate. (The world can force it back faster.)
+ * - in a mantle (mantle.ts) the body follows a path whose every pose is re-checked every
+ *   tick: never inside anything solid, with no allowance for steps, and never inside
+ *   another body; it waits for what's in the way, and gives up if it stays. Only colliders can be
+ *   mantled, never the terrain, and never onto ground too steep to stand on.
  * A new mode states its own invariants here and adds them to the invariant run.
  *
  * Ground steeper than maxSlopeDeg is not ground you can stand on: you can't climb it, and
@@ -62,6 +67,8 @@ export interface MoveIntent {
   lean: number;
   /** With a weapon or optic up, a lean goes all the way rather than peeking. */
   raised: boolean;
+  /** Mantle what's in front, if anything can be mantled. */
+  climb: boolean;
 }
 
 export function idleIntent(b: BodyState, tick: number, out: MoveIntent): MoveIntent {
@@ -73,6 +80,7 @@ export function idleIntent(b: BodyState, tick: number, out: MoveIntent): MoveInt
   out.pitch = b.pitch;
   out.lean = 0;
   out.raised = false;
+  out.climb = false;
   return out;
 }
 
@@ -109,7 +117,7 @@ interface MotorMode {
   drive(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext, tanMax: number): void;
 }
 
-const MODES: Record<MotorModeName, MotorMode> = {
+const MODES: Record<Exclude<MotorModeName, 'mantle'>, MotorMode> = {
   ground: { drive: driveGround },
   air: { drive: driveAir },
 };
@@ -121,32 +129,28 @@ const tmpPush = { x: 0, z: 0 };
 const dest = { x: 0, z: 0 };
 const leanEye = { x: 0, y: 0, z: 0 };
 
-/** Directions for testing the body's rim against the terrain: 12 around the circle. */
-const RIM = [
-  [1, 0],
-  [0.8660254037844387, 0.5],
-  [0.5, 0.8660254037844387],
-  [0, 1],
-  [-0.5, 0.8660254037844387],
-  [-0.8660254037844387, 0.5],
-  [-1, 0],
-  [-0.8660254037844387, -0.5],
-  [-0.5, -0.8660254037844387],
-  [0, -1],
-  [0.5, -0.8660254037844387],
-  [0.8660254037844387, -0.5],
-] as const;
-
 /** Moves a body one tick toward what it intends. */
 export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext): void {
-  const { world, tuning, dt } = ctx;
   const tanMax = dtanDeg(spec.maxSlopeDeg);
 
   pushHistory(b);
   b.yaw = i.yaw;
   b.pitch = clamp(i.pitch, -spec.pitchLimit, spec.pitchLimit);
-  easeStance(b, spec, dt);
-  MODES[b.motor].drive(b, i, spec, ctx, tanMax);
+  easeStance(b, spec, ctx.dt);
+  if (i.climb && b.motor === 'ground') startMantle(b, spec, ctx);
+  if (b.motor === 'mantle') stepMantle(b, spec, ctx);
+  else moveBody(b, i, spec, ctx, tanMax);
+  stepLean(b, i, spec, ctx);
+  if (ctx.draw) {
+    drawController(ctx.draw, b, spec, ctx.world, tanMax);
+    drawMantle(ctx.draw, b, spec, ctx);
+  }
+}
+
+/** A tick of the modes that drive a velocity (on the ground, in the air): move and collide, settle, footsteps and landing. */
+function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext, tanMax: number): void {
+  const { world, tuning, dt } = ctx;
+  MODES[b.motor as 'ground' | 'air'].drive(b, i, spec, ctx, tanMax);
 
   // --- Move and collide. ------------------------------------------------------------
   const feet = b.y;
@@ -262,8 +266,6 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
     });
     b.stride = 0;
   }
-  stepLean(b, i, spec, ctx);
-  if (ctx.draw) drawController(ctx.draw, b, spec, world, tanMax);
 }
 
 /**
@@ -381,40 +383,6 @@ function driveGround(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorCont
 /** In the air there is nothing to push against: the body keeps its velocity and falls. */
 function driveAir(b: BodyState): void {
   b.sliding = false;
-}
-
-/**
- * Starts a stance change, if the body can make it: standing up needs headroom. A change
- * into or out of prone takes stanceTime.prone and can't be interrupted (`proneTransition`).
- * Returns whether the stance changed.
- */
-export function requestStance(b: BodyState, to: Stance, spec: BodySpec, ctx: Pick<MotorContext, 'solids' | 'source' | 'emit'>): boolean {
-  if (to === b.stance) return false;
-  if (spec.height[to] > spec.height[b.stance] && !hasHeadroom(b, spec.height[to], spec, ctx.solids)) return false;
-  const prone = to === 'prone' || b.stance === 'prone';
-  ctx.emit({ type: 'stance', source: ctx.source, from: b.stance, to });
-  b.eyeFrom = b.eyeHeight;
-  b.stance = to;
-  b.stanceDuration = prone ? spec.stanceTime.prone : spec.stanceTime.crouch;
-  b.stanceTimer = b.stanceDuration;
-  // An instant change (a zero stance time) has no transition to wait out.
-  b.proneTransition = prone && b.stanceDuration > 0;
-  return true;
-}
-
-/** True if nothing solid sits between the body's current top and `height` above its feet. */
-function hasHeadroom(b: BodyState, height: number, spec: BodySpec, solids: Solids): boolean {
-  const r = spec.radius;
-  const current = bodyHeight(b, spec);
-  solids.query(b.x - r, b.z - r, b.x + r, b.z + r, ids);
-  for (let q = 0; q < ids.length; q++) {
-    const c = solids.get(ids[q]!);
-    if ((c.flags & Blocks.Move) === 0) continue;
-    // Same comparisons as moving: a slab exactly at head height is overhead, not in the way.
-    if (c.y0 < b.y + current - 0.01 || c.y0 >= b.y + height) continue;
-    if (circleOverlaps(c, b.x, b.z, r)) return false;
-  }
-  return true;
 }
 
 /**
@@ -581,16 +549,6 @@ function rimPush(world: World, x: number, z: number, feet: number, r: number, st
   out.x = px * cap;
   out.z = pz * cap;
   return true;
-}
-
-/** How far the terrain inside the body's rim rises above a step, at most; 0 or less if clear. */
-function rimExcess(world: World, x: number, z: number, feet: number, r: number, stepHeight: number): number {
-  let worst = -Infinity;
-  for (let k = 0; k < RIM.length; k++) {
-    const e = world.terrain.heightAt(x + RIM[k]![0] * r, z + RIM[k]![1] * r) - (feet + stepHeight);
-    if (e > worst) worst = e;
-  }
-  return worst;
 }
 
 /** True if the body can end the tick at (x, z): nothing solid inside it, no cliff under it. */

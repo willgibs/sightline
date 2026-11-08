@@ -26,13 +26,15 @@ export interface PlayerControl {
   queuedStance: 'crouch' | 'prone' | null;
   /** Crouched or went prone while holding sprint: don't auto-stand until sprint is released. */
   sprintSuppressed: boolean;
+  /** Seconds a press of climb stays good, for a press made just early. */
+  climbWait: number;
 }
 
 export function createPlayer(world: World, solids: Solids, tuning: Tuning): { body: BodyState; control: PlayerControl } {
   const { spawn } = world;
   return {
     body: createBody(world, solids, tuning.bodies.player, spawn.x, spawn.z, spawn.faceX, spawn.faceZ),
-    control: { queuedStance: null, sprintSuppressed: false },
+    control: { queuedStance: null, sprintSuppressed: false, climbWait: 0 },
   };
 }
 
@@ -42,7 +44,7 @@ export function playerIntent(
   c: PlayerControl,
   input: InputFrame,
   spec: BodySpec,
-  ctx: Pick<MotorContext, 'world' | 'solids' | 'tick' | 'source' | 'emit'>,
+  ctx: Pick<MotorContext, 'world' | 'solids' | 'tick' | 'source' | 'emit' | 'dt'>,
   out: MoveIntent,
 ): MoveIntent {
   updateStance(b, c, input, spec, ctx);
@@ -75,11 +77,17 @@ export function playerIntent(
   out.pitch = input.pitch;
   out.lean = gait === 'sprint' ? 0 : (input.lean ?? 0);
   out.raised = input.optic !== undefined && input.optic !== Optic.None;
+  // A press is good for a moment, so one made just before reaching the wall still works.
+  if (input.commands?.some((c) => c.kind === 'climb')) c.climbWait = spec.mantle.buffer;
+  else if (c.climbWait > 0) c.climbWait = c.climbWait > ctx.dt ? c.climbWait - ctx.dt : 0;
+  out.climb = b.motor !== 'mantle' && c.climbWait > 0;
+  if (b.motor === 'mantle') c.climbWait = 0;
   return out;
 }
 
 function updateStance(b: BodyState, c: PlayerControl, input: InputFrame, spec: BodySpec, ctx: Pick<MotorContext, 'solids' | 'source' | 'emit'>): void {
   if (!input.sprint) c.sprintSuppressed = false;
+  if (b.motor === 'mantle') return; // the hands are busy
   let request: 'crouch' | 'prone' | null = input.prone ? 'prone' : input.crouch ? 'crouch' : null;
   if (b.proneTransition) {
     if (request) c.queuedStance = request;

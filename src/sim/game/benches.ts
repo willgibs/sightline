@@ -1,6 +1,6 @@
 import { defaultTuning } from '../../config/tuning';
-import { InvariantWatch, bodyShape, createBody, eyeOf } from '../body';
-import { generateWorld } from '../generation';
+import { InvariantWatch, bodyHeight, bodyShape, createBody, eyeOf, mantleAt, stepMotor, type Cylinder, type MotorContext } from '../body';
+import { buildWorld, generateWorld } from '../generation';
 import type { LayerName } from '../lanes';
 import { LAYERS } from '../lanes';
 import { Hasher } from '../kernel/core/hash';
@@ -19,6 +19,7 @@ import { runScene } from '../kernel/scene';
 import { labWorld } from './scenes/perceptionLab';
 import { arenaWorld } from './scenes/movementLab';
 import { Blocks } from '../kernel/world/colliders';
+import { Surface } from '../kernel/world/surfaces';
 import { Solids } from '../kernel/world/solids';
 import { sightLine, type QueryView } from '../kernel/world/query';
 import { emptyShape } from '../kernel/world/shape';
@@ -104,7 +105,7 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
           m['worst gain on steep ground (m)'] = Math.max(m['worst gain on steep ground (m)'], r.steepGain);
         }
       }
-      return { ...m, ...eyeToHead() };
+      return { ...m, ...eyeToHead(), ...mantleMeetsWalker() };
     },
   },
   perception: {
@@ -158,6 +159,57 @@ function eyeToHead(): Record<string, number> {
     [`lean: pairs in view (of ${pairs})`]: inView,
     [`seed · lean: pairs where the camera sees a guard who has no line to the head (of ${pairs})`]: unseen,
   };
+}
+
+/**
+ * The mantle's every pose, checked every tick (C4): over a wall, as someone walks across
+ * where it lands, timed to reach it just as the mantle does. The seed, The Dark Mod's
+ * mantle, validated its endpoint once, and goes through him.
+ */
+function mantleMeetsWalker(): Record<string, number> {
+  const P = defaultTuning.bodies.player;
+  const dt = 1 / defaultTuning.sim.tickHz;
+  const wall = { kind: 'box' as const, x: 0, z: -0.15, y0: -0.3, y1: 1, hx: 3, hz: 0.15, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Rock };
+  const world = buildWorld({ name: 'bench-mantle', size: 30, cell: 0.5, colliders: [wall], spawn: { x: 0, z: 2 } }, defaultTuning.gen);
+  const solids = new Solids(world.colliders);
+  const speed = defaultTuning.bodies.guard.speed.walk;
+  const walker: Cylinder = { x: 0, y: 0, z: -0.62, radius: 0.3, height: 1.85 };
+  const crossing = 0.62; // seconds until he is where the mantle lands
+  const placed = (t: number): void => {
+    walker.x = (t - crossing) * speed;
+  };
+  const body = createBody(world, solids, P, 0, 0.4, 0, -1);
+  const ctx: MotorContext = { world, solids, tuning: defaultTuning, dt, tick: 1, source: 1, others: [walker], emit: () => 0 };
+  const inside = (x: number, y: number, z: number, height: number): boolean => {
+    const dx = x - walker.x;
+    const dz = z - walker.z;
+    const rr = P.radius + walker.radius - 1e-3;
+    return dx * dx + dz * dz < rr * rr && y < walker.y + walker.height && walker.y < y + height;
+  };
+  // The mantle as it runs: it waits for him.
+  let ours = 0;
+  let plan: { points: number[]; legs: number[] } | null = null;
+  placed(0);
+  for (let t = 1; t <= 90; t++) {
+    ctx.tick = t;
+    placed((t - 1) * dt);
+    stepMotor(body, { tick: t, wishX: 0, wishZ: 0, gait: 'idle', yaw: body.yaw, pitch: 0, lean: 0, raised: false, climb: t === 1 }, P, ctx);
+    plan ??= body.mantle ? { points: [...body.mantle.points], legs: [...body.mantle.legs] } : null;
+    if (inside(body.x, body.y, body.z, bodyHeight(body, P))) ours++;
+  }
+  // The seed: the same path, checked when it starts and never again.
+  let seed = 0;
+  const pose = { x: 0, y: 0, z: 0 };
+  if (plan) {
+    const total = plan.legs.reduce((a, b) => a + b, 0);
+    for (let t = 1; t <= 90; t++) {
+      placed((t - 1) * dt);
+      const when = Math.min(t * dt, total);
+      mantleAt({ ...plan, t: 0, waited: 0, stand: false, grip: Surface.Rock, feet: Surface.Grass, grabbed: false, dropped: 0 }, when, pose);
+      if (when < total && inside(pose.x, pose.y, pose.z, P.height.crouch)) seed++;
+    }
+  }
+  return { 'mantle: ticks inside someone walking across the landing': ours, 'seed · mantle checked once: ticks inside him': seed };
 }
 
 /** Lab A's bench (perception lane): docs/phase-1-plan.md, A · recorded before building, says what each should be. */

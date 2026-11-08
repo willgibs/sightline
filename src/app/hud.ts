@@ -15,6 +15,7 @@ export class Hud {
   private readonly reticle: HTMLElement;
   private readonly range: HTMLElement;
   private readonly toastEl: HTMLElement;
+  private readonly promptEl: HTMLElement;
   /** Labels systems drew (sim/debugDraw.ts), placed over the world in the debug view. */
   private readonly labelLayer: HTMLElement;
   private readonly labels: HTMLElement[] = [];
@@ -34,6 +35,7 @@ export class Hud {
       <div class="replay-legend"></div>
       <div class="reticle"></div>
       <div class="range"></div>
+      <div class="prompt"></div>
       <div class="toast"></div>
       <div class="debug-labels"></div>`;
     this.compass = root.querySelector('.compass')!;
@@ -43,6 +45,7 @@ export class Hud {
     this.reticle = root.querySelector('.reticle')!;
     this.range = root.querySelector('.range')!;
     this.toastEl = root.querySelector('.toast')!;
+    this.promptEl = root.querySelector('.prompt')!;
     this.labelLayer = root.querySelector('.debug-labels')!;
     const legend: Array<[Action[], string]> = [
       [['debugView'], 'view'],
@@ -70,6 +73,12 @@ export class Hud {
     replayKeys.innerHTML = replayLegend.map(([actions, text]) => `<span>${keysHtml(map, actions)}${text}</span>`).join('');
     labelKeys(replayKeys);
     this.resizeCompass();
+  }
+
+  /** What the body could do right now: a small prompt, or nothing. */
+  setPrompt(text: string | null): void {
+    if (this.promptEl.textContent !== (text ?? '')) this.promptEl.textContent = text ?? '';
+    this.promptEl.classList.toggle('on', text !== null);
   }
 
   setDebug(on: boolean): void {

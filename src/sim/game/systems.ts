@@ -59,7 +59,7 @@ const playerIntentSystem: System = {
   emits: ['stance'],
   run(ctx) {
     const p = player(ctx.index);
-    const motor = { world: ctx.world, solids: ctx.solids, tick: ctx.tick, source: p.id, emit: ctx.emit };
+    const motor = { world: ctx.world, solids: ctx.solids, tick: ctx.tick, source: p.id, emit: ctx.emit, dt: ctx.dt };
     playerIntent(p.body, p.control, ctx.input, ctx.tuning.bodies.player, motor, intentFor(ctx, p.id));
   },
 };

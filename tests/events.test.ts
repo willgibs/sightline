@@ -72,6 +72,7 @@ function events(): { sim: Simulation; all: SimEvent[] } {
     { type: 'alert', id: 0, tick, t: tick / 30, source: guard, cause: 0, from: 'unaware', to: 'curious', reason: 'heard' },
     { type: 'bark', id: 0, tick, t: tick / 30, source: guard, cause: 0, ...voice, line: 3 },
     { type: 'noise', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, loudness: 2, radius: 24 },
+    { type: 'mantle', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, surface: Surface.Rock, loudness: 0.735, radius: 8.82 },
   ];
   perceived.forEach((e) => all.push({ ...e, id: all.length + 1 }));
   return { sim, all };
@@ -97,7 +98,7 @@ describe('events', () => {
     for (const e of all) expect(ids.has(e.source)).toBe(true);
     const types = new Set(all.filter((e) => e.source === PLAYER_ID).map((e) => e.type));
     // The player drops noises from the sandbox (A10).
-    expect([...types].sort()).toEqual(['footstep', 'land', 'noise', 'outcome', 'shot', 'stance']);
+    expect([...types].sort()).toEqual(['footstep', 'land', 'mantle', 'noise', 'outcome', 'shot', 'stance']);
     expect(all.some((e) => e.source !== PLAYER_ID && e.type === 'footstep')).toBe(true);
   });
 

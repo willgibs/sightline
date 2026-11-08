@@ -573,7 +573,7 @@ Playable at `?scene=movement-lab`; the movement course stays as a regression tes
   - A peek exposes one eye; a lean with the weapon goes far enough to clear the corner (Ground Branch).
   - Rate-limited and swept against solids and bodies.
   - A property test: whenever the player can see a guard past a corner, the guard has a line to the player's eye.
-- [ ] C4 · Mantle: a motor mode onto and over low walls, and through windows.
+- [x] C4 · Mantle: a motor mode onto and over low walls, and through windows.
   - Three probes find the ledge: forward at several heights, down for the top, and an overlap at the landing pose.
   - Eased phases: hang, pull, shift, push.
   - Every pose is re-checked every tick. A 1.2 m mantle over 0.6 s rises 0.067 m per tick.

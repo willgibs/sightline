@@ -18,6 +18,19 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 Built on the `lab-c-movement` branch to `docs/phase-1-plan.md`, section C. Lean and the mantle use input the bots never give, so the valley's behaviour is untouched until the prone body (C2).
 
+### The mantle (C4): every pose, every tick, and no noise you didn't choose
+
+**Decision:**
+- A press of Space (the `climb` command, code 50) starts a mantle, if one can be found; it's never automatic, so its noise is one the player chose (Tarkov's automatic vault is the counter-example). A press stays good for 0.2 s, so one made just early still works.
+- **Three probes find the ledge** (The Dark Mod's): forward at nine heights for the face, down for its top, an overlap at the landing pose. Only colliders can be mantled, so the rule that nothing gains height on too-steep terrain holds here as well.
+- **Over or onto.** Shallower than `overDepth` (0.8 m) it goes over, if the far side is within `maxDrop` (1.6 m); deeper, or with nowhere to land beyond, it stands on top. The body squares up to the wall it faces, up to about 66° off square.
+- **Four eased legs:** reach for the ledge, pull, shift, push down. It goes crouched, so a window that fits a crouch fits a mantle. Heights up to 1.5 m, about 0.6 s for 1.2 m, a little over 0.2 m of rise a tick at most.
+- **Every pose is re-checked every tick** against everything solid (no step allowance) and every other body; a pose that isn't clear holds the body where it is, and after 0.4 s of waiting the mantle gives up and the body drops where it is. The Dark Mod validated its endpoint once, and clipped whatever moved in afterwards: on the bench, a walker crossing the landing is met 0 times; the seed path goes through him for 15 ticks.
+- **Sounds:** the hands taking hold (a new sound event, `mantle`, code 50), by what they grip: 0.7 × surface × 12 m. Lowered down the far side is quieter than falling from there (`noise.mantle.drop`).
+- `STATE_SCHEMA` 8 (taken with the lean, this is the same unmerged bump): bodies keep their mantle; the player's controls keep `climbWait`. No behaviour golden moved: the bots don't press climb.
+
+**Why:** Mantles in shipped games fail by clipping and by surprising the player. Checking every pose, every tick, in every mode is the lab's claim (no motor mode gets an exception); making it a press rather than an automatic vault keeps the noise deliberate.
+
 ### The lean (C3): the eye is the centre of the head that's hit
 
 **Decision:**

@@ -38,7 +38,9 @@ export const BENCH_GOLDEN: PinnedBench = {
       "worst gain on steep ground (m)": 0,
       "lean: eye-to-head lines that differ by direction (of 2000)": 0,
       "lean: pairs in view (of 2000)": 1496,
-      "seed · lean: pairs where the camera sees a guard who has no line to the head (of 2000)": 19
+      "seed · lean: pairs where the camera sees a guard who has no line to the head (of 2000)": 19,
+      "mantle: ticks inside someone walking across the landing": 0,
+      "seed · mantle checked once: ticks inside him": 15
     },
     "runs": {
       "movement-course": {

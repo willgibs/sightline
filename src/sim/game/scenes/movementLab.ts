@@ -281,8 +281,18 @@ function route(): Waypoint[] {
   }
   const D = ARENA.divider;
   const gate = (D.gate[0] + D.gate[1]) / 2;
-  points.push({ x: 15, z: 12, stance: 'stand' }); // south of the row's gap between two windows
-  points.push({ x: 15, z: D.z + 7, stance: 'stand' }); // through the gap
+  const G = ARENA.garden;
+  const south = G.z + G.thickness + 0.55; // where a body stands to mantle the row from the south
+  const north = G.z - 1.2; // beyond it, the far side of the row
+  // Over the 0.9 m wall.
+  points.push({ x: WALLS[1]!.x, z: south, stance: 'stand', climb: true });
+  points.push({ x: WALLS[1]!.x, z: north, stance: 'stand' });
+  // Back through a gap, and in through the window that fits a body.
+  points.push({ x: -14, z: north, stance: 'stand' });
+  points.push({ x: -14, z: 4, stance: 'stand' });
+  points.push({ x: WINDOWS[0]!.x, z: south, stance: 'stand', climb: true });
+  points.push({ x: WINDOWS[0]!.x, z: north, stance: 'stand' });
+  points.push({ x: 15, z: north, stance: 'stand' });
   points.push({ x: gate, z: D.z + 3, stance: 'stand' });
   points.push({ x: gate, z: D.z - 4, stance: 'stand' });
   points.push({ x: 0, z: ARENA.roof.z + ARENA.roof.hz + 4, stance: 'stand' });
@@ -290,8 +300,8 @@ function route(): Waypoint[] {
 }
 
 /** What the expectations gather as the run goes on. */
-function fresh(): { stepped: Set<string>; heard: number; sawThroughTent: boolean; noticed: boolean; noticedAcrossDivider: boolean } {
-  return { stepped: new Set(), heard: 0, sawThroughTent: false, noticed: false, noticedAcrossDivider: false };
+function fresh(): { stepped: Set<string>; heard: number; sawThroughTent: boolean; noticed: boolean; noticedAcrossDivider: boolean; mantles: number } {
+  return { stepped: new Set(), heard: 0, sawThroughTent: false, noticed: false, noticedAcrossDivider: false, mantles: 0 };
 }
 
 export function movementLab(): Scene {
@@ -309,7 +319,7 @@ export function movementLab(): Scene {
       for (const k of SENSING) sim.guards[k]!.senses ??= createSenses(false);
     },
     driver: () => new WaypointDriver(route(), 1),
-    seconds: 150,
+    seconds: 180,
     playOn: true,
     expect: [
       {
@@ -339,6 +349,15 @@ export function movementLab(): Scene {
         after: () => {
           if (seen.heard === 0) return 'he heard nothing';
           if (seen.sawThroughTent) return 'he noticed the walker by sight, through the tent';
+        },
+      },
+      {
+        name: 'the walker mantles a wall and goes through a window',
+        during: (sim, events) => {
+          for (const e of events) if (e.type === 'mantle' && e.source === sim.playerId) seen.mantles++;
+        },
+        after: () => {
+          if (seen.mantles !== 2) return `${seen.mantles} mantles`;
         },
       },
       {

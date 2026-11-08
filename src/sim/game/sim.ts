@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import { bodyShape, queryBodies, stridePhase, type BodyState, type Gait, type Stance } from '../body';
+import { bodyShape, canMantle, queryBodies, stridePhase, type BodyState, type Gait, type MotorContext, type Stance } from '../body';
 import { generateWorld, worldFingerprint } from '../generation';
 import type { Game } from '../kernel/game';
 import { neutralInput } from '../kernel/input';
@@ -51,6 +51,8 @@ export interface Snapshot {
   eyeZ: number;
   /** How far it is leaned to the right, metres (body/lean.ts). */
   lean: number;
+  /** A press of climb would mantle what's in front: the prompt (body/mantle.ts). */
+  climb: boolean;
   yaw: number;
   pitch: number;
   speed: number;
@@ -121,6 +123,11 @@ export class Simulation extends KernelSimulation {
     this.playerEntity();
   }
 
+  /** What the motor sees of the world, for questions asked between ticks. */
+  private motorView(): MotorContext {
+    return { world: this.world, solids: this.solids, tuning: this.tuning, dt: this.dt, tick: this.tick, source: this.playerId, others: [], emit: () => 0 };
+  }
+
   snapshot(out?: Snapshot): Snapshot {
     const guards = this.guards;
     const n = guards.length;
@@ -137,6 +144,7 @@ export class Simulation extends KernelSimulation {
             eyeY: 0,
             eyeZ: 0,
             lean: 0,
+            climb: false,
             yaw: 0,
             pitch: 0,
             speed: 0,
@@ -159,6 +167,7 @@ export class Simulation extends KernelSimulation {
     s.eyeY = shape.head.y - p.y;
     s.eyeZ = shape.head.z - p.z;
     s.lean = p.lean;
+    s.climb = canMantle(p, this.tuning.bodies.player, this.motorView());
     s.yaw = p.yaw;
     s.pitch = p.pitch;
     s.speed = p.speed;

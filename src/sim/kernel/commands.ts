@@ -28,7 +28,12 @@ export interface FireCommand {
   pitch: number;
 }
 
-export type Command = FireCommand;
+/** Mantle or take a ladder, if one is in front (lab C, body/mantle.ts). */
+export interface ClimbCommand {
+  kind: 'climb';
+}
+
+export type Command = FireCommand | ClimbCommand;
 export type CommandKind = Command['kind'];
 
 /** How a command field is stored and quantized. */
@@ -44,6 +49,7 @@ export interface CommandSpec<C> {
 
 export const COMMANDS: { readonly [K in CommandKind]: CommandSpec<Extract<Command, { kind: K }>> } = {
   fire: { code: 1, range: 'foundation', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
+  climb: { code: 50, range: 'body', fields: {} },
 };
 
 /** The most commands one tick carries; more are dropped, oldest kept. */

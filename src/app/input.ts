@@ -199,7 +199,7 @@ export class InputController {
     for (const a of actions) {
       if (this.map.actions[a].kind !== 'pressed') continue;
       if (a === 'fire') this.latch.latch('fire');
-      else if (a === 'crouch' || a === 'prone') this.pressed.add(a);
+      else if (a === 'crouch' || a === 'prone' || a === 'climb') this.pressed.add(a);
       else this.onAction?.(a);
     }
   }
@@ -219,6 +219,7 @@ export class InputController {
     out.sprint = !frozen && this.held('sprint');
     out.crouch = !frozen && this.pressed.has('crouch');
     out.prone = !frozen && this.pressed.has('prone');
+    const climb = !frozen && this.pressed.has('climb');
     this.pressed.clear();
     out.yaw = this.yaw;
     out.pitch = this.pitch;
@@ -229,6 +230,7 @@ export class InputController {
       this.commands.length = 0;
     } else {
       this.latch.drain(startTick, this.commands);
+      if (climb) this.commands.push({ kind: 'climb' });
     }
     out.commands = this.commands;
     return out;

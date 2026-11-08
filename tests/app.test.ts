@@ -29,8 +29,8 @@ describe('the action map', () => {
     expect(map.actionsOf('KeyW', new Set(['play']))).toEqual(['forward']);
     expect(map.actionsOf('KeyB', new Set(['play', 'always']))).toEqual([]);
     expect(map.actionsOf('KeyB', all)).toEqual(['colliders']);
-    expect(map.actionsOf('Space', new Set(['play', 'always', 'debug']))).toEqual([]);
-    expect(map.actionsOf('Space', all)).toEqual(['flyUp']);
+    expect(map.actionsOf('Space', new Set(['play', 'always', 'debug']))).toEqual(['climb']);
+    expect(map.actionsOf('Space', new Set(['fly', 'always', 'debug']))).toEqual(['flyUp']);
     expect(map.actionsOf('F3', new Set(['always']))).toEqual(['debugView']);
   });
 

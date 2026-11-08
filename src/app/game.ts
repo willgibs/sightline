@@ -760,6 +760,7 @@ export class Game {
     // A click from now on is about this frame.
     this.input.latch.frameShown(this.sim.tick, this.clock.alpha, pose.yaw, pose.pitch);
     this.hud.updateCompass(pose.yaw);
+    this.hud.setPrompt(this.curr.climb && !this.detached && !this.replay ? `${this.input.map.describe('climb')} · mantle` : null);
     this.hud.setRange(this.debug ? this.aimText : null);
 
     if (!this.paused) this.tickWindow += dt;

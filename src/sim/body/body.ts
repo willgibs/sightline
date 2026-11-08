@@ -27,9 +27,30 @@ export type Gait = 'idle' | StepGait;
 /**
  * Which motor mode owns the body. Each mode moves the body its own way and keeps its own
  * invariants (see motor.ts): on the ground it walks, steps and slides; in the air it
- * falls. Lab C adds traverse (mantle, vault, ladder); later modes could swim or glide.
+ * falls; in a mantle it follows a path of its own. Later modes could swim or glide.
  */
-export type MotorModeName = 'ground' | 'air';
+export type MotorModeName = 'ground' | 'air' | 'mantle';
+
+/** A mantle under way (mantle.ts): its path, as plain data in the state tree. */
+export interface MantleState {
+  /** Seconds along the path. It advances only while the next pose is clear. */
+  t: number;
+  /** Seconds it has waited for something to get out of the way, since it last moved. */
+  waited: number;
+  /** Waypoints as x, y, z triples: the start, at the wall, above the ledge, over the landing, the landing. */
+  points: number[];
+  /** Seconds each leg between waypoints takes: reach, pull, shift, push. */
+  legs: number[];
+  /** It began standing: stand up again at the end, if there's room. */
+  stand: boolean;
+  /** What the hands take hold of, and what the feet land on. */
+  grip: Surface;
+  feet: Surface;
+  /** The hands have taken hold (its sound has been made). */
+  grabbed: boolean;
+  /** How far it is lowered down the far side, metres. */
+  dropped: number;
+}
 
 /** A kind of body: its sizes, limits and parts (tuning.bodies). Every kind has the same fields; a test keeps them so. */
 export type BodySpec = Tuning['bodies']['player'];
@@ -69,6 +90,8 @@ export interface BodyState {
   /** How far the head is leaned to the body's right (negative: left), metres (lean.ts). */
   lean: number;
   motor: MotorModeName;
+  /** The mantle under way, or null (mantle.ts). */
+  mantle: MantleState | null;
   /** On the ground but on terrain too steep to stand on: no traction, sliding down. */
   sliding: boolean;
   /** Distance walked since the last footstep (shoves from others don't count). */
@@ -96,6 +119,22 @@ export type BodyEntity = Extract<Entity, { body: BodyState }>;
 export function hasBody(e: Entity): e is BodyEntity {
   return 'body' in e;
 }
+
+/** Directions for testing the body's rim against the terrain: 12 around the circle. */
+export const RIM = [
+  [1, 0],
+  [0.8660254037844387, 0.5],
+  [0.5, 0.8660254037844387],
+  [0, 1],
+  [-0.5, 0.8660254037844387],
+  [-0.8660254037844387, 0.5],
+  [-1, 0],
+  [-0.8660254037844387, -0.5],
+  [-0.5, -0.8660254037844387],
+  [0, -1],
+  [0.5, -0.8660254037844387],
+  [0.8660254037844387, -0.5],
+] as const;
 
 const ids: number[] = [];
 
@@ -133,6 +172,7 @@ export function createBody(world: World, solids: Solids, spec: BodySpec, x: numb
     eyeHeight: spec.eyeHeight.stand,
     lean: 0,
     motor: 'ground',
+    mantle: null,
     sliding: false,
     stride: 0,
     gait: 'idle',
@@ -204,6 +244,16 @@ export function solidAround(solids: Solids, x: number, z: number, y0: number, y1
     if ((c.flags & Blocks.Move) !== 0 && c.y1 > y0 && c.y0 < y1 && circleOverlaps(c, x, z, r)) return true;
   }
   return false;
+}
+
+/** How far the terrain inside the body's rim rises above a step, at most; 0 or less if clear. */
+export function rimExcess(world: World, x: number, z: number, feet: number, r: number, stepHeight: number): number {
+  let worst = -Infinity;
+  for (let k = 0; k < RIM.length; k++) {
+    const e = world.terrain.heightAt(x + RIM[k]![0] * r, z + RIM[k]![1] * r) - (feet + stepHeight);
+    if (e > worst) worst = e;
+  }
+  return worst;
 }
 
 export interface Ground {
