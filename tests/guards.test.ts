@@ -9,6 +9,8 @@ import { Simulation } from '../src/sim/game/sim';
 import { Blocks } from '../src/sim/kernel/world/colliders';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testGuard, testWorld, tuningCopy } from './fixtures';
+import { GUARD_ROLES } from '../src/sim/generation';
+import { palette } from '../src/render/palette';
 
 const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
 const worlds: World[] = [];
@@ -50,6 +52,15 @@ describe('routines', () => {
         expect(Math.hypot(pose.x - g.x, pose.z - g.z)).toBeLessThan(1e-9);
       }
     }
+  });
+});
+
+describe('roles', () => {
+  it('are the seven of the design doc, each tinted in the debug view; the test camp uses three', () => {
+    expect([...GUARD_ROLES]).toEqual(['sentry', 'patrol', 'marksman', 'radio-operator', 'officer', 'worker', 'target']);
+    expect(Object.keys(palette.debug.roles).sort()).toEqual([...GUARD_ROLES].sort());
+    expect(new Set(Object.values(palette.debug.roles)).size).toBe(GUARD_ROLES.length);
+    for (const w of worlds) expect([...new Set(w.camp.guards.map((g) => g.role))].sort()).toEqual(['patrol', 'sentry', 'worker']);
   });
 });
 

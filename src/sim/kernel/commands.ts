@@ -1,3 +1,4 @@
+import type { CodeRange } from './codes';
 import { clamp } from './core/math';
 import { quantPitch, quantYaw } from './quantize';
 
@@ -15,8 +16,9 @@ import { quantPitch, quantYaw } from './quantize';
  * The simulation resolves a precise command against its pose history (body/body.ts),
  * so what it computes matches what was on screen, at any frame rate.
  *
- * Adding a command: add it to Command and to COMMANDS with a new code. Its fields are
- * quantized by their codec, so live play and re-simulation see the same numbers.
+ * Adding a command: add it to Command and to COMMANDS with a new code from your lane's
+ * range (codes.ts). Its fields are quantized by their codec, so live play and
+ * re-simulation see the same numbers.
  */
 
 export interface FireCommand {
@@ -35,11 +37,13 @@ export type CommandField = 'lag' | 'yaw' | 'pitch';
 export interface CommandSpec<C> {
   /** Identifies the kind in recordings. Never reuse a retired code. */
   code: number;
+  /** The range the code was taken from (codes.ts). */
+  range: CodeRange;
   fields: { readonly [F in Exclude<keyof C, 'kind'>]-?: CommandField };
 }
 
 export const COMMANDS: { readonly [K in CommandKind]: CommandSpec<Extract<Command, { kind: K }>> } = {
-  fire: { code: 1, fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
+  fire: { code: 1, range: 'foundation', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
 };
 
 /** The most commands one tick carries; more are dropped, oldest kept. */

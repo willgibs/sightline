@@ -8,7 +8,7 @@
 export { generateWorld, simTuningKey, siteBounds, worldFingerprint, worldTuningKey, type Spawn } from './world';
 export { buildWorld, handmadeMission, type HandmadeSpec } from './handmade';
 export { siteAt, type Site } from './site';
-export { buildTestCamp, type Camp, type GuardRole, type GuardSpawn, type Structure, type StructureKind } from './camp';
+export { buildTestCamp, GUARD_ROLES, type Camp, type GuardRole, type GuardSpawn, type Structure, type StructureKind } from './camp';
 export { buildRoutine, routinePose, type Leg, type Routine, type RoutinePose } from './routine';
 export type { Bush, Props, Rock, Tree } from './props';
 export type { Backdrop, TerrainFeatures } from './terrain';

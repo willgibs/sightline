@@ -6,6 +6,16 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.
 
+### Codes by lane, and all seven roles (W0.6)
+
+**Decision:**
+- **Code ranges** are data in `kernel/codes.ts`, by lane: the foundation 1–9, perception 10–29, ballistics 30–49, body 50–69, generation 70–89, brain 90–129, later phases 130–255. Every entry in the event and command registries names its range, and `tests/codes.test.ts` checks that the ranges split the byte with no gap or overlap, and that every code is unique in its registry and inside its range.
+- **Roles:** `GUARD_ROLES` (generation lane) lists the design doc's seven: sentry, patrol, marksman, radio-operator, officer, worker and target. The debug view tints each; the test camp still uses three.
+
+**What moved:** nothing. The registries' new `range` field isn't recorded.
+
+**Why:** codes are permanent once recorded, so two branches that picked the same one would make recordings ambiguous; with a range per lane, they can't. Lab D staffs camps with all seven roles (D6) and lab E gives each its behaviour, so the roles exist before either branch opens.
+
 ### One grid search, exact and budgeted (W0.5)
 
 **Decision:** `GridSearch` (`kernel/world/search.ts`) searches either layer of the spatial grid, for generation and the simulation alike: a bounded Dijkstra flood with a bucket queue (Dial's), for hearing and analysis, and A* with the octile estimate, for navigation.

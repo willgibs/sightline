@@ -37,7 +37,15 @@ export interface Structure {
   colliders: number[];
 }
 
-export type GuardRole = 'sentry' | 'patrol' | 'worker';
+/**
+ * The jobs a guard can have (design doc, Roles). Each is something the player can remove
+ * from the camp, with its own consequence: a sentry's sector, a patrol's partner, a
+ * marksman's long-range eyes, a radio operator's check-ins, an officer's searches, a
+ * worker's chores, the target the mission is for. The test camp uses three.
+ */
+export const GUARD_ROLES = ['sentry', 'patrol', 'marksman', 'radio-operator', 'officer', 'worker', 'target'] as const;
+
+export type GuardRole = (typeof GUARD_ROLES)[number];
 
 export interface GuardSpawn {
   id: number;

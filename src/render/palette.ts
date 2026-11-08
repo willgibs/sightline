@@ -52,7 +52,8 @@ export const palette = {
     bounds: '#c92a2a',
     collider: '#7048e8',
     ridges: ['#3b5bdb', '#0ca678', '#ae3ec9', '#f08c00', '#1098ad', '#d6336c', '#5c940d', '#495057'],
-    roles: { sentry: '#5f3dc4', patrol: '#c2255c', worker: '#2b8a3e' },
+    /** The debug view's tint for each guard role (generation's GUARD_ROLES). */
+    roles: { sentry: '#5f3dc4', patrol: '#c2255c', marksman: '#1864ab', 'radio-operator': '#e67700', officer: '#0b7285', worker: '#2b8a3e', target: '#c92a2a' },
     /** What systems draw (sim/debugDraw.ts), by tone. */
     tones: { info: '#1c7ed6', good: '#2b8a3e', warn: '#f08c00', bad: '#e03131', muted: '#868e96' },
   },

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { GuardRole } from '../sim/generation';
+import { GUARD_ROLES, type GuardRole } from '../sim/generation';
 import { GUARD_FIELDS, type Snapshot } from '../sim/game/sim';
 import { lerp } from '../sim/kernel/core/math';
 import type { Tuning } from '../config/tuning';
@@ -72,11 +72,7 @@ export class GuardMeshes {
     this.visorGeo.translate(0, 0.015, -0.1);
     this.rifleGeo = new THREE.BoxGeometry(0.05, 0.06, 0.95);
     this.honestMaterial = createFlatMaterial(look, { color: palette.guard });
-    this.roleMaterials = {
-      sentry: createFlatMaterial(look, { color: palette.debug.roles.sentry }),
-      patrol: createFlatMaterial(look, { color: palette.debug.roles.patrol }),
-      worker: createFlatMaterial(look, { color: palette.debug.roles.worker }),
-    };
+    this.roleMaterials = Object.fromEntries(GUARD_ROLES.map((role) => [role, createFlatMaterial(look, { color: palette.debug.roles[role] })])) as Record<GuardRole, THREE.ShaderMaterial>;
     this.visorMaterial = createFlatMaterial(look, { color: palette.guardVisor });
     // The body's radius covers its capsules; the camera's near plane (0.08 m) cuts into anything closer.
     this.reach = spec.radius + 0.12;

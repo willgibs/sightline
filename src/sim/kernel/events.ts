@@ -1,3 +1,4 @@
+import type { CodeRange } from './codes';
 import type { EntityId } from './state';
 import type { Surface } from './world/surfaces';
 
@@ -14,8 +15,8 @@ import type { Surface } from './world/surfaces';
  * just hear it along an open path).
  *
  * Adding an event type: add its interface to SimEvent and its entry to EVENTS, with a
- * code never used before. The compiler rejects a type without an entry, and an entry
- * that doesn't say how to store every field.
+ * code never used before from your lane's range (codes.ts). The compiler rejects a type
+ * without an entry, and an entry that doesn't say how to store every field.
  */
 
 export interface EventBase {
@@ -111,6 +112,8 @@ type Payload<E> = Omit<E, keyof EventBase | 'type'>;
 export interface EventSpec<E> {
   /** Identifies the type in recordings. Never reuse a retired code. */
   code: number;
+  /** The range the code was taken from (codes.ts). */
+  range: CodeRange;
   /** A sound: perception hears it, and it has SoundFields. */
   sound: boolean;
   /** How each field beyond the base is stored, in order. */
@@ -122,11 +125,11 @@ const STANCES = ['stand', 'crouch', 'prone'] as const satisfies readonly StanceN
 const SOUND = { x: 'f32', y: 'f32', z: 'f32', surface: 'u8', loudness: 'f32', radius: 'f32' } as const;
 
 export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
-  footstep: { code: 1, sound: true, fields: { ...SOUND, gait: { enum: GAITS } } },
-  stance: { code: 2, sound: false, fields: { from: { enum: STANCES }, to: { enum: STANCES } } },
-  land: { code: 3, sound: true, fields: { ...SOUND, speed: 'f32' } },
-  shot: { code: 4, sound: false, fields: { x: 'f64', y: 'f64', z: 'f64', dx: 'f64', dy: 'f64', dz: 'f64' } },
-  outcome: { code: 5, sound: false, fields: { status: { enum: ['succeeded', 'failed'] } } },
+  footstep: { code: 1, range: 'foundation', sound: true, fields: { ...SOUND, gait: { enum: GAITS } } },
+  stance: { code: 2, range: 'foundation', sound: false, fields: { from: { enum: STANCES }, to: { enum: STANCES } } },
+  land: { code: 3, range: 'foundation', sound: true, fields: { ...SOUND, speed: 'f32' } },
+  shot: { code: 4, range: 'foundation', sound: false, fields: { x: 'f64', y: 'f64', z: 'f64', dx: 'f64', dy: 'f64', dz: 'f64' } },
+  outcome: { code: 5, range: 'foundation', sound: false, fields: { status: { enum: ['succeeded', 'failed'] } } },
 };
 
 export function isSound(e: SimEvent): e is Extract<SimEvent, SoundFields> {

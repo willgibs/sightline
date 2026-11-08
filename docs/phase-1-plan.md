@@ -310,7 +310,7 @@ The kernel boundary goes first, so everything after it lands in its final place.
   - A cost per edge, and a fixed neighbour order.
   - Budgeted by iterations (rule 18), deterministic.
   - Usable from generation as well as the simulation.
-- [ ] W0.6 · Registries and roles.
+- [x] W0.6 · Registries and roles.
   - The code ranges above, written into the registries, with a test that codes are unique and in range.
   - `GuardRole` gains marksman, radio operator, officer and target. The renderer's role tints follow; the test camp still uses three roles.
 - [ ] W0.7 · Landing, made mechanical.
