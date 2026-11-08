@@ -2,7 +2,7 @@ import type { Tuning } from '../../config/tuning';
 import { dpow } from '../kernel/core/detmath';
 import { Rng } from '../kernel/core/rng';
 import { startScene } from '../kernel/scene';
-import { MASK_DISTANCE, NOISE_GAITS, NOISE_SURFACES, formatNoise, noiseScenario, parseNoise, type NoiseGait, type NoiseParams, type NoiseSurface } from './scenes/noiseScenario';
+import { MASK_DISTANCE, NOISE_GAITS, NOISE_PREROLL, NOISE_SURFACES, formatNoise, noiseScenario, parseNoise, type NoiseGait, type NoiseParams, type NoiseSurface } from './scenes/noiseScenario';
 import { formatSight, parseSight, type SightParams } from './scenes/sightScenario';
 import { SITTING, SPOT_MAX, briefOf, generateSitting, legibleCues, outcomeOf, rulesPredict, spaceSteps, stepFactor, type Factor, type Outcome, type SittingOptions, type Trial, type TrialSpace } from './trials';
 
@@ -25,9 +25,9 @@ import { SITTING, SPOT_MAX, briefOf, generateSitting, legibleCues, outcomeOf, ru
  *   distance: the rule of thumb. It leaves out the surface and the hum, which are what the
  *   world has to show (the ground underfoot, the generator, your own footsteps). So reading
  *   the gait and the distance alone gets half the borderline trials at best, as in lab A.
- * - **Freezes:** a noise trial frozen at its cue stops as your first footstep lands, so you
- *   have heard yourself and he can't yet have reacted. A sprint can't be one: running
- *   along the arc, you aren't looking at him. Visibility trials freeze as lab A's do.
+ * - **Freezes:** a noise trial frozen at its cue stops after a few steps (NOISE_PREROLL), so
+ *   you have heard yourself and he has only now started listening. A sprint can't be one:
+ *   running along the arc, you aren't looking at him. Visibility trials freeze as lab A's do.
  *
  * Generation is deterministic and bounded by a count of candidates (rule 18).
  */
@@ -55,7 +55,7 @@ function drawNoise(rng: Rng, tuning: Tuning): NoiseParams {
   return { surface, gait, d, mask, secs: SITTING.seconds, expect: null };
 }
 
-/** Runs a noise trial headless: heard or not, when, and when the player's first footstep landed. */
+/** Runs a noise trial headless: heard or not, and when. Its cue is the pre-roll's end. */
 export function noiseOutcome(params: string, tuning: Tuning): Outcome {
   const p = parseNoise(params);
   const scene = noiseScenario(params);
@@ -63,11 +63,9 @@ export function noiseOutcome(params: string, tuning: Tuning): Outcome {
   const driver = scene.driver!();
   const raw = scene.game.still(sim);
   const ticks = Math.round(p.secs * tuning.sim.tickHz);
-  const wantCue = p.gait !== 'sprint';
-  const out: Outcome = { seen: false, seenAt: -1, cueAt: -1, clear: { start: true, cue: true } };
-  for (let i = 0; i < ticks && !(out.seen && (out.cueAt >= 0 || !wantCue)); i++) {
+  const out: Outcome = { seen: false, seenAt: -1, cueAt: p.gait === 'sprint' ? -1 : NOISE_PREROLL, clear: { start: true, cue: true } };
+  for (let i = 0; i < ticks && !out.seen; i++) {
     for (const e of sim.step(driver.next(sim, raw))) {
-      if (e.type === 'footstep' && e.source === sim.playerId && out.cueAt < 0 && wantCue) out.cueAt = e.t;
       if (e.type === 'heard' && !out.seen) {
         out.seen = true;
         out.seenAt = e.t;
@@ -196,7 +194,7 @@ export const OWN_SIGHT_SPACE: TrialSpace = {
 };
 
 /** The noise half's options: any trial but a sprint reaches its cue, so freezes are simply shared out. */
-export const NOISE_SITTING: SittingOptions = { ...SITTING, warmups: 3, scored: 15, balanceFreeze: false, cueHoldSeconds: 0.05 };
+export const NOISE_SITTING: SittingOptions = { ...SITTING, warmups: 3, scored: 15, balanceFreeze: false };
 /** The visibility half's. */
 export const OWN_SIGHT_SITTING: SittingOptions = { ...SITTING, warmups: 2, scored: 15 };
 

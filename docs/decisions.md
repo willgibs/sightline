@@ -40,6 +40,19 @@ Built on its branch as `docs/phase-1-plan.md`, section B, plans it. Its seed, th
 
 Built on the `lab-c-movement` branch to `docs/phase-1-plan.md`, section C. Lean and the mantle use input the bots never give, so the valley's behaviour is untouched until the prone body (C2).
 
+### The noise and visibility trials (C8), and the player's own light and noise (C7)
+
+**Decision:**
+- The exit test's protocol is lab A's, whole (`game/trials.ts`): the four cells, the borderline split by a rules-only predictor, the pairwise spread, the freezes, balanced accuracy, and the verdict over two sittings. It became generic at this second use: a `TrialSpace` supplies the draw, the run, the factor steps, the rule and the words. Lab A's sight trials are one space, and a seed draws exactly what it drew before.
+- A noise trial (`scenes/noiseScenario.ts`) is one guard with his back turned and the player on a flat field of one surface, moving for 8 s at one gait along an arc about him, so every step comes from the same distance. A generator hums 5 m or 2.5 m from him in half the trials. "Will he hear you within 8 seconds?" The key comes from running it. A scenario table pins each gait either side of the edge of hearing, and the masking.
+- The rule of thumb for noise knows how far a gait carries and the distance. It leaves out the surface and the hum, which are what the world has to show: the ground underfoot, the generator, your own footsteps. Its mistakes go both ways, so reading the gait and the distance alone gets about half the borderline trials.
+- Half the noise trials freeze at the start and half after a few steps (2 s), so you have heard yourself on that ground. He only starts listening there: the pre-screen showed that freezing on the first footstep gave the answer away, with his "What was that?" already on screen. A sprint always freezes at the start, since running along the arc you aren't looking at him.
+- The visibility half is lab A's sight scenario, drawn for what your own body and light do: one sentry, open ground, shade or the skyline, stance and movement together, distance.
+- A sitting is 5 warm-ups and 30 scored, 15 of each kind shuffled together, at `?trials=<seed>&lab=movement`. `npm run playtest` scores it and keeps each lab's verdict apart. `npm run trials -- <seed> --movement --shots` pictures one for the pre-screen.
+- C7: the lab's shade is drawn as simulated (lab A's shade map over the arena, held to `groundLight` by a test). Your own footsteps play at their simulated loudness (the browser audio test), and every surface tag matches its drawn material (`tests/surface-audit.test.ts`). The small cue on the body for ambient masking and light from behind isn't built: the plan wants it only if the trials fail without it.
+
+**Why:** Two protocols would mean two ways of scoring that can disagree, and the owner would be sitting two different tests under one name. The rule of thumb is the honest baseline, because "people judge by distance" (the research behind lab A's protocol), and the surface and the hum are what this lab has to make readable.
+
 ### The use action (C6): carry, drag, hide
 
 **Decision:**

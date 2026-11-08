@@ -103,6 +103,7 @@ The debug view's other keys work in a replay too, whichever view is showing.
 URL options:
 - `?seed=TAL-4471` picks a valley.
 - `?scene=movement-lab` plays a scene.
+- `?trials=<seed>&lab=movement` runs a sitting of the movement lab's exit test: can you predict your own noise and visibility? (`?trials=<seed>` alone is the perception lab's.)
 - `?hz=60` runs the simulation at another tick rate; `?hz=blind` picks 30 or 60 at random and doesn't say which.
 - `?view=debug` starts in the debug view.
 - `?spawn=edge` starts where the road leaves the map.

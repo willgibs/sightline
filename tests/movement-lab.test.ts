@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { lightName } from '../src/sim/perception/light';
 import { groundLight } from '../src/sim/perception/light';
+import { drawnLit, shadeMap } from '../src/sim/perception';
+import { Rng } from '../src/sim/kernel/core/rng';
+import { Solids } from '../src/sim/kernel/world/solids';
 import { SCENES } from '../src/sim/game/scenes';
 import { ARENA, PLATFORM, WALLS, WINDOWS, arenaWorld } from '../src/sim/game/scenes/movementLab';
 import type { Simulation } from '../src/sim/game/sim';
@@ -50,5 +53,38 @@ describe('the movement lab', () => {
     expect(WALLS.map((w) => w.height)).toEqual([0.6, 0.9, 1.2, 1.5, 1.9]);
     expect(WINDOWS.length).toBeGreaterThanOrEqual(3);
     expect(PLATFORM.height).toBeGreaterThan(T.bodies.player.stepHeight);
+  });
+});
+
+/** C7: the player's own light, read from the world: what's drawn as shade is what the guards' eyes treat as shade. */
+describe('the movement lab’s shade', () => {
+  const world = arenaWorld(T);
+  const solids = new Solids(world.colliders);
+  const env = world.spec.env;
+  const area = world.shadeArea!;
+  const map = shadeMap(world, solids, env, 0, area, T);
+  const lit = (x: number, z: number): boolean => groundLight(world, solids, env, 0, x, world.terrain.heightAt(x, z), z, T) === T.visibility.light.lit;
+
+  it('is drawn as simulated at 99.5% of points over the arena', () => {
+    const rng = new Rng('SHADE-LAB', 'points');
+    let agree = 0;
+    const n = 12000;
+    for (let k = 0; k < n; k++) {
+      const x = rng.range(area.x0, area.x1);
+      const z = rng.range(area.z0, area.z1);
+      if (drawnLit(map, x, z) === lit(x, z)) agree++;
+    }
+    expect(agree / n).toBeGreaterThanOrEqual(0.995);
+  });
+
+  it('falls where the field needs it: under the roof, and along the divider', () => {
+    const R = ARENA.roof;
+    expect(drawnLit(map, R.x, R.z)).toBe(false);
+    expect(lit(R.x, R.z)).toBe(false);
+    // Open ground away from any wall or roof is in the sun.
+    expect(drawnLit(map, 0, 70)).toBe(true);
+    // The divider's strip is on one side of it.
+    const strip = [ARENA.divider.z - 1, ARENA.divider.z + 1].map((z) => drawnLit(map, -20, z));
+    expect(strip.filter((v) => !v)).toHaveLength(1);
   });
 });

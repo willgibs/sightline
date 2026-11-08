@@ -281,6 +281,8 @@ export function arenaWorld(tuning: Tuning): World {
   );
   world.foliage = arenaFoliage(tuning);
   world.ladders = [LADDER];
+  // The shade is drawn as it's simulated (A4): the divider's strip and the roof's patch are what the field is for.
+  world.shadeArea = { x0: -105, z0: -105, x1: 105, z1: 105, cell: 0.5 };
   return world;
 }
 

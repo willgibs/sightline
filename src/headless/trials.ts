@@ -5,6 +5,7 @@
  *                                        that flip it, and the cues the simulation says show
  *   npm run trials -- <seed> --shots     and every trial's freeze frame, drawn by the honest
  *                                        view, in shots/trials/<seed>/, with manifest.json
+ *   npm run trials -- <seed> --movement  the movement lab's sitting (C8), not the perception lab's
  *
  * The pre-screen (docs/phase-1-plan.md, Exit tests · A) is an agent looking at those frames
  * for cues the simulation shows to be missing. It starts with a perception check: the
@@ -19,7 +20,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { defaultTuning } from '../config/tuning';
-import { CELL_NAMES, cellOfTrial, generateSitting, type Trial } from '../sim/game/trials';
+import { MOVEMENT_SITTING, generateAnySitting } from '../sim/game/movementTrials';
+import { CELL_NAMES, cellOfTrial, type Trial } from '../sim/game/trials';
 import { openGame } from './browser';
 
 const args = process.argv.slice(2);
@@ -29,10 +31,12 @@ if (!seed) {
   process.exit(2);
 }
 const shots = args.includes('--shots');
+const movement = args.includes('--movement');
+const id = (movement ? MOVEMENT_SITTING : '') + seed;
 
 const t0 = performance.now();
-const trials = generateSitting(seed, defaultTuning);
-console.log(`\nSitting ${seed} · ${trials.length} trials, generated in ${((performance.now() - t0) / 1000).toFixed(1)} s\n`);
+const trials = generateAnySitting(id, defaultTuning);
+console.log(`\nSitting ${id} · ${trials.length} trials, generated in ${((performance.now() - t0) / 1000).toFixed(1)} s\n`);
 for (const t of trials) console.log(row(t));
 
 if (shots) await picture(seed, trials);
@@ -55,7 +59,7 @@ function row(t: Trial): string {
 async function picture(seed: string, trials: readonly Trial[]): Promise<void> {
   const dir = join('shots', 'trials', seed);
   mkdirSync(dir, { recursive: true });
-  const g = await openGame({ query: `trials=${encodeURIComponent(seed)}`, width: 1280, height: 720 });
+  const g = await openGame({ query: `trials=${encodeURIComponent(seed)}${movement ? '&lab=movement' : ''}&fresh`, width: 1280, height: 720 });
   const manifest: unknown[] = [];
   try {
     await g.until(`sightline.trial()?.phase === 'ready'`, 120_000);

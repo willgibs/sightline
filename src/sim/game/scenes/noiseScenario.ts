@@ -6,7 +6,9 @@ import type { InputFrame } from '../../kernel/input';
 import { Blocks, type ColliderInput } from '../../kernel/world/colliders';
 import { Surface } from '../../kernel/world/surfaces';
 import type { World } from '../../kernel/world/world';
-import { PERCEPTION, giveSenses } from '../perception';
+import type { System } from '../../kernel/systems';
+import { acousticsOf, createSenses } from '../../perception';
+import { PERCEPTION } from '../perception';
 import { placePlayer } from '../setup';
 import { SIGHTLINE, type Simulation } from '../sim';
 import type { Scene } from '.';
@@ -32,7 +34,14 @@ import type { Scene } from '.';
  * The player keeps the distance by moving along an arc about the guard, on the side away
  * from the generator: facing him and side-stepping, or, sprinting, running along it. So
  * every step comes from the same distance, and an honest view holds him in sight.
+ *
+ * He starts listening only after NOISE_PREROLL: the player has taken a few steps and
+ * heard themselves, and a trial frozen there (C8) gives nothing away. Before that a step
+ * close by would have drawn his "What was that?" before the question could be asked.
  */
+
+/** Seconds of steps before he starts listening, for a trial to freeze on. */
+export const NOISE_PREROLL = 2;
 
 export const NOISE_SURFACES = ['grass', 'dirt', 'rock', 'gravel', 'wood', 'water', 'metal'] as const;
 export type NoiseSurface = (typeof NOISE_SURFACES)[number];
@@ -92,6 +101,20 @@ const SURFACE: Readonly<Record<NoiseSurface, Surface>> = { grass: Surface.Grass,
 
 /** The guard's post: everything else is placed about it. */
 const GUARD = { x: 0, z: 0 };
+
+/** He starts listening once the pre-roll is over: at the end of that tick, so it's what the next tick hears. */
+const listen: System = {
+  name: 'noise-listen',
+  phase: 'decide',
+  after: ['guard-brains'],
+  reads: [],
+  writes: ['guard.senses'],
+  emits: [],
+  run(ctx) {
+    if (ctx.tick < Math.round(NOISE_PREROLL / ctx.dt)) return;
+    for (const g of ctx.index.of('guard')) g.senses ??= createSenses(false);
+  },
+};
 
 const worlds = new WeakMap<Tuning, Map<string, World>>();
 
@@ -178,7 +201,7 @@ export function noiseScenario(params?: string): Scene {
     description: `One sentry with his back turned, the player moving at a ${p.gait} on ${p.surface} ${p.d} m away${p.mask ? `, a generator running ${MASK_DISTANCE[p.mask]} m from him` : ''}${p.expect === null ? '' : p.expect === 'heard' ? ': he hears it' : ': he never hears it'}.`,
     game: SIGHTLINE,
     world: (tuning) => noiseWorld(p, tuning),
-    systems: PERCEPTION,
+    systems: [...PERCEPTION, listen],
     setup: (sim) => {
       heardAt = -1;
       placePlayer(sim, GUARD.x + p.d, GUARD.z, -1, 0);
@@ -198,7 +221,7 @@ export function noiseScenario(params?: string): Scene {
         h.lying = b.lying;
         h.axis = b.axis;
       }
-      giveSenses(sim);
+      acousticsOf(sim.world, sim.tuning).warm();
     },
     driver: () => new ArcDriver(p),
     seconds: p.secs,

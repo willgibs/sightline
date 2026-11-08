@@ -635,11 +635,12 @@ Playable at `?scene=movement-lab`; the movement course stays as a regression tes
   - Carry or drag a body: slow, and noisy on gravel. The body reuses the prone chain.
   - Hide it in foliage or a container, where guards don't see it.
   - E's sabotage uses the same action.
-- [ ] C7 · The player's own light and noise, read from the world.
-  - The drawn shade and your own footsteps, at their simulated loudness.
+- [x] C7 · The player's own light and noise, read from the world.
+  - The drawn shade and your own footsteps, at their simulated loudness. Landed: the lab's shade is drawn as simulated, held to `groundLight` by a test; your own footsteps play at their radius (the browser audio test).
   - An audit that every cell's surface tag matches its drawn material (`tests/surface-audit.test.ts`). Hunt shipped silent footsteps from mis-tagged surfaces.
-  - A small cue on the body, only for what the world can't show (ambient masking and light from behind), and only if the trials fail without it.
-- [ ] C8 · Noise and visibility trials, with A's trial mode.
+  - A small cue on the body, only for what the world can't show (ambient masking and light from behind), and only if the trials fail without it. Not built: it waits for the sittings.
+- [x] C8 · Noise and visibility trials, with A's trial mode.
+  - Landed: `?trials=<seed>&lab=movement`, 5 warm-ups and 30 scored, 15 noise and 15 visibility, scored by lab A's protocol (`game/movementTrials.ts`, `scenes/noiseScenario.ts`). The factors reported are the surface, the gait, the distance, the masking, the light and the skyline. The owner's two sittings are the exit test, below.
 - [ ] C9 · Feel: whether 30 Hz interpolation is responsive enough, and whether moving feels deliberate. Since every rate is per second, a blind comparison of 30 and 60 Hz is possible in the owner's sitting.
 - [ ] Exit test, the bench numbers, a note, a playable link.
 

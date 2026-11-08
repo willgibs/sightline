@@ -5,8 +5,8 @@ import type { Driver } from '../sim/kernel/scene';
 import type { Scene } from '../sim/game/scenes';
 import { sightScenario } from '../sim/game/scenes/sightScenario';
 import type { Simulation } from '../sim/game/sim';
-import { noiseScenario } from '../sim/game/scenes/noiseScenario';
-import { MOVEMENT_CANDIDATES, NOISE_SITTING, movementSteps } from '../sim/game/movementTrials';
+import { NOISE_PREROLL, noiseScenario } from '../sim/game/scenes/noiseScenario';
+import { MOVEMENT_CANDIDATES, movementSteps } from '../sim/game/movementTrials';
 import { ALL_FACTORS, SITTING, TOLD, answersTrial, probeTally, scoreSitting, sittingSteps, type ProbeTally, type Score, type Told, type Trial } from '../sim/game/trials';
 
 /**
@@ -48,16 +48,6 @@ export const SIGHT_PLAN: SittingPlan = { steps: sittingSteps, maxCandidates: SIT
 
 /** The movement lab's (C8): noise and visibility trials, the same protocol. */
 export const MOVEMENT_PLAN: SittingPlan = { steps: movementSteps, maxCandidates: MOVEMENT_CANDIDATES, scene: (t) => (t.kind === 'noise' ? noiseScenario(t.params) : sightScenario(t.params)) };
-
-/** How long after a trial's first cue it freezes: the time the key was made with. */
-function cueHold(t: Trial): number {
-  return t.kind === 'noise' ? NOISE_SITTING.cueHoldSeconds : SITTING.cueHoldSeconds;
-}
-
-/** Whether an event is the first cue a trial freezes at: his meter at 30%, or your own first footstep. */
-function isCue(t: Trial, e: SimEvent, player: number): boolean {
-  return t.kind === 'noise' ? e.type === 'footstep' && e.source === player : e.type === 'noticed';
-}
 
 /** What the sitting needs from the game. */
 export interface TrialHost {
@@ -195,9 +185,11 @@ export class TrialSitting {
   onTick(sim: Simulation, events: readonly SimEvent[]): void {
     const t = this.trials[this.k];
     if (!t) return;
+    // A noise trial freezes after its few steps, as he starts listening, and nothing has given it away.
+    if (t.kind === 'noise' && t.freeze === 'cue' && this.freezeAt < 0 && this.phase === 'running' && sim.tick >= Math.round(NOISE_PREROLL * this.tuning.sim.tickHz)) this.freezeAt = sim.tick;
     for (const e of events) {
       // The same hold the key was made with (trials.ts), so the freeze shows what it recorded.
-      if (isCue(t, e, sim.playerId) && t.freeze === 'cue' && this.freezeAt < 0 && this.phase === 'running') this.freezeAt = sim.tick + Math.round(cueHold(t) * this.tuning.sim.tickHz);
+      if (e.type === 'noticed' && t.kind === 'sight' && t.freeze === 'cue' && this.freezeAt < 0 && this.phase === 'running') this.freezeAt = sim.tick + Math.round(SITTING.cueHoldSeconds * this.tuning.sim.tickHz);
       if (answersTrial(t.kind, e) && this.seenAt < 0) this.seenAt = e.t;
     }
     const end = sim.tick >= SITTING.seconds * this.tuning.sim.tickHz || (this.phase === 'playing-on' && this.seenAt >= 0);
@@ -362,7 +354,7 @@ export class TrialSitting {
     const said = `You said ${this.answers.get(t.k) ? 'he would' : "he wouldn't"}.`;
     const heard = t.kind === 'noise';
     let prompt: string;
-    if (this.phase === 'asking') prompt = `<b>Y</b> he'll ${heard ? 'hear' : 'see'} you · <b>N</b> he won't${t.freeze === 'cue' ? (heard ? ' · frozen as your first step lands' : ' · frozen at the first sign he noticed something') : ' · frozen at the start'}`;
+    if (this.phase === 'asking') prompt = `<b>Y</b> he'll ${heard ? 'hear' : 'see'} you · <b>N</b> he won't${t.freeze === 'cue' ? (heard ? ' · frozen after a few steps, as he starts listening' : ' · frozen at the first sign he noticed something') : ' · frozen at the start'}`;
     else if (this.phase === 'probe') prompt = `What told you? <b>1</b> the mark · <b>2</b> his head · <b>3</b> his voice · <b>4</b> the situation alone · <b>Space</b> skip`;
     else if (this.phase === 'running') prompt = 'Watch…';
     else if (this.phase === 'playing-on') prompt = this.reviewing ? `${said} Playing it back…` : 'Playing on…';
