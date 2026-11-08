@@ -280,6 +280,19 @@ The statistics behind these protocols are in `docs/research/foundations.md`. A p
   - sound;
   - the runs the game keeps;
   - a replay.
+- **Where the sittings stand (Nov 8).** Nobody has played any of this yet. Everything is at https://sightline-brown.vercel.app, with no login. Each sitting ends by saving a file, for `npm run playtest`.
+
+  | When | What | Where | About |
+  | --- | --- | --- | --- |
+  | Any time | B, with taste call 3 and the foundation pass's check | `?scene=shooting-range` | 10 min |
+  | Any time | A, first sitting | `?trials=OWNER-A1` | 12 min |
+  | Any time | C, first sitting, and feel (C9) | `?trials=OWNER-C1&lab=movement`, then `?scene=movement-lab`, with `&hz=blind` | 15 min |
+  | A few days later | A and C, second sittings | `?trials=OWNER-A2` and `?trials=OWNER-C2&lab=movement` | 25 min |
+  | Once E13, E7, E8 and E12 are on `main` | E, and D's three camps | E13's scene | 25 min |
+
+  What each sitting asks is in its lab's section. Lab A's questions wait until after its first sitting.
+
+  The four trial sets were pre-screened on Nov 8 by two agents who first passed a perception check against the simulation's record. No cue is drawn against the record, nothing on screen gives an outcome away, and no trial changed (`docs/decisions.md`, After the labs).
 
 ## Milestones
 
@@ -435,7 +448,7 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - [x] impacts (B4), and the crack from the bullet's path;
   - [x] thrown objects (B9);
   - [x] lens glint (B6);
-  - [ ] open doors (D4, when lab D's code is on `main`).
+  - [ ] open doors (D4). Lab D's doors are on `main`, but they all stand open and nothing changes them yet, so this goes in with the use key (E7).
 - [x] A10 · Sandbox mode: noise drops, and the time-scale hook.
 - [x] A11 · The budget: 16 guards perceiving within the frame budget, measured by work counts as well as `npm run sim -- --profile`, in Chromium, Firefox and WebKit. Fast paths come only if it needs them: a still body skips the motor, and a distant guard skips perception.
 - [x] A12 · Trial mode, with the protocol in Exit tests, and the agents' pre-screen.
@@ -445,6 +458,26 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - The freeze kind says nothing about the outcome: each kind holds the same share of seen and not seen, and they're scored apart. Answers survive a reload, and each carries its key, so later builds can still score the sitting.
 - [x] A13 · Perception joins the valley (`SYSTEMS`), announced, with the version bump.
 - [ ] Exit test, the bench numbers, a note, a playable link.
+  - **Ready for the owner's two sittings** (Nov 8). `?scene=perception-lab` is the lab, and The owner's time above has the sittings.
+  - **The owner should leave the rest of this item until after the first sitting.** It says how the trials are built and how quickly guards see you, which would spoil a blind test.
+  - **Three questions, for after the first sitting:**
+    1. Is the borderline split the test the owner wants? The sight table alone proved a strong predictor, so each borderline cell holds as many trials it gets right as wrong (`docs/decisions.md`, A12). The alternative is to draw them as they come, where the table gets about two thirds right.
+    2. Is a still body found too slowly up close? Standing still in shade 7 m in front of a sentry takes 5.9 s, and lying still in the open 4 m away takes 7.2 s. If that's too forgiving, it's a tuning call.
+    3. Does the first cue's time count as reading it? A meter that reaches 30% early reaches 100% in time. A reader of that alone, with the table otherwise, scores about 75% and fails the verdict.
+  - **The bench against the seed** (`npm run bench`, lane perception):
+
+    | Measure | The seed | Target | Measured |
+    | --- | --- | --- | --- |
+    | Standing, walking in the open: seen to | 150 m | 150 ± 10 m | 155.75 m |
+    | Still, prone, in cover: seen to | 150 m | never beyond 50 m | 46.75 m |
+    | Crouched, walking, in shade at 30 m | 8.89 s | 3–6 s | 5.33 s |
+    | A marksman's far zone | 400 m | 400 ± 20 m | 405.75 m |
+    | Least time, first cue to 100%, outside contact | 0.47 s | at least 1.5 s | 1.5 s |
+    | Steepest edge, per metre and per degree | 0.301 and 0.955 | no cliffs | 0.122 and 0.114 |
+    | The crack at 300 m, degrees off the shooter | 0° | 55–62° | 55.4–57.2° |
+    | A reader guessing the borderline trials passes | 17.4% | as low as can be | 2.0% |
+    | A reader right 80% of the time passes | 58.6% | | 50.9% |
+    | A reader right 90% of the time passes | 99.5% | | 99.0% |
 
 ### B · Shooting
 
@@ -787,9 +820,12 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
     - Repair: shift a patrol's phase, turn or move a post, or move it out of an offending perch's sight, kept only if the camp comes closer to valid, within 12 re-analyses. A camp it can't save is rebuilt from fresh forks, up to 3 times.
     - Firing the reviewers' plans in the simulation (`npm run plans -- --evaluate`) corrected two more: a perch is ground a body can lie on (at most 40°), and its eye is the body's prone eye. Lab C's check gave each tower's rail a gap at the ladder's head.
     - Running the ways in through the real simulation (`npm run plans -- --simulate`) corrected four things in D7's model: the crouched pace (a step takes 5/9 s), towers (open under the roof), how the raster stamps thin things (by cell centres, so a certificate of stealth errs the safe way), and a margin (a certified way may fill the meter only to 85%). With them, every way in tried held in the simulation.
-- [ ] D9 · The valley switches to the generator, and the test camp retires. It lands alone.
+- [ ] D9 · The valley switches to the generator, and the test camp retires. It lands alone. (Lab D held this for the owner's go-ahead. It isn't a taste call, so it goes ahead without one: `docs/decisions.md`, After the labs.)
 - [ ] Exit test, the bench numbers, a note, a playable link.
   - **Where it stands (Nov 8), waiting on the owner:**
+    - **Two questions, for the camps' sitting:**
+      1. Should camps steer players away from the ridge shot at the target? The default proposed is to keep all three approaches but vary how contested that shot is, so that in some camps every clean moment is watched or brief. The alternative is to leave it to lab E's reactions and accept the signature test as too strict for now. The camp's reaction can only make escaping harder once the target is dead, so the shot is measured with the camp answering (E13, E12) before the owner is asked.
+      2. Are sightline hard cores bigger than the intended 4 all right? 22 of 100 camps have one, the largest 7, because tower marksmen now see properly. They make camps harder rather than broken.
     - **The held-out series passes:** 97 of 100 at the first camp attempt, 3 repaired or rebuilt, none invalid (`lab-d-exit-3`).
     - **The bots prove diversity:** 36 distinct best-plan signatures over those 100, and 8 of 10 on the review set, whose plans are clearly worse elsewhere in 77 of 90 cases.
     - **The reviewers:** 3 agents, 10 camps. Their plans work (29 of 30 on D's model; 24 of the 28 rifle plans dropped their guards in the simulation) and they agree (19 of 30 pairs).
@@ -896,8 +932,32 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - The player's health is two or three hits (`tuning.brain.combat`), and the player can die (`game/combat.ts`, `campRules`).
   - Phase 2 only joins labs, so this is built here.
 - [x] E11 · Sandbox body drops: L in the debug view drops a body where the player looks (lab A's A9/A10 sandbox); the camp finds it as it would any body (`tests/commander.test.ts`).
-- [ ] E12 · The scenarios and the baselines (see Exit tests). Done so far: the scenario family `camp-scenario` (suspicion, search, alarm, escape), the search-cycle and calibration benches, the relocation metric, and the honest brain against Xu and Verbrugge's baselines (`game/baselines.ts`, pinned in the bench). "One overlook doesn't clear the camp" waits for lab D's validated camps.
+- [ ] E12 · The scenarios and the baselines (see Exit tests). Done so far: the scenario family `camp-scenario` (suspicion, search, alarm, escape), the search-cycle and calibration benches, the relocation metric, and the honest brain against Xu and Verbrugge's baselines (`game/baselines.ts`, pinned in the bench). "One overlook doesn't clear the camp" waits for lab D's validated camps, and for E13. Two leftovers: every report of the same body adds its own cover order, so seven guards are told to take cover where three should be; and the seed search isn't on the bench yet (the other four baselines are).
+- [ ] E13 · The camp brain on generated camps (added Nov 8). So far it has run only on E2's handmade camp: a generated camp's guards perceive (A13), but they have no brain, commander, radio or rules, and the player has no rifle. A scene puts all of those on any validated camp, using that camp's own devices, so that E7, E8 and E12 can finish there and the owner can play it. It stays a scene: the default valley's behaviour doesn't move until Phase 2.
 - [ ] Exit test, the bench numbers, a note, a playable link.
+  - **Not ready for the owner's sitting yet:** E13, E7, E8 and E12 come first, so that the sitting is on a generated camp. `?scene=camp-brain` plays now on the handmade camp, for an early look that doesn't count.
+  - **What to try** (F3 opens the debug view, which lists each guard's act and the camp's state; M marks a reaction you can't explain):
+    - Walk toward the gate. The sentry looks up, walks over or calls it in. Move off, and watch him go back when he finds nothing.
+    - Make a noise near the gate, or press K in the debug view to drop one: one guard goes, and the others look that way but stay put.
+    - Run once you've been seen. The camp radios, goes on alert, sends search teams to where it last believed you were, and stands down one level higher about 30 s after the last news.
+    - Shoot from far away. Guards look up inside a second, report it by radio, and the marksman turns to sweep where the camp believes it came from.
+    - Get a guard into combat near the alarm box: he runs for it. Shoot him first and it never sounds. Let it sound, and reinforcements come, and the target runs for the truck.
+    - Press L in the debug view to drop a body in a guard's sight: he finds it, and the camp goes on alert.
+    - Fire last. In one scripted run, one unsuppressed shot from the ridge led to the siren 5 s later and the target away 11 s after the shot, before a second shot could matter.
+  - **Three questions for the sitting:**
+    1. Radio calls play as murmurs with captions. Is that enough, or should the camp's level be shown to the player? It isn't shown anywhere in the honest view.
+    2. A search comes out at about 30 s, the short end of the plan's 30–45 s. Long enough to be a real search, and short enough not to drag?
+    3. How bold should the run for the alarm be? As it stands, a worker who hears a shot runs for the box, and so does any other guard in combat within a sprint of it. Should a worker go only once someone has seen the shooter, or only when near it and alone?
+  - **The bench against the plan's targets** (`npm run bench`, lane brain):
+
+    | Measure | Target | Measured |
+    | --- | --- | --- |
+    | Search cycle | 30–45 s | 30.3 s |
+    | The camp's search map | at most 5,000 numbers (the seed's: about 410,000) | 4,096 |
+    | Ellipse holds the perch, in the world, at 1 and 2 sigma | 39% and 86%, ±5 points | 41.2% and 86.6% |
+    | A 26–30 m move at ±5° and 300 m ends outside 2 sigma | at least half the time | 50.5% moving across the line of fire; 29.5% in any direction |
+    | Re-found within 60 s, of 16 | honest at least 80% of omniscient, and ahead of the rest | honest 15, unpaced 16; staleness 13, plain 13, random 2, omniscient 16 |
+    | Reactions unexplained | 0 | 0 of 62 |
 
 ### Gate · Labs pass
 

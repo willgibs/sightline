@@ -39,6 +39,7 @@ interface Check {
   conclusion?: string | null;
   context?: string | null;
   state?: string | null;
+  targetUrl?: string | null;
 }
 const view = JSON.parse(sh('gh', 'pr', 'view', pr, '--json', 'state,isDraft,baseRefName,headRefName,headRefOid,statusCheckRollup')) as {
   state: string;
@@ -60,7 +61,15 @@ try {
   refuse(`${view.headRefName} is behind main (${main.slice(0, 7)}): merge main into it, regenerate its goldens, push, and land it when CI is green`);
 }
 
-const checks = view.statusCheckRollup.map((c) =>
+/**
+ * Vercel's free plan allows 100 deployments a day. Past that, a commit's Vercel status
+ * fails with a link to the upgrade page and stays red until something new is pushed.
+ * CI builds the game itself, so this one failure says nothing about the code, and it is
+ * the only red this script looks past: any other failed deploy still stops a landing.
+ */
+const rateLimited = (c: Check): boolean => c.__typename === 'StatusContext' && c.context === 'Vercel' && c.state === 'FAILURE' && (c.targetUrl ?? '').includes('build-rate-limit');
+
+const checks = view.statusCheckRollup.filter((c) => !rateLimited(c)).map((c) =>
   c.__typename === 'StatusContext'
     ? { name: c.context ?? 'a status', done: c.state !== 'PENDING' && c.state !== 'EXPECTED', outcome: c.state ?? '' }
     : { name: c.name ?? 'a check', done: c.status === 'COMPLETED', outcome: c.conclusion ?? '' },
@@ -72,6 +81,9 @@ const failed = checks.filter((c) => !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(
 if (failed.length > 0) refuse(`CI isn't green: ${failed.map((c) => `${c.name} (${c.outcome.toLowerCase()})`).join(', ')}`);
 
 console.log(`✓ ${view.headRefName} (${view.headRefOid.slice(0, 7)}) is up to date with main and green.`);
+if (view.statusCheckRollup.some(rateLimited)) {
+  console.log("! Vercel's daily limit is spent, so this commit wasn't deployed. CI built the game, so that doesn't hold up the landing, but the live site won't change until a push to main after room returns.");
+}
 if (checkOnly) process.exit(0);
 // --match-head-commit: if anything was pushed since these checks, GitHub refuses the merge.
 sh('gh', 'pr', 'merge', pr, '--merge', '--match-head-commit', view.headRefOid);

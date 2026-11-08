@@ -7,7 +7,7 @@ Written on Nov 7, 2026, at the end of the session that ran the foundation pass, 
 ## Where things stand
 
 - **Phase 0 passed its gate,** Engine runs, on Nov 7, 2026. The **foundation pass** that followed is done: `docs/foundation-plan.md` records each milestone (M1–M10), what was deliberately left to the labs, and the Horizons.
-- **One item waits on the owner:** checking the deployed build on his Mac with the screen in view. That means frame rate, sound, the runs the game keeps, and a replay. It doesn't block planning.
+- **What waits on the owner** is in the plan's *The owner's time*: the labs' sittings, and, folded into the first of them, checking the deployed build on his Mac with the screen in view (frame rate, sound, the runs the game keeps, and a replay).
 - **Phase 1 is planned** (`docs/phase-1-plan.md`), and **Wave 0 is on `main`** (W0.2–W0.8). All five labs reached `main` on Nov 8, and the plan's checkboxes say what's done and what's left.
   - `src/sim` is now the kernel, five lanes and the game, each lane behind its `index.ts` (`src/sim/lanes.ts` says who may import whom).
   - Systems declare what they read, write and emit; brains decide in 'decide' and steer through orders; systems query bodies and spawn inside a tick; one grid search serves every lab; each lane has a code range and a bench.
@@ -15,7 +15,7 @@ Written on Nov 7, 2026, at the end of the session that ran the foundation pass, 
 - **`main` is green** at the commit that added this file.
   - CI runs the check on Linux, macOS and Windows, and a 20-minute run gives the same hash on all three (`e9311dda2ac00379`).
   - A 40-hour fuzz run passed, and Chromium, Firefox, WebKit and Bun all give the golden values.
-  - The build is deployed at sightline-willgibs.vercel.app.
+  - The build is deployed publicly at sightline-brown.vercel.app.
 - **Versions:** `SIM_VERSION` 9 and `STATE_SCHEMA` 9 (A13, Nov 8), `GEN_VERSION` 4 (D1, Nov 8), recording format 12 (lab B, Nov 8).
 
 ## Getting going in a new session
@@ -150,7 +150,8 @@ These were settled when Phase 1 was planned, on Nov 7, 2026. `docs/phase-1-plan.
 - **Footstep voices.** After changing one, recalibrate (`CLAUDE.md`, Checking work). Firefox can't suspend an offline audio context, so only the voices test runs there.
 - **The first browser-test run.** If it ever hangs again, run it with `DEBUG=vite:deps`.
 - **Push with an explicit destination:** `git push origin HEAD:<branch>`. This repository sets `push.default=upstream`, so a branch cut from `origin/main` tracks it, and a plain `git push` from there goes straight to `main`. Four commits reached production that way on Nov 8.
-- **Vercel's free plan allows 100 deployments a day,** and every push to any branch is one. Several sessions pushing as they go used it up on Nov 8. Commit as you go, and push in batches. While the limit is hit, a pull request's Vercel check goes red and stays red until something new is pushed. CI builds the game itself, so that red check says nothing about the code.
+- **Vercel's free plan allows 100 deployments a day,** and every push to any branch is one. Several sessions pushing as they go used it up on Nov 8. Commit as you go, and push in batches. While the limit is hit, a pull request's Vercel check goes red and stays red until something new is pushed. CI builds the game itself, so that red check says nothing about the code, and `npm run land` looks past it.
+- **Reports for the owner** land in the repository or go out as an artifact. A session's notes folder doesn't outlast the session.
 - **Deleting branches.** The GitHub proxy in Claude's cloud sessions refused to delete branches (both `git push --delete` and the API). Ask the owner to delete stale ones.
 
 ## Keeping the design doc's copy current
