@@ -107,6 +107,25 @@ Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Unt
 
 Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the generation lane.
 
+### The camp's systems and the objective (D5)
+
+**Decision:**
+- **Systems are data, and entities where they have state.** Generation records the devices (`camp.devices`: the generator, each light, alarm box and the radio set, each with its structure and its feed, the generator it draws from) and the objective (`camp.objective`: eliminate the target, with his building and his escape vehicle). In a run, each is an entity of its own kind (`game/camp.ts`):
+  - a `generator` that runs;
+  - a `light` that is on;
+  - an `alarm` box that is powered and can be raised;
+  - a `radio` that is powered and working;
+  - an `objective` that is open, done or escaped.
+
+  They spawn after the doors and vehicles, so no earlier id moves.
+- **One system powers the circuit.** `camp-power`, in the 'world' phase, sets every light, alarm box and radio from its generator's state each tick, so a cut is seen in the tick it happens: before perception, and before lab E's camp acts. `objective`, in the 'mission' phase, marks the objective done when its target is gone.
+  - Lab E raises alarms and drives the escape; lab C's use action and lab E's sabotage stop the generator or break the radio. Each writes the state that is already here.
+- **Explained.** The snapshot carries each device's state, and the debug view draws the wiring from the generator to each device, live or dead. The `camp-systems` scene cuts the generator at tick 60, restores it at 180 and takes the target at 120, with expectations on each. It is pinned as the generation lane's run (`64d0c1711e6ab4c0`, state `af5ba8029683ec86`).
+
+**What moved:** no existing golden. The new pinned run changes the build's behaviour digest, so the golden recording is rewritten. `camp-power` shares the 'world' phase with systems that spawn, so they name it in `after` (the spawn-tick scene, a test); their order is unchanged.
+
+**Why:** the plan's who-defines-what gives lab D camp systems as data, plus entity kinds for those with state, so labs C and E build on one answer to "is that alarm box live?".
+
 ### The compound: plots, parcels and modules, skeleton first (D4)
 
 **Decision:**

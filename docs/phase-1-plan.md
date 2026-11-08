@@ -651,7 +651,16 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
     - Doors (open, swung into the room) and vehicles spawn as entities after the guards, each with a solid. Their data is in `camp.doors` and `camp.vehicles`, and tower ladders are in `camp.ladders` for lab C.
     - Tested on five seeds: the corridor reaches the target, the generator is reachable, both ways out and the escape route are walkable, every doorway passes on the grid, nothing overlaps, the camp moves with its site, and a minute of the person-like bot breaks no promise of the motor's.
     - Its guards are a placeholder until D6.
-- [ ] D5 · Systems: the generator powers the lights, the alarm boxes and the radio; the objective.
+- [x] D5 · Systems: the generator powers the lights, the alarm boxes and the radio; the objective.
+  - **Built.** The camp's devices are data (`camp.devices`, each wired to the one generator) and its objective (`camp.objective`: the target, his building, his escape vehicle).
+  - In a run they are entities (`game/camp.ts`):
+    - `generator` (running);
+    - `light` (on);
+    - `alarm` (powered, raised);
+    - `radio` (powered, working);
+    - `objective` (open, done or escaped).
+  - `camp-power` (phase 'world') powers everything on a running generator's circuit. `objective` (phase 'mission') marks the target's death.
+  - The debug view draws the wiring, live or dead. The `camp-systems` scene cuts and restarts the generator and takes the target, and is pinned as the generation lane's run.
 - [ ] D6 · Staffing.
   - All seven roles, bought with points under the 16-guard cap.
   - Sentries at the real chokepoints Brogue's method finds.

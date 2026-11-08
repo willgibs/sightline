@@ -29,7 +29,13 @@ export const BENCH_GOLDEN: PinnedBench = {
       "lab D widest overwatched horizon (°)": 157,
       "lab D narrowest open horizon (°)": 164
     },
-    "runs": {}
+    "runs": {
+      "camp-systems": {
+        "work": {
+          "motor": { "rays": 0, "nodes": 0, "bodies": 2519 }
+        }
+      }
+    }
   },
   "body": {
     "metrics": {

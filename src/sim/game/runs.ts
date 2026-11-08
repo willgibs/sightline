@@ -89,6 +89,7 @@ export const PINNED_RUNS: readonly PinnedRun[] = [
   scene('movement-course', 'body', SCENES['movement-course']!),
   scene('perception-lab', 'perception', SCENES['perception-lab']!),
   scene('spawn-tick', 'kernel', SCENES['spawn-tick']!),
+  scene('camp-systems', 'generation', SCENES['camp-systems']!),
   scene('kernel-alone', 'kernel', kernelAloneScene),
 ];
 

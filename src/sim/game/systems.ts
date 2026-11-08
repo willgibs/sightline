@@ -2,6 +2,7 @@ import { intentFor, motorSystem, poseAt, type PoseSample } from '../body';
 import { carryOut } from '../brain';
 import { dcos, dsin } from '../kernel/core/detmath';
 import { scheduleSystem, type ScheduleHandler, type System } from '../kernel/systems';
+import { campPower, objectiveStatus } from './camp';
 import { player } from './entities';
 import { think } from './guards';
 import { playerIntent } from './player';
@@ -89,4 +90,4 @@ const guardBrains: System = {
   },
 };
 
-export const SYSTEMS: readonly System[] = [scheduleSystem(SCHEDULE_HANDLERS), playerCommands, playerIntentSystem, guardOrders, motorSystem, guardBrains];
+export const SYSTEMS: readonly System[] = [scheduleSystem(SCHEDULE_HANDLERS), playerCommands, playerIntentSystem, guardOrders, motorSystem, campPower, guardBrains, objectiveStatus];

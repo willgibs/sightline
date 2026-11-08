@@ -59,6 +59,12 @@ export interface Snapshot {
   guards: Float32Array;
   /** Entities' solid shapes (copies), in entity order; their ids say whose (kernel/world/solids.ts). */
   solids: Collider[];
+  /**
+   * The camp's devices by index (world.camp.devices; game/camp.ts): 1 while live (a running
+   * generator, a lit light, a powered alarm box, a working radio), 0 when not, 2 for a raised
+   * alarm. Empty in a camp without them.
+   */
+  devices: number[];
 }
 
 /**
@@ -134,6 +140,7 @@ export class Simulation extends KernelSimulation {
             guardSpawns: [],
             guards: new Float32Array(n * GUARD_FIELDS),
             solids: [],
+            devices: [],
           };
     const p = this.player;
     s.tick = this.tick;
@@ -165,6 +172,12 @@ export class Simulation extends KernelSimulation {
     const shapes = this.solids.shapes;
     s.solids.length = shapes.length;
     for (let k = 0; k < shapes.length; k++) s.solids[k] = Object.assign(s.solids[k] ?? ({} as Collider), shapes[k]!);
+    s.devices.length = this.world.camp.devices?.length ?? 0;
+    s.devices.fill(0);
+    for (const g of this.index.of('generator')) s.devices[g.generator.device] = g.generator.running ? 1 : 0;
+    for (const l of this.index.of('light')) s.devices[l.light.device] = l.light.on ? 1 : 0;
+    for (const a of this.index.of('alarm')) s.devices[a.alarm.device] = a.alarm.raised ? 2 : a.alarm.powered ? 1 : 0;
+    for (const r of this.index.of('radio')) s.devices[r.radio.device] = r.radio.powered && r.radio.working ? 1 : 0;
     return s;
   }
 }

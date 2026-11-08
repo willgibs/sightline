@@ -3,15 +3,15 @@ import type { Simulation as KernelSimulation } from '../kernel/sim';
 import { Faction } from '../kernel/state';
 import type { TickContext } from '../kernel/systems';
 import type { GuardEntity, PlayerEntity } from './entities';
-import { spawnCampThings } from './camp';
+import { spawnCampSystems, spawnCampThings } from './camp';
 import { createGuard, think } from './guards';
 import { createPlayer } from './player';
 import type { Simulation } from './sim';
 
 /**
  * How a run of Sightline starts (kernel/game.ts, Game.start): the player at the world's
- * spawn, then each of the camp's guards at his post, then the camp's doors and vehicles
- * (game/camp.ts), in that order, so the player is always entity 1 and the guards follow in
+ * spawn, then each of the camp's guards at his post, then the camp's doors, vehicles,
+ * devices and objective (game/camp.ts), in that order, so the player is always entity 1 and the guards follow in
  * the camp's order. Re-simulating a recording starts the same way.
  */
 export function startRun(sim: KernelSimulation): void {
@@ -19,6 +19,7 @@ export function startRun(sim: KernelSimulation): void {
   sim.spawn((id): PlayerEntity => ({ id, kind: 'player', faction: Faction.Player, ...createPlayer(world, solids, tuning) }));
   for (let i = 0; i < world.camp.guards.length; i++) spawnGuard(sim, i);
   spawnCampThings(sim);
+  spawnCampSystems(sim);
 }
 
 /** What can spawn: a simulation between ticks, or a system inside one. */

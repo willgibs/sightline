@@ -35,7 +35,9 @@ export type StructureKind =
   | 'ladder'
   | 'shed'
   | 'light'
-  | 'alarm';
+  | 'alarm'
+  /** The radio set inside the radio room; its antenna is the mast. */
+  | 'radio';
 
 export interface Structure {
   kind: StructureKind;

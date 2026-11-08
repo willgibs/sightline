@@ -165,3 +165,35 @@ describe("the compound's doors and vehicles", () => {
     expect(plain.solids.count).toBe(0);
   });
 });
+
+describe("the compound's systems (D5)", () => {
+  it('wires every light, alarm box and the radio to the one generator, and names the target as the objective', () => {
+    for (const w of worlds) {
+      const devices = w.camp.devices!;
+      const generators = devices.filter((d) => d.kind === 'generator');
+      expect(generators.length).toBe(1);
+      const gen = devices.indexOf(generators[0]!);
+      for (const d of devices) expect(d.feed).toBe(d.kind === 'generator' ? -1 : gen);
+      expect(devices.filter((d) => d.kind === 'radio').length).toBe(1);
+      expect(devices.filter((d) => d.kind === 'alarm').length).toBeGreaterThanOrEqual(T.gen.compound.alarms[0]!);
+      expect(devices.filter((d) => d.kind === 'light').length).toBeGreaterThanOrEqual(T.gen.compound.lights[0]!);
+      for (const d of devices) expect(w.camp.structures[d.structure]!.kind).toBe(d.kind);
+      const o = w.camp.objective!;
+      expect(w.camp.guards[o.target]!.role).toBe('target');
+      expect(w.camp.layout!.buildings[o.building]!.module).toBe('hq');
+      expect(w.camp.vehicles![o.vehicle]!.escape).toBe(true);
+    }
+  });
+
+  it('shows each device as live or dead in the snapshot the renderer reads', () => {
+    const w = worlds[1]!;
+    const sim = new Simulation(w, T);
+    const devices = w.camp.devices!;
+    expect(sim.snapshot().devices).toEqual(devices.map(() => 1));
+    sim.index.of('generator')[0]!.generator.running = false;
+    sim.step(neutralInput(sim.player.yaw));
+    const states = sim.snapshot().devices;
+    devices.forEach((_, i) => expect(states[i]).toBe(0));
+    expect(sim.index.of('objective')[0]!.objective.status).toBe('open');
+  });
+});

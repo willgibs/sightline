@@ -1,5 +1,6 @@
 import type { Scene as KernelScene } from '../../kernel/scene';
 import type { Simulation } from '../sim';
+import { campSystems } from './campSystems';
 import { movementCourse } from './movementCourse';
 import { perceptionLab } from './perceptionLab';
 import { SIGHT_TABLE, sightScenario } from './sightScenario';
@@ -18,6 +19,7 @@ export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   'perception-lab': perceptionLab,
   sight: sightScenario,
   'spawn-tick': spawnTick,
+  'camp-systems': campSystems,
 };
 
 /** The scene a recording was made in, with its parameters, if this build has it. */

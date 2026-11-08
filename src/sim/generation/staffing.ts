@@ -53,4 +53,18 @@ export function staffPlaceholder(camp: Camp, hf: Heightfield, gen: GenTuning, rn
     spawn.routine = buildRoutine(spawn, gen.routines, routines.fork(`guard${p.id}`));
     camp.guards.push(spawn);
   }
+  setObjective(camp);
+}
+
+/** The mission's objective, once the camp has its target: him, his building, his vehicle. */
+export function setObjective(camp: Camp): void {
+  const L = camp.layout!;
+  const target = camp.guards.findIndex((g) => g.role === 'target');
+  if (target < 0) throw new Error('A camp with no target has no objective');
+  camp.objective = {
+    kind: 'eliminate',
+    target,
+    building: L.buildings.findIndex((b) => b.module === 'hq'),
+    vehicle: (camp.vehicles ?? []).findIndex((v) => v.escape),
+  };
 }

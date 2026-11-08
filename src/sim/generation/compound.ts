@@ -91,6 +91,34 @@ export interface LadderSpec {
   oz: number;
 }
 
+export type DeviceKind = 'generator' | 'light' | 'alarm' | 'radio';
+
+/**
+ * A part of the camp's systems (D5): the generator, and what it powers. Each is a
+ * structure in the world and an entity with state in a run (game/camp.ts).
+ */
+export interface DeviceSpec {
+  kind: DeviceKind;
+  /** Where it is: the generator's middle, a light's lamp, an alarm box, the radio set. */
+  x: number;
+  y: number;
+  z: number;
+  /** Its structure (camp.structures index). */
+  structure: number;
+  /** The generator that powers it (its index in camp.devices), or −1 for a generator. */
+  feed: number;
+}
+
+/** What the mission is for (D5): today, to eliminate the target before he escapes. */
+export interface ObjectiveSpec {
+  kind: 'eliminate';
+  /** The target's post (camp.guards index). */
+  target: number;
+  /** His building (layout.buildings index) and his escape vehicle (camp.vehicles index). */
+  building: number;
+  vehicle: number;
+}
+
 export interface Opening {
   kind: 'gate' | 'breach';
   side: Side;
@@ -169,6 +197,10 @@ declare module './camp' {
     doors?: DoorSpec[];
     vehicles?: VehicleSpec[];
     ladders?: LadderSpec[];
+    /** The generator and what it powers (D5). */
+    devices?: DeviceSpec[];
+    /** What the mission is for (D5), set once the camp is staffed. */
+    objective?: ObjectiveSpec;
   }
 }
 
@@ -373,6 +405,12 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   const doors: DoorSpec[] = [];
   const buildings: BuildingSpec[] = [];
   const vehicles: VehicleSpec[] = [];
+  // Wired once all are placed: every device draws from the camp's one generator.
+  const devices: DeviceSpec[] = [];
+  const device = (kind: DeviceKind, a: number, b: number, y: number, structure: number) => {
+    const p = at(a, b);
+    devices.push({ kind, x: p.x, y, z: p.z, structure, feed: -1 });
+  };
   /** The wall facing a direction (unit, in the camp frame): which of a building's four sides. */
   type Face = 'a+' | 'a-' | 'b+' | 'b-';
   const faceToward = (da: number, db: number): Face => (Math.abs(da) >= Math.abs(db) ? (da >= 0 ? 'a+' : 'a-') : db >= 0 ? 'b+' : 'b-');
@@ -474,6 +512,11 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   const radioLenA = rf.lenA >= rf.lenB ? rf.lenA - 4 : rf.lenA;
   const radioLenB = rf.lenA >= rf.lenB ? rf.lenB : rf.lenB - 4;
   building('radio', radioA, radioB, radioLenA, radioLenB, C.radio[2]!, Surface.Wood, [inwardFace(radioA, radioB)], radioRng);
+  // The set against the room's far wall from its door; its antenna is the mast outside.
+  const radioDoor = doors[doors.length - 1]!;
+  const setW = { x: radioDoor.x + radioDoor.nx * (Math.min(radioLenA, radioLenB) - 1.2), z: radioDoor.z + radioDoor.nz * (Math.min(radioLenA, radioLenB) - 1.2) };
+  const setF = toFrame(setW.x, setW.z);
+  device('radio', setF.x, setF.z, ground(setF.x, setF.z) + 1.0, add('radio', [box(setF.x, setF.z, 0.8, 0.5, 1.0, Blocks.All, Surface.Metal)]));
   const mastA = rf.lenA >= rf.lenB ? rf.a + rf.lenA / 2 - 1.5 : rf.a;
   const mastB = rf.lenA >= rf.lenB ? rf.b : rf.b + rf.lenB / 2 - 1.5;
   add('mast', [cyl(mastA, mastB, 0.2, C.mast, Blocks.Move | Blocks.Bullet, Surface.Metal)]);
@@ -497,7 +540,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   }
   shedIds.push(box(shedA, shedB, sf.lenA + 0.4, sf.lenB + 0.4, 0.15, Blocks.All, Surface.Metal, ground(shedA, shedB) + C.shed[2]!));
   add('shed', shedIds);
-  add('generator', [box(shedA, shedB, 2.2, 1.2, 1.5, Blocks.All, Surface.Metal)]);
+  device('generator', shedA, shedB, ground(shedA, shedB) + 0.75, add('generator', [box(shedA, shedB, 2.2, 1.2, 1.5, Blocks.All, Surface.Metal)]));
   occupied.push({ a0: shedA - sf.lenA / 2 - 1.5, a1: shedA + sf.lenA / 2 + 1.5, b0: shedB - sf.lenB / 2 - 1.5, b1: shedB + sf.lenB / 2 + 1.5 });
 
   // The motor pool: the escape vehicle facing the road, and a truck beside it.
@@ -528,7 +571,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   ];
   const lightCount = frng.int(C.lights[0]!, C.lights[1]!);
   for (const p of frng.shuffle(lightSpots).slice(0, lightCount)) {
-    add('light', [cyl(p.x, p.z, 0.12, 7, Blocks.Move | Blocks.Bullet, Surface.Metal), box(p.x, p.z, 0.8, 0.4, 0.25, Blocks.All, Surface.Metal, padH + 6.8)]);
+    device('light', p.x, p.z, padH + 6.9, add('light', [cyl(p.x, p.z, 0.12, 7, Blocks.Move | Blocks.Bullet, Surface.Metal), box(p.x, p.z, 0.8, 0.4, 0.25, Blocks.All, Surface.Metal, padH + 6.8)]));
     occupied.push({ a0: p.x - 1, a1: p.x + 1, b0: p.z - 1, b1: p.z + 1 });
   }
   const alarmSpots: Point2[] = [{ x: gate.a - L + 1.5, z: gate.b + gate.width / 2 + 2 }];
@@ -540,7 +583,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   }
   const alarmCount = Math.min(alarmSpots.length, frng.int(C.alarms[0]!, C.alarms[1]!));
   for (const p of alarmSpots.slice(0, alarmCount)) {
-    add('alarm', [cyl(p.x, p.z, 0.06, 1.2, Blocks.Move | Blocks.Bullet, Surface.Metal), box(p.x, p.z, 0.35, 0.25, 0.45, Blocks.All, Surface.Metal, padH + 1.15)]);
+    device('alarm', p.x, p.z, padH + 1.4, add('alarm', [cyl(p.x, p.z, 0.06, 1.2, Blocks.Move | Blocks.Bullet, Surface.Metal), box(p.x, p.z, 0.35, 0.25, 0.45, Blocks.All, Surface.Metal, padH + 1.15)]));
   }
   function toFrame(x: number, z: number): Point2 {
     const dx = x - site.x;
@@ -633,7 +676,9 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     breach,
     skeleton,
   };
-  return { site, structures, guards: [], fenceHalf: Math.max(HA, HB), layout, doors, vehicles, ladders };
+  const generator = devices.findIndex((d) => d.kind === 'generator');
+  for (const d of devices) d.feed = d.kind === 'generator' ? -1 : generator;
+  return { site, structures, guards: [], fenceHalf: Math.max(HA, HB), layout, doors, vehicles, ladders, devices };
 }
 
 function overlaps(p: Rect, q: Rect): boolean {
