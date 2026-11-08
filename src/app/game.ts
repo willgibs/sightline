@@ -23,6 +23,7 @@ import { Hud } from './hud';
 import { InputController } from './input';
 import { Overlay } from './overlay';
 import { GameSound } from './sound';
+import { BrowserStore, DevInbox, PlaytestCapture, type StoredRun } from './playtest';
 import { frameSpan, type SoundTiming } from '../audio/engine';
 import { FrameStats, percentile } from './perf';
 import { missionSpec } from '../sim/mission';
@@ -86,6 +87,10 @@ export class Game {
   private readonly hud: Hud;
   private readonly overlay: Overlay;
   private readonly sound: GameSound;
+  /** Every run kept as it goes: in playtests/ in development, in this browser when deployed (playtest.ts). */
+  private readonly capture: PlaytestCapture;
+  /** When the current pause began (performance.now()), or 0 while playing. */
+  private pausedAt = 0;
   /** Where this frame's picture is on the simulation's timeline: sounds wait for it (audio/engine.ts). */
   private readonly soundTiming: SoundTiming = { shown: 0, scale: 1, hold: 0 };
   /** About how long a frame takes: jumps to a long frame, eases back over a second or so. */
@@ -154,6 +159,11 @@ export class Game {
     this.clock = new FixedStepClock(this.tuning.sim.tickHz);
     this.renderer = new GameRenderer(opts.canvas, this.tuning, opts.pixelRatio);
     this.sound = new GameSound(this.tuning);
+    this.capture = new PlaytestCapture(opts.bench ? null : import.meta.env.DEV ? new DevInbox() : typeof indexedDB !== 'undefined' ? new BrowserStore() : null, {
+      build: BUILD,
+      machine: () => this.machine(),
+      settings: () => ({ ...this.settings }),
+    });
     this.input = new InputController(opts.canvas);
     if (this.debug) this.input.contexts.add('debug');
     this.hud = new Hud(opts.hud, this.input.map);
@@ -214,9 +224,15 @@ export class Game {
     });
     // Closing the tab with a minute or more of unsaved play asks first, in the deployed game
     // (in development, Vite reloads the page after code changes and must not be stopped).
+    // A hidden tab may never come back (closed, discarded): keep the run first.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.capture.save('hidden');
+    });
     window.addEventListener('beforeunload', (e) => {
       if (!import.meta.env.PROD || !this.sim || this.bench) return;
-      if ((this.sim.tick - this.savedTick) / this.tuning.sim.tickHz < UNSAVED_WARNING_SECONDS) return;
+      // Kept by hand, or by the autosave in this browser (playtest.ts).
+      const saved = Math.max(this.savedTick, this.capture.savedTick);
+      if ((this.sim.tick - saved) / this.tuning.sim.tickHz < UNSAVED_WARNING_SECONDS) return;
       e.preventDefault();
     });
     this.generate(this.opts.seed);
@@ -243,6 +259,7 @@ export class Game {
       this.retry = () => this.generate(seed);
       this.overlay.showMessage('error', `The valley ${seed} could not be generated`, `${message}${stack}`, 'Try again');
     } else if (where === 'tick') {
+      this.capture.save('fault');
       const f = this.sim.fault;
       this.retry = () => this.restartRunFromStart();
       this.overlay.showMessage('error', 
@@ -274,6 +291,7 @@ export class Game {
   private showOutcome(): void {
     const o = this.sim.state.outcome;
     this.paused = true;
+    this.capture.save('outcome');
     this.hud.setVisible(false);
     this.retry = () => {
       this.restartRun();
@@ -363,6 +381,7 @@ export class Game {
         this.startBench();
       } else {
         this.overlay.show('start');
+        this.showKept();
       }
     }, 30);
   }
@@ -371,6 +390,7 @@ export class Game {
     this.sim = this.scene ? startScene(this.scene, this.tuning, this.world) : new Simulation(this.world, this.tuning);
     this.recorder = new Recorder(this.sim, BUILD);
     this.sound.setSimulation(this.sim);
+    this.capture.startRun(this.sim, this.recorder, this.world.seed, this.scene?.name ?? null);
     this.savedTick = 0;
     this.failure = null;
     this.sim.drawDebug = this.debug;
@@ -433,6 +453,8 @@ export class Game {
 
   private onLocked(): void {
     this.paused = false;
+    if (this.pausedAt) this.capture.paused(performance.now() - this.pausedAt);
+    this.pausedAt = 0;
     this.overlay.hide();
     this.hud.setVisible(true);
     this.lastNow = 0;
@@ -441,6 +463,11 @@ export class Game {
   private onUnlocked(): void {
     if (this.bench || this.failure || (this.overlay.visible && this.overlay.currentMode === 'outcome')) return;
     this.paused = true;
+    this.pausedAt = performance.now();
+    this.recorder.annotate('pause');
+    this.capture.pauseStarted();
+    this.capture.save('pause');
+    this.showKept();
     this.hud.setVisible(false);
     if (this.overlay.currentMode !== 'loading' || !this.overlay.visible) this.overlay.show('paused');
   }
@@ -563,7 +590,10 @@ export class Game {
   };
 
   private drawFrame(now: number): void {
-    const dt = this.lastNow ? Math.min((now - this.lastNow) / 1000, 0.25) : 0;
+    // The frame as it really was (for the playtest report), and as the game takes it: a
+    // frame longer than a quarter second (a hitch, a debugger) doesn't jump the world.
+    const frameMs = this.lastNow ? now - this.lastNow : 0;
+    const dt = Math.min(frameMs / 1000, 0.25);
     this.lastNow = now;
     const cpuStart = performance.now();
     // Paused means still: animation time and the head bob stop with the simulation.
@@ -581,6 +611,8 @@ export class Game {
     this.input.sensitivityScale = Math.tan((fov * Math.PI) / 360) / Math.tan((base * Math.PI) / 360);
     this.input.pitchLimit = this.tuning.bodies.player.pitchLimit;
 
+    let frameTicks = 0;
+    let frameTickMs = 0;
     if (!this.paused) {
       const scale = this.debug ? TIME_SCALES[this.timeScaleIndex]! : 1;
       const ticks = this.clock.advance(dt, scale);
@@ -598,7 +630,9 @@ export class Game {
           this.decided = false;
           this.showOutcome();
         }
-        this.tickTimeSum += performance.now() - t0;
+        frameTicks = ticks;
+        frameTickMs = performance.now() - t0;
+        this.tickTimeSum += frameTickMs;
         this.tickCount += ticks;
       }
     }
@@ -639,6 +673,7 @@ export class Game {
     }
     const cpu = performance.now() - cpuStart;
     this.stats.push(dt * 1000, cpu, this.tickMs);
+    if (!this.paused && !this.bench && frameMs > 0) this.capture.frame(frameMs, cpu, frameTickMs, frameTicks);
     if (this.bench) this.benchFrame(now, dt, cpu);
     this.panelTimer -= dt;
     if (this.debug && this.panelTimer <= 0) {
@@ -808,22 +843,56 @@ export class Game {
       ``,
       `SOUND`,
       this.sound.report(),
+      ``,
+      `PLAYTEST · ${this.capture.status}`,
     ];
     return lines.join('\n');
+  }
+
+  /** The deployed game's kept runs, on the start and pause screens, for saving as files. */
+  private showKept(): void {
+    const store = this.capture.store;
+    if (!(store instanceof BrowserStore)) return;
+    // After any save under way, so the list includes it.
+    void this.capture
+      .settled()
+      .then(() => store.list())
+      .then((runs) => this.overlay.setKept(runs.slice(0, 3).map((r) => ({ text: keptLabel(r), save: () => this.download(r.recording, `sightline-${r.name}.slrec`) }))))
+      .catch(() => undefined);
+  }
+
+  private download(blob: Blob, name: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  /** The machine and browser, for the playtest report: what only the browser knows. */
+  private machine(): Record<string, unknown> {
+    const nav = navigator as Navigator & { deviceMemory?: number };
+    return {
+      userAgent: nav.userAgent,
+      language: nav.language,
+      cores: nav.hardwareConcurrency,
+      memoryGB: nav.deviceMemory ?? null,
+      gpu: this.renderer.gpuName(),
+      viewport: `${window.innerWidth}×${window.innerHeight}`,
+      pixelRatio: this.renderer.gl.getPixelRatio(),
+      screen: `${screen.width}×${screen.height} @${window.devicePixelRatio || 1}`,
+      sound: this.sound.status(),
+    };
   }
 
   private saveRecording(): void {
     if (!this.sim) return;
     const rec = this.recorder.finish(this.sim, new Date().toISOString());
-    const blob = new Blob(rec.toParts() as BlobPart[], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sightline-${this.world.seed}-${this.sim.tick}.slrec`;
-    a.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const name = `sightline-${this.world.seed}-${this.sim.tick}.slrec`;
+    this.download(new Blob(rec.toParts() as BlobPart[], { type: 'application/octet-stream' }), name);
     this.savedTick = this.sim.tick;
-    this.overlay.setStatus(`Saved ${a.download} · to re-simulate it: npm run sim -- --replay <folder>/${a.download}`);
+    this.overlay.setStatus(`Saved ${name} · to re-simulate it: npm run sim -- --replay <folder>/${name}`);
   }
 
   // --- Automation (window.sightline). ----------------------------------------------------
@@ -912,6 +981,8 @@ export class Game {
       sound: () => this.sound.status(),
       /** Guards hidden with the camera inside them, and foliage drawn from inside, in the last frame. */
       insides: () => this.renderer.insides(),
+      /** The last playtest save, and whether one is under way. */
+      playtest: () => ({ status: this.capture.status, busy: this.capture.busy, where: this.capture.store?.where ?? null }),
       state: () => ({
         seed: this.world?.seed,
         scene: this.scene?.name ?? null,
@@ -1042,6 +1113,14 @@ function zoomFov(base: number, zoomed: number, t: number): number {
   const a = Math.tan((base * Math.PI) / 360);
   const b = Math.tan((zoomed * Math.PI) / 360);
   return (Math.atan(lerp(a, b, t)) * 360) / Math.PI;
+}
+
+/** A kept run as a button: what was played, for how long, and when. */
+function keptLabel(r: StoredRun): string {
+  const when = new Date(r.savedAt);
+  const today = new Date().toDateString() === when.toDateString();
+  const at = today ? when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : when.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return `${r.label} · ${clock(r.ticks / (r.tickHz || 30))} · ${at}`;
 }
 
 function samePose(a: CameraPose, b: CameraPose): boolean {

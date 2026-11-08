@@ -416,6 +416,31 @@ body {
   visibility: hidden;
 }
 
+/* Runs the deployed game kept in this browser, offered for saving. */
+.kept {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 10px;
+  font: 11px/1.4 var(--mono);
+  color: var(--panel-soft);
+}
+
+.kept .link {
+  border: 1px solid rgba(233, 236, 239, 0.18);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--panel-ink);
+  font: 11px/1 var(--mono);
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.kept .link:hover {
+  border-color: rgba(233, 236, 239, 0.5);
+}
+
 @media (max-width: 560px) {
   .compass {
     width: 300px;

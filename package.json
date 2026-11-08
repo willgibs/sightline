@@ -21,7 +21,8 @@
     "check": "npm run typecheck && npm run test",
     "golden": "tsx src/headless/golden.ts",
     "scene": "tsx src/headless/scene.ts",
-    "fuzz": "tsx src/headless/fuzz.ts"
+    "fuzz": "tsx src/headless/fuzz.ts",
+    "playtest": "tsx src/headless/playtest.ts"
   },
   "dependencies": {
     "three": "0.186.1"

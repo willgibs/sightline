@@ -75,6 +75,7 @@ export class Overlay {
           <span class="status"></span>
           <button class="link" type="button" data-act="save">Save recording</button>
         </div>
+        <div class="kept" hidden></div>
       </div>`;
     labelKeys(root);
     this.settingsRoot = root.querySelector('.settings')!;
@@ -184,5 +185,26 @@ export class Overlay {
 
   setReport(text: string): void {
     this.report.textContent = text;
+  }
+
+  /**
+   * Runs kept in this browser (the deployed game's autosaves, playtest.ts), newest first,
+   * each with a way to save it as a file. Empty hides the line.
+   */
+  setKept(runs: ReadonlyArray<{ text: string; save: () => void }>): void {
+    const el = this.root.querySelector<HTMLElement>('.kept')!;
+    el.hidden = runs.length === 0;
+    el.replaceChildren();
+    if (runs.length === 0) return;
+    el.append('Kept in this browser:');
+    for (const run of runs) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'link';
+      b.textContent = run.text;
+      b.title = 'Save this run as a recording file';
+      b.addEventListener('click', run.save);
+      el.append(b);
+    }
   }
 }

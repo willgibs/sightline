@@ -42,3 +42,45 @@ export function percentile(values: number[], q: number): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]!;
 }
+
+/**
+ * Frame times over a whole session, in 1 ms buckets up to 250 ms: percentiles and slow
+ * frames for the playtest report, at a fixed cost however long the session runs.
+ */
+export class FrameHistogram {
+  readonly buckets = new Uint32Array(251);
+  count = 0;
+  max = 0;
+  private sum = 0;
+
+  push(ms: number): void {
+    if (!(ms >= 0)) return;
+    this.buckets[Math.min(250, Math.floor(ms))]!++;
+    this.count++;
+    this.sum += ms;
+    if (ms > this.max) this.max = ms;
+  }
+
+  get mean(): number {
+    return this.count ? this.sum / this.count : 0;
+  }
+
+  /** The time q of the frames came in under, to the millisecond. */
+  percentile(q: number): number {
+    if (this.count === 0) return 0;
+    const want = q * this.count;
+    let seen = 0;
+    for (let k = 0; k < this.buckets.length; k++) {
+      seen += this.buckets[k]!;
+      if (seen >= want) return k + 1;
+    }
+    return this.buckets.length;
+  }
+
+  /** How many frames took longer than `ms` (a whole number of milliseconds). */
+  over(ms: number): number {
+    let n = 0;
+    for (let k = Math.max(0, Math.floor(ms)); k < this.buckets.length; k++) n += this.buckets[k]!;
+    return n;
+  }
+}

@@ -3,6 +3,7 @@ import { neutralInput } from '../input';
 import { startScene, type Scene } from '../scene';
 import { Simulation } from '../sim';
 import { SYSTEMS, type System } from '../systems';
+import type { SimEvent } from '../events';
 import { STATE_SCHEMA, stateParts } from '../state';
 import { GEN_VERSION, SIM_VERSION } from '../version';
 import { hashOrZeros, type Recording } from './recording';
@@ -35,6 +36,8 @@ export interface ReplayOptions {
   systems?: readonly System[];
   /** Milliseconds, to time the run. */
   clock?: () => number;
+  /** Called around each re-simulated tick, to watch the run (npm run playtest). Must only look. */
+  watch?: { before?(sim: Simulation): void; after?(sim: Simulation, events: readonly SimEvent[]): void };
 }
 
 /**
@@ -103,8 +106,10 @@ export function resimulate(rec: Recording, opts: ReplayOptions = {}): ResimResul
   for (let i = 0; i < h.ticks; i++) {
     while (change < changes.length && changes[change]!.tick === sim.tick + 1) sim.setTuning(changes[change++]!.tuning);
     rec.readInput(i, input);
+    opts.watch?.before?.(sim);
+    let events: readonly SimEvent[];
     try {
-      sim.step(input);
+      events = sim.step(input);
     } catch {
       // A fault: the recorded one if this is its tick, otherwise a new one.
       const got = sim.fault ? describe(sim.fault) : 'an error outside the systems';
@@ -112,6 +117,7 @@ export function resimulate(rec: Recording, opts: ReplayOptions = {}): ResimResul
       const same = expected !== null && sim.fault?.tick === h.fault!.tick && got === expected && finalHash === h.finalHash;
       return result({ ok: same && firstDivergence === null, ticks: i + 1, finalHash, firstDivergence, divergedParts, fault: { expected: expected ?? '(none)', got } });
     }
+    opts.watch?.after?.(sim, events);
     const cp = checkpoints[checkpoint];
     if (cp && cp.tick === sim.tick) {
       if (firstDivergence === null && sim.hash() !== cp.hash) {
