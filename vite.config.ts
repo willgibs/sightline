@@ -19,5 +19,7 @@ export default defineConfig({
     environment: 'node',
     // Windows' runner is the slowest, and the heaviest tests (a sitting generated headless) pass 60 s there.
     testTimeout: 180_000,
+    // A beforeAll may generate worlds, and a generated camp takes seconds on a busy runner.
+    hookTimeout: 180_000,
   },
 });
