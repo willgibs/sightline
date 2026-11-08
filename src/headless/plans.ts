@@ -158,6 +158,12 @@ function reconOf(row: Row): object {
   };
   const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
   const round = (v: number, d = 0): number => Number(v.toFixed(d));
+  /** A yaw as a bearing in the camp's frame: 0 toward the gate, 90 to its right. */
+  const facing = (yaw: number): number => {
+    const wx = -Math.sin(yaw);
+    const wz = -Math.cos(yaw);
+    return round((Math.atan2(wx * L.vx + wz * L.vz, wx * L.ux + wz * L.uz) * 180) / Math.PI);
+  };
   return {
     frame: 'All positions are metres from the camp centre: forward is toward the gate, right is to its right. Heights are above the camp pad.',
     cycleSeconds: c.cycle,
@@ -178,7 +184,7 @@ function reconOf(row: Row): object {
             (last.path as unknown[]).push(frame(leg.x1, leg.z1));
           } else legs.push({ walk: [round(leg.t0), round(leg.t1)], path: [frame(leg.x0, leg.z0), frame(leg.x1, leg.z1)] });
         } else if (leg.t1 - leg.t0 >= 3) {
-          legs.push({ hold: [round(leg.t0), round(leg.t1)], at: frame(leg.x, leg.z), faces: round(leg.yawTo * (180 / Math.PI)) });
+          legs.push({ hold: [round(leg.t0), round(leg.t1)], at: frame(leg.x, leg.z), faces: facing(leg.yawTo) });
         }
       }
       routinePose(g.routine, 0, pose);
