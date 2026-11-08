@@ -4,6 +4,7 @@ import { Rng } from '../kernel/core/rng';
 import { startScene } from '../kernel/scene';
 import { Blocks } from '../kernel/world/colliders';
 import { foliageOf } from '../perception';
+import type { SimEvent } from '../kernel/events';
 import { formatSight, parseSight, sightScenario, type SightParams } from './scenes/sightScenario';
 import type { Simulation } from './sim';
 
@@ -52,20 +53,33 @@ import type { Simulation } from './sim';
  * count of candidates (rule 18).
  */
 
-export type Factor = 'distance' | 'stance' | 'movement' | 'light' | 'cover' | 'sky' | 'gaze';
+export type Factor = 'distance' | 'stance' | 'movement' | 'light' | 'cover' | 'sky' | 'gaze' | 'surface' | 'gait' | 'masking';
+/** The factors of the perception lab's trials, in the order they're tried. */
 export const FACTORS: readonly Factor[] = ['distance', 'stance', 'movement', 'light', 'cover', 'sky', 'gaze'];
+/** Every factor any lab's trials use, in the order reports list them. */
+export const ALL_FACTORS: readonly Factor[] = [...FACTORS, 'surface', 'gait', 'masking'];
+
+/** What a trial asks: whether a guard sees the player, or (the movement lab, C8) hears them. */
+export type TrialKind = 'sight' | 'noise';
+
+/** Whether an event is a trial's answer: he saw you, or heard you. */
+export function answersTrial(kind: TrialKind, e: SimEvent): boolean {
+  return kind === 'noise' ? e.type === 'heard' : e.type === 'detected';
+}
 
 export interface Trial {
   /** Its place in the sitting, from 0; the warm-ups come first. */
   k: number;
   warmup: boolean;
-  /** The sight scenario it runs (canonical parameters). */
+  /** Which question it asks, and so which scene it runs. */
+  kind: TrialKind;
+  /** The scenario it runs (canonical parameters). */
   params: string;
   /** What the player will do, and who's watching, in words. */
   brief: string;
   /** Judged from the situation, frozen at the start; or frozen at the first cue. */
   freeze: 'start' | 'cue';
-  /** The answer key: seen within the trial, and when (s); when the first cue came (s), or −1. */
+  /** The answer key: seen (or, in a noise trial, heard) within the trial, and when (s); when the first cue came (s), or −1. */
   seen: boolean;
   seenAt: number;
   cueAt: number;
@@ -104,7 +118,7 @@ export interface SittingOptions {
 
 export const SITTING: SittingOptions = { warmups: 5, scored: 30, maxCandidates: 1600, pool: 3, balanceFreeze: true, seconds: 8, cueHoldSeconds: 0.3, headPixels: 2, seeThrough: 0.15 };
 
-interface Outcome {
+export interface Outcome {
   seen: boolean;
   seenAt: number;
   cueAt: number;
@@ -168,7 +182,7 @@ function headInView(sim: Simulation, opts: SittingOptions): boolean {
 const STANCES: readonly SightParams['stance'][] = ['prone', 'crouch', 'stand'];
 const MOVES: readonly SightParams['move'][] = ['still', 'walk', 'sprint'];
 /** How far each spot's ground lets a guard stand from it with a clear line (sightScenario's geometry). */
-const SPOT_MAX: Readonly<Record<SightParams['spot'], number>> = { open: 390, shade: 50, bush: 70, wall: 60, crest: 230 };
+export const SPOT_MAX: Readonly<Record<SightParams['spot'], number>> = { open: 390, shade: 50, bush: 70, wall: 60, crest: 230 };
 
 /** One step of one factor, toward more exposure (`up`) or less; null if it has no step that way here. */
 export function stepFactor(p: SightParams, f: Factor, up: boolean): SightParams | null {
@@ -215,6 +229,10 @@ export function stepFactor(p: SightParams, f: Factor, up: boolean): SightParams 
       q.off = off;
       return q;
     }
+    case 'surface':
+    case 'gait':
+    case 'masking':
+      return null; // the movement lab's factors (game/movementTrials.ts)
   }
 }
 
@@ -351,17 +369,17 @@ function levelsOf(p: SightParams, t: Pick<Trial, 'seen' | 'borderline'>): string
 }
 
 /** Every pair of a situation's levels. */
-function pairsOf(t: Trial): string[] {
-  const levels = levelsOf(parseSight(t.params), t);
+function pairsOf(t: Trial, space: TrialSpace): string[] {
+  const levels = space.levels(t.params, t);
   const pairs: string[] = [];
   for (let i = 0; i < levels.length; i++) for (let j = i + 1; j < levels.length; j++) pairs.push(`${levels[i]}|${levels[j]}`);
   return pairs;
 }
 
 /** How many distinct pairs of factor levels a sitting's scored trials cover. */
-export function pairsCovered(trials: readonly Trial[]): number {
+export function pairsCovered(trials: readonly Trial[], space: TrialSpace = SIGHT_SPACE): number {
   const covered = new Set<string>();
-  for (const t of trials) if (!t.warmup) for (const pair of pairsOf(t)) covered.add(pair);
+  for (const t of trials) if (!t.warmup) for (const pair of pairsOf(t, space)) covered.add(pair);
   return covered.size;
 }
 
@@ -370,12 +388,12 @@ export function pairsCovered(trials: readonly Trial[]): number {
  * pairs not yet covered, the earliest drawn among equals. Cells are kept separate, so the
  * key's balance holds.
  */
-function spread(cells: readonly Trial[][], quotas: readonly number[]): Trial[][] {
+function spread(cells: readonly Trial[][], quotas: readonly number[], space: TrialSpace): Trial[][] {
   const chosen: Trial[][] = cells.map(() => []);
   const taken = new Set<Trial>();
   const covered = new Set<string>();
   const pairs = new Map<Trial, string[]>();
-  for (const cell of cells) for (const t of cell) pairs.set(t, pairsOf(t));
+  for (const cell of cells) for (const t of cell) pairs.set(t, pairsOf(t, space));
   for (;;) {
     let best: Trial | null = null;
     let bestCell = -1;
@@ -401,6 +419,51 @@ function spread(cells: readonly Trial[][], quotas: readonly number[]): Trial[][]
 }
 
 /**
+ * What a sitting is drawn from: the situations of one kind of trial, and how each is run
+ * and judged. The protocol below is the same for every kind (generateSitting): the cells,
+ * the spread over factor levels, the freezes and the scoring. A lab supplies this.
+ * Parameters travel as the scenario's canonical text, so a trial's params rebuild it.
+ */
+export interface TrialSpace {
+  readonly kind: TrialKind;
+  /** The random stream the sitting draws from, so another kind never shifts this one's trials. */
+  readonly stream: string;
+  /** The factors a borderline trial can flip on, in the order they're tried. */
+  readonly factors: readonly Factor[];
+  /** One candidate situation from the seeded space, as canonical parameters. */
+  draw(rng: Rng, tuning: Tuning): string;
+  /** Runs the trial: its answer key, its first cue, and the view at each freeze. */
+  outcome(params: string, tuning: Tuning, opts: SittingOptions): Outcome;
+  /** One step of one factor, toward more exposure (`up`) or less, or null if it has none that way. */
+  step(params: string, f: Factor, up: boolean): string | null;
+  /** What the rules-only predictor says. */
+  rules(params: string, tuning: Tuning): boolean;
+  /** What the player will do, and who's there, in words. */
+  brief(params: string): string;
+  /** A situation's levels, for spreading a sitting over them. */
+  levels(params: string, t: Pick<Trial, 'seen' | 'borderline'>): string[];
+  /** Which cues can be read at the freeze, as the simulation knows them. */
+  legible(params: string, freeze: Trial['freeze'], tuning: Tuning, clear: Outcome['clear'], opts: SittingOptions): Trial['legible'];
+}
+
+/** The perception lab's trials (A12): will he see you? */
+export const SIGHT_SPACE: TrialSpace = {
+  kind: 'sight',
+  stream: 'trials',
+  factors: FACTORS,
+  draw: (rng, tuning) => formatSight(draw(rng, tuning)),
+  outcome: outcomeOf,
+  step: (params, f, up) => {
+    const q = stepFactor(parseSight(params), f, up);
+    return q ? formatSight(q) : null;
+  },
+  rules: (params, tuning) => rulesPredict(parseSight(params), tuning),
+  brief: (params) => briefOf(parseSight(params)),
+  levels: (params, t) => levelsOf(parseSight(params), t),
+  legible: (params, freeze, tuning, clear, opts) => legibleCues(parseSight(params), freeze, tuning, clear, opts),
+};
+
+/**
  * A sitting's trials from its seed: candidates drawn and run until each of the four cells
  * has its quarter of the scored trials and the warm-ups are found, or the candidates run
  * out. `progress` hears how far it has got (for the browser's wait).
@@ -417,8 +480,13 @@ export function generateSitting(seed: string, tuning: Tuning, opts: SittingOptio
  * The same, a candidate at a time: each step yields how many candidates have run, and the
  * last returns the trials. The browser runs a few steps a frame, so the page stays alive.
  */
-export function* sittingSteps(seed: string, tuning: Tuning, opts: SittingOptions = SITTING): Generator<number, Trial[]> {
-  const rng = new Rng(seed, 'trials');
+export function sittingSteps(seed: string, tuning: Tuning, opts: SittingOptions = SITTING): Generator<number, Trial[]> {
+  return spaceSteps(SIGHT_SPACE, seed, tuning, opts);
+}
+
+/** The protocol, for any kind of trial: see generateSitting. */
+export function* spaceSteps(space: TrialSpace, seed: string, tuning: Tuning, opts: SittingOptions = SITTING): Generator<number, Trial[]> {
+  const rng = new Rng(seed, space.stream);
   // Without balanced freezes (the bench's seed), the six cells alone, as trials come.
   const cellIndex = opts.balanceFreeze ? subCellOf : cellOf;
   const quotas = opts.balanceFreeze ? subQuotas(opts.scored) : cellQuotas(opts.scored);
@@ -431,27 +499,27 @@ export function* sittingSteps(seed: string, tuning: Tuning, opts: SittingOptions
   const want = (): boolean => drawn.length < enough || gathered.some((c, i) => c.length < capacity[i]!);
   for (let n = 0; n < opts.maxCandidates && want(); n++) {
     yield n;
-    const p = draw(rng, tuning);
-    const params = formatSight(p);
+    const params = space.draw(rng, tuning);
     if (seen.has(params)) continue;
     seen.add(params);
-    const o = outcomeOf(params, tuning, opts);
-    const rules = rulesPredict(p, tuning);
+    const o = space.outcome(params, tuning, opts);
+    const rules = space.rules(params, tuning);
     const borderlineCell = cellIndex({ seen: o.seen, borderline: true, rules, cueAt: o.cueAt });
     const clearCell = cellIndex({ seen: o.seen, borderline: false, rules, cueAt: o.cueAt });
     // A candidate no cell can take, once there are enough for the warm-ups, isn't worth its flips.
     if (drawn.length >= enough && gathered[borderlineCell]!.length >= capacity[borderlineCell]! && gathered[clearCell]!.length >= capacity[clearCell]!) continue;
     // Borderline: one factor's step toward the other outcome flips it. Every factor that does.
     const flips: Factor[] = [];
-    for (const f of FACTORS) {
-      const q = stepFactor(p, f, !o.seen);
-      if (q && outcomeOf(formatSight(q), tuning, opts).seen !== o.seen) flips.push(f);
+    for (const f of space.factors) {
+      const q = space.step(params, f, !o.seen);
+      if (q !== null && space.outcome(q, tuning, opts).seen !== o.seen) flips.push(f);
     }
     const t: Trial = {
       k: 0,
       warmup: false,
+      kind: space.kind,
       params,
-      brief: briefOf(p),
+      brief: space.brief(params),
       freeze: 'start',
       seen: o.seen,
       seenAt: o.seenAt,
@@ -466,7 +534,7 @@ export function* sittingSteps(seed: string, tuning: Tuning, opts: SittingOptions
     const c = cellIndex(t);
     if (gathered[c]!.length < capacity[c]!) gathered[c]!.push(t);
   }
-  const cells = spread(gathered, quotas);
+  const cells = spread(gathered, quotas, space);
   // The warm-ups: what's left, in the order drawn, showing all four of seen or not, at the cue or the start.
   const picked = new Set(cells.flat());
   const rest = drawn.filter((t) => !picked.has(t));
@@ -516,7 +584,7 @@ export function* sittingSteps(seed: string, tuning: Tuning, opts: SittingOptions
   const all = [...warmups, ...scored];
   all.forEach((t, k) => {
     t.k = k;
-    t.legible = legibleCues(parseSight(t.params), t.freeze, tuning, clears.get(t)!, opts);
+    t.legible = space.legible(t.params, t.freeze, tuning, clears.get(t)!, opts);
   });
   return all;
 }

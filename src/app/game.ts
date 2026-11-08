@@ -6,7 +6,8 @@ import { headBob } from '../sim/body';
 import { BARKS, beliefRadius, explainChain, groundLight, lightName, movementVisibility, stanceVisibility } from '../sim/perception';
 import { EventLog } from '../sim/kernel/eventlog';
 import { Cues } from './cues';
-import { TrialSitting, type TrialHost } from './trials';
+import { MOVEMENT_SITTING } from '../sim/game/movementTrials';
+import { MOVEMENT_PLAN, SIGHT_PLAN, TrialSitting, type TrialHost } from './trials';
 import { generateWorld, simTuningKey, worldTuningKey } from '../sim/generation';
 import type { World } from '../sim/kernel/world/world';
 import { neutralInput } from '../sim/kernel/input';
@@ -220,7 +221,7 @@ export class Game {
     this.hud = new Hud(opts.hud, this.input.map);
     this.cues = new Cues(opts.hud, this.tuning.perception.sight.cue);
     if (opts.trials) {
-      this.trial = new TrialSitting(opts.hud, this.trialHost(), opts.trials, this.tuning, opts.trialsFresh ?? false);
+      this.trial = new TrialSitting(opts.hud, this.trialHost(), opts.trials, this.tuning, opts.trialsFresh ?? false, opts.trials.startsWith(MOVEMENT_SITTING) ? MOVEMENT_PLAN : SIGHT_PLAN);
       // Every trial's run is kept, however short: each holds an answer.
       this.capture.minSeconds = 0;
     }

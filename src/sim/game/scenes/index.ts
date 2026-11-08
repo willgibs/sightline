@@ -3,6 +3,7 @@ import type { Simulation } from '../sim';
 import { movementCourse } from './movementCourse';
 import { movementLab } from './movementLab';
 import { perceptionCrowd, perceptionLab } from './perceptionLab';
+import { NOISE_TABLE, noiseScenario } from './noiseScenario';
 import { SIGHT_TABLE, sightScenario } from './sightScenario';
 import { shootingRange } from './shootingRange';
 import { spawnTick } from './spawnTick';
@@ -20,6 +21,7 @@ export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   'movement-lab': movementLab,
   'perception-crowd': perceptionCrowd,
   'perception-lab': perceptionLab,
+  noise: noiseScenario,
   sight: sightScenario,
   'spawn-tick': spawnTick,
   'shooting-range': shootingRange,
@@ -37,5 +39,6 @@ export function sceneOf(header: { scene: { name: string; params: string } | null
  * Labs C and E add theirs.
  */
 export const SCENARIOS: Readonly<Record<string, readonly string[]>> = {
+  noise: NOISE_TABLE,
   sight: SIGHT_TABLE,
 };

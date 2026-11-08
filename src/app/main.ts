@@ -3,6 +3,7 @@ import { knownAnswerProblems } from '../sim/kernel/core/known';
 import { normalizeSeed, randomSeed } from '../sim/kernel/core/seed';
 import type { SpawnKind } from '../sim/kernel/mission';
 import { Game } from './game';
+import { MOVEMENT_SITTING } from '../sim/game/movementTrials';
 import { SCENES } from '../sim/game/scenes';
 import './styles.css';
 
@@ -11,6 +12,7 @@ import './styles.css';
  *   ?seed=TAL-4471   which valley to generate
  *   ?scene=movement-course   play a scene instead (sim/game/scenes/index.ts)
  *   &params=...              with these parameters (a scenario: game/scenes/sightScenario.ts)
+ *   ?trials=<seed>&lab=movement  a sitting of the movement lab's exit test instead (C8): noise and visibility
  *   ?trials=<seed>           a sitting of trial mode, the perception lab's exit test (A12); any seed, or none for a fresh one (&fresh forgets a sitting kept in this browser)
  *   ?view=debug      start in the debug view
  *   ?spawn=edge      start where the road leaves the map instead of on an overlook
@@ -58,6 +60,9 @@ function tickRateChoice(tuning: Tuning, hz: string | null): Tuning {
   return out;
 }
 
+const movementTrials = params.get('lab') === 'movement';
+const trialScene = movementTrials ? 'noise' : 'perception-lab';
+
 let game: Game;
 try {
   game = new Game({
@@ -71,10 +76,10 @@ try {
     bench: params.has('bench'),
     pixelRatio: dprParam > 0 ? Math.min(3, Math.max(0.5, dprParam)) : Math.min(window.devicePixelRatio || 1, 1.5),
     pixelRatioFollowsScreen: !(dprParam > 0),
-    // Trial mode (A12) plays in the perception lab.
-    sceneName: params.has('trials') ? 'perception-lab' : sceneName,
-    scene: params.has('trials') ? SCENES['perception-lab']!() : sceneName ? SCENES[sceneName]?.(params.get('params') ?? undefined) : null,
-    trials: params.has('trials') ? normalizeSeed(params.get('trials') || randomSeed()) : null,
+    // Trial mode plays in a lab's own scenes: the perception lab's (A12), or the movement lab's (C8, &lab=movement).
+    sceneName: params.has('trials') ? trialScene : sceneName,
+    scene: params.has('trials') ? SCENES[trialScene]!() : sceneName ? SCENES[sceneName]?.(params.get('params') ?? undefined) : null,
+    trials: params.has('trials') ? (movementTrials ? MOVEMENT_SITTING : '') + normalizeSeed(params.get('trials') || randomSeed()) : null,
     trialsFresh: params.has('fresh'),
     replayUrl: params.get('replay'),
   });
