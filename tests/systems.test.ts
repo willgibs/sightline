@@ -8,7 +8,7 @@ import { createBody, type BodySpec } from '../src/sim/body/body';
 import { stepMotor, type MotorContext, type MoveIntent } from '../src/sim/body/motor';
 import { emptySchedule, popDue, scheduleAt, ticksAfter, type Scheduled } from '../src/sim/kernel/schedule';
 import { Simulation } from '../src/sim/game/sim';
-import { assertPlain, type SimState } from '../src/sim/kernel/state';
+import { Faction, assertPlain, type SimState, type SolidEntity } from '../src/sim/kernel/state';
 import { SYSTEMS } from '../src/sim/game/systems';
 import { accessConflicts, overlaps, planSystems, scheduleSystem, withSystem, type ScheduleHandler, type System } from '../src/sim/kernel/systems';
 import type { Simulation as KernelSimulation } from '../src/sim/kernel/sim';
@@ -241,6 +241,43 @@ describe('declared data access', () => {
     const sim = new Simulation(testWorld(), tuningCopy(), withSystem(SYSTEMS, liar));
     expect(() => sim.step(neutralInput())).toThrow(/emitted 'outcome', which it doesn't declare/);
     expect(sim.fault?.system).toBe('liar');
+  });
+
+  it('lets only a system that declares it spawn or despawn inside a tick', () => {
+    const crate = (id: number): SolidEntity => ({ id, kind: 'solid', faction: Faction.None, solid: { kind: 'box', id: 0, x: 30, z: 30, y0: 0, y1: 1, hx: 0.5, hz: 0.5, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Wood } });
+    const sneak: System = { ...sys('sneak', 'world', {}), run: (ctx) => void ctx.spawn(crate) };
+    const sim = new Simulation(testWorld(), tuningCopy(), withSystem(SYSTEMS, sneak));
+    expect(() => sim.step(neutralInput())).toThrow(/spawned an entity, which it doesn't declare/);
+    // Declared, it spawns: the crate is in the index and the solids at once, and gone again when despawned.
+    const seen: string[] = [];
+    const maker: System = {
+      ...sys('maker', 'world', { writes: ['entities'] }),
+      run(ctx) {
+        if (ctx.tick === 1) {
+          const c = ctx.spawn(crate);
+          seen.push(`spawned ${c.id}: indexed ${ctx.index.get(c.id) === c}, solid ${ctx.solids.shapes.some((s) => s.id === c.solid.id)}`);
+        } else if (ctx.tick === 2) {
+          const c = ctx.index.of('solid')[0]!;
+          seen.push(`despawned ${ctx.despawn(c.id)}: indexed ${ctx.index.get(c.id) !== undefined}, solids ${ctx.solids.count}`);
+        }
+      },
+    };
+    const ok = new Simulation(testWorld(), tuningCopy(), withSystem(SYSTEMS, maker));
+    ok.step(neutralInput());
+    ok.step(neutralInput());
+    expect(seen).toEqual([`spawned 2: indexed true, solid true`, `despawned true: indexed false, solids 0`]);
+  });
+
+  it('lets systems query every body as it stands, mid-tick', () => {
+    // After the motor, a query sees the player where the motor just put him.
+    const at: number[] = [];
+    const look: System = { ...sys('look', 'motor', { reads: ['*.body'] }), after: ['motor'], run: (ctx) => void at.push(ctx.query().bodies[0]!.shape.head.x) };
+    const sim = new Simulation(testWorld(), tuningCopy(), withSystem(SYSTEMS, look));
+    for (let i = 0; i < 30; i++) {
+      sim.step({ ...neutralInput(-Math.PI / 2), moveZ: 1 });
+      expect(at[i]).toBe(sim.player.x);
+    }
+    expect(sim.player.x).toBeGreaterThan(0.5);
   });
 
   /** The access path of a changed leaf of the state tree: entities by their kind, random streams by their purpose. */

@@ -299,7 +299,7 @@ The kernel boundary goes first, so everything after it lands in its final place.
   - 'decide' at tick N plans tick N + 1. 'intent' carries out the current order, with an initial order for tick 1.
   - Behaviour must not move: the `behaviour` goldens hold. The state does: `STATE_SCHEMA` 7, and the golden recording is rewritten.
   - The probe in `tests/perception.test.ts` moves to 'decide' with the brains.
-- [ ] W0.4 · Queries and spawning inside a tick.
+- [x] W0.4 · Queries and spawning inside a tick.
   - `TickContext` gains `query()`: the world, everything solid, and every body's shape as they stand now.
   - It also gains `spawn` and `despawn`, with the index and the solids kept current.
   - A scene pins the tick on which a spawned body first exists, for the motor and for perception.

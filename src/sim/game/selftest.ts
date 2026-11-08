@@ -43,9 +43,13 @@ export const GOLDEN = {
     'MUD-9031 wander': { behaviour: '6e7045d91ca788ae', state: '0beac8712fcd45a4' },
     'TAL-4471 chaos': { behaviour: '746cd8eaaa80aa4b', state: '5031fb7d0451b494' },
   },
-  /** Scenes run by their own drivers: the movement course covers stairs, drops, ramps, ceilings, crawling and surfaces. */
+  /**
+   * Scenes run by their own drivers: the movement course covers stairs, drops, ramps,
+   * ceilings, crawling and surfaces; spawn timing covers bodies spawned inside a tick.
+   */
   scenes: {
     'movement-course': { behaviour: '40c97133a0ef732d', state: 'a72123b8c4cb29d8' },
+    'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '2535df87754d14eb' },
   },
 } as const;
 

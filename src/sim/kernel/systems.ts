@@ -4,7 +4,8 @@ import type { Rng } from './core/rng';
 import { EVENTS, type EventDraft, type EventType } from './events';
 import type { TickInput } from './input';
 import { popDue, scheduleAt, ticksAfter, type Scheduled } from './schedule';
-import type { EntityId, EntityIndex, SimState } from './state';
+import type { Entity, EntityId, EntityIndex, SimState } from './state';
+import type { QueryView } from './world/query';
 import type { Solids } from './world/solids';
 import type { World } from './world/world';
 
@@ -73,6 +74,23 @@ export interface TickContext {
    * view is on, so it must never change what the system does.
    */
   debug(paint: (draw: DebugDraw) => void): void;
+  /**
+   * What queries look through (world/query.ts): the world, everything solid, and every
+   * body's shape as it stands at this moment, the bodies a system has just moved or
+   * spawned included. Each call takes the shapes afresh, into a view that is reused, so
+   * call again after anything moves.
+   */
+  query(): QueryView;
+  /**
+   * Adds an entity now, with the next id. It is in the index, and its solid shape in
+   * the solids, at once: systems later in this tick see it, and so do queries. Phases
+   * already run this tick don't, so the phase that spawns decides when it first exists
+   * for each system (game/scenes/spawnTick.ts pins this). A system that spawns declares
+   * `entities` in its writes. Never spawn a solid shape into a body (world/solids.ts).
+   */
+  spawn<E extends Entity>(make: (id: EntityId) => E): E;
+  /** Removes an entity now; false if there was none. Declared like spawning. */
+  despawn(id: EntityId): boolean;
   /**
    * A value that systems hand on to later systems within this tick, made by `make` the
    * first time it is asked for: the bodies' intents, say, from 'intent' to 'motor'. Every

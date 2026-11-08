@@ -6,6 +6,18 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.
 
+### Systems query bodies and spawn inside a tick (W0.4)
+
+**Decision:** the tick's context gains three calls.
+- `ctx.query()`: the world, everything solid, and every body's shape as it stands at that moment, taken afresh on each call.
+- `ctx.spawn` and `ctx.despawn`, which keep the entity index and the solids current at once. A system that uses them declares `entities` in its writes, or the simulation stops it.
+
+**The rule this pins** (`game/scenes/spawnTick.ts`, the `spawn-tick` scene): a spawned entity exists from the moment it is spawned, for every system that runs after it in the tick, and for every system from the next tick on. A guard spawned in 'world' at tick 30 is in queries at once, seen by perception that tick, and first moved by the motor on tick 31; one spawned in 'commands' at tick 60 is seen and moved in tick 60. A guard spawned anywhere starts with his first order (`spawnGuard`, `game/setup.ts`), for the first tick not yet finished.
+
+**What moved:** nothing. The scene's fingerprints are new in the self-test (`f5e93112e48134bb`, `2535df87754d14eb`).
+
+**Why:** labs A, B and E all need it: sight lines against bodies, a killed guard's body, reinforcements, and the sandbox's drops. Overwatch had to add immediate creation in a patch after release; the research recommended pinning the semantics before the labs depend on them.
+
 ### Brains decide after perceiving, and steer through orders (W0.3)
 
 **Decision:** a guard's brain runs in the 'decide' phase, after the world has moved and been perceived, and gives an order for the next tick. The order is plain data in the guard's state (`guard.order`, `brain/orders.ts`), and 'intent' carries out the current order every tick until the brain gives another. Each guard spawns with his first order, for tick 1, decided the same way from where he stands.

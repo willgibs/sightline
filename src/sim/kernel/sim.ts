@@ -136,6 +136,15 @@ export class Simulation {
         ctx.state.rng[key] = this.draws.stateWords();
         return out;
       },
+      query: (): QueryView => this.queryView(),
+      spawn: <E extends Entity>(make: (id: EntityId) => E): E => {
+        this.mayChangeEntities('spawned');
+        return this.spawn(make);
+      },
+      despawn: (id: EntityId): boolean => {
+        this.mayChangeEntities('despawned');
+        return this.despawn(id);
+      },
       channel: <T>(name: string, make: () => T): T => {
         let v = this.channels.get(name) as T | undefined;
         if (v === undefined) this.channels.set(name, (v = make()));
@@ -154,6 +163,12 @@ export class Simulation {
   /** The tuning this simulation runs on: a frozen copy. Change it with setTuning. */
   get tuning(): Tuning {
     return this.current;
+  }
+
+  /** Inside a tick, only a system that declares it writes `entities` may spawn or despawn. */
+  private mayChangeEntities(what: string): void {
+    const system = this.running;
+    if (system && !system.writes.includes('entities')) throw new Error(`System '${system.name}' ${what} an entity, which it doesn't declare (writes: entities)`);
   }
 
   /** Rebuilds the caches derived from the state tree (after spawning, despawning or restoring). */
@@ -209,9 +224,9 @@ export class Simulation {
   }
 
   /**
-   * Adds an entity between ticks (a scene's gate, a test's crate), with the next id. An
-   * entity with a solid shape gets its collider id from its entity id, and must not be
-   * placed inside a body (world/solids.ts).
+   * Adds an entity, with the next id: between ticks (a scene's gate, a test's crate), or
+   * inside one through the TickContext. An entity with a solid shape gets its collider id
+   * from its entity id, and must not be placed inside a body (world/solids.ts).
    */
   spawn<E extends Entity>(make: (id: EntityId) => E): E {
     const e = spawn(this.state, make);
@@ -220,7 +235,7 @@ export class Simulation {
     return e;
   }
 
-  /** Removes an entity between ticks (a killed guard, a picked-up object). Returns false if there was none. */
+  /** Removes an entity (a killed guard, a picked-up object), between ticks or inside one. Returns false if there was none. */
   despawn(id: EntityId): boolean {
     const removed = despawn(this.state, id);
     if (removed) this.reindex();
