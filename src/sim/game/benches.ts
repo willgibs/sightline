@@ -12,10 +12,13 @@ import { WanderBot } from './bots/wander';
 import { PINNED_RUNS, behaviourInto } from './runs';
 import { Simulation } from './sim';
 import { Acoustics, SEED_LAW, SIGHT_LAW, crackHeard, emptyHeard, foliageOf, sweepSight, type CrackHeard, type FlightPoint } from '../perception';
-import { datan2, dexp } from '../kernel/core/detmath';
+import { datan2, dcos, dexp, dlog, dsin } from '../kernel/core/detmath';
 import { air, defaultEnv } from '../kernel/env';
 import { Rng } from '../kernel/core/rng';
-import { runScene } from '../kernel/scene';
+import { runScene, sceneOver, sceneTicks, startScene } from '../kernel/scene';
+import { emptyEstimate, fuseBearings, inEllipse, type Bearing, type FuseGrid } from '../brain';
+import { POLICIES, pursuit } from './baselines';
+import { campScenario } from './scenes/campScenario';
 import { labWorld } from './scenes/perceptionLab';
 import { SIGHT_TABLE, sightScenario } from './scenes/sightScenario';
 import { SWAY_RUNGS, decisionSensitivity, swayRadius, sweepCases, sweepWorst } from './ballisticsBench';
@@ -112,7 +115,11 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
       "Lab A: the sight rate law swept over the factor grid against the design doc's ranges, beside the seed's (Blacklist's model with the table as rates); the sight scenarios run whole; foliage symmetric to the bit.",
     metrics: perceptionMetrics,
   },
-  brain: { about: "Lab E: search cycle length, and the calibration of the camp's estimate of where a shot came from, from E5 on.", metrics: () => ({}) },
+  brain: {
+    about:
+      "Lab E: search cycle length, the calibration of the camp's estimate of where a shot came from, the search map's size, how often the honest brain re-finds an intruder against the baselines (omniscient, staleness, plain, random), and how many reactions are explained back to a percept.",
+    metrics: brainMetrics,
+  },
   ballistics: {
     about: 'Lab B: the reticle against the impact within 1 cm over the sweep, decision sensitivity at 300 m, and the sway ladder.',
     metrics() {
@@ -130,6 +137,107 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
   },
   game: { about: "The valley's plays, which exercise every lane together: pinned by their fingerprints and work.", metrics: () => ({}) },
 };
+
+/** Lab E's bench (brain lane): docs/phase-1-plan.md, E · recorded before building. */
+function brainMetrics(): Record<string, number> {
+  const m: Record<string, number> = {};
+  const T = defaultTuning;
+  // The camp's memory.
+  m['search map: numbers'] = T.brain.searchMap.cells * T.brain.searchMap.cells;
+  // Search cycles: from the last report to the search's end, in the search scenarios.
+  const cycles: number[] = [];
+  for (let seed = 0; seed < 3; seed++) {
+    const sc = campScenario(`script=search&seed=${seed}`);
+    const sim = startScene(sc, T);
+    const driver = sc.driver?.();
+    const raw = sc.game.still(sim);
+    const ticks = sceneTicks(sc, T);
+    let cycle = -1;
+    while (!sceneOver(sc, sim, ticks) && cycle < 0) {
+      const events = sim.step(driver ? driver.next(sim, raw) : raw);
+      const camp = sim.index.of('commander')[0]!.camp;
+      for (const e of events) if (e.type === 'level' && e.to === 'uneasy' && camp.search === null) cycle = (e.tick - camp.lastPercept) / T.sim.tickHz;
+    }
+    cycles.push(cycle);
+  }
+  m['search cycle: shortest (s)'] = round(Math.min(...cycles));
+  m['search cycle: longest (s)'] = round(Math.max(...cycles));
+  // Calibration: seeded shots, bearings with the stated error, the camp's ellipse.
+  const rng = new Rng('BENCH-E', 'calibration');
+  const grid: FuseGrid = { x: 0, z: 0, half: 720, cells: 120, rangeMin: 120, rangeMax: 480 };
+  const sigma = (5 * Math.PI) / 180;
+  const est = emptyEstimate();
+  let in1 = 0;
+  let in2 = 0;
+  const N = 400;
+  for (let k = 0; k < N; k++) {
+    const a = rng.range(0, 2 * Math.PI);
+    const r = Math.sqrt(rng.next() * (grid.rangeMax * grid.rangeMax - grid.rangeMin * grid.rangeMin) + grid.rangeMin * grid.rangeMin);
+    const sx = r * dcos(a);
+    const sz = r * dsin(a);
+    const bs: Bearing[] = [];
+    for (let i = 0; i < 2 + (k % 5); i++) {
+      const x = rng.range(-30, 30);
+      const z = rng.range(-30, 30);
+      const dx = sx - x;
+      const dz = sz - z;
+      const d = Math.sqrt(dx * dx + dz * dz);
+      const err = sigma * Math.sqrt(-2 * dlog(Math.max(1e-12, rng.next()))) * dcos(2 * Math.PI * rng.next());
+      const c = dcos(err);
+      const sn = dsin(err);
+      bs.push({ x, z, ux: (dx / d) * c - (dz / d) * sn, uz: (dx / d) * sn + (dz / d) * c, sigma });
+    }
+    fuseBearings(bs, grid, est);
+    if (inEllipse(est, sx, sz, 1)) in1++;
+    if (inEllipse(est, sx, sz, 2)) in2++;
+  }
+  m['ellipse: contains the shooter at 1 sigma (%)'] = round((100 * in1) / N);
+  m['ellipse: contains the shooter at 2 sigma (%)'] = round((100 * in2) / N);
+  // Competence against the baselines: re-finding an intruder who has broken contact.
+  const horizon = 25;
+  const seeds = 8;
+  for (const policy of POLICIES) {
+    let found = 0;
+    for (let s = 0; s < seeds; s++) if (pursuit(policy, s, T, horizon) >= 0) found++;
+    m[`re-found within ${horizon} s (of ${seeds}): ${policy}`] = found;
+  }
+  // Every reaction in the scripted scenarios has a chain of causes back to something sensed.
+  let reactions = 0;
+  let unexplained = 0;
+  for (const params of ['script=suspicion&seed=0', 'script=search&seed=0']) {
+    const sc = campScenario(params);
+    const sim = startScene(sc, T);
+    const driver = sc.driver?.();
+    const raw = sc.game.still(sim);
+    const ticks = sceneTicks(sc, T);
+    const byId = new Map<number, { type: string; cause: number }>();
+    while (!sceneOver(sc, sim, ticks)) {
+      for (const e of sim.step(driver ? driver.next(sim, raw) : raw)) {
+        byId.set(e.id, { type: e.type, cause: e.cause });
+        if (e.type !== 'act' || e.to === 'routine' || e.to === 'return') continue;
+        reactions++;
+        let cause = e.cause;
+        let ok = false;
+        for (let hops = 0; hops < 32 && cause !== 0; hops++) {
+          const c = byId.get(cause);
+          if (!c) break;
+          if (PERCEPT_ROOTS.has(c.type)) {
+            ok = true;
+            break;
+          }
+          cause = c.cause;
+        }
+        if (!ok) unexplained++;
+      }
+    }
+  }
+  m['reactions (in the scripted scenarios)'] = reactions;
+  m['reactions unexplained'] = unexplained;
+  return m;
+}
+
+/** What a chain of causes can end in: something sensed (a sound or a sighting), or an order from what was sensed. */
+const PERCEPT_ROOTS = new Set(['footstep', 'land', 'noise', 'report', 'impact', 'bark', 'heard', 'noticed', 'detected', 'radio', 'call', 'clatter', 'cry', 'bolt', 'death', 'checkin', 'order']);
 
 /** Lab A's bench (perception lane): docs/phase-1-plan.md, A · recorded before building, says what each should be. */
 function perceptionMetrics(): Record<string, number> {

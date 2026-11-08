@@ -240,7 +240,8 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
   const reacting = act !== 'routine' && act !== 'return';
   const ordered = act === 'task' && b.task !== null;
   const reason: ActWhy = ordered ? 'ordered' : reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
-  const cause = ordered ? b.task!.cause : reacting ? perceptCause(m) : b.event;
+  // A reaction traces to what he sensed; if that memory is gone, to the act that led here.
+  const cause = ordered ? b.task!.cause : reacting ? perceptCause(m) || b.event : b.event;
   b.cause = cause;
   if (ordered) {
     b.x = b.task!.x;
