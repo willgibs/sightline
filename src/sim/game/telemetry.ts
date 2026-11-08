@@ -45,6 +45,23 @@ export interface ShotReport {
   miss: Hold;
 }
 
+/** The end screen's columns: the header for `shotRow`'s lines. */
+export const SHOT_COLUMNS = ` #  ${'aimed at'.padEnd(13)} ${'struck'.padEnd(16)}${'range'.padStart(7)}${'lead'.padStart(7)}${'wind'.padStart(7)}${'sway'.padStart(7)}`;
+
+/**
+ * A shot on one line in `SHOT_COLUMNS`' columns, for the end screen: fifteen of them
+ * have to fit on it at once, so what each shot needed stays in `describeShot`.
+ */
+export function shotRow(r: ShotReport, result: string, n: number): string {
+  const num = String(n).padStart(2);
+  const struck = result.replace(/^missed, /, '').padEnd(16);
+  const sway = r.errors.sway.toFixed(2).padStart(7);
+  if (!r.target) return `${num}  ${'no guard near'.padEnd(13)} ${struck}${'–'.padStart(7).repeat(3)}${sway}`;
+  const who = `${r.target.range.toFixed(0)} m ${r.target.walking ? 'walker' : 'guard'}`.padEnd(13);
+  const column = (x: number): string => `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(2)}`.padStart(7);
+  return `${num}  ${who} ${struck}${column(r.errors.range)}${column(r.errors.lead)}${column(r.errors.wind)}${sway}`;
+}
+
 const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
 const shape = emptyShape();
 
@@ -161,7 +178,9 @@ export function describeShot(r: ShotReport, result: string, hit: boolean): strin
   const who = `${r.target.range.toFixed(0)} m ${r.target.walking ? 'walker' : 'guard'} (post ${r.target.post})`;
   const needed = `needed drop ${r.needed.drop.toFixed(2)}, lead ${signed(r.needed.lead)}, wind ${signed(r.needed.wind)} mil`;
   if (hit) return `${who} · ${result} · ${needed} · sway ${r.errors.sway.toFixed(2)}`;
-  const metres = Math.abs(r.errors.range) >= 0.1 ? ` (as if ${Math.round(r.target.range + r.errors.rangeM)} m)` : '';
+  // Under about 25 m the drop barely changes with range, so a hold can't imply one.
+  const asIf = r.target.range + r.errors.rangeM;
+  const metres = Math.abs(r.errors.range) < 0.1 ? '' : asIf >= 25 ? ` (as if ${Math.round(asIf)} m)` : ' (as if point-blank)';
   const skip = r.skipped === 'none' ? '' : ` · ${r.skipped === 'both' ? 'lead and wind' : r.skipped} left out`;
   return `${who} · ${result} · off ${signed(r.miss.up)} up ${signed(r.miss.right)} right: range ${signed(r.errors.range)}${metres} · lead ${signed(r.errors.lead)} · wind ${signed(r.errors.wind)} · sway ${r.errors.sway.toFixed(2)} mil${skip} · ${needed}`;
 }
