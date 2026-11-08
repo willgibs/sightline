@@ -86,8 +86,9 @@ It works on a branch named for the lab: `lab-a-perception`, `lab-b-shooting`, `l
 
 Several branches change the same goldens, versions and registries at once. W0.7 made most of these rules mechanical.
 
-- **One merge at a time,** from a branch that is up to date with `main` and green there. Two pull requests that are each green on their own can still leave `main`'s golden values wrong. Land with `npm run land -- <number>`, which refuses a branch behind `main` or not green, and CI's "Up to date with main" check fails a branch that is behind. The repository's plan allows neither a merge queue nor a branch rule (they need an organization, or GitHub Pro, or a public repository), so these are the rule.
-- **Goldens are regenerated after a rebase, never merged by hand.** That means:
+- **One merge at a time,** from a branch that is up to date with `main` and green there. Two pull requests that are each green on their own can still leave `main`'s golden values wrong. Land with `npm run land -- <number>`, which refuses a branch behind `main` or not green, and CI's "Up to date with main" check fails a branch that is behind. A merge queue needs an organization, and no branch rule is set (one became possible when the repository went public on Nov 8, and it is the owner's call), so these are the rule.
+- **A branch takes `main` by merging it, never by rebasing.** Merge `origin/main` in, or use GitHub's *Update branch*. The app refuses a session's force push of a rebased branch (lab A, Nov 8), and the landing check asks only that `main` be an ancestor of the branch's head.
+- **Goldens are regenerated after `main` comes in, never merged by hand.** Where one conflicts, take either side and regenerate. That means:
   - `GOLDEN` in `src/sim/game/golden.ts`, which pins every lane's runs;
   - `GOLDEN_TAL_4471` in `tests/world.test.ts`;
   - each lane's work and metrics (`npm run bench -- --write`);
@@ -98,7 +99,7 @@ Several branches change the same goldens, versions and registries at once. W0.7 
   - Version numbers are taken at merge time: the next free one.
   - That covers `SIM_VERSION`, `GEN_VERSION`, `STATE_SCHEMA` and `RECORDING_VERSION`.
   - There are no version numbers per lane: in a bit-exact simulation, every observable bit is part of the contract.
-- **Changes that move every golden land alone and announced:** W0.3, D1, D9, C2 and A13. The other branches rebase onto each before their next merge. W0.2 moves files but must move no golden at all.
+- **Changes that move every golden land alone and announced:** W0.3, D1, D9, C2 and A13. The other branches merge each in before their next merge. W0.2 moves files but must move no golden at all.
 - **The valley's behaviour moves only in announced commits.** Until then, a lab keeps its work in one of these:
   - its scene (`scene.systems`);
   - input the bots never give;
@@ -334,7 +335,7 @@ The kernel boundary goes first, so everything after it lands in its final place.
 - **Grid search** (`kernel/world/search.ts`): costs are whole centimetres, budgets are expansions, and one `GridSearch` per layer can be kept for the world's life.
 - **Codes:** take event and command codes from your range (`kernel/codes.ts`: A 10–29, B 30–49, D 70–89) and name it in the entry's `range`.
 - **Your bench** (`game/benches.ts`): pin your lab's scene in `game/runs.ts` and `game/golden.ts`, add your metrics, and pin them with `npm run bench -- --write`. That is how your exit note's bench numbers stay true after you.
-- **Landing:** rebase onto `main`, regenerate (the values in `game/golden.ts`, `npm run golden`, `npm run bench -- --write`, and `GOLDEN_TAL_4471` for generation), read `npm run explain`, then `npm run land -- <number>`. The repository's plan has no branch rule, so nothing but this stops a merge from a stale branch.
+- **Landing:** merge `main` in (never rebase: see Landing on `main`), regenerate (the values in `game/golden.ts`, `npm run golden`, `npm run bench -- --write`, and `GOLDEN_TAL_4471` for generation), read `npm run explain`, then `npm run land -- <number>`. No branch rule is set, so nothing but this stops a merge from a stale branch.
 - **Recordings carry their build's behaviour digest** (format 10): one made on your preview deploy is refused by `main` with a reason, by design. `npm run bisect -- --recording <file>` shows where your build and the one that made it part ways.
 
 ### A · Perception and awareness
