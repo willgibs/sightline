@@ -71,7 +71,10 @@ function bodyAt(dx: number, dz: number, fellAt = 0): (ctx: TickContext) => void 
 
 describe('a body', () => {
   it('in plain view is spotted once, with an event, and raises him to searching', () => {
-    const r = run(setup(bodyAt(0, -20), ['spotted'], ['entities']), 6);
+    const sim = setup(bodyAt(0, -20), ['spotted'], ['entities']);
+    // The debug view's overlay runs too (rule 8).
+    sim.drawDebug = true;
+    const r = run(sim, 6);
     const spotted = r.events.filter((e) => e.type === 'spotted');
     expect(spotted).toHaveLength(1);
     expect(spotted[0]).toMatchObject({ what: 'body' });

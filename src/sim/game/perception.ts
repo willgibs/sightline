@@ -362,6 +362,18 @@ export const perceptionSpotting: System = {
       }
       s.flashed = flashing;
     }
+    // What's been caught sight of, drawn for the debug view: each guard to the bodies he has seen, and to a lens flashing at him.
+    ctx.debug((draw) => {
+      for (const r of remains) draw.label(r.remains.x, r.remains.y + 0.7, r.remains.z, 'body', 'warn');
+      for (const g of ctx.index.of('guard')) {
+        const s = g.senses;
+        if (!s) continue;
+        const b = g.body;
+        const y = b.y + b.eyeHeight;
+        for (const r of remains) if (s.bodies.includes(r.id)) draw.line(b.x, y, b.z, r.remains.x, r.remains.y + 0.3, r.remains.z, 'warn');
+        if (s.flashed && armed) draw.line(b.x, y, b.z, armed.body.x, armed.body.y + armed.body.eyeHeight, armed.body.z, 'bad');
+      }
+    });
   },
 };
 
