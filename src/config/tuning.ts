@@ -281,6 +281,15 @@ export const defaultTuning = {
     cooldown: { investigate: 2.5, search: 2 },
     search: { points: 3, radius: 7, growth: 0.35 },
     taskWeight: 0.9, // how strongly he weighs an order against what his own senses tell him
+    // Counter-sniper (E8): triangulating shots from bearings (triangulate.ts) and hunting the shooter.
+    sniper: {
+      fusion: { half: 720, cells: 120, rangeMin: 80, rangeMax: 650 }, // the commander's grid around the camp, metres, and its ring of plausible perches
+      window: 90, // seconds of bearings it fuses
+      maxBearings: 16, // bearings it keeps
+      minSigmaDeg: 3, // nobody's ear is sharper than this
+      maxSigmaDeg: 25, // a bearing worse than this is said to be no bearing at all
+      sweepSeconds: 8, // how long a marksman sweeps a believed perch
+    },
     // Minimal combat (E10): guards engage, take cover and call support; the player can be hit and die.
     combat: {
       range: { sentry: 90, patrol: 90, marksman: 320, 'radio-operator': 60, officer: 80, worker: 0, target: 0 }, // metres he will shoot at what he sees

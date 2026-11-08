@@ -315,7 +315,7 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   // Worth calling in: something to report, a radio in his hands, and he hasn't just called it in.
   const task = b.task;
   const order =
-    task && !elevated && (m.tick - task.issued) / hz < m.tuning.brain.camp.keepOrder ? (task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
+    task && (!elevated || task.kind === 'sweep') && (m.tick - task.issued) / hz < m.tuning.brain.camp.keepOrder ? (task.kind === 'sweep' ? 1 : task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
   // Worth calling in: something he sensed himself (what he was only told is already on the
   // net), a radio in his hands, and he hasn't just called it in.
   // (Once he's on his way, he finishes: a percept lapsing doesn't call him back mid-walk.)
@@ -440,6 +440,20 @@ function stand(m: GuardMind, out: Order, scan: boolean): void {
   writeOrder(m, out, 0, 0, 'idle', yaw, head);
 }
 
+/** Stands where he is and faces a place: the sweep of a far marksman. */
+function standToward(m: GuardMind, out: Order, tx: number, tz: number, scan: boolean): void {
+  const A = m.tuning.perception.awareness;
+  const dt = 1 / m.tuning.sim.tickHz;
+  const self = m.self;
+  const dx = tx - self.x;
+  const dz = tz - self.z;
+  const toward = dx * dx + dz * dz > 1e-6 ? yawFromDirection(dx, dz) : self.yaw;
+  const yaw = turnTowards(self.yaw, toward, A.turnRate * dt);
+  let head = 0;
+  if (scan) head = (20 * Math.PI / 180) * dsin((2 * Math.PI * (m.tick / m.tuning.sim.tickHz)) / A.scanPeriod);
+  writeOrder(m, out, 0, 0, 'idle', yaw, head);
+}
+
 /** Stands where he is and looks around, while he lingers at a spot. */
 function lookAround(m: GuardMind, out: Order): void {
   stand(m, out, true);
@@ -561,6 +575,17 @@ function performTask(m: GuardMind, out: Order): void {
   }
   b.x = task.x;
   b.z = task.z;
+  // A sweep (a marksman on his tower): he stays and looks over the place, then calls it.
+  if (task.kind === 'sweep') {
+    standToward(m, out, task.x, task.z, true);
+    if (b.until < 0) b.until = m.tick + Math.round(T.sniper.sweepSeconds * hz);
+    if (m.tick >= b.until) {
+      b.until = -1;
+      b.task = null;
+      b.done = true;
+    }
+    return;
+  }
   const w = walk(m, out, task.x, task.z, task.kind === 'search' ? T.paces.search : T.paces.investigate, 'walk', task.x, task.z);
   if (w === 'arrived') {
     b.linger = m.tick + Math.round(T.linger.search * hz);

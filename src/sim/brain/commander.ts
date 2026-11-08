@@ -3,6 +3,7 @@ import type { World } from '../kernel/world/world';
 import { routinePose } from '../generation';
 import { ALERT_LEVELS, alertRung, type AlertLevel, type CampState, type RosterEntry, type Task, type TaskKind } from './camp';
 import { clearSeen, hottestCell, injectBelief, mapMass, mapSpread, spreadBelief } from './searchMap';
+import { fuseBearings, emptyEstimate } from './triangulate';
 import type { Report } from './reports';
 
 /**
@@ -60,6 +61,7 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   injectBelief(camp.map, r.x, r.z, Math.max(r.radius, M.injectRadius), 1);
   camp.lastPercept = tick;
   camp.lastCause = r.cause;
+  if (r.kind === 'shot') noteShot(camp, r, tick, tuning);
   // A post gone quiet is a job for someone: walk over and see (E6).
   if (r.kind === 'missing') {
     const t = addTask(camp, 'check', r.x, r.z, 2, 1, tick);
@@ -76,6 +78,31 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
     camp.search.x = r.x;
     camp.search.z = r.z;
     camp.search.radius = Math.max(r.radius, M.injectRadius);
+  }
+}
+
+/**
+ * A report of a shot adds a bearing to what the camp fuses (E8): the direction the
+ * reporter heard it from, with an error that grows the less sure he is of it (the
+ * uncertainty of his guess, seen from where he stood, clamped to plausible ears).
+ */
+function noteShot(camp: CampState, r: Report, tick: number, tuning: Tuning): void {
+  const S = tuning.brain.sniper;
+  const dx = r.x - r.fromX;
+  const dz = r.z - r.fromZ;
+  const d = Math.sqrt(dx * dx + dz * dz);
+  if (d < 1) return; // he heard it on top of himself: no bearing to speak of
+  const sigma = Math.min((S.maxSigmaDeg * Math.PI) / 180, Math.max((S.minSigmaDeg * Math.PI) / 180, r.radius / (2 * d)));
+  const shots = camp.shots;
+  shots.bearings.push({ x: r.fromX, z: r.fromZ, ux: dx / d, uz: dz / d, sigma, tick });
+  // Keep the newest, within its window.
+  const horizon = tick - Math.round(S.window * tuning.sim.tickHz);
+  shots.bearings = shots.bearings.filter((b) => b.tick >= horizon);
+  if (shots.bearings.length > S.maxBearings) shots.bearings.splice(0, shots.bearings.length - S.maxBearings);
+  const est = shots.estimate ?? emptyEstimate();
+  if (fuseBearings(shots.bearings, { x: camp.map.x0 + (camp.map.n * camp.map.cell) / 2, z: camp.map.z0 + (camp.map.n * camp.map.cell) / 2, half: S.fusion.half, cells: S.fusion.cells, rangeMin: S.fusion.rangeMin, rangeMax: S.fusion.rangeMax }, est)) {
+    shots.estimate = est;
+    shots.tick = tick;
   }
 }
 
@@ -112,17 +139,23 @@ export function plan(m: CampMind, out: CampOrder[]): void {
   }
   // Orders in force lapse when nothing renews them.
   camp.tasks = camp.tasks.filter((t) => (m.tick - t.issued) / hz < m.tuning.brain.camp.keepOrder);
-  if (camp.level === 'calm' || !camp.search) return;
+  // Shots sweep and search whether or not a search is under way; a search needs the level.
+  if (camp.level === 'calm') return;
   const slots = camp.level === 'uneasy' ? T.slots.uneasy : camp.level === 'alert' ? T.slots.alert : T.slots.lockdown;
   // Investigate where the last report said.
-  if (slots.investigate > 0 && camp.tasks.filter((t) => t.kind === 'investigate').length === 0 && camp.level === 'uneasy') {
+  if (camp.search && slots.investigate > 0 && camp.tasks.filter((t) => t.kind === 'investigate').length === 0 && camp.level === 'uneasy') {
     addTask(camp, 'investigate', camp.search.x, camp.search.z, 2, slots.investigate, m.tick);
+  }
+  // A shooter the camp has fixed: the marksmen sweep where it believes he is (E8).
+  const shot = camp.shots.estimate;
+  if (shot && m.tick - camp.shots.tick < T.keepOrder * m.tuning.sim.tickHz && camp.tasks.filter((t) => t.kind === 'sweep').length === 0) {
+    addTask(camp, 'sweep', shot.x, shot.z, 3, m.world.camp.guards.filter((g) => g.role === 'marksman').length, m.tick);
   }
   // Search teams at the hottest cells on the map, spaced apart.
   const taken: number[] = [];
   for (const t of camp.tasks) taken.push(t.x, t.z);
   let searches = camp.tasks.filter((t) => t.kind === 'search').length;
-  while (searches < slots.search) {
+  while (camp.search && searches < slots.search) {
     const spot = hottestCell(camp.map, taken, T.search.avoid);
     if (!spot) break;
     addTask(camp, 'search', spot.x, spot.z, 1, 1, m.tick);
@@ -172,9 +205,9 @@ function assign(m: CampMind, out: CampOrder[]): void {
       for (const g of camp.roster) {
         if (busy.has(g.id) || g.status !== 'ok') continue;
         const post = m.world.camp.guards[g.post]!;
-        if (post.elevated) continue;
+        if (post.elevated && t.kind !== 'sweep') continue;
         const role = roles[post.role];
-        const suit = t.kind === 'search' ? role.search : role.investigate;
+        const suit = t.kind === 'sweep' ? (post.role === 'marksman' ? 1 : 0) : t.kind === 'search' ? role.search : role.investigate;
         if (suit <= 0) continue;
         const pos = whereIs(m, g);
         const dx = pos.x - t.x;

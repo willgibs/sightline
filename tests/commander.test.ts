@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { digest, injectBelief, plan, type CampMind, type CampOrder, type CampState, type Report } from '../src/sim/brain';
+import { digest, inEllipse, injectBelief, plan, type CampMind, type CampOrder, type CampState, type Report } from '../src/sim/brain';
 import { giveBrains } from '../src/sim/game/brains';
 import { campCheckins, campCommander, commanderOf, commsVoice, giveCommander } from '../src/sim/game/comms';
 import { PERCEPTION, giveSenses } from '../src/sim/game/perception';
@@ -12,7 +12,8 @@ import { Hasher } from '../src/sim/kernel/core/hash';
 import type { SimEvent } from '../src/sim/kernel/events';
 import { withSystem, type System } from '../src/sim/kernel/systems';
 import type { World } from '../src/sim/kernel/world/world';
-import { campWorld } from '../src/sim/game/scenes/campBrain';
+import { campHeight, campWorld } from '../src/sim/game/scenes/campBrain';
+import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testGuard, testWorld } from './fixtures';
 
 /**
@@ -335,5 +336,71 @@ describe('radio check-ins', () => {
     const world = worldWith(guards(G(0, 0), G(10, 0), G(-10, 0, 'radio-operator')));
     const { events } = checkins(world, 20, undefined, true);
     expect(events.some((e) => e.type === 'checkin')).toBe(false);
+  });
+});
+
+describe('counter-sniper (E8)', () => {
+  // A shot from the ridge, 300 m out: a report, heard by the camp.
+  const PERCH = { x: 295, z: -118 };
+  function reportAt(tick: number): System {
+    return {
+      name: 'test-shot',
+      phase: 'commands',
+      after: ['player-commands', 'rifle'],
+      reads: [],
+      writes: [],
+      emits: ['report'],
+      run(ctx) {
+        if (ctx.tick !== tick) return;
+        ctx.emit({ type: 'report', source: 1, x: PERCH.x, y: campHeight(PERCH.x, PERCH.z) + 1.6, z: PERCH.z, surface: Surface.Grass, loudness: 2400 / ctx.tuning.noise.radiusPerUnit, radius: 2400, suppressed: 0 });
+      },
+    };
+  }
+
+  it('turns reports of a shot into bearings the commander fuses, and a marksman sweeps there', () => {
+    const world = campWorld(T);
+    let systems = SYSTEMS;
+    for (const s of [...PERCEPTION, commsVoice, campCommander, campCheckins, reportAt(30)]) systems = withSystem(systems, s);
+    const sim = new Simulation(world, T, systems);
+    placePlayer(sim, 372, 372);
+    giveSenses(sim);
+    giveBrains(sim);
+    giveCommander(sim);
+    const raw = neutralInput();
+    const events: SimEvent[] = [];
+    for (let i = 0; i < 12 * 30; i++) for (const e of sim.step(raw)) events.push({ ...e });
+    // Guards heard it, the camp came up and it has an estimate.
+    expect(events.some((e) => e.type === 'heard' && e.kind === 'shot')).toBe(true);
+    const camp = commanderOf(sim)!.camp;
+    expect(camp.shots.bearings.length).toBeGreaterThan(0);
+    expect(camp.shots.estimate).not.toBeNull();
+    const est = camp.shots.estimate!;
+    // The estimate is honest about where the shot came from: inside its two-sigma ellipse, the shooter.
+    expect(inEllipse(est, PERCH.x, PERCH.z, 2)).toBe(true);
+    // And the marksman turns to sweep it.
+    const orders = events.filter((e): e is Extract<SimEvent, { type: 'order' }> => e.type === 'order' && e.task === 'sweep');
+    expect(orders.length).toBeGreaterThan(0);
+    expect(world.camp.guards[sim.guards.find((g) => g.id === orders[0]!.to)!.guard.spawn]!.role).toBe('marksman');
+    expect(sim.guards.some((g) => world.camp.guards[g.guard.spawn]!.role === 'marksman' && g.brain!.act === 'task')).toBe(true);
+    expect(camp.level).toBe('alert');
+  });
+
+  it('visibly reacts to a shot from 300 m inside the window', () => {
+    const world = campWorld(T);
+    let systems = SYSTEMS;
+    for (const s of [...PERCEPTION, commsVoice, campCommander, campCheckins, reportAt(30)]) systems = withSystem(systems, s);
+    const sim = new Simulation(world, T, systems);
+    placePlayer(sim, 372, 372);
+    giveSenses(sim);
+    giveBrains(sim);
+    giveCommander(sim);
+    const raw = neutralInput();
+    let first = -1;
+    for (let i = 0; i < 6 * 30 && first < 0; i++) {
+      for (const e of sim.step(raw)) if (e.type === 'act' && e.tick >= 30 && e.to !== 'routine') first = e.t - 30 / 30;
+    }
+    // Sound takes 0.9 s from 300 m; his reaction is telegraphed from then.
+    expect(first).toBeGreaterThan(0);
+    expect(first).toBeLessThanOrEqual(2);
   });
 });

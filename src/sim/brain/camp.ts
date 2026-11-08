@@ -1,6 +1,7 @@
 import type { Tuning } from '../../config/tuning';
 import type { Report } from './reports';
 import { createSearchMap, type SearchMap } from './searchMap';
+import type { Bearing, ShotEstimate } from './triangulate';
 
 /**
  * The camp's memory and its nervous system (E4, E5): one plain record, the commander's,
@@ -41,7 +42,7 @@ export interface Task {
   issued: number;
 }
 
-export type TaskKind = 'investigate' | 'search' | 'check';
+export type TaskKind = 'investigate' | 'search' | 'check' | 'sweep';
 
 /** A search under way: the camp's last known position of the intruder, and how it's going. */
 export interface SearchState {
@@ -53,6 +54,8 @@ export interface SearchState {
 }
 
 export interface CampState {
+  /** A shooter the camp has triangulated (E8): the bearings it fuses, and its estimate. */
+  shots: { bearings: Array<Bearing & { tick: number }>; estimate: ShotEstimate | null; tick: number };
   /** The camp's alert level, since when, and the floor it settles back to. */
   level: AlertLevel;
   since: number;
@@ -87,6 +90,7 @@ export interface CampState {
 export function createCamp(campX: number, campZ: number, tuning: Tuning): CampState {
   const M = tuning.brain.searchMap;
   return {
+    shots: { bearings: [], estimate: null, tick: -1 },
     level: 'calm',
     since: 0,
     floor: 'calm',

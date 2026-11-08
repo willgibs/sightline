@@ -193,7 +193,7 @@ export type HeardKind = 'sound' | 'shot' | 'voice';
 /** What a guard can be doing, and why he changed (brain/brain.ts, ACTS and ACT_WHYS). Stored by index: only add at the end. */
 export type ActCode = 'routine' | 'return' | 'look' | 'investigate' | 'search' | 'hold' | 'report' | 'task' | 'engage' | 'cover';
 export type ReportCode = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear' | 'claim';
-export type TaskCode = 'investigate' | 'search' | 'check';
+export type TaskCode = 'investigate' | 'search' | 'check' | 'sweep';
 export type LevelCode = 'calm' | 'uneasy' | 'alert' | 'lockdown';
 export type ActReason = 'start' | 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm' | 'arrived' | 'nothing' | 'stalled' | 'no-route' | 'lost' | 'told' | 'report' | 'ordered';
 
@@ -455,7 +455,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   clatter: { code: 36, range: 'ballistics', sound: true, fields: { ...SOUND, thrown: 'u32', speed: 'f32' } },
   call: { code: 91, range: 'brain', sound: true, fields: { ...SOUND, radio: 'u8' } },
   radio: { code: 92, range: 'brain', sound: false, fields: { kind: { enum: REPORT_CODES }, x: 'f32', z: 'f32', radius: 'f32' } },
-  order: { code: 93, range: 'brain', sound: false, fields: { to: 'u32', task: { enum: ['investigate', 'search', 'check'] }, x: 'f32', z: 'f32' } },
+  order: { code: 93, range: 'brain', sound: false, fields: { to: 'u32', task: { enum: ['investigate', 'search', 'check', 'sweep'] }, x: 'f32', z: 'f32' } },
   hurt: { code: 96, range: 'brain', sound: false, fields: { part: { enum: ['head', 'torso', 'legs'] }, hits: 'u8' } },
   checkin: { code: 95, range: 'brain', sound: false, fields: { post: 'i32', stage: { enum: ['call', 'answer', 'silence'] } } },
   level: { code: 94, range: 'brain', sound: false, fields: { from: { enum: LEVELS }, to: { enum: LEVELS } } },
