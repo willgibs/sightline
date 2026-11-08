@@ -29,12 +29,14 @@ export const GOLDEN = {
   /**
    * Scenes run by their own drivers, each pinning its lane (benches.ts): the movement
    * course covers stairs, drops, ramps, ceilings, crawling and surfaces; the perception
-   * lab, guards seeing and hearing a walker who ends in a bush; spawn timing,
+   * lab, guards seeing and hearing a walker who ends in a bush; the shooting range, a
+   * marksman's shots from the click to the body on the ground; spawn timing,
    * bodies spawned inside a tick; the kernel alone, a run with every lane switched off.
    */
   scenes: {
     'movement-course': { behaviour: '40c97133a0ef732d', state: '4556f9f1def66abd' },
     'perception-lab': { behaviour: '0dfa42645814f21a', state: 'f160e8081ebf14e8' },
+    'shooting-range': { behaviour: 'b1e8920883443ac0', state: '70e15aeda49a860d' },
     'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '96e403c64cb50cb9' },
     'kernel-alone': { behaviour: '0698e581024f5b35', state: '7797e5bc3b7451dc' },
   },

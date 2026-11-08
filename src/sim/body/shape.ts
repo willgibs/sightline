@@ -3,7 +3,7 @@ import { dcos, dsin } from '../kernel/core/detmath';
 import type { Entity } from '../kernel/state';
 import type { QueryBody } from '../kernel/world/query';
 import { emptyShape, type BodyShape, type Capsule, type Sphere } from '../kernel/world/shape';
-import { hasBody, type BodySpec, type BodyState } from './body';
+import { hasBody, poseAt, type BodySpec, type BodyState, type PoseSample } from './body';
 
 /**
  * A body's shape, for everything that asks what can be seen or hit (kernel/world/shape.ts):
@@ -64,7 +64,7 @@ function applyLean(b: ShapePose, out: BodyShape): void {
   const t = out.torso;
   const spine = out.head.y - t.ay;
   const share = spine > 1e-6 ? (t.by - t.ay) / spine : 0;
-  const drop = spine > Math.abs(b.lean) ? spine - Math.sqrt(spine * spine - b.lean * b.lean) : 0;
+  const drop = leanDrop(spine, b.lean);
   out.head.x += rx * b.lean;
   out.head.z += rz * b.lean;
   out.head.y -= drop;
@@ -73,16 +73,31 @@ function applyLean(b: ShapePose, out: BodyShape): void {
   t.by -= drop * share;
 }
 
-/** Where a body's eye is: the centre of its head. */
-export function eyeOf(b: ShapePose, spec: BodySpec, out: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
-  const s = bodyShape(b, spec, scratch);
-  out.x = s.head.x;
-  out.y = s.head.y;
-  out.z = s.head.z;
-  return out;
+/** How far down the arc a spine of this length takes the head, leaned this far. */
+function leanDrop(spine: number, lean: number): number {
+  return spine > Math.abs(lean) ? spine - Math.sqrt(spine * spine - lean * lean) : 0;
 }
 
-const scratch = emptyShape();
+/**
+ * Where a body's eye is: where its head is, as far as a lean has put it aside and down the
+ * arc. The camera, a shot and anything an eye sees from use this, so what you can see
+ * around a corner is what can see you.
+ */
+export function eyeOf(b: ShapePose, spec: BodySpec, out: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+  const lean = b.lean;
+  if (!lean) {
+    out.x = b.x;
+    out.y = b.y + b.eyeHeight;
+    out.z = b.z;
+    return out;
+  }
+  const upright = b.eyeHeight >= spec.eyeHeight.crouch;
+  const drop = upright ? leanDrop(b.eyeHeight - hipHeight(b.eyeHeight, spec), lean) : 0;
+  out.x = b.x + dcos(b.yaw) * lean;
+  out.y = b.y + b.eyeHeight - drop;
+  out.z = b.z - dsin(b.yaw) * lean;
+  return out;
+}
 
 function uprightShape(x: number, y: number, z: number, eye: number, hip: number, B: Parts, out: BodyShape): BodyShape {
   const shoulders = Math.max(hip, eye - B.neck);
@@ -142,6 +157,16 @@ function mixCapsule(a: Capsule, b: Capsule, t: number, out: Capsule): void {
     a.bz + (b.bz - a.bz) * t,
     a.r + (b.r - a.r) * t,
   );
+}
+
+const posed: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0, lean: 0 };
+
+/**
+ * A body's shape `lag` ticks before now (0 to 2), between its samples (body.ts, poseAt):
+ * where a shot resolved against what the player saw finds it.
+ */
+export function bodyShapeAt(b: BodyState, spec: BodySpec, lag: number, out: BodyShape): BodyShape {
+  return bodyShape(poseAt(b, lag, posed), spec, out);
 }
 
 /** Every body's shape as it stands now, in entity order, for queries (kernel/world/query.ts). Reuses `out` and its shapes. */

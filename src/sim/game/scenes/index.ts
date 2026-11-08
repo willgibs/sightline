@@ -4,6 +4,7 @@ import { movementCourse } from './movementCourse';
 import { movementLab } from './movementLab';
 import { perceptionLab } from './perceptionLab';
 import { SIGHT_TABLE, sightScenario } from './sightScenario';
+import { shootingRange } from './shootingRange';
 import { spawnTick } from './spawnTick';
 
 /** A scene of Sightline (kernel/scene.ts): its game is SIGHTLINE, and its runs are the game's simulations. */
@@ -20,6 +21,7 @@ export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   'perception-lab': perceptionLab,
   sight: sightScenario,
   'spawn-tick': spawnTick,
+  'shooting-range': shootingRange,
 };
 
 /** The scene a recording was made in, with its parameters, if this build has it. */

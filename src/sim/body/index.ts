@@ -26,6 +26,7 @@ export { idleIntent, stepMotor, type Cylinder, type MotorContext, type MoveInten
 export { canMantle, mantleAt } from './mantle';
 export { requestStance } from './stance';
 export { intentFor, intents, motorSystem } from './system';
-export { bodyShape, eyeOf, hipHeight, queryBodies, type ShapePose } from './shape';
+export { bodyShape, bodyShapeAt, eyeOf, hipHeight, queryBodies, type ShapePose } from './shape';
 export { bobDepth, headBob, stridePhase, type BobDepths } from './bob';
 export { InvariantWatch, OVERLAP_TOLERANCE, STEEP_TOLERANCE, type InvariantReport } from './invariants';
+export { breathRate, calmVitals, holding, holdLength, startle, stepVitals, type VitalsState } from './vitals';

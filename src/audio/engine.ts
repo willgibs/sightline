@@ -2,10 +2,12 @@ import type { Tuning } from '../config/tuning';
 import type { SimEvent } from '../sim/kernel/events';
 import { PLAYER_ID } from '../sim/game/entities';
 import { audibility, travelTime } from '../sim/kernel/sound';
-import { surfaceName } from '../sim/kernel/world/surfaces';
 import type { AmbientSource } from '../sim/generation';
 import { emptyRoute, type RouteFn, type SteadyFn } from './hearing';
 import { footstep, humLoop, makeNoiseBuffers, makeRand, rustle, waterLoop, windBed, type Loop, type NoiseBuffers, type Rand } from './voices';
+import { bolt, clatter, crack, cry, impact, report } from './shotVoices';
+import { crackAt, type Crack, type Flight } from '../sim/ballistics';
+import { Surface, surfaceName } from '../sim/kernel/world/surfaces';
 
 /**
  * The sound engine: plays what the simulation reports, the way the simulation says it
@@ -126,6 +128,9 @@ export class SoundEngine {
   private sources: AmbientSource[] = [];
   private readonly ambient = new Map<AmbientSource, { loop: Loop; panner: PannerNode; filter: BiquadFilterNode; distance: number; muffled: boolean }>();
   private ambientTimer = 0;
+  /** Scratch for a shot's path and its crack. */
+  private readonly flight: Flight = { x: 0, y: 0, z: 0, dx: 0, dy: 0, dz: -1, t: 0, v0: 0, k: 0, g: 0, wx: 0, wz: 0 };
+  private readonly crackOut: Crack = { t: 0, emitted: 0, x: 0, y: 0, z: 0, distance: 0 };
   private volume = 1;
   private ducked = false;
 
@@ -253,6 +258,48 @@ export class SoundEngine {
           this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) =>
             footstep(this.ctx, out, this.noise, this.rand, when, surfaceName(e.surface), gait, amp), lead,
           );
+        }
+      } else if (e.type === 'report') {
+        // A shot's blast: at your own ears, loud (the suppressor makes it a cough); anyone else's, placed and late.
+        const suppressed = e.suppressed === 1;
+        if (own) {
+          const amp = suppressed ? 0.3 : 0.9;
+          this.voice(amp, lead, (when) => report(this.ctx, this.body, this.noise, this.rand, when, amp, suppressed));
+        } else {
+          this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => report(this.ctx, out, this.noise, this.rand, when, amp, suppressed), lead);
+        }
+      } else if (e.type === 'shot' && e.speed > 0) {
+        // The crack: from where the bullet's shock cone leaves its path toward the listener,
+        // when it gets there (sim/ballistics/crack.ts). Behind the muzzle there is none.
+        const f = this.flight;
+        f.x = e.x;
+        f.y = e.y;
+        f.z = e.z;
+        f.dx = e.dx;
+        f.dy = e.dy;
+        f.dz = e.dz;
+        f.t = e.t;
+        f.v0 = e.speed;
+        f.k = e.drag;
+        f.g = this.tuning.sim.gravity;
+        f.wx = e.wx;
+        f.wz = e.wz;
+        const c = crackAt(f, e.t + this.tuning.ballistics.maxFlight, this.listenerPose, this.speedOfSound, this.crackOut);
+        if (c) this.spatial(c.x, c.y, c.z, this.tuning.ballistics.sound.crack, (out, when, amp) => crack(this.ctx, out, this.noise, this.rand, when, amp), lead + (c.emitted - e.t));
+      } else if (e.type === 'impact') {
+        // Heard where it struck, after the way back: about 1.28 s after the trigger at 300 m.
+        const kind = e.what === 'body' ? 'body' : e.surface === Surface.Metal ? 'metal' : e.surface === Surface.Water ? 'water' : 'ground';
+        this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => impact(this.ctx, out, this.noise, this.rand, when, amp, kind), lead);
+      } else if (e.type === 'clatter') {
+        this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => clatter(this.ctx, out, this.noise, this.rand, when, amp), lead);
+      } else if (e.type === 'cry') {
+        this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => cry(this.ctx, out, this.noise, this.rand, when, amp), lead);
+      } else if (e.type === 'bolt') {
+        if (own) {
+          const amp = THRESHOLD * audibility(e.radius, 0.6);
+          this.voice(amp, lead, (when) => bolt(this.ctx, this.body, this.noise, this.rand, when, amp));
+        } else {
+          this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => bolt(this.ctx, out, this.noise, this.rand, when, amp), lead);
         }
       } else if (e.type === 'stance' && own) {
         // Your own clothes, at your ears. Not a sound in the simulation (nobody else hears

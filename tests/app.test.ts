@@ -35,7 +35,9 @@ describe('the action map', () => {
   });
 
   it('names keys the way a legend shows them', () => {
-    expect(map.describe('zoom')).toBe('Right mouse or F');
+    expect(map.describe('zoom')).toBe('Right mouse');
+    expect(map.describe('binoculars')).toBe('F');
+    expect(map.describe('zeroUp')).toBe('↑ or PageUp');
     expect(keysHtml(map, ['forward', 'left', 'back', 'right'])).toBe('<kbd data-code="KeyW KeyA KeyS KeyD">W A S D</kbd>');
     expect(keysHtml(map, ['sprint'])).toBe('<kbd data-code="ShiftLeft">Shift</kbd>');
     expect(keysHtml(map, ['debugView'])).toBe('<kbd data-code="F3">F3</kbd> or <kbd data-code="Backquote">`</kbd>');
@@ -51,7 +53,10 @@ describe('settings', () => {
       volume: 0,
       invertY: false,
       rawMouse: true,
+      assists: 'lite',
     });
+    expect(cleanSettings({ assists: 'arcade' }).assists).toBe('arcade');
+    expect(cleanSettings({ assists: 'easy' }).assists).toBe('lite');
     expect(cleanSettings({ sensitivity: NaN, fov: 0 }).sensitivity).toBe(1);
   });
 });

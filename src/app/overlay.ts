@@ -1,7 +1,7 @@
 import { normalizeSeed, randomSeed } from '../sim/kernel/core/seed';
 import { labelKeys } from './keys';
 import { ActionMap, keysHtml, type Action } from './actions';
-import type { Settings } from './settings';
+import { cleanSettings, type Settings } from './settings';
 
 /**
  * The start and pause screen: the seed, how to play, and the way back in. Kept to one
@@ -47,7 +47,14 @@ export class Overlay {
       [['prone'], 'prone'],
       [['leanLeft', 'leanRight'], 'lean'],
       [['climb'], 'mantle'],
-      [['zoom'], 'zoom'],
+      [['fire'], 'fire'],
+      [['zoom'], 'scope'],
+      [['scopeToggle'], 'scope on or off'],
+      [['binoculars'], 'binoculars'],
+      [['zeroUp', 'zeroDown'], 'zero'],
+      [['suppressor'], 'suppressor'],
+      [['throw'], 'throw a stone'],
+      [['assists'], 'instruments'],
       [['debugView'], 'debug view'],
     ];
     const keys = legend.map(([actions, text]) => `<span>${keysHtml(map, actions)} ${text}</span>`).join('\n          ');
@@ -73,6 +80,7 @@ export class Overlay {
           <label>Volume <input type="range" data-set="volume" min="0" max="1" step="0.05" /> <output data-for="volume"></output></label>
           <label class="check"><input type="checkbox" data-set="invertY" /> Invert the mouse</label>
           <label class="check"><input type="checkbox" data-set="rawMouse" /> Raw mouse input (no system acceleration, where the browser offers it)</label>
+          <label>Instruments <select data-set="assists"><option value="sim">Simulation: the reticle and the range</option><option value="lite">Realistic-lite: and a dope card</option><option value="arcade">Arcade: holds read out, landing marked</option></select></label>
         </details>
         <pre class="report"></pre>
         <div class="overlay-foot">
@@ -161,6 +169,7 @@ export class Overlay {
     input('volume').value = String(s.volume);
     input('invertY').checked = s.invertY;
     input('rawMouse').checked = s.rawMouse;
+    this.settingsRoot.querySelector<HTMLSelectElement>('[data-set="assists"]')!.value = s.assists;
     this.showValues(s);
   }
 
@@ -173,6 +182,7 @@ export class Overlay {
       volume: Number(input('volume').value),
       invertY: input('invertY').checked,
       rawMouse: input('rawMouse').checked,
+      assists: cleanSettings({ assists: this.settingsRoot.querySelector<HTMLSelectElement>('[data-set="assists"]')!.value }).assists,
     };
     this.showValues(s);
     return s;
