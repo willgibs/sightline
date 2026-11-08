@@ -6,6 +6,7 @@ import { scheduleSystem, type Access, type ScheduleHandler, type System, type Ti
 import { Blocks } from '../kernel/world/colliders';
 import { emptyHit, raycast } from '../kernel/world/query';
 import { Surface } from '../kernel/world/surfaces';
+import { campPower, objectiveStatus } from './camp';
 import { player } from './entities';
 import { drawBrain } from './brains';
 import { guardFire } from './combat';
@@ -207,5 +208,7 @@ export const SYSTEMS: readonly System[] = [
   SHOOTING_SYSTEMS.bullets,
   SHOOTING_SYSTEMS.thrown,
   SHOOTING_SYSTEMS.aim,
+  campPower,
   guardBrains,
+  objectiveStatus,
 ];
