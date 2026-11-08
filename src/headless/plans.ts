@@ -162,15 +162,27 @@ function reconOf(row: Row): object {
     frame: 'All positions are metres from the camp centre: forward is toward the gate, right is to its right. Heights are above the camp pad.',
     cycleSeconds: c.cycle,
     fence: { forwardHalf: round(L.halfA), rightHalf: round(L.halfB), openings: L.openings.map((o) => ({ kind: o.kind, side: o.side, forward: round(o.a), right: round(o.b), width: o.width })) },
-    ridges: (w.features.ridges ?? []).map((rd) => ({ crest: rd.crest.points.filter((_, i) => i % 6 === 0).map((p) => ({ ...frame(p.x, p.z), height: round(w.terrain.heightAt(p.x, p.z) - c.site.height) })) })),
+    ridges: (w.features.ridges ?? []).map((rd) => ({ crest: rd.crest.points.filter((_, i) => i % 10 === 0).map((p) => ({ ...frame(p.x, p.z), height: round(w.terrain.heightAt(p.x, p.z) - c.site.height) })) })),
     buildings: L.buildings.map((b) => ({ module: b.module, centre: frame(b.x, b.z), length: round(b.length), depth: round(b.depth), height: round(b.height, 1), doors: b.doors.map((d) => frame(c.doors![d]!.x, c.doors![d]!.z)) })),
     towers: c.structures.filter((st) => st.kind === 'tower').length,
     devices: (c.devices ?? []).map((d) => ({ kind: d.kind, ...frame(d.x, d.z), height: round(d.y - c.site.height, 1) })),
     vehicles: (c.vehicles ?? []).map((v) => ({ kind: v.kind, escape: v.escape, ...frame(v.x, v.z) })),
     guards: c.guards.map((g, id) => {
-      const legs = g.routine.legs.map((leg) => (leg.kind === 'hold' ? { hold: [round(leg.t0), round(leg.t1)], at: frame(leg.x, leg.z), faces: round(leg.yawTo * (180 / Math.PI)) } : { walk: [round(leg.t0), round(leg.t1)], from: frame(leg.x0, leg.z0), to: frame(leg.x1, leg.z1) }));
+      // Consecutive walks as one path, and holds of a moment dropped: what recon would note down.
+      const legs: Array<Record<string, unknown>> = [];
+      for (const leg of g.routine.legs) {
+        const last = legs[legs.length - 1];
+        if (leg.kind === 'walk') {
+          if (last && 'walk' in last) {
+            (last.walk as number[])[1] = round(leg.t1);
+            (last.path as unknown[]).push(frame(leg.x1, leg.z1));
+          } else legs.push({ walk: [round(leg.t0), round(leg.t1)], path: [frame(leg.x0, leg.z0), frame(leg.x1, leg.z1)] });
+        } else if (leg.t1 - leg.t0 >= 3) {
+          legs.push({ hold: [round(leg.t0), round(leg.t1)], at: frame(leg.x, leg.z), faces: round(leg.yawTo * (180 / Math.PI)) });
+        }
+      }
       routinePose(g.routine, 0, pose);
-      return { id, role: g.role, onTower: g.elevated, offsetSeconds: g.routine.offset ?? 0, periodSeconds: g.routine.period, legs };
+      return { id, role: g.role, onTower: g.elevated, offsetSeconds: round(g.routine.offset ?? 0), periodSeconds: round(g.routine.period), legs };
     }),
   };
 }
