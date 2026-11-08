@@ -18,7 +18,7 @@ import { Rng } from '../kernel/core/rng';
 import { runScene } from '../kernel/scene';
 import { labWorld } from './scenes/perceptionLab';
 import { SIGHT_TABLE, sightScenario } from './scenes/sightScenario';
-import { SWAY_RUNGS, swayRadius } from './ballisticsBench';
+import { SWAY_RUNGS, decisionSensitivity, swayRadius, sweepCases, sweepWorst } from './ballisticsBench';
 
 /** A metric to four decimals: enough to see a change, and the same bits everywhere it's computed. */
 function round4(x: number): number {
@@ -117,6 +117,13 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
     about: 'Lab B: the reticle against the impact within 1 cm over the sweep, decision sensitivity at 300 m, and the sway ladder.',
     metrics() {
       const m: Record<string, number> = {};
+      m[`reticle against impact, worst of ${sweepCases().length} shots (cm)`] = round4(sweepWorst(defaultTuning) * 100);
+      const s = decisionSensitivity(defaultTuning);
+      m['300 m walker: head radius (mil)'] = round4(s.head);
+      m['300 m walker: drop skipped (mil off)'] = round4(s.drop);
+      m['300 m walker: lead skipped (mil off)'] = round4(s.lead);
+      m['300 m walker: wind skipped (mil off)'] = round4(s.wind);
+      m['300 m walker: ranged by eye, 15% out (mil off)'] = round4(s.ranging);
       for (const rung of SWAY_RUNGS) m[`sway, ${rung.name} (mil, 95th percentile)`] = round4(swayRadius(rung, defaultTuning));
       return m;
     },

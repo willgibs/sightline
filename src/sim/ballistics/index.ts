@@ -37,3 +37,4 @@ export { emptyStrike, fly, type BodiesAt, type BulletEntity, type BulletState, t
 export { ballisticOf, dialZero, freshRifle, loadOf, pushSway, swayAt, zeroOf, type RifleState, type SwaySample } from './rifle';
 export { smoothNoise, swaySample } from './sway';
 export { restAvailable } from './rest';
+export { glint } from './glint';

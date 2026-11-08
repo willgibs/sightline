@@ -3,6 +3,7 @@ import {
   ballisticOf,
   dialZero,
   emptyStrike,
+  flightAt,
   fly,
   freshRifle,
   launch,
@@ -21,7 +22,7 @@ import {
 } from '../ballistics';
 import { calmVitals, poseAt, stepVitals, type PoseSample } from '../body';
 import type { Command } from '../kernel/commands';
-import { datan2 } from '../kernel/core/detmath';
+import { datan2, dcos, dsin } from '../kernel/core/detmath';
 import { air, windAt } from '../kernel/env';
 import { Faction } from '../kernel/state';
 import type { System, TickContext } from '../kernel/systems';
@@ -248,7 +249,22 @@ const bulletsSystem: System = {
   run(ctx) {
     const now = ctx.tick / ctx.tuning.sim.tickHz;
     // Bullets in id order; striking despawns them, so go through a copy.
-    for (const bullet of [...ctx.index.of('bullet')]) flyAndStrike(ctx, bullet, now);
+    for (const bullet of [...ctx.index.of('bullet')]) {
+      // The debug view: each bullet's path so far, as the one function has it.
+      ctx.debug((draw) => {
+        const f = bullet.bullet.flight;
+        const steps = 12;
+        flightAt(f, f.t, eye);
+        for (let k = 1; k <= steps; k++) {
+          flightAt(f, f.t + ((now - f.t) * k) / steps, sight);
+          draw.line(eye.x, eye.y, eye.z, sight.x, sight.y, sight.z, 'warn');
+          eye.x = sight.x;
+          eye.y = sight.y;
+          eye.z = sight.z;
+        }
+      });
+      flyAndStrike(ctx, bullet, now);
+    }
   },
 };
 
@@ -286,6 +302,13 @@ const aimSystem: System = {
     // Settling after moving, and onto a rest.
     rifle.steady = body.speed > S.movingSpeed ? 0 : Math.min(1, rifle.steady + dt / Math.max(S.settle, 1e-6));
     const rested = restAvailable(ctx.world, ctx.solids, body, ctx.input.yaw, ctx.input.pitch, S);
+    // The debug view: where a rest is looked for, under the fore-end, green when there is one.
+    ctx.debug((draw) => {
+      const reach = body.stance === 'prone' ? S.restReach.prone : S.restReach.upright;
+      const x = body.x - dsin(ctx.input.yaw) * reach;
+      const z = body.z - dcos(ctx.input.yaw) * reach;
+      draw.point(x, body.y + body.eyeHeight - 0.15, z, 0.05, rested ? 'good' : 'muted');
+    });
     const restStep = dt / Math.max(S.restTime, 1e-6);
     rifle.rest = rested ? Math.min(1, rifle.rest + restStep) : Math.max(0, rifle.rest - restStep);
     // The sway at the tick's end, with the two before kept.

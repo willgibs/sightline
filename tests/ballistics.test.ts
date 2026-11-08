@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { defaultTuning } from '../src/config/tuning';
 import { flightAt, timeAtRange, velocityAt, vec3, type Flight, type Vec3 } from '../src/sim/ballistics/trajectory';
 import { holdBetween, landing, markDirection, solveAim, unit, zeroFor, type Ballistic } from '../src/sim/ballistics/aim';
+import { glint } from '../src/sim/ballistics/glint';
 
 /**
  * The one ballistic function (sim/ballistics/trajectory.ts) against physics it stands for:
@@ -198,5 +199,39 @@ describe('aiming', () => {
     const back = markDirection(sight, -hold.up, -hold.right, vec3());
     expect(Math.abs(back.y - 0)).toBeLessThan(1e-12);
     expect(Math.abs(back.x)).toBeLessThan(1e-12);
+  });
+});
+
+describe('lens glint', () => {
+  const G = defaultTuning.ballistics.glint;
+  const n = (x: number, y: number, z: number): Vec3 => {
+    const l = Math.hypot(x, y, z);
+    return { x: x / l, y: y / l, z: z / l };
+  };
+
+  it('flashes at whoever the scope points at when it faces the sun, and not with the sun behind', () => {
+    const sun = n(0, 0.4, -1);
+    const aim = n(0, 0.1, -1);
+    const ahead = aim;
+    expect(glint(aim, 1, sun, ahead, G)).toBeGreaterThan(0.9);
+    // Turned away from the sun, or the sun behind the shooter: nothing.
+    expect(glint(n(1, 0, 0), 1, sun, n(1, 0, 0), G)).toBe(0);
+    expect(glint(aim, 1, n(0, 0.4, 1), ahead, G)).toBe(0);
+    // Only as far as the optic is up, and never at night.
+    expect(glint(aim, 0.5, sun, ahead, G)).toBeCloseTo(glint(aim, 1, sun, ahead, G) / 2, 12);
+    expect(glint(aim, 0, sun, ahead, G)).toBe(0);
+    expect(glint(aim, 1, n(0, -0.1, -1), ahead, G)).toBe(0);
+  });
+
+  it('eases from full to nothing between its two angles', () => {
+    const sun = n(0, 0, -1);
+    let last = 1;
+    for (let deg = 0; deg <= 40; deg += 2) {
+      const r = (deg * Math.PI) / 180;
+      const g = glint(n(Math.sin(r), 0, -Math.cos(r)), 1, sun, n(0, 0, -1), G);
+      expect(g).toBeLessThanOrEqual(last + 1e-12);
+      last = g;
+    }
+    expect(last).toBe(0);
   });
 });

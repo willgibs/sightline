@@ -104,7 +104,7 @@ export class Game {
   private ranged: { range: number; at: number } | null = null;
   /** The dope card for the dialled zero, load and air, computed when they change. */
   private dope: { key: string; rows: DopeRow[] } = { key: '', rows: [] };
-  private readonly rifleNow: RifleView = { up: 0, right: 0, raise: 0, rest: 0, rounds: 0, zero: 0, bolt: 0, fitting: 0, suppressed: false, load: '', heartRate: 0, held: 0, air: 0 };
+  private readonly rifleNow: RifleView = { up: 0, right: 0, raise: 0, rest: 0, rounds: 0, zero: 0, bolt: 0, fitting: 0, suppressed: false, load: '', heartRate: 0, held: 0, air: 0, glint: 0, steady: 1 };
   private readonly overlay: Overlay;
   private readonly sound: GameSound;
   /** Every run kept as it goes: in playtests/ in development, in this browser when deployed (playtest.ts). */
@@ -1072,6 +1072,7 @@ export class Game {
       `noise ${p.loudness.toFixed(2)} → heard within ${(p.loudness * T.noise.radiusPerUnit).toFixed(1)} m`,
       `outcome ${this.sim.state.outcome.status}${this.sim.state.outcome.reason ? ` · ${this.sim.state.outcome.reason}` : ''}`,
       `seen ×${exp.toFixed(2)} = ${p.stance} ${V.stance[p.stance]} × ${p.gait === 'idle' ? 'still' : 'moving'} ${moveFactor} × ${lightName} ${light}`,
+      ...this.rifleLines(),
       `aim ${this.aimText ?? '—'}`,
       ``,
       `WORLD`,
@@ -1090,6 +1091,17 @@ export class Game {
       `PLAYTEST · ${this.capture.status}`,
     ];
     return lines.join('\n');
+  }
+
+  /** The rifle and the vitals in the debug panel (sim/ballistics, sim/body/vitals.ts). */
+  private rifleLines(): string[] {
+    const r = this.curr?.rifle;
+    if (!r) return [];
+    return [
+      `rifle ${r.load}${r.suppressed ? ' suppressed' : ''} · zero ${r.zero} m · ${r.rounds} rounds · bolt ${r.bolt.toFixed(1)} s · scope ${r.raise.toFixed(2)}`,
+      `sway ${r.up.toFixed(2)} up ${r.right.toFixed(2)} right mil · rest ${r.rest.toFixed(2)} · steady ${r.steady.toFixed(2)} · glint ${r.glint.toFixed(2)}`,
+      `heart ${r.heartRate.toFixed(0)} bpm · breath ${r.held > 0 ? `held ${r.held.toFixed(1)} s` : 'breathing'} · air ${r.air.toFixed(2)}${this.ranged ? ` · ranged ${this.ranged.range} m` : ''}`,
+    ];
   }
 
   // --- Replays. ------------------------------------------------------------------------

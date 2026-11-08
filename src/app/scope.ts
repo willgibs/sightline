@@ -140,6 +140,15 @@ export class Instruments {
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.clip();
     this.reticle(cx, cy, r, ppm);
+    // Facing the sun, the glass flares: you can see you're glinting (ballistics/glint.ts).
+    const flare = s.rifle?.glint ?? 0;
+    if (flare > 0.01) {
+      const g = ctx.createRadialGradient(cx, cy - r * 0.3, 0, cx, cy - r * 0.3, r * 1.2);
+      g.addColorStop(0, `rgba(255,244,214,${0.45 * flare})`);
+      g.addColorStop(1, 'rgba(255,244,214,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - r, cy - r, 2 * r, 2 * r);
+    }
     if (s.assists === 'arcade' && s.dot) {
       // Where a shot lands at the ranged distance: put this on the target.
       ctx.fillStyle = '#e03131';

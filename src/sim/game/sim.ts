@@ -11,7 +11,8 @@ import type { System } from '../kernel/systems';
 import type { Collider } from '../kernel/world/colliders';
 import type { World } from '../kernel/world/world';
 import { PLAYER_ID, player, type GuardEntity, type PlayerEntity, type RemainsEntity } from './entities';
-import type { Flight } from '../ballistics';
+import { glint, vec3, viewLine, type Flight } from '../ballistics';
+import { sunDirection } from '../kernel/env';
 import type { PlayerControl } from './player';
 import { writeSample } from './samples';
 import { startRun } from './setup';
@@ -86,6 +87,10 @@ export interface RifleView {
   /** Seconds the breath has been held, and how much is left to hold. */
   held: number;
   air: number;
+  /** How bright the lens glints to someone straight ahead, 0 to 1 (ballistics/glint.ts): facing the sun. */
+  glint: number;
+  /** How settled after moving, 0 to 1. */
+  steady: number;
 }
 
 /**
@@ -94,6 +99,8 @@ export interface RifleView {
  * Every run has a player, always entity 1.
  */
 export class Simulation extends KernelSimulation {
+  private readonly aimDir = vec3();
+  private readonly sun = { x: 0, y: 0, z: 0 };
   /** `systems` replaces the game's own list, for tests and scenes; recordings replay with the game's. */
   constructor(world: World, tuning: Tuning, systems: readonly System[] = SYSTEMS) {
     super(world, tuning, SIGHTLINE, systems);
@@ -199,7 +206,7 @@ export class Simulation extends KernelSimulation {
     const r = pe.rifle;
     const v = pe.vitals;
     if (r && v) {
-      const view = (s.rifle ??= { up: 0, right: 0, raise: 0, rest: 0, rounds: 0, zero: 0, bolt: 0, fitting: 0, suppressed: false, load: '', heartRate: 0, held: 0, air: 0 });
+      const view = (s.rifle ??= { up: 0, right: 0, raise: 0, rest: 0, rounds: 0, zero: 0, bolt: 0, fitting: 0, suppressed: false, load: '', heartRate: 0, held: 0, air: 0, glint: 0, steady: 1 });
       view.up = r.sway.up;
       view.right = r.sway.right;
       view.raise = r.sway.raise;
@@ -213,6 +220,10 @@ export class Simulation extends KernelSimulation {
       view.heartRate = v.heartRate;
       view.held = v.held;
       view.air = v.air;
+      view.steady = r.steady;
+      const p = pe.body;
+      const aim = viewLine(p.yaw, p.pitch, r.sway, this.aimDir);
+      view.glint = glint(aim, r.raise, sunDirection(this.world.spec.env, this.tick / this.tuning.sim.tickHz, this.sun), aim, this.tuning.ballistics.glint);
     } else {
       s.rifle = null;
     }

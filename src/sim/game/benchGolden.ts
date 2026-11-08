@@ -87,6 +87,12 @@ export const BENCH_GOLDEN: PinnedBench = {
   },
   "ballistics": {
     "metrics": {
+      "reticle against impact, worst of 160 shots (cm)": 0.1355,
+      "300 m walker: head radius (mil)": 0.3825,
+      "300 m walker: drop skipped (mil off)": 1.7859,
+      "300 m walker: lead skipped (mil off)": 1.8418,
+      "300 m walker: wind skipped (mil off)": 0.5967,
+      "300 m walker: ranged by eye, 15% out (mil off)": 0.4599,
       "sway, standing (mil, 95th percentile)": 1.6426,
       "sway, crouched (mil, 95th percentile)": 0.9856,
       "sway, prone (mil, 95th percentile)": 0.6899,

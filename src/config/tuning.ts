@@ -296,6 +296,9 @@ export const defaultTuning = {
     // The optics. Field is the true angle across the view, degrees.
     scope: { fieldDeg: 3.6 }, // a fixed 10× scope: 6.3 m across at 100 m
     binoculars: { fieldDeg: 6.5, rangeMax: 1500 }, // 8× glasses with a laser rangefinder, to the nearest metre
+    // Lens glint (design doc · Tools: binoculars glint when facing the sun): full while the
+    // lens faces within fullDeg of half way between the sun and the one who sees it, gone by zeroDeg.
+    glint: { fullDeg: 12, zeroDeg: 35 },
     // The throwable (design doc · Tools): a rock that pulls one guard's attention.
     throwable: {
       count: 3, // carried at the start
