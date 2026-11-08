@@ -122,6 +122,18 @@ Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the gener
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.
 
+### Branches take `main` by merging it (Nov 8)
+
+**Decision:**
+- A branch behind `main` brings it in by merging it (`git merge origin/main`, or GitHub's *Update branch*), never by rebasing. The plan said to rebase, but `npm run land` and CI's "Up to date with main" ask only that `main` be an ancestor of the branch's head, and a merge gives that too.
+- Goldens are still regenerated once `main` is in, never merged by hand: where one conflicts, take either side and regenerate.
+- `npm run land` reads commit statuses (Vercel's deploys, which have a context and a state) as well as check runs. It took Vercel's status for a check still running, and refused with an empty list (#2 and #3 were merged by hand because of it).
+- A ruleset on `main` became possible when the repository went public. It is the owner's call, and none is set.
+
+**Why:** the app refuses a session's force push of a rebased branch, so lab A's finished #8 could not land after #7 moved `main` (Nov 8). A merge keeps every branch's history append-only, which is what the refusal protects.
+
+**What moved:** nothing in the game. Only the landing script, CI's message and the plan's wording changed.
+
 ### A sliding body's own speed never carries it uphill (Nov 8)
 
 **Decision:** on ground too steep to stand on, the motor now removes the uphill part of a body's velocity, as it already did for the wish. `SIM_VERSION` 7.

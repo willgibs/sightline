@@ -2,16 +2,15 @@
  * Lands a pull request on main the way docs/phase-1-plan.md (Landing on main) says: one
  * at a time, from a branch that is up to date with main and green there. Two pull
  * requests that are each green on their own can still leave main's goldens wrong
- * together, so a branch behind main is refused: rebase it, regenerate its goldens
- * (`npm run golden`, `npm run bench -- --write`, and the values in golden.ts), push, and
- * land it once CI is green again.
+ * together, so a branch behind main is refused: merge main into it (a session can't
+ * force-push a rebase), regenerate its goldens (`npm run golden`, `npm run bench --
+ * --write`, and the values in golden.ts), push, and land it once CI is green again.
  *
  *   npm run land -- 12          land pull request 12
  *   npm run land -- 12 --check  say whether it could land, and change nothing
  *
- * The repository's plan has no merge queue or branch rule (they need an organization, or
- * GitHub Pro, or a public repository), so this script and CI's "Up to date with main"
- * check are the rule.
+ * A merge queue needs an organization, and no branch rule is set on main (the owner's
+ * call), so this script and CI's "Up to date with main" check are the rule.
  */
 import { execFileSync } from 'node:child_process';
 
@@ -58,7 +57,7 @@ const main = sh('git', 'rev-parse', 'origin/main');
 try {
   execFileSync('git', ['merge-base', '--is-ancestor', main, view.headRefOid]);
 } catch {
-  refuse(`${view.headRefName} is behind main (${main.slice(0, 7)}): rebase it, regenerate its goldens, push, and land it when CI is green`);
+  refuse(`${view.headRefName} is behind main (${main.slice(0, 7)}): merge main into it, regenerate its goldens, push, and land it when CI is green`);
 }
 
 const checks = view.statusCheckRollup.map((c) =>
