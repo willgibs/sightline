@@ -1,5 +1,5 @@
 import type { GenTuning } from '../../config/tuning';
-import { Hasher } from './core/hash';
+import { Hasher, hashString } from './core/hash';
 import { defaultEnv } from './env';
 import type { Game } from './game';
 import { neutralInput } from './input';
@@ -7,7 +7,7 @@ import type { Scene } from './scene';
 import { Simulation } from './sim';
 import { Faction, type SolidEntity } from './state';
 import { decide, scheduleSystem, type Access, type ScheduleHandler, type System } from './systems';
-import { GEN_VERSION } from './version';
+import { GEN_VERSION, SIM_VERSION } from './version';
 import { Blocks, ColliderSet, type BoxCollider, type ColliderInput } from './world/colliders';
 import { buildGrid } from './world/grid';
 import { Heightfield } from './world/heightfield';
@@ -36,6 +36,8 @@ export function kernelFingerprint(world: World): string {
 export function kernelGame(handlers: Readonly<Record<string, ScheduleHandler>> = {}, access?: Access): Game {
   const game: Game = {
     name: 'the kernel alone',
+    // It pins nothing of its own: its behaviour is the kernel's, by version.
+    behaviour: hashString(`the kernel alone, simulation ${SIM_VERSION}`),
     systems: [scheduleSystem(handlers, access)],
     simulation: (world, tuning, systems) => new Simulation(world, tuning, game, systems),
     start: () => {},

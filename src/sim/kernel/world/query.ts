@@ -5,6 +5,7 @@ import { Blocks, type Collider, type RayHit } from './colliders';
 import { makeTerrainSample } from './heightfield';
 import type { Solids } from './solids';
 import type { Surface } from './surfaces';
+import type { WorkCounts } from '../work';
 
 /**
  * One answer to "what does this line hit": the terrain, everything solid (the world's
@@ -49,6 +50,8 @@ export interface QueryView {
   readonly world: World;
   readonly solids: Solids;
   readonly bodies: readonly QueryBody[];
+  /** Where the rays cast through this view are counted (work.ts): a simulation's; none for a view made by hand. */
+  readonly work?: WorkCounts;
 }
 
 /** The masks bodies stand in the way of. */
@@ -82,6 +85,7 @@ export function raycast(
   out.part = null;
   out.surface = null;
   const { world, solids, bodies } = view;
+  if (view.work) view.work.rays++;
 
   const t = world.terrain.raycast(ox, oy, oz, dx, dy, dz, maxDist);
   if (t <= maxDist) {

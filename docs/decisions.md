@@ -6,6 +6,19 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.
 
+### Landing, made mechanical (W0.7)
+
+**Decision:**
+- **Goldens explain themselves.** `npm run explain` runs another build (by default `origin/main`) from a temporary git worktree, traces every pinned run in both (`npm run trace`), and for each run that moved prints the first divergent tick, whether behaviour or only state moved, and the state paths that differ there (`guard:4.body.x: 12.5 → 12.75`, `kernel/diff.ts`), then each lane's work and metrics before and after. CI's "Goldens, explained" job prints it for every pull request and push to `main`.
+- **Pinned runs and benches per lane.** The pinned runs (`game/runs.ts`) belong to lanes: the valley's plays to the game, the movement course to the body, spawn timing and the kernel alone to the kernel. Their fingerprints are `GOLDEN` (`game/golden.ts`). Each lane's bench (`game/benches.ts`) adds the work each system does in its runs and its quality metrics, pinned in `benchGolden.ts` and held by `tests/bench.test.ts`: today the body lane's broken promises and closest calls under two bots, and generation's valleys valid at their first attempt, of a held-out series. The other labs add theirs.
+- **Work counts.** The kernel counts rays cast, grid nodes expanded and bodies resolved, and attributes them to the system that did the work (`kernel/work.ts`). They are deterministic, so they are pinned like goldens; `npm run sim -- --profile` prints them beside the time.
+- **Behaviour fingerprints in recordings.** A recording's header carries its build's behaviour digest (`Game.behaviour`: one digest of every pinned behaviour value). A build that behaves differently refuses it with the reason and the build to replay it with, instead of re-simulating until it diverges.
+- **The merge rule.** The repository is private and on GitHub Free: merge queues need an organization, and branch rules and rulesets need GitHub Pro or a public repository. So the rule is CI's "Up to date with main" check on every pull request, and `npm run land -- <number>`, which merges only a branch that is up to date with `main` and green, and only at the commit that was checked. Making the check blocking is the owner's call: it needs Pro, or a public repository.
+
+**What moved:** `RECORDING_VERSION` 10, for the header's `behaviour` field, so the golden recording is rewritten. The kernel-alone scene's fingerprints join the goldens (`0698e581024f5b35`, `b51b84477d71dbf1`). No behaviour or state value moved.
+
+**Why:** five lab branches are about to move shared goldens; the plan's landing rules were right but held by hand, and a recording from a lab's preview deploy would have been accepted by `main` and then diverged.
+
 ### Codes by lane, and all seven roles (W0.6)
 
 **Decision:**

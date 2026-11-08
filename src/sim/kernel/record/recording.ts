@@ -38,9 +38,10 @@ import { readInput, writeInput } from './inputCodec';
 /**
  * 6: tagged tracks; checkpoints part by part; tuning changes and annotations recorded.
  * 7: the mission spec carries its environment. 8: a run that ended in a fault says so.
- * 9: the scene a run was played in, and worlds built by hand.
+ * 9: the scene a run was played in, and worlds built by hand. 10: the behaviour
+ * fingerprint of the build that made it.
  */
-export const RECORDING_VERSION = 9;
+export const RECORDING_VERSION = 10;
 const MAGIC = [0x53, 0x4c, 0x52, 0x43]; // SLRC
 /** Larger than a day of play. Anything bigger is not a recording. */
 export const MAX_RECORDING_BYTES = 512 * 1024 * 1024;
@@ -54,6 +55,8 @@ export interface RecordingHeader {
   simVersion: number;
   genVersion: number;
   stateSchema: number;
+  /** How the build that made it behaves (Game.behaviour): another build that behaves differently refuses it. */
+  behaviour: string;
   mission: MissionSpec;
   /** The scene the run was played in (sim/scene.ts), which re-simulating it needs; null for a plain mission. */
   scene: { name: string; version: number } | null;
@@ -195,6 +198,7 @@ export class Recorder {
       simVersion: SIM_VERSION,
       genVersion: GEN_VERSION,
       stateSchema: STATE_SCHEMA,
+      behaviour: sim.game.behaviour,
       mission: structuredClone(this.mission),
       scene: this.scene ? { ...this.scene } : null,
       tuning: structuredClone(this.tuning),
@@ -480,6 +484,7 @@ function checkHeader(v: unknown): RecordingHeader {
     'simVersion',
     'genVersion',
     'stateSchema',
+    'behaviour',
     'mission',
     'scene',
     'tuning',
@@ -534,7 +539,7 @@ function checkHeader(v: unknown): RecordingHeader {
     fail(e instanceof Error ? e.message : 'tuning');
   }
   if (hashValue(h.tuning) !== h.tuningHash) fail('tuning does not match its hash');
-  if (!digest(h.worldFingerprint) || !digest(h.startHash) || !digest(h.finalHash)) fail('fingerprints');
+  if (!digest(h.worldFingerprint) || !digest(h.startHash) || !digest(h.finalHash) || !digest(h.behaviour)) fail('fingerprints');
   const tuning = h.tuning as Tuning;
   if (h.tickHz !== tuning.sim.tickHz) fail('tick rate');
   if (!whole(h.stateEvery, 1, 1e6) || !whole(h.checkpointEvery, 1, 1e8) || !whole(h.ticks, 0, 2147483647)) fail('counts');

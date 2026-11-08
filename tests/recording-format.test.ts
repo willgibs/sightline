@@ -141,6 +141,19 @@ describe('re-simulating a recording', () => {
     const elsewhere = generateWorld(missionSpec('KOR-1188'), defaultTuning);
     expect(resimulate(rec, { game: SIGHTLINE, world: elsewhere }).problem).toMatch(/different valley/);
   });
+
+  it("refuses a recording from a build that behaves differently, with the same versions", () => {
+    // A lab's preview deploy: the same SIM_VERSION as main, other behaviour.
+    const { rec } = play(30);
+    expect(rec.header.behaviour).toBe(SIGHTLINE.behaviour);
+    const preview = Recording.fromBytes(new Recording({ ...rec.header, behaviour: '0123456789abcdef', build: 'lab-a-perception@1234567' }, rec.tracks).toBytes());
+    const r = resimulate(preview, { game: SIGHTLINE, world });
+    expect(r.ok).toBe(false);
+    expect(r.problem).toMatch(/behaves differently \(behaviour 0123456789abcdef; this build's is [0-9a-f]{16}\): replay it with lab-a-perception@1234567/);
+    expect(() => new ReplaySeeker(preview, { game: SIGHTLINE, world })).toThrow(/behaves differently/);
+    // A behaviour that isn't a digest is damage, not another build.
+    expect(() => Recording.fromBytes(new Recording({ ...rec.header, behaviour: 'abc' }, rec.tracks).toBytes())).toThrow(/fingerprints/);
+  });
 });
 
 describe('a run that ends in a fault', () => {

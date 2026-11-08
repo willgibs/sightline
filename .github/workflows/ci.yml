@@ -39,6 +39,50 @@ jobs:
           name: hash-linux
           path: hash-linux.txt
 
+  # Pull requests land only from branches up to date with main (docs/phase-1-plan.md,
+  # Landing on main): two that are each green alone can leave main's goldens wrong
+  # together. The repository's plan has no merge queue or branch rule, so this check and
+  # `npm run land` are the rule.
+  up-to-date:
+    name: Up to date with main
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - shell: bash
+        run: |
+          git fetch --quiet origin "${{ github.base_ref }}"
+          if git merge-base --is-ancestor "origin/${{ github.base_ref }}" HEAD; then
+            echo "Up to date with ${{ github.base_ref }} ($(git rev-parse --short origin/${{ github.base_ref }}))."
+          else
+            echo "This branch is behind ${{ github.base_ref }}: rebase it onto origin/${{ github.base_ref }}, regenerate its goldens (npm run golden, npm run bench -- --write and golden.ts), and push." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+  # Goldens explain themselves: for every pinned run that moved since the base, the first
+  # divergent tick, the state paths that differ there, and each lane's work and metrics.
+  explain:
+    name: Goldens, explained
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - shell: bash
+        run: npm run explain -- --base "${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}" --summary "$GITHUB_STEP_SUMMARY"
+
   platforms:
     name: Check (${{ matrix.os }})
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

@@ -6,6 +6,7 @@ import type { TickInput } from './input';
 import { popDue, scheduleAt, ticksAfter, type Scheduled } from './schedule';
 import type { Entity, EntityId, EntityIndex, SimState } from './state';
 import type { QueryView } from './world/query';
+import type { WorkCounts } from './work';
 import type { Solids } from './world/solids';
 import type { World } from './world/world';
 
@@ -58,6 +59,12 @@ export interface TickContext {
   readonly index: EntityIndex;
   /** This tick's input, already quantized. */
   readonly input: TickInput;
+  /**
+   * The simulation's work counts (work.ts), which systems add to: the motor its bodies, a
+   * search its nodes (pass this as its `work`); queries count their own rays. The
+   * simulation attributes what each system adds to that system.
+   */
+  readonly work: WorkCounts;
 
   /** Records an event and returns its id, for the events it causes. A system emits only the types it declares. */
   emit(e: EventDraft): number;

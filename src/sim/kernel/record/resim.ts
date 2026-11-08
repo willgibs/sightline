@@ -60,6 +60,9 @@ export function replaySimulation<S extends Simulation = Simulation>(rec: Recordi
   if (h.scene && scene && scene.version !== h.scene.version) return `made in version ${h.scene.version} of the scene '${h.scene.name}'; this build has version ${scene.version}`;
   const game = h.scene && scene ? scene.game : opts.game;
   if (!game) return 'no game was given to re-simulate it in';
+  if (h.behaviour !== game.behaviour) {
+    return `made by a build that behaves differently (behaviour ${h.behaviour}; this build's is ${game.behaviour})${h.build ? `: replay it with ${h.build}` : ''}`;
+  }
   if (!h.scene && !opts.world && h.mission.terrain.kind !== 'procedural') return `its world '${h.mission.terrain.name}' was built by hand outside any scene; pass the world`;
   let world: World;
   try {

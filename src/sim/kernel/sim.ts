@@ -11,6 +11,7 @@ import { planSystems, scheduleIn, type System, type TickContext } from './system
 import type { QueryBody, QueryView } from './world/query';
 import { Solids, solidId } from './world/solids';
 import type { World } from './world/world';
+import { WORK_KINDS, noWork, type WorkCounts } from './work';
 
 /**
  * The simulation: pure TypeScript, no rendering, no DOM, fixed timestep.
@@ -86,7 +87,10 @@ export class Simulation {
   private readonly channels = new Map<string, unknown>();
   /** The system running now, whose declared events are the only ones it may emit. */
   private running: System | null = null;
-  private readonly view: { world: World; solids: Solids; bodies: QueryBody[] };
+  /** All work counted so far, and how much of it each system did (by position in `systems`). */
+  private readonly counts = noWork();
+  private readonly bySystem: WorkCounts[];
+  private readonly view: { world: World; solids: Solids; bodies: QueryBody[]; work: WorkCounts };
   private readonly ctx: { -readonly [K in keyof TickContext]: TickContext[K] };
 
   /** `systems` replaces the game's own list, for tests and scenes; recordings replay with the game's. */
@@ -95,11 +99,12 @@ export class Simulation {
     this.world = world;
     this.game = game;
     this.solids = new Solids(world.colliders);
-    this.view = { world, solids: this.solids, bodies: [] };
+    this.view = { world, solids: this.solids, bodies: [], work: this.counts };
     this.current = frozenTuning(tuning);
     this.dt = 1 / tuning.sim.tickHz;
     this.systems = systems;
     this.every = planSystems(systems, tuning.sim.tickHz);
+    this.bySystem = systems.map(noWork);
     this.state = emptyState();
     this.reindex();
     const ctx = {
@@ -111,6 +116,7 @@ export class Simulation {
       state: this.state,
       index: this.index,
       input: this.lastInput,
+      work: this.counts,
       emit: (draft: EventDraft): number => {
         const system = this.running;
         if (system && !system.emits.includes(draft.type)) throw new Error(`System '${system.name}' emitted '${draft.type}', which it doesn't declare`);
@@ -202,9 +208,17 @@ export class Simulation {
         if (tick % every !== 0) continue;
         const system = this.systems[k]!;
         this.running = system;
+        const w = this.counts;
+        const rays = w.rays;
+        const nodes = w.nodes;
+        const bodies = w.bodies;
         prof?.begin(system);
         system.run(ctx, this.dt * every);
         prof?.end(system);
+        const mine = this.bySystem[k]!;
+        mine.rays += w.rays - rays;
+        mine.nodes += w.nodes - nodes;
+        mine.bodies += w.bodies - bodies;
       }
     } catch (e) {
       this.fault = { tick, system: this.systems[k]?.name ?? '?', message: e instanceof Error ? e.message : String(e) };
@@ -264,6 +278,19 @@ export class Simulation {
   queryView(): QueryView {
     this.queryBodies(this.view.bodies);
     return this.view;
+  }
+
+  /**
+   * The work each system has done since the simulation began (work.ts), in running order.
+   * Deterministic, like the state, but not part of it: a restore doesn't rewind it.
+   */
+  work(): Array<{ system: string; phase: System['phase'] } & WorkCounts> {
+    return this.systems.map((s, k) => {
+      const w = this.bySystem[k]!;
+      const out = { system: s.name, phase: s.phase, ...noWork() };
+      for (const kind of WORK_KINDS) out[kind] = w[kind];
+      return out;
+    });
   }
 
   /** A hash of the complete dynamic state, for determinism checks: the whole state tree. */

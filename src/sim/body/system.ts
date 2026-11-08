@@ -65,6 +65,7 @@ export const motorSystem: System = {
       let draw: DebugDraw | null = null;
       if (faction === Faction.Player) ctx.debug((d) => (draw = d));
       stepMotor(body, intent, spec, { world: ctx.world, solids: ctx.solids, tuning: ctx.tuning, dt, tick: ctx.tick, source: id, others, emit: ctx.emit, draw });
+      ctx.work.bodies++;
     }
   },
 };

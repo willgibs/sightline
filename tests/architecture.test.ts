@@ -160,7 +160,8 @@ describe('architecture', () => {
       for (const spec of specifiers(f)) {
         const target = resolve(f, spec);
         if (!target) continue;
-        if (target.startsWith('src/config/')) continue;
+        // The tuning is data, and the lane map is the table this test reads: any layer may read them.
+        if (target.startsWith('src/config/') || target === 'src/sim/lanes.ts') continue;
         const to = layerOf(target);
         if (!to) {
           offenders.push(`${from} imports ${target}, outside every layer`);

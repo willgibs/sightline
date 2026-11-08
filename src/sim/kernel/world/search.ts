@@ -1,3 +1,4 @@
+import type { WorkCounts } from '../work';
 import { Edge, type GridLayer } from './grid';
 
 /**
@@ -52,6 +53,8 @@ export interface SearchOptions {
   maxExpansions: number;
   /** A flood goes no further than this cost. Default: no limit. */
   maxCost?: number;
+  /** Where to count the cells expanded: a system passes its tick's (TickContext.work). */
+  work?: WorkCounts;
 }
 
 export interface SearchResult {
@@ -107,6 +110,12 @@ export class GridSearch {
    * the order they were reached.
    */
   flood(sources: readonly number[], opts: SearchOptions): SearchResult {
+    const r = this.runFlood(sources, opts);
+    if (opts.work) opts.work.nodes += r.expanded;
+    return r;
+  }
+
+  private runFlood(sources: readonly number[], opts: SearchOptions): SearchResult {
     this.clear();
     const q = this.buckets;
     q.clear();
@@ -142,6 +151,12 @@ export class GridSearch {
    * to goal, to `out`.
    */
   path(start: number, goal: number, opts: SearchOptions, out: number[] = []): PathResult {
+    const r = this.runPath(start, goal, opts, out);
+    if (opts.work) opts.work.nodes += r.expanded;
+    return r;
+  }
+
+  private runPath(start: number, goal: number, opts: SearchOptions, out: number[]): PathResult {
     this.check(start);
     this.check(goal);
     out.length = 0;

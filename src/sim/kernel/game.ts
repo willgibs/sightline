@@ -21,6 +21,12 @@ import type { World } from './world/world';
 export interface Game<S extends Simulation = Simulation> {
   /** Names the game, in messages. */
   readonly name: string;
+  /**
+   * This build's behaviour, as one digest of its pinned behaviour fingerprints. Recordings
+   * carry it, and a recording made by a build that behaves differently is refused with
+   * the reason, rather than re-simulated until it diverges.
+   */
+  readonly behaviour: string;
   /** The systems every tick runs, phase by phase (systems.ts). */
   readonly systems: readonly System[];
   /** A simulation of this game in a world: with its own systems, or a scene's or a test's. */

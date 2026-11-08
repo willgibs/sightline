@@ -84,17 +84,17 @@ It works on a branch named for the lab: `lab-a-perception`, `lab-b-shooting`, `l
 
 ## Landing on `main`
 
-Several branches change the same goldens, versions and registries at once. W0.7 makes most of these rules mechanical; until it lands, they hold by hand.
+Several branches change the same goldens, versions and registries at once. W0.7 made most of these rules mechanical.
 
-- **One merge at a time,** from a branch that is up to date with `main` and green there. Two pull requests that are each green on their own can still leave `main`'s golden values wrong. W0.7 enforces this with a merge queue, or a branch rule where the repository's plan has no queue.
+- **One merge at a time,** from a branch that is up to date with `main` and green there. Two pull requests that are each green on their own can still leave `main`'s golden values wrong. Land with `npm run land -- <number>`, which refuses a branch behind `main` or not green, and CI's "Up to date with main" check fails a branch that is behind. The repository's plan allows neither a merge queue nor a branch rule (they need an organization, or GitHub Pro, or a public repository), so these are the rule.
 - **Goldens are regenerated after a rebase, never merged by hand.** That means:
-  - `GOLDEN` in `src/sim/game/selftest.ts`;
+  - `GOLDEN` in `src/sim/game/golden.ts`, which pins every lane's runs;
   - `GOLDEN_TAL_4471` in `tests/world.test.ts`;
-  - each lane's pinned scenes;
+  - each lane's work and metrics (`npm run bench -- --write`);
   - the golden recording (`npm run golden`).
 
   The golden recording also needs rewriting whenever the tuning's shape changes, not only on a version bump. `src/config/validate.ts` refuses a recording whose tuning has other keys.
-- **The pull request lists every golden that moved, and why.** After W0.7, CI prints the first divergent tick, the state path and the lane's metrics beside each moved fingerprint.
+- **The pull request lists every golden that moved, and why.** CI's "Goldens, explained" job prints, for every pinned run that moved, the first divergent tick, the state paths and its lane's work and metrics (`npm run explain`).
   - Version numbers are taken at merge time: the next free one.
   - That covers `SIM_VERSION`, `GEN_VERSION`, `STATE_SCHEMA` and `RECORDING_VERSION`.
   - There are no version numbers per lane: in a bit-exact simulation, every observable bit is part of the contract.
@@ -313,7 +313,7 @@ The kernel boundary goes first, so everything after it lands in its final place.
 - [x] W0.6 · Registries and roles.
   - The code ranges above, written into the registries, with a test that codes are unique and in range.
   - `GuardRole` gains marksman, radio operator, officer and target. The renderer's role tints follow; the test camp still uses three roles.
-- [ ] W0.7 · Landing, made mechanical.
+- [x] W0.7 · Landing, made mechanical.
   - **Goldens explain themselves:** the first divergent tick, the state path, and the lane's metrics.
   - **Benches per lane:** pinned scenes, quality metrics, and deterministic work counts (rays, grid nodes, bodies) in `--profile`, pinned as budgets.
   - **Behaviour fingerprints in recording headers,** so a preview deploy's recording is refused with a reason. Today it would be accepted, then diverge.

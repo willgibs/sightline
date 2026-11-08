@@ -3,7 +3,7 @@
  * record everything, then re-simulate the recording and check it matches bit for bit.
  *
  *   npm run sim -- --seed TAL-4471 --minutes 10 --out run.slrec
- *   npm run sim -- --profile                                 (time spent in each system)
+ *   npm run sim -- --profile                                 (time and work in each system)
  *   npm run sim -- --replay sightline-TAL-4471-5400.slrec   (a recording saved in the browser)
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -121,10 +121,17 @@ console.log(
 if (profile) {
   const rows = profile.report(ticks);
   const total = rows.reduce((sum, r) => sum + r.usPerTick, 0);
+  // Work is deterministic, so these numbers are the same on every machine (kernel/work.ts);
+  // time is this machine's, a trend.
+  const work = new Map(sim.work().map((w) => [w.system, w]));
+  const per = (n: number): string => (n / ticks).toFixed(n % ticks === 0 ? 0 : 2);
   for (const r of rows) {
+    const w = work.get(r.name);
+    const done = w && w.rays + w.nodes + w.bodies > 0 ? ` · per tick: ${per(w.rays)} rays, ${per(w.nodes)} grid nodes, ${per(w.bodies)} bodies` : '';
     console.log(
       `        ${r.phase.padEnd(11)} ${r.name.padEnd(14)} ${r.usPerTick.toFixed(2).padStart(7)} µs/tick · ${((r.usPerTick / total) * 100).toFixed(0).padStart(3)}%` +
-        (r.runs !== ticks ? ` · ran ${fmt.int(r.runs)} times` : ''),
+        (r.runs !== ticks ? ` · ran ${fmt.int(r.runs)} times` : '') +
+        done,
     );
   }
 }

@@ -13,6 +13,7 @@ import { PLAYER_ID, player, type GuardEntity, type PlayerEntity } from './entiti
 import type { PlayerControl } from './player';
 import { writeSample } from './samples';
 import { startRun } from './setup';
+import { BEHAVIOUR } from './golden';
 import { SYSTEMS } from './systems';
 
 /**
@@ -22,6 +23,7 @@ import { SYSTEMS } from './systems';
  */
 export const SIGHTLINE: Game<Simulation> = {
   name: 'Sightline',
+  behaviour: BEHAVIOUR,
   systems: SYSTEMS,
   simulation: (world, tuning, systems) => new Simulation(world, tuning, systems),
   start: startRun,
