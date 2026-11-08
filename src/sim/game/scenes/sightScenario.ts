@@ -7,6 +7,9 @@ import type { InputFrame } from '../../kernel/input';
 import { Solids } from '../../kernel/world/solids';
 import type { World } from '../../kernel/world/world';
 import { groundLight } from '../../perception';
+import { keepRoutine } from '../../brain';
+import type { System } from '../../kernel/systems';
+import { emptyMind, guardMind } from '../guards';
 import { PERCEPTION, giveSenses } from '../perception';
 import { placePlayer } from '../setup';
 import { SIGHTLINE, type Simulation } from '../sim';
@@ -33,10 +36,12 @@ import { LAB, labWorld } from './perceptionLab';
  *   stance  stand, crouch or prone                                              [stand]
  *   move    still, walk (in the stance's own gait) or sprint                   [still]
  *   secs    how long it runs                                                    [20]
+ *   react   1: the guard reacts as his awareness rises (A7); 0: he holds his gaze  [0]
  *   expect  seconds to 100%, as a range ('3-6'), or 'never' within the run     [none]
  *
- * The guard keeps a fixed gaze (no head scan). The player moves round a small circle about
- * the spot, so the speed and the distance hold. The guard stands where the spot's line runs clear:
+ * The guard keeps a fixed gaze (no head scan), and unless he reacts, holds it whatever he
+ * notices, so the scenario measures sight alone. The player moves round a small circle
+ * about the spot, so the speed and the distance hold. The guard stands where the spot's line runs clear:
  * west of the open field's far end, of the shade, the bush and the wall; south of the
  * crest.
  */
@@ -49,11 +54,13 @@ export interface SightParams {
   stance: 'stand' | 'crouch' | 'prone';
   move: 'still' | 'walk' | 'sprint';
   secs: number;
+  /** The guard reacts to what he notices (A7), or holds his gaze. */
+  react: boolean;
   /** Seconds to detection, [min, max]; or 'never'; or null for no expectation. */
   expect: readonly [number, number] | 'never' | null;
 }
 
-const DEFAULTS: SightParams = { guard: 'sentry', spot: 'open', d: 30, off: 0, stance: 'stand', move: 'still', secs: 20, expect: null };
+const DEFAULTS: SightParams = { guard: 'sentry', spot: 'open', d: 30, off: 0, stance: 'stand', move: 'still', secs: 20, react: false, expect: null };
 
 /** Reads a scenario's parameters, refusing anything it doesn't know. */
 export function parseSight(text: string | undefined): SightParams {
@@ -80,6 +87,7 @@ export function parseSight(text: string | undefined): SightParams {
     else if (key === 'stance') p.stance = one(key, v, ['stand', 'crouch', 'prone']);
     else if (key === 'move') p.move = one(key, v, ['still', 'walk', 'sprint']);
     else if (key === 'secs') p.secs = num(key, v, 1, 120);
+    else if (key === 'react') p.react = num(key, v, 0, 1) === 1;
     else if (key === 'expect') {
       if (v === 'never') p.expect = 'never';
       else {
@@ -95,7 +103,7 @@ export function parseSight(text: string | undefined): SightParams {
 /** The canonical form of a scenario's parameters: every key, in a fixed order. */
 export function formatSight(p: SightParams): string {
   const e = p.expect === null ? '' : p.expect === 'never' ? '&expect=never' : `&expect=${p.expect[0]}-${p.expect[1]}`;
-  return `guard=${p.guard}&spot=${p.spot}&d=${p.d}&off=${p.off}&stance=${p.stance}&move=${p.move}&secs=${p.secs}${e}`;
+  return `guard=${p.guard}&spot=${p.spot}&d=${p.d}&off=${p.off}&stance=${p.stance}&move=${p.move}&secs=${p.secs}${p.react ? '&react=1' : ''}${e}`;
 }
 
 interface Spot {
@@ -206,6 +214,21 @@ class CircleDriver {
   }
 }
 
+const mind = emptyMind();
+
+/** Holds the scenario's guard to his post and gaze, whatever he notices: after his brain, the routine's order again. */
+const hold: System = {
+  name: 'sight-hold',
+  phase: 'decide',
+  after: ['guard-brains'],
+  reads: ['guard.body', 'guard.guard'],
+  writes: ['guard.guard.order'],
+  emits: [],
+  run(ctx) {
+    for (const g of ctx.index.of('guard')) keepRoutine(guardMind(g, ctx.world, ctx.tuning, ctx.tick + 1, mind), g.guard.order);
+  },
+};
+
 /** A sight scenario, from its parameters. */
 export function sightScenario(params?: string): Scene {
   const p = parseSight(params);
@@ -219,7 +242,7 @@ export function sightScenario(params?: string): Scene {
     description: `One ${p.guard} watching the player ${p.d} m away, ${p.stance} and ${p.move} in the ${p.spot}${p.expect === null ? '' : p.expect === 'never' ? ': never seen' : `: seen in ${p.expect[0]}–${p.expect[1]} s`}.`,
     game: SIGHTLINE,
     world: (tuning) => scenarioWorld(p, tuning),
-    systems: PERCEPTION,
+    systems: p.react ? PERCEPTION : [...PERCEPTION, hold],
     setup: (sim) => {
       seen.noticed = -1;
       seen.detected = -1;
@@ -298,4 +321,6 @@ export const SIGHT_TABLE: readonly string[] = [
   'spot=wall&d=40&stance=stand&move=still&expect=10-16',
   // Sprinting fills fastest, but never faster than the telegraph allows.
   'spot=open&d=12&stance=stand&move=sprint&expect=2-3',
+  // A guard who reacts turns to look at what caught his eye: the periphery's 20 m, sooner.
+  'spot=open&d=20&off=45&stance=stand&move=walk&react=1&expect=3.5-5.5',
 ];

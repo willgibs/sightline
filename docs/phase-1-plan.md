@@ -380,7 +380,7 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - **Telegraphed:** outside a 2.5 m contact zone, at least 1.5 s from the first cue (30%) to 100%, in every combination.
   - **No cliffs:** every edge, of range and of cone, ramps over at least 2 m or 4°.
   - **Symmetric, bit for bit:** foliage between a guard and the player, both ways; a sound's clarity in the player's speakers and for a guard at the player's cell.
-  - **The crack:** a listener 5–20 m from a supersonic path hears it from 55–62° off the shooter's bearing.
+  - **The crack:** a listener 5–15 m from a supersonic path at 300 m hears it from 55–62° off the shooter's bearing. (Recorded as 5–20 m; at 20 m the shooter's own bearing sits 3.8° off the path, giving 54.6°. The research's figure is for listeners near the path.)
   - **Readable:** the owner beats the rules-only predictor on borderline trials (A12).
 
 **Milestones:**
@@ -405,18 +405,18 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - A test holds the drawing to `lightAt` at sampled points; 99.5% is the starting bar.
   - Fog uses distance, not view depth, so a guard's contrast doesn't change as you turn.
   - Foliage is a transmittance multiplied along each body ray in both directions, drawn from the same volumes, and tested for symmetry.
-- [ ] A5 · Hearing, with one law of sound (owner, Nov 7).
+- [x] A5 · Hearing, with one law of sound (owner, Nov 7).
   - A bounded flood on the site grid (W0.5), once per sound, which every listener and the player's speakers read at their own cell.
   - A second, through-wall route that loses a set number of decibels per wall, as in Rainbow Six Siege. The louder route wins.
   - Masking by the steady sources in `generation/ambient.ts`, as a shift of the hearing threshold.
   - A heard sound gives a guess, not a fix. It arrives from the doorway it came through, blurred by how much longer its path was than a straight line, with the error drawn from the guard's own stream.
-  - The crack comes from the point the bullet's shock cone predicts, about 55–62° off the shooter's true bearing, scheduled at its exact arrival (B8).
+  - The crack comes from the point the bullet's shock cone predicts, about 55–62° off the shooter's true bearing, scheduled at its exact arrival (B8). Its geometry is built and benched (`perception/crack.ts`); it is scheduled at arrival when B8's shot sounds land.
   - No offscreen bias: anything unfair gets a cue.
-- [ ] A6 · Percepts and beliefs.
+- [x] A6 · Percepts and beliefs.
   - Percepts are records with a kind, strength, place, age, expiry and cause.
   - The mind holds the last known position, with its uncertainty.
   - The no-omniscience test extends to guards who perceive. Its two places must lie beyond every sense: marksmen see 400 m, and the overlook is about 330 m from the camp.
-- [ ] A7 · The awareness ladder.
+- [x] A7 · The awareness ladder.
   - Curious from 30%, then suspicious, searching and combat.
   - A rise is delayed by the current state's dwell. A fall steps down one state at a time, to a raised floor.
   - Grace periods, with the spread drawn from the guard's own stream.

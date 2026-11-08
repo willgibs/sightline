@@ -1,3 +1,4 @@
+import type { AlertReason } from '../kernel/events';
 import type { Belief, Percept } from './percept';
 
 /**
@@ -77,8 +78,9 @@ export interface Awareness {
   fx: number;
   fy: number;
   fz: number;
-  /** The event behind his current state. */
+  /** The last stimulus that raised him: the event behind it, and why, for the rise it causes. */
   cause: number;
+  reason: AlertReason;
   /** He has searched since he last settled: when he does, his floor and eyes rise. */
   searched: boolean;
 }
@@ -120,6 +122,7 @@ export function createSenses(far = false): Senses {
       fy: 0,
       fz: 0,
       cause: 0,
+      reason: 'heard',
       searched: false,
     },
     belief: null,

@@ -6,6 +6,44 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
 
+### The awareness ladder and its minimal reactions (A7)
+
+**Decision:**
+- **Two kinds of evidence.** The sight meter, and the evidence other stimuli leave (a footstep raises a guard to between 0.3 and 0.62 by its clarity, a shot to 0.8), on one scale with the design doc's thresholds: curious 0.3, suspicious 0.55, searching 0.8; combat only from the meter at 1, a confirmed sighting.
+- **Rises wait for the dwell** of the state they rise from (curious 0.6 s, suspicious 0.8 s, searching 0.6 s), one state at a time: something alarming reaches searching in 1.4 s, telegraphed by curiosity at once. A confirmed sighting leaves searching-level evidence for when he loses you.
+- **Falls step down one state at a time** after the state's ramp-down (curious 6 s, suspicious 10 s, searching 20 s, combat 30 s), each varied ±25% from the guard's own stream. Evidence explains a rise but holds nothing up: only sight at the state's level, or a fresh stimulus of it, moves the fall back.
+- **Grace periods** of 2.5 s ignore weaker stimuli unless one beats the last rise by 25%, or three arrive, which counts as a rise of 0.2: repeated footsteps escalate, single ones don't stack.
+- **Sharper after a search:** a guard who searched settles at unaware with a floor of 0.15 under every stimulus and eyes 1.25× quicker.
+- **Minimal reactions** (`brain/react.ts`), until lab E's brain: curious, stop and look (the head first, the body when it must); suspicious and searching, walk (1.5 m/s, 2.2 m/s) to where he believes it was and look around there; combat, face where he believes you are; unaware, back to the routine. A guard on a tower looks from it and never walks off.
+- **Every change is an event:** 'alert', with its from, to, reason and the percept that caused it.
+
+**Why:** Thief's filtered rises and capacitor-like falls and The Dark Mod's grace periods are the strongest open ladder; the design doc asks for a raised baseline and a 1.5 s reaction window. Stale evidence holding a state up kept guards searching forever: the tests caught it.
+
+### Percepts and beliefs (A6)
+
+**Decision:**
+- **Percepts are records:** kind (sight, sound, shot, voice; body, impact, object, glint and door to come), place, radius of uncertainty, strength, the tick sensed, the tick it lapses, and its cause. A guard keeps at most eight live ones.
+- **Beliefs:** the mind holds the last known position with its uncertainty: from sight (a fix within 0.5 m plus 1% of the distance), or from a heard guess, whichever is surer, its radius grown at 1.5 m/s as it ages. Seen at 100%, it is confirmed.
+- **The mind** (`brain/mind.ts`) gains the head's turn, the percepts, the awareness (state, since, focus) and the belief. A guard without senses has the empty ones, so the valley's brains decide as before.
+- **No-omniscience, for guards who perceive:** the valley with every guard's senses on, the player at two corners over 600 m from any guard (beyond a marksman's far zone against the sky) for the whole run: every guard has the same mind on every tick, and decides the same. A peeking brain is caught at its first decision; a run with the player near the camp shows minds that differ, which is perception doing its job.
+
+**Why:** a percept never says who made a stimulus, and a belief comes only from percepts, so a guard can be wrong exactly where his senses were.
+
+### Hearing: one law for the guards and the speakers (A5)
+
+**Decision:**
+- **Two routes, the louder wins.** Around: one bounded flood over the site grid per sound (W0.5's search, its radius as the cost limit, 120,000 expansions at most), read at every listener's cell. Through: the straight line, losing 12 dB for each full-height wall (counted against the colliders, by the grid's own rule, so a wall thinner than a cell counts and sound passes over a crate) and 15 dB where the ground is in the way.
+- **Masking:** the steady sources (`generation/ambient.ts`), heard by the same law and summed as power, raise the threshold to 17 dB below them. Their floods are made once per world.
+- **A guess, not a fix:** a sound around a corner seems to come from the last cell of its route the listener can see (the doorway); its place is blurred by 0.5 m, 8% of the distance and 60% of the detour, drawn from the guard's own stream. It arrives at the speed of sound along its route.
+- **Sides:** a guard ignores his own side's footsteps, never a voice.
+- **The speakers ask the same function** (`audio/hearing.ts`): level, the place it seems to come from, its delay along the route, muffled through walls; the steady sources too. The bench compares 200 random sounds and listeners: none differ by a bit.
+- **The crack** (`perception/crack.ts`): from a bullet's flight, the point whose shock reaches a listener first, cos φ = c / v. On a path slowing from 790 m/s, listeners 5–15 m from it at 300 m hear it 55.4–57.2° off the shooter. It is wired in when lab B's shot sounds land (B8). The plan's recorded target said 5–20 m: at 20 m the shooter's own bearing sits 3.8° off the path, giving 54.6°, so the target now says 5–15 m.
+- **Barks are delivered by their system:** a sound made after 'perception' (a bark in 'awareness') reaches listeners through `deliverSound`, since the tick's later events reach no reader.
+
+**Why:** Mark of the Ninja fed one path to its AI and the player's audio; Thief's doorways and Siege's muffled second route keep hearing honest round buildings; Dungeon Crawl Stone Soup's integer flood is exact and cheap. The old speakers' straight-line muffle let you hear what a guard where you stood couldn't, and the reverse.
+
+**What moved (A5–A7):** the perception lab's fingerprints (`0dfa42645814f21a`, `6625deddfd28368b`): guards now hear, react and fall back. Nothing in the valley.
+
 ### The scenario runner: scenes with parameters, and the factor-grid sweep (A3)
 
 **Decision:**

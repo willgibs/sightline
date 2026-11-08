@@ -11,7 +11,9 @@ import { ChaosBot } from './bots/chaos';
 import { WanderBot } from './bots/wander';
 import { PINNED_RUNS, behaviourInto } from './runs';
 import { Simulation } from './sim';
-import { SEED_LAW, SIGHT_LAW, foliageOf, sweepSight } from '../perception';
+import { Acoustics, SEED_LAW, SIGHT_LAW, crackHeard, emptyHeard, foliageOf, sweepSight, type CrackHeard, type FlightPoint } from '../perception';
+import { datan2, dexp } from '../kernel/core/detmath';
+import { air, defaultEnv } from '../kernel/env';
 import { Rng } from '../kernel/core/rng';
 import { runScene } from '../kernel/scene';
 import { labWorld } from './scenes/perceptionLab';
@@ -145,7 +147,54 @@ function perceptionMetrics(): Record<string, number> {
     if (!Object.is(f.transmittance(ax, ay, az, bx, by, bz), f.transmittance(bx, by, bz, ax, ay, az))) asymmetric++;
   }
   m['foliage: pairs that differ by direction (of 2000)'] = asymmetric;
+  // One law of sound: what the speakers hear and what a guard at the same place hears, bit for bit.
+  const lab = labWorld(defaultTuning);
+  const ears = new Acoustics(lab, defaultTuning);
+  const guards = new Acoustics(lab, defaultTuning);
+  const a = emptyHeard();
+  const b = emptyHeard();
+  let differ = 0;
+  for (let k = 0; k < 200; k++) {
+    const sx = -200 + rng.range(0, 80);
+    const sz = -30 + rng.range(0, 60);
+    const radius = rng.range(4, 40);
+    const lx = sx + rng.range(-30, 30);
+    const lz = sz + rng.range(-30, 30);
+    ears.spread({ x: sx, y: 0, z: sz, radius });
+    ears.hear(lx, 1.7, lz, a);
+    guards.spread({ x: sx, y: 0, z: sz, radius });
+    guards.hear(lx, 1.7, lz, b);
+    if (!Object.is(a.clarity, b.clarity) || a.fromX !== b.fromX || a.fromZ !== b.fromZ || a.length !== b.length) differ++;
+  }
+  m['hearing: speakers and a guard at the same place differ (of 200)'] = differ;
+  // The crack (A5): listeners 5–15 m from a bullet's path at 300 m, its speed falling as a
+  // drag constant makes it (790 m/s at the muzzle, about 650 m/s there).
+  const angles = crackBias();
+  m['crack at 300 m: least degrees off the shooter'] = round(Math.min(...angles));
+  m['crack at 300 m: most degrees off the shooter'] = round(Math.max(...angles));
+  m['seed · crack at 300 m: degrees off the shooter'] = 0;
   return m;
+}
+
+/** Degrees between where the crack seems to come from and where the shooter is, for listeners near a path at 300 m. */
+export function crackBias(): number[] {
+  const v0 = 790;
+  const k = 0.00065;
+  const path: FlightPoint[] = [];
+  for (let s = 0; s <= 420; s += 5) path.push({ x: s, y: 1.5, z: 0, t: (dexp(k * s) - 1) / (k * v0) });
+  const out: CrackHeard = { x: 0, y: 0, z: 0, t: 0 };
+  const c = air(defaultEnv()).speedOfSound;
+  const angles: number[] = [];
+  for (const side of [5, 10, 15]) {
+    const L = { x: 300, y: 1.7, z: side };
+    if (!crackHeard(path, L.x, L.y, L.z, c, out)) continue;
+    const ax = out.x - L.x;
+    const az = out.z - L.z;
+    const bx = 0 - L.x;
+    const bz = 0 - L.z;
+    angles.push((datan2(Math.abs(ax * bz - az * bx), ax * bx + az * bz) * 180) / Math.PI);
+  }
+  return angles;
 }
 
 /** To 9 significant digits: metrics are pinned exactly, and their last bits are noise to a reader. */

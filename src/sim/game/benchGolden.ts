@@ -65,14 +65,18 @@ export const BENCH_GOLDEN: PinnedBench = {
       "seed · least seconds from the first cue to 100%, outside contact": 0.468416667,
       "seed · steepest edge: rate change per metre": 0.301129235,
       "seed · steepest edge: rate change per degree": 0.954545455,
-      "sight scenarios as expected (of 14)": 14,
-      "foliage: pairs that differ by direction (of 2000)": 0
+      "sight scenarios as expected (of 15)": 15,
+      "foliage: pairs that differ by direction (of 2000)": 0,
+      "hearing: speakers and a guard at the same place differ (of 200)": 0,
+      "crack at 300 m: least degrees off the shooter": 55.438591,
+      "crack at 300 m: most degrees off the shooter": 57.2126615,
+      "seed · crack at 300 m: degrees off the shooter": 0
     },
     "runs": {
       "perception-lab": {
         "work": {
           "motor": { "rays": 0, "nodes": 0, "bodies": 10800 },
-          "perception-sight": { "rays": 15787, "nodes": 0, "bodies": 0 }
+          "perception-sight": { "rays": 25723, "nodes": 0, "bodies": 0 }
         }
       }
     }

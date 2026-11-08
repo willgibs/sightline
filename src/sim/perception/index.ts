@@ -40,3 +40,6 @@ export { groundLight, lightName } from './light';
 export { Foliage, coneChord, cylinderChord, foliageOf, type FoliageVolume } from './foliage';
 export { SIGHT_LAW, sweepSight, type RateLaw, type SweepReport } from './sweep';
 export { SEED_LAW } from './seed';
+export { Acoustics, acousticsOf, emptyHeard, type Heard, type SoundSource } from './hearing';
+export { believe, levelOf, prunePercepts, soundLevel, stateAt, stepLadder, stimulate, type Change, type Stimulus } from './awareness';
+export { crackHeard, type CrackHeard, type FlightPoint } from './crack';
