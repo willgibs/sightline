@@ -362,7 +362,9 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       out.push({ act: 'look', rank: 3, weight: T.lookWeight });
       if (!elevated && own) out.push({ act: 'investigate', rank: 3, weight: role.investigate * near * fresh * cool('investigate') * claimed(m, focus) });
       break;
-    case 'searching':
+    case 'searching': {
+      // Rounds landing near him: he gets behind something first (design doc: uses cover).
+      if (!elevated && underFire(m)) out.push({ act: 'cover', rank: 4.5, weight: role.fight > 0 ? 1 : 0.6 });
       // A worker runs for the alarm when he has seen something (design doc: still raises the alarm).
       if (m.post.role === 'worker' && own) out.push({ act: 'alarm', rank: 4, weight: alarmWeight(m, dist) * 0.9 });
       if (order) out.push({ act: 'task', rank: 4, weight: order });
@@ -373,6 +375,7 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
         out.push({ act: 'search', rank: 4, weight: role.search * (0.25 + 0.75 * fresh) * near * cool('search') });
       }
       break;
+    }
     case 'combat': {
       const sees = seesTarget(m);
       const alarmW = alarmWeight(m, dist);
@@ -401,6 +404,19 @@ function claimed(m: GuardMind, at: { x: number; z: number }): number {
     if (dx * dx + dz * dz <= C.claimWithin * C.claimWithin) return C.claimedWeight;
   }
   return 1;
+}
+
+/** True if a round has just struck near him: a shot percept that's a strike, close by. */
+function underFire(m: GuardMind): boolean {
+  const hz = m.tuning.sim.tickHz;
+  for (const p of m.percepts) {
+    if (p.kind !== 'shot' || p.sound !== 'impact') continue;
+    if ((m.tick - p.tick) / hz > 3) continue;
+    const dx = p.x - m.self.x;
+    const dz = p.z - m.self.z;
+    if (dx * dx + dz * dz < 18 * 18) return true;
+  }
+  return false;
 }
 
 /** How much he wants the alarm: near enough to run to, unclaimed by someone he's heard, and a role that does it. */

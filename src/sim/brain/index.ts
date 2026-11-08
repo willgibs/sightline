@@ -18,4 +18,4 @@ export { REPORT_KINDS, type Report, type ReportKind, type Told, type Via } from 
 export { clearSeen, createSearchMap, hottestCell, injectBelief, mapMass, mapSpread, spreadBelief, type SearchMap } from './searchMap';
 export { ellipseArea, emptyEstimate, fuseBearings, inEllipse, mahalanobis2, type Bearing, type FuseGrid, type ShotEstimate } from './triangulate';
 export { ALERT_LEVELS, alertRung, createCamp, type AlertLevel, type CampState, type RosterEntry, type SearchState, type Task, type TaskKind } from './camp';
-export { digest, plan, spreadCamp, type CampMind, type CampOrder } from './commander';
+export { digest, fuseShots, plan, spreadCamp, type CampMind, type CampOrder } from './commander';

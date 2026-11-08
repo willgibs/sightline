@@ -62,7 +62,7 @@ export interface CampState {
   /** The camp's devices (E7): where they are and whether they work. A stand-in until lab D's entities land. */
   devices: CampDevices;
   /** A shooter the camp has triangulated (E8): the bearings it fuses, and its estimate. */
-  shots: { bearings: Array<Bearing & { tick: number }>; estimate: ShotEstimate | null; tick: number };
+  shots: { bearings: Array<Bearing & { tick: number }>; estimate: ShotEstimate | null; tick: number; dirty: boolean };
   /** The camp's alert level, since when, and the floor it settles back to. */
   level: AlertLevel;
   since: number;
@@ -104,7 +104,7 @@ export function createCamp(campX: number, campZ: number, tuning: Tuning): CampSt
   const M = tuning.brain.searchMap;
   return {
     devices: { alarms: [], generatorRunning: true },
-    shots: { bearings: [], estimate: null, tick: -1 },
+    shots: { bearings: [], estimate: null, tick: -1, dirty: false },
     level: 'calm',
     since: 0,
     floor: 'calm',

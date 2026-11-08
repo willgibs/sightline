@@ -49,11 +49,13 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   const M = tuning.brain.searchMap;
   if (r.kind === 'clear') {
     clearSeen(camp.map, r.x, r.z, tuning.brain.comms.clearRadius, world, tuning, tuning.bodies.guard.eyeHeight.stand);
-    // Someone has finished looking: free the slot if it was his task.
+    // Someone has finished looking: free the slot if it was his task, and retire the task if it's done.
     for (const t of camp.tasks) {
+      const before = t.assigned.length;
       t.assigned = t.assigned.filter((id) => id !== r.from);
+      if (t.assigned.length < before && t.assigned.length === 0) t.capacity = 0;
     }
-    camp.tasks = camp.tasks.filter((t) => t.assigned.length > 0 || t.capacity === 0);
+    camp.tasks = camp.tasks.filter((t) => t.capacity > 0);
     noteMan(camp, r);
     return;
   }
@@ -107,12 +109,23 @@ function noteShot(camp: CampState, r: Report, tick: number, tuning: Tuning): voi
   const sigma = Math.min((S.maxSigmaDeg * Math.PI) / 180, Math.max((S.minSigmaDeg * Math.PI) / 180, stated));
   const shots = camp.shots;
   shots.bearings.push({ x: r.fromX, z: r.fromZ, ux: dx / d, uz: dz / d, sigma, tick });
-  // Keep the newest, within its window.
+  // Keep the newest, within its window; the fusion runs once a tick, after the whole inbox.
   const horizon = tick - Math.round(S.keep * tuning.sim.tickHz);
   shots.bearings = shots.bearings.filter((b) => b.tick >= horizon);
   if (shots.bearings.length > S.maxBearings) shots.bearings.splice(0, shots.bearings.length - S.maxBearings);
+  shots.dirty = true;
+}
+
+/** Re-fuses the camp's bearings if new ones came in this tick: at most once a tick, however many reports arrived. */
+export function fuseShots(camp: CampState, tick: number, tuning: Tuning): void {
+  const shots = camp.shots;
+  if (!shots.dirty) return;
+  shots.dirty = false;
+  const F = tuning.brain.sniper.fusion;
   const est = shots.estimate ?? emptyEstimate();
-  if (fuseBearings(shots.bearings, { x: camp.map.x0 + (camp.map.n * camp.map.cell) / 2, z: camp.map.z0 + (camp.map.n * camp.map.cell) / 2, half: S.fusion.half, cells: S.fusion.cells, rangeMin: S.fusion.rangeMin, rangeMax: S.fusion.rangeMax }, est)) {
+  const cx = camp.map.x0 + (camp.map.n * camp.map.cell) / 2;
+  const cz = camp.map.z0 + (camp.map.n * camp.map.cell) / 2;
+  if (fuseBearings(shots.bearings, { x: cx, z: cz, half: F.half, cells: F.cells, rangeMin: F.rangeMin, rangeMax: F.rangeMax }, est)) {
     shots.estimate = est;
     shots.tick = tick;
   }

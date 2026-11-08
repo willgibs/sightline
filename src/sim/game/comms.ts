@@ -1,4 +1,4 @@
-import { REPORT_KINDS, alertRung, createBrain, createCamp, digest, mapMass, plan, spreadCamp, standStill, type CampMind, type CampOrder, type CampState, type Report, type Task, type Told, type Via } from '../brain';
+import { REPORT_KINDS, alertRung, createBrain, createCamp, digest, fuseShots, mapMass, plan, spreadCamp, standStill, type CampMind, type CampOrder, type CampState, type Report, type Task, type Told, type Via } from '../brain';
 import type { DebugDraw } from '../kernel/debugDraw';
 import type { SimEvent } from '../kernel/events';
 import { createBody } from '../body';
@@ -304,6 +304,7 @@ export const campCommander: System = {
     const before = camp.level;
     for (const r of camp.inbox) digest(camp, r, ctx.tick, ctx.tuning, ctx.world);
     camp.inbox.length = 0;
+    fuseShots(camp, ctx.tick, ctx.tuning);
     spreadCamp(camp, ctx.tick, ctx.tuning, ctx.world);
     const T = ctx.tuning.brain.camp;
     const hz = ctx.tuning.sim.tickHz;
