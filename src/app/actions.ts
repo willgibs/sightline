@@ -38,6 +38,7 @@ export type Action =
   | 'slower'
   | 'faster'
   | 'restart'
+  | 'shotDrop'
   // The fly camera.
   | 'flyUp'
   | 'flyDown'
@@ -92,6 +93,8 @@ export const DEFAULT_ACTIONS: Readonly<Record<Action, ActionSpec>> = {
   slower: { context: 'debug', kind: 'pressed', inputs: ['BracketLeft'], label: 'slower' },
   faster: { context: 'debug', kind: 'pressed', inputs: ['BracketRight'], label: 'faster' },
   restart: { context: 'debug', kind: 'pressed', inputs: ['KeyR'], label: 'restart run' },
+  // Sandbox: a shot where you look, rifle or not.
+  shotDrop: { context: 'debug', kind: 'pressed', inputs: ['KeyJ'], label: 'drop a shot' },
   flyUp: { context: 'fly', kind: 'held', inputs: ['Space', 'KeyE'], label: 'up' },
   flyDown: { context: 'fly', kind: 'held', inputs: ['KeyQ'], label: 'down' },
   replayPlay: { context: 'replay', kind: 'pressed', inputs: ['KeyP'], label: 'play or pause' },

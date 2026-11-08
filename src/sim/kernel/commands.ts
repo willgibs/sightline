@@ -44,6 +44,17 @@ export interface ThrowCommand {
   pitch: number;
 }
 
+/**
+ * Sandbox (the debug view): a shot dropped where the frame's line of sight meets the world,
+ * fired from the eye whether or not a rifle is carried (ballistics lane).
+ */
+export interface ShotDropCommand {
+  kind: 'shotDrop';
+  lag: number;
+  yaw: number;
+  pitch: number;
+}
+
 /** One click of the scope's zero dial, up or down; fit or take off the suppressor. */
 export interface ZeroUpCommand {
   kind: 'zeroUp';
@@ -55,7 +66,7 @@ export interface SuppressorCommand {
   kind: 'suppressor';
 }
 
-export type Command = FireCommand | RangeCommand | ThrowCommand | ZeroUpCommand | ZeroDownCommand | SuppressorCommand;
+export type Command = FireCommand | RangeCommand | ThrowCommand | ZeroUpCommand | ZeroDownCommand | SuppressorCommand | ShotDropCommand;
 export type CommandKind = Command['kind'];
 
 /** How a command field is stored and quantized. */
@@ -76,6 +87,7 @@ export const COMMANDS: { readonly [K in CommandKind]: CommandSpec<Extract<Comman
   zeroUp: { code: 32, range: 'ballistics', fields: {} },
   zeroDown: { code: 33, range: 'ballistics', fields: {} },
   suppressor: { code: 34, range: 'ballistics', fields: {} },
+  shotDrop: { code: 35, range: 'ballistics', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
 };
 
 /** The most commands one tick carries; more are dropped, oldest kept. */

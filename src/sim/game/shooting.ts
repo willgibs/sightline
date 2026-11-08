@@ -11,6 +11,7 @@ import {
   markDirection,
   pushSway,
   restAvailable,
+  solveAim,
   swayAt,
   swaySample,
   vec3,
@@ -79,6 +80,7 @@ const rifleSystem: System = {
   emits: ['shot', 'report', 'ranged', 'impact', 'death', 'cry'],
   run(ctx) {
     const p = player(ctx.index);
+    for (const c of ctx.input.commands) if (c.kind === 'shotDrop') dropShot(ctx, p, c);
     const rifle = p.rifle;
     if (!rifle) return;
     for (const c of ctx.input.commands) {
@@ -135,6 +137,41 @@ function shoot(ctx: TickContext, p: PlayerEntity, rifle: RifleState, c: Extract<
   // Sweep it from its instant to the tick's start, through the world as the player saw it.
   const now = (ctx.tick - 1) / hz;
   flyAndStrike(ctx, bullet, now);
+}
+
+/**
+ * Sandbox (B8): a match round dropped where the frame's line of sight meets the world,
+ * from the eye, with or without a rifle: no sway, no bolt, no rounds counted. Solved to
+ * land on that point (aim.ts), so a guard beside it hears the crack and the strike.
+ */
+function dropShot(ctx: TickContext, p: PlayerEntity, c: Extract<Command, { kind: 'shotDrop' }>): void {
+  const T = ctx.tuning;
+  const B = T.ballistics;
+  const t = (ctx.tick - 1 - c.lag) / T.sim.tickHz;
+  poseAt(p.body, c.lag, pose);
+  eye.x = pose.x;
+  eye.y = pose.y + pose.eyeHeight;
+  eye.z = pose.z;
+  lineOfSight(c.yaw, c.pitch, sight);
+  const env = ctx.world.spec.env;
+  const a = air(env);
+  windAt(env, t, wind);
+  const kit = { load: B.rifle.load, zero: B.rifle.zero.start };
+  const b = ballisticOf(kit, T, a.density, wind);
+  const zero = zeroOf(kit, T, a.density);
+  raycast(ctx.query(), eye.x, eye.y, eye.z, sight.x, sight.y, sight.z, B.binoculars.rangeMax, Blocks.Bullet, hit, p.id);
+  if (hit.what !== 'none') solveAim(eye, { x: hit.x, y: hit.y, z: hit.z }, 0, 0, zero, b, B.maxFlight, aim);
+  else {
+    aim.x = sight.x;
+    aim.y = sight.y;
+    aim.z = sight.z;
+  }
+  const flight = launch({ x: 0, y: 0, z: 0, dx: 0, dy: 0, dz: 0, t: 0, v0: 0, k: 0, g: 0, wx: 0, wz: 0 }, eye, aim, zero, b, t);
+  const shotId = ctx.emit({ type: 'shot', source: p.id, t, x: eye.x, y: eye.y, z: eye.z, dx: flight.dx, dy: flight.dy, dz: flight.dz, speed: b.v0, drag: b.k, wx: b.wx, wz: b.wz });
+  const radius = B.sound.report;
+  ctx.emit({ type: 'report', source: p.id, t, cause: shotId, x: eye.x, y: eye.y, z: eye.z, surface: p.body.surface, loudness: radius / T.noise.radiusPerUnit, radius, suppressed: 0 });
+  const bullet = ctx.spawn((id): BulletEntity => ({ id, kind: 'bullet', faction: p.faction, bullet: { shooter: p.id, shot: shotId, flight, swept: t } }));
+  flyAndStrike(ctx, bullet, (ctx.tick - 1) / T.sim.tickHz);
 }
 
 /** Lasers the range along the frame's line of sight: the distance to the first thing that stops light, to the metre. */

@@ -38,3 +38,4 @@ export { ballisticOf, dialZero, freshRifle, loadOf, pushSway, swayAt, zeroOf, ty
 export { smoothNoise, swaySample } from './sway';
 export { restAvailable } from './rest';
 export { glint } from './glint';
+export { crackAt, type Crack } from './crack';

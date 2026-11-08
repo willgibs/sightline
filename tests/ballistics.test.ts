@@ -3,6 +3,7 @@ import { defaultTuning } from '../src/config/tuning';
 import { flightAt, timeAtRange, velocityAt, vec3, type Flight, type Vec3 } from '../src/sim/ballistics/trajectory';
 import { holdBetween, landing, markDirection, solveAim, unit, zeroFor, type Ballistic } from '../src/sim/ballistics/aim';
 import { glint } from '../src/sim/ballistics/glint';
+import { crackAt } from '../src/sim/ballistics/crack';
 
 /**
  * The one ballistic function (sim/ballistics/trajectory.ts) against physics it stands for:
@@ -233,5 +234,30 @@ describe('lens glint', () => {
       last = g;
     }
     expect(last).toBe(0);
+  });
+});
+
+describe('the crack', () => {
+  it('comes from d·tan μ upstream of the nearest pass, for a straight supersonic path', () => {
+    // Constant speed, no gravity: Mach 2 in 343 m/s air.
+    const f: Flight = { x: 0, y: 0, z: 0, dx: 0, dy: 0, dz: -1, t: 5, v0: 686, k: 0, g: 0, wx: 0, wz: 0 };
+    const out = { t: 0, emitted: 0, x: 0, y: 0, z: 0, distance: 0 };
+    const c = crackAt(f, 7, { x: 10, y: 0, z: -200 }, 343, out)!;
+    expect(c).not.toBeNull();
+    // tan μ = 1/√(M² − 1) = 1/√3: 5.77 m upstream of z = −200.
+    expect(c.z).toBeCloseTo(-200 + 10 / Math.sqrt(3), 4);
+    expect(c.emitted).toBeCloseTo(5 + (200 - 10 / Math.sqrt(3)) / 686, 6);
+    expect(c.t).toBeCloseTo(c.emitted + Math.hypot(10, 10 / Math.sqrt(3)) / 343, 6);
+  });
+
+  it('is never heard behind the muzzle, from a subsonic load, or past where the bullet stopped short', () => {
+    const fast: Flight = { x: 0, y: 0, z: 0, dx: 0, dy: 0, dz: -1, t: 0, v0: 823, k: 0.000756, g: 9.81, wx: 0, wz: 0 };
+    const out = { t: 0, emitted: 0, x: 0, y: 0, z: 0, distance: 0 };
+    expect(crackAt(fast, 2, { x: 0, y: 0, z: 20 }, 340, out)).toBeNull();
+    expect(crackAt({ ...fast, v0: 320, k: 0.00037 }, 2, { x: 5, y: 0, z: -100 }, 340, out)).toBeNull();
+    // A guard 10 m off the path at 300 m hears it from about 6 m before the bullet's nearest pass.
+    const c = crackAt(fast, 2, { x: 10, y: 0, z: -300 }, 340, out)!;
+    expect(c.z).toBeGreaterThan(-300);
+    expect(c.z).toBeLessThan(-292);
   });
 });

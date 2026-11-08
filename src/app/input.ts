@@ -218,6 +218,7 @@ export class InputController {
         if (this.armed) this.latch.latch('throw');
       } else if (a === 'crouch' || a === 'prone') this.pressed.add(a);
       else if (a === 'scopeToggle') this.scopeToggled = !this.scopeToggled;
+      else if (a === 'shotDrop') this.latch.latch('shotDrop');
       else if (a === 'zeroUp' || a === 'zeroDown' || a === 'suppressor') {
         if (this.armed) this.simple.push({ kind: a });
       } else this.onAction?.(a);

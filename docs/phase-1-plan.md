@@ -523,12 +523,13 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
   - Breath holds for about 4 s, recovers over about 6 s, and spikes on release.
   - Heart rate rises with sprinting and close calls, and settles over about 20 s.
   - Landed: `ballistics/sway.ts` (breathing on two incommensurate phases, hashed smooth tremor, the heartbeat's kick, the recoil), sampled at every tick's end with two ticks of history (`rifle.ts`), and `body/vitals.ts` (heart rate, breath held and recovered, `startle` for close calls, which lab E calls when guards shoot back). A rest is found by geometry (`rest.ts`): a bipod prone, sandbags or a wall upright. The ladder measured (`game/ballisticsBench.ts`): 1.64 mil standing, 0.99 crouched, 0.69 prone, 0.255 prone on a rest, 0.046 with the breath held. Shots leave along the camera of the frame clicked on, sway and all, at 30–144 fps (`tests/sway.test.ts`).
-- [ ] B8 · The shot's sound.
+- [x] B8 · The shot's sound.
   - The report at the muzzle, the crack along the path, the impact.
   - The suppressor cuts the report.
   - The impact's sound reaches the shooter at flight time plus return time, about 1.28 s at 300 m.
   - Voices in the audio engine.
   - Sandbox shot drops.
+  - Landed: `report`, `impact` and `cry` events (sounds, with radii by the suppressor, the load and what was struck) and the crack as a function of the path (`ballistics/crack.ts`: the Mach cone's point, d·tan μ upstream of the nearest pass), for lab A's hearing and the speakers alike. Voices in `audio/shotVoices.ts`. Measured offline in Chromium (`tests/browser/shot.test.ts`): the strike of a 300 m shot comes back 1.24–1.33 s after the trigger; a listener 10 m off the path hears the crack near 0.4 s and the report after 0.8 s; the shooter hears no crack; the suppressor cuts the report by more than 12 dB. Sandbox: J in the debug view drops a shot where you look (`shotDrop`, command 35), rifle or not.
 - [ ] B9 · The throwable: its arc, and a landing sound that draws one guard.
 - [ ] B10 · Hit confirmation, and telemetry.
   - Dust on a miss, so the player can correct like a spotter.
