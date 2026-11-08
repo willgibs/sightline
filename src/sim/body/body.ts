@@ -275,7 +275,12 @@ export function poseAt(b: BodyState, lag: number, out: PoseSample): PoseSample {
  * headroom and sight all use this, so the body can't slip under a slab its eye is above.
  */
 export function bodyHeight(b: BodyState, spec: BodySpec): number {
-  return Math.max(spec.height[b.stance], b.eyeHeight + (spec.height[b.stance] - spec.eyeHeight[b.stance]));
+  // Above the eye, the least of what any stance has: lying down from a crouch must not make a body
+  // taller than it is, by a prone head's bigger clearance, under a slab just over its head.
+  const H = spec.height;
+  const E = spec.eyeHeight;
+  const above = Math.min(H.stand - E.stand, H.crouch - E.crouch, H.prone - E.prone);
+  return Math.max(H[b.stance], b.eyeHeight + above);
 }
 
 /**
