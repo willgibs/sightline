@@ -2,6 +2,25 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · Lab B, shooting
+
+Built on its branch as `docs/phase-1-plan.md`, section B, plans it. Its seed, the seed's shortfall and its targets are recorded there.
+
+### How the lab is built
+
+**Decision:**
+- **One ballistic function.** The closed form for one quadratic drag constant per load, worked in the bore's frame (drop on g·cos θ, ½·g·sin θ·t² along the bore), with the lag rule for wind: drift = wind × (time of flight − distance ÷ muzzle speed). The bullet, the zero dial, the reticle's holds, the rangefinder's readout and every assist evaluate it; none integrates.
+- **A bullet is its launch.** Its state is where and when it left, its direction, its muzzle speed and drag (at the mission's air), and the time up to which it has been swept; its position at any instant follows exactly. It is an entity, spawned when fired and despawned when it lands.
+- **A shot resolves against what the player saw.** The `fire` command already carries the frame's instant and angles; the rifle sweeps the bullet from that instant to the tick's start against the bodies' two ticks of history, in 'commands', then 'projectiles' sweeps each tick's segment against every body part between its two poses, the terrain and the colliders.
+- **The rifle and vitals are components a run's setup gives** (the player's `rifle` and `vitals`). The range scene gives them; the valley gets them in Phase 2, when the labs are joined. A click in the valley stays the bare `shot` it was.
+- **Sway is sampled at every tick's end** (`rifle.sway`, with two ticks of history, as a body keeps its pose), from pure functions of the state and the time. The camera and the shot read it through one interpolation at the frame's instant.
+- **Assist layers are view-only.** Arcade, realistic-lite and simulation differ in what the instruments show, never in the physics, so taste call 3 never changes a recording.
+
+**Why:**
+- The research's measurements (`docs/research/notes/labs/ballistics_and_shooting.md`): one Euler step per tick lands 18.5 cm low at 500 m, nearly a head, so a reticle drawn from an exact formula over an integrating bullet would lie. A function with no integration state can't drift from its instruments.
+- Resolving the shot against history is the single-player form of lag compensation; the bodies already keep the two poses it needs.
+- Giving the valley a rifle now would move every valley golden's state for a feature no bot uses, while labs A and D land beside this one. A loadout given by the setup keeps the valley still until Phase 2 joins the labs on purpose.
+- Sway that changes every tick can't be re-evaluated exactly between ticks unless both sides read the same samples; two ticks of history is what the pose already does, so the shot and the drawn reticle agree by construction.
 ## 2026-11-08 · Public
 
 ### The repository is public, under MIT

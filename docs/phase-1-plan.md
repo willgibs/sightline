@@ -467,6 +467,25 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
   - the miss breakdown in telemetry;
   - the owner's call.
 
+**Recorded before building** (Nov 8, by the lab B session). Each row is a number the lane's bench (`game/benches.ts`, lane `ballistics`) measures, with the seed's value where the research measured one. The exit note gives the bench's values against both columns.
+
+| Measure | The seed | Target |
+| --- | --- | --- |
+| Drawn hold against simulated impact: two loads, 100–500 m, winds 0–8 m/s from any side, slopes ±30° | 18.5 cm low at 500 m (one Euler step per tick under an exact reticle); a field of view that bent Tarkov's reticle by 100–200 m of zero | Under 1 cm everywhere; aim for 0.2 cm |
+| The model against a G7 point-mass solver (.308, 168 gr, sea level) | Gravity only: drop 22–29% short; wind carried with the air: drift 6–9 times too much | Drop within 1 cm and drift within 0.5 cm to 500 m |
+| The closed form against RK4 of its own model, ±30° | — | Under 0.05 cm across the aim |
+| Decision sensitivity at 300 m, a guard walking 1.35 m/s | Measured by no game | Skipping drop, lead, wind (4 m/s) or ranging (an unaided 15% guess) each moves a centred head shot off the 23 cm head |
+| Sway, the 95th-percentile radius over 20 s | Arma: no numbers published | Free-standing at least 1.5 mil; prone 0.5–0.8; prone rested 0.25; rested, breath held, 0.1 or less |
+| The impact heard back at the shooter | No game times it physically | Flight plus return, to the tick: about 1.28 s at 300 m |
+| What decided each miss | Sniper Elite: a hidden score | Range, lead, wind and sway error in mils, for every shot, in the playtest summary |
+
+**How the lab is built** (decided before building; `docs/decisions.md`, Lab B, has the reasons):
+- **One ballistic function** (`ballistics/trajectory.ts`): the closed form for one drag constant, in the bore's frame, with the lag rule for wind. A bullet's whole path is its launch, so a bullet in the state is its launch and nothing else, and its position at any instant is exact.
+- **Bullets are entities.** A shot is resolved in 'commands' against the poses the player saw (the two ticks of history), from its instant to the tick's start, then flown in 'projectiles' every tick, each segment swept against every body part between two ticks' poses, the terrain and the colliders.
+- **The rifle and vitals are components the run's setup gives.** The range gives them now; the valley gets them in Phase 2. Until then a click in the valley is the bare shot it was, and no valley golden moves.
+- **Sway is sampled at every tick's end, kept with two ticks of history** like a body's pose, and both the camera and the shot read it through one function at the frame's instant: the shot goes where the drawn reticle pointed.
+- **Assist layers are view-only.** Arcade, realistic-lite and simulation differ only in what the instruments show, over one physics, so taste call 3 never changes a recording.
+
 **Milestones:**
 - [ ] B1 · The range scene: firing points with a rest; targets walking routines across 100–500 m; flags and grass that show the wind.
 - [ ] B2 · Content as data in `tuning.ts` (rule 16): the rifle, its ammunition and suppressor, the scope and binoculars, and the throwable.
