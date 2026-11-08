@@ -41,13 +41,14 @@ export const BENCH_GOLDEN: PinnedBench = {
       "seed · lean: pairs where the camera sees a guard who has no line to the head (of 2000)": 18,
       "mantle: ticks inside someone walking across the landing": 0,
       "seed · mantle checked once: ticks inside him": 15,
-      "prone: fuzzing bot on the course, lying poses checked": 2972,
-      "prone: fuzzing bot on the course, poses with a part inside something solid": 44,
-      "seed · single circle: fuzzing bot on the course, poses with a part inside something solid": 2,
+      "prone: fuzzing bot on the course and in two valleys, lying poses checked": 16869,
+      "prone: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 398,
+      "seed · single circle: fuzzing bot on the course and in two valleys, lying poses checked": 16869,
+      "seed · single circle: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 3258,
       "prone: turning between walls a metre apart, poses with a part inside something solid": 0,
       "seed · single circle: turning between walls a metre apart, poses with a part inside something solid": 259,
-      "prone: deepest any part goes into something solid (m)": 0.133584506,
-      "seed · single circle: deepest any part goes into something solid (m)": 0.249764984
+      "prone: deepest any part goes into something solid (m)": 0.267231692,
+      "seed · single circle: deepest any part goes into something solid (m)": 0.490337132
     },
     "runs": {
       "movement-course": {

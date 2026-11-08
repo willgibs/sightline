@@ -142,11 +142,12 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
 /**
  * Prone (C2): how far a lying body's shape goes into what's solid, with the chain and with
  * the seed's single 0.3 m circle standing in for it: the fuzzing bot on the movement course
- * for three minutes, and a body turning right round between two walls a metre apart.
+ * for ten minutes and in two valleys for five each (long enough to outweigh where the bot
+ * happens to wander), and a body turning right round between two walls a metre apart.
  * Measured independently of the motor, as a part's penetration in three dimensions (the
- * least of how far it is in horizontally, under the top and over the bottom); the shape is
- * straight, so a body lying over a low edge bends across it by centimetres (that's why the
- * measure allows 2 cm).
+ * least of how far it is in horizontally, under the top and over the bottom), allowing
+ * 2 cm. The shape is straight, so a leg lying up over a ledge can cut its corner: the
+ * chain doesn't (the invariant watch), but the capsules that stand for it here can.
  */
 function proneBench(): Record<string, number> {
   const seed = structuredClone(defaultTuning);
@@ -186,13 +187,16 @@ function proneBench(): Record<string, number> {
   };
   const course = (tuning: typeof defaultTuning): { inside: number; deepest: number; poses: number } => {
     const tally = { inside: 0, deepest: 0, poses: 0 };
-    const sim = startScene(SCENES['movement-course']!() as unknown as KernelScene<Simulation>, tuning);
-    const bot = new ChaosBot('BENCH-COURSE');
-    const raw = neutralInput();
-    for (let i = 0; i < 180 * 30; i++) {
-      sim.step(bot.next(sim, raw));
-      measure(sim, tally);
-    }
+    const play = (sim: Simulation, botSeed: string, minutes: number): void => {
+      const bot = new ChaosBot(botSeed);
+      const raw = neutralInput();
+      for (let i = 0; i < minutes * 60 * 30; i++) {
+        sim.step(bot.next(sim, raw));
+        measure(sim, tally);
+      }
+    };
+    play(startScene(SCENES['movement-course']!() as unknown as KernelScene<Simulation>, tuning), 'BENCH-COURSE', 10);
+    for (const valley of ['TAL-4471', 'MUD-9031']) play(new Simulation(generateWorld(missionSpec(valley), tuning), tuning), valley, 5);
     return tally;
   };
   const between = (tuning: typeof defaultTuning): { inside: number; deepest: number; poses: number } => {
@@ -215,9 +219,10 @@ function proneBench(): Record<string, number> {
   const c = between(defaultTuning);
   const d = between(seed);
   return {
-    'prone: fuzzing bot on the course, lying poses checked': a.poses,
-    'prone: fuzzing bot on the course, poses with a part inside something solid': a.inside,
-    'seed · single circle: fuzzing bot on the course, poses with a part inside something solid': b.inside,
+    'prone: fuzzing bot on the course and in two valleys, lying poses checked': a.poses,
+    'prone: fuzzing bot on the course and in two valleys, poses with a part inside something solid': a.inside,
+    'seed · single circle: fuzzing bot on the course and in two valleys, lying poses checked': b.poses,
+    'seed · single circle: fuzzing bot on the course and in two valleys, poses with a part inside something solid': b.inside,
     'prone: turning between walls a metre apart, poses with a part inside something solid': c.inside,
     'seed · single circle: turning between walls a metre apart, poses with a part inside something solid': d.inside,
     'prone: deepest any part goes into something solid (m)': round(Math.max(a.deepest, c.deepest)),

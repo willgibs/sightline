@@ -4,7 +4,7 @@ A first-person stealth-sniper game for the browser. Each mission is a freshly ge
 
 It's early, and wireframe on purpose. The rule is to prove the core with plain shapes first: if a mission isn't tense with capsules and boxes, more content won't save it. Art comes after that.
 
-**[Play the latest build](https://sightline-brown.vercel.app)** in a desktop browser with a mouse and keyboard. It's whatever is on `main`: a walkable valley with a test camp and both views, not yet a mission. The labs are playable too: **[the shooting range](https://sightline-brown.vercel.app/?scene=shooting-range)** has 15 rounds and guards walking at 100–500 m.
+**[Play the latest build](https://sightline-brown.vercel.app)** in a desktop browser with a mouse and keyboard. It's whatever is on `main`: a walkable valley with a test camp and both views, not yet a mission. The labs are playable too: **[the shooting range](https://sightline-brown.vercel.app/?scene=shooting-range)** has 15 rounds and guards walking at 100–500 m, and **[the movement lab](https://sightline-brown.vercel.app/?scene=movement-lab)** has walls to mantle, windows, a ladder, a body to carry and every surface to hear yourself on.
 
 ![A valley overlook in the honest view, with the camp below](docs/images/overlook.png)
 
@@ -55,7 +55,10 @@ That's the typecheck and every test. The tests that need a real browser run with
 | W A S D | Move |
 | Shift | Sprint |
 | C | Crouch (toggle) |
-| Z | Prone (toggle) |
+| Z | Prone (toggle). You turn as far as the ground lets you, and need room to get up |
+| Q and E (hold) | Lean left and right; further with the scope up |
+| Space | Climb: over a low wall, through a window, or onto a ladder (a prompt says when) |
+| G | Pick up or put down a body (a prompt says when). Crouch to drag it; put it down in foliage or by a container to hide it |
 | Right mouse or F (hold) | Zoom |
 | Left mouse | Fire the rifle on the shooting range. In the valley, a test shot drawn in the debug view (the rifle reaches the valley in Phase 2) |
 | M | Mark this moment (it shows on the replay's timeline) |
@@ -80,7 +83,7 @@ In the debug view only:
 | --- | --- |
 | B | Show every collider: purple blocks everything, blue blocks movement, green blocks sight |
 | O | Show overwatch perches and their sightlines to the camp |
-| G | Show the spatial grid |
+| L | Show the spatial grid |
 | N | Fly camera (Space or E up, Q down, Shift fast) |
 | [ and ] | Slow down or speed up time (0.25× to 8×) |
 | R | Restart the run |
@@ -99,7 +102,8 @@ The debug view's other keys work in a replay too, whichever view is showing.
 
 URL options:
 - `?seed=TAL-4471` picks a valley.
-- `?scene=movement-course` plays a scene.
+- `?scene=movement-lab` plays a scene.
+- `?hz=60` runs the simulation at another tick rate; `?hz=blind` picks 30 or 60 at random and doesn't say which.
 - `?view=debug` starts in the debug view.
 - `?spawn=edge` starts where the road leaves the map.
 - `?bench` runs a 20-second performance flythrough.
