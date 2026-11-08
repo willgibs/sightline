@@ -39,9 +39,9 @@ import { readInput, writeInput } from './inputCodec';
  * 6: tagged tracks; checkpoints part by part; tuning changes and annotations recorded.
  * 7: the mission spec carries its environment. 8: a run that ended in a fault says so.
  * 9: the scene a run was played in, and worlds built by hand. 10: the behaviour
- * fingerprint of the build that made it.
+ * fingerprint of the build that made it. 11: the scene's parameters (a scenario's).
  */
-export const RECORDING_VERSION = 10;
+export const RECORDING_VERSION = 11;
 const MAGIC = [0x53, 0x4c, 0x52, 0x43]; // SLRC
 /** Larger than a day of play. Anything bigger is not a recording. */
 export const MAX_RECORDING_BYTES = 512 * 1024 * 1024;
@@ -58,8 +58,8 @@ export interface RecordingHeader {
   /** How the build that made it behaves (Game.behaviour): another build that behaves differently refuses it. */
   behaviour: string;
   mission: MissionSpec;
-  /** The scene the run was played in (sim/scene.ts), which re-simulating it needs; null for a plain mission. */
-  scene: { name: string; version: number } | null;
+  /** The scene the run was played in (sim/scene.ts), with its parameters, which re-simulating it needs; null for a plain mission. */
+  scene: { name: string; version: number; params: string } | null;
   /** The exact tuning at the start, so re-simulation never depends on today's defaults. */
   tuning: Tuning;
   tuningHash: string;
@@ -119,7 +119,7 @@ export class Recorder {
   private readonly tunings: TuningChange[] = [];
   private readonly annotations: Annotation[] = [];
   private fault: SimFault | null = null;
-  private readonly scene: { name: string; version: number } | null;
+  private readonly scene: { name: string; version: number; params: string } | null;
   ticks = 0;
 
   constructor(
@@ -521,7 +521,7 @@ function checkHeader(v: unknown): RecordingHeader {
     fail('mission');
   }
   const sc = h.scene as Record<string, unknown> | null;
-  if (sc !== null && (!sc || typeof sc !== 'object' || Object.keys(sc).sort().join() !== 'name,version' || !text(sc.name, 64) || !whole(sc.version, 1, 1e6))) {
+  if (sc !== null && (!sc || typeof sc !== 'object' || Object.keys(sc).sort().join() !== 'name,params,version' || !text(sc.name, 64) || !whole(sc.version, 1, 1e6) || !text(sc.params, 1024))) {
     fail('scene');
   }
   // Tuning that is shaped differently comes from a build with other tuning values, not

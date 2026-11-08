@@ -81,7 +81,7 @@ const guardOrders: System = {
 const guardBrains: System = {
   name: 'guard-brains',
   phase: 'decide',
-  reads: ['guard.body', 'guard.guard.spawn'],
+  reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.senses'],
   writes: ['guard.guard.order'],
   emits: [],
   run(ctx) {

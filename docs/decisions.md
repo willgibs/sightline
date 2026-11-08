@@ -2,6 +2,122 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · Public
+
+### The repository is public, under MIT
+
+**Decision:**
+- `willgibs/sightline` is public, under the MIT License (`LICENSE`, © 2026 Will Gibson). The license covers the code and the documents, and grants no rights to the name Sightline.
+- It stays the owner's project. `CONTRIBUTING.md` welcomes bug reports, best with a recording, and asks for an issue before any code. The README is written for people who find the repository.
+- Production is public at sightline-brown.vercel.app, the repository's website link, and the README links it. Vercel Authentication covers sightline-willgibs.vercel.app and the previews, not the production domain, so Phase 0's entry below (Version control, CI and a playable link) overstated it.
+- Nothing private is committed. The owner's local path is gone from the handoff, and a link only the owner can open, such as the live design doc, says so and points to the public copy.
+
+**Why:** The owner wants people to be able to read the code and play the build, while the project stays the owner's own. MIT is the simplest, most familiar license for that. Art and sound, when they arrive, can carry their own terms.
+
+## 2026-11-08 · Lab A: perception and awareness
+
+Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
+
+### The awareness ladder and its minimal reactions (A7)
+
+**Decision:**
+- **Two kinds of evidence.** The sight meter, and the evidence other stimuli leave (a footstep raises a guard to between 0.3 and 0.62 by its clarity, a shot to 0.8), on one scale with the design doc's thresholds: curious 0.3, suspicious 0.55, searching 0.8; combat only from the meter at 1, a confirmed sighting.
+- **Rises wait for the dwell** of the state they rise from (curious 0.6 s, suspicious 0.8 s, searching 0.6 s), one state at a time: something alarming reaches searching in 1.4 s, telegraphed by curiosity at once. A confirmed sighting leaves searching-level evidence for when he loses you.
+- **Falls step down one state at a time** after the state's ramp-down (curious 6 s, suspicious 10 s, searching 20 s, combat 30 s), each varied ±25% from the guard's own stream. Evidence explains a rise but holds nothing up: only sight at the state's level, or a fresh stimulus of it, moves the fall back.
+- **Grace periods** of 2.5 s ignore weaker stimuli unless one beats the last rise by 25%, or three arrive, which counts as a rise of 0.2: repeated footsteps escalate, single ones don't stack.
+- **Sharper after a search:** a guard who searched settles at unaware with a floor of 0.15 under every stimulus and eyes 1.25× quicker.
+- **Minimal reactions** (`brain/react.ts`), until lab E's brain: curious, stop and look (the head first, the body when it must); suspicious and searching, walk (1.5 m/s, 2.2 m/s) to where he believes it was and look around there; combat, face where he believes you are; unaware, back to the routine. A guard on a tower looks from it and never walks off.
+- **Every change is an event:** 'alert', with its from, to, reason and the percept that caused it.
+
+**Why:** Thief's filtered rises and capacitor-like falls and The Dark Mod's grace periods are the strongest open ladder; the design doc asks for a raised baseline and a 1.5 s reaction window. Stale evidence holding a state up kept guards searching forever: the tests caught it.
+
+### Percepts and beliefs (A6)
+
+**Decision:**
+- **Percepts are records:** kind (sight, sound, shot, voice; body, impact, object, glint and door to come), place, radius of uncertainty, strength, the tick sensed, the tick it lapses, and its cause. A guard keeps at most eight live ones.
+- **Beliefs:** the mind holds the last known position with its uncertainty: from sight (a fix within 0.5 m plus 1% of the distance), or from a heard guess, whichever is surer, its radius grown at 1.5 m/s as it ages. Seen at 100%, it is confirmed.
+- **The mind** (`brain/mind.ts`) gains the head's turn, the percepts, the awareness (state, since, focus) and the belief. A guard without senses has the empty ones, so the valley's brains decide as before.
+- **No-omniscience, for guards who perceive:** the valley with every guard's senses on, the player at two corners over 600 m from any guard (beyond a marksman's far zone against the sky) for the whole run: every guard has the same mind on every tick, and decides the same. A peeking brain is caught at its first decision; a run with the player near the camp shows minds that differ, which is perception doing its job.
+
+**Why:** a percept never says who made a stimulus, and a belief comes only from percepts, so a guard can be wrong exactly where his senses were.
+
+### Hearing: one law for the guards and the speakers (A5)
+
+**Decision:**
+- **Two routes, the louder wins.** Around: one bounded flood over the site grid per sound (W0.5's search, its radius as the cost limit, 120,000 expansions at most), read at every listener's cell. Through: the straight line, losing 12 dB for each full-height wall (counted against the colliders, by the grid's own rule, so a wall thinner than a cell counts and sound passes over a crate) and 15 dB where the ground is in the way.
+- **Masking:** the steady sources (`generation/ambient.ts`), heard by the same law and summed as power, raise the threshold to 17 dB below them. Their floods are made once per world.
+- **A guess, not a fix:** a sound around a corner seems to come from the last cell of its route the listener can see (the doorway); its place is blurred by 0.5 m, 8% of the distance and 60% of the detour, drawn from the guard's own stream. It arrives at the speed of sound along its route.
+- **Sides:** a guard ignores his own side's footsteps, never a voice.
+- **The speakers ask the same function** (`audio/hearing.ts`): level, the place it seems to come from, its delay along the route, muffled through walls; the steady sources too. The bench compares 200 random sounds and listeners: none differ by a bit.
+- **The crack** (`perception/crack.ts`): from a bullet's flight, the point whose shock reaches a listener first, cos φ = c / v. On a path slowing from 790 m/s, listeners 5–15 m from it at 300 m hear it 55.4–57.2° off the shooter. It is wired in when lab B's shot sounds land (B8). The plan's recorded target said 5–20 m: at 20 m the shooter's own bearing sits 3.8° off the path, giving 54.6°, so the target now says 5–15 m.
+- **Barks are delivered by their system:** a sound made after 'perception' (a bark in 'awareness') reaches listeners through `deliverSound`, since the tick's later events reach no reader.
+
+**Why:** Mark of the Ninja fed one path to its AI and the player's audio; Thief's doorways and Siege's muffled second route keep hearing honest round buildings; Dungeon Crawl Stone Soup's integer flood is exact and cheap. The old speakers' straight-line muffle let you hear what a guard where you stood couldn't, and the reverse.
+
+**What moved (A5–A7):** the perception lab's fingerprints (`0dfa42645814f21a`, `6625deddfd28368b`): guards now hear, react and fall back. Nothing in the valley.
+
+### The scenario runner: scenes with parameters, and the factor-grid sweep (A3)
+
+**Decision:**
+- **Parameters join a scene's identity.** A scene can be made from parameters (`SCENES[name](params)`); a recording's header names them (`scene: { name, version, params }`, format 11), and re-simulating makes the scene again with them, refusing a scene made with others. `?scene=sight&params=...` plays one in the browser.
+- **The sight scenario** (`game/scenes/sightScenario.ts`): one guard with a fixed gaze and the player in the lab, at a spot (open, shade, bush, wall, crest), a distance, an angle off the gaze, a stance and a movement, with the outcome it should have. The player circles the spot, so speed and distance hold. Its first table (`SIGHT_TABLE`) is the design doc's ranges and their neighbours either side of each edge: 14 rows, all as expected. `npm run scene` runs every table; `npm run scene -- sight --params ...` one row.
+- **The factor-grid sweep** (`perception/sweep.ts`) runs the rate law, split from the geometry as `exposureRate`, over every combination of distance, angle, stance, movement, light, cover, sky, zones and sharpness: 2.7 million neighbouring pairs, none filling slower with more exposure. It reports the design's fixed points, the least time from cue to 100%, and the steepest edge per metre and per degree.
+- **The seed is a rate law too** (`perception/seed.ts`): Blacklist's zones with hard ranges and the table as one product of rates. The bench sweeps it on the same grid.
+- **Movement ramps with speed:** from still at rest to moving at 1 m/s, then from moving at the body's walk to sprinting at its sprint. It was a step at 0.2 m/s, a cliff the table runs found when a pacing player slowed to turn.
+
+**The bench (perception lane), ours against the seed:** standing and walking, seen to 155.75 m (seed 150); still, prone, in cover, 46.75 m (seed 150); crouched and walking in shade at 30 m, 5.33 s (seed 8.89); a marksman's far zone, 405.75 m (seed 400); least time from the first cue to 100%, 1.5 s (seed 0.47); steepest edge 0.12 per metre and 0.11 per degree (seed 0.30 and 0.95, its cliffs measured at 1 m and 0.5° steps); monotonicity violations 0 of 2.7 million (seed 0).
+
+**What moved:** `RECORDING_VERSION` 11, so the golden recording is rewritten. The perception lab's behaviour fingerprint (`ec5e3044c2701e84`), from the movement ramp; nothing in the valley.
+
+### Sight: zones, caps and rates, with ramped edges (A2)
+
+**Decision:**
+- **How the table is read** (owner, Nov 7, made exact): each zone has a range for the reference body (standing, walking, lit, in the open): core ±30° to 150 m, peripheral ±60° to 25 m, and a marksman's far zone ±2.5° to 400 m. The most inclusive zone at the body's angle sets the rate. **Stance, light and the sky behind are range caps**; **movement and the share of the body in view are rate factors**. Inside a range the meter fills in 2 s at the eye growing linearly to 8 s at the edge.
+- **Every edge ramps:** a cone's over 4°, a range's over 8% of it (2 to 12 m).
+- **Telegraphed by construction:** outside a 2.5 m contact zone the rate is capped at 0.7 / 1.5 s, so the first cue (30%) always comes at least 1.5 s before 100%. Inside contact, a body is noticed in any direction, in 0.8 s.
+- **Each part at its own range.** Rays go to head, chest and feet (weights 0.2, 0.5, 0.3), each through foliage; a part with open sky behind it is seen up to 1.5× farther. Summing parts, rather than scaling the range by the sky's share of what's visible, keeps the model monotone: more of you in view never fills more slowly.
+- **Sky ramps too:** a line on past a body counts as sky as it rises through level (±0.5°), and ground behind it counts partly from 750 m and fully past 1,500 m.
+- **One ray is enough** to start the meter, in every stance: the share in view already slows a sliver, and a minimum would be a cliff. The minimum stays a knob in tuning.
+- **Light is the ground's** beneath the body (owner): the environment's light 5 cm above the feet, with foliage between it and the sun casting shade where it passes less than half.
+- **A distant guard skips perception:** a body beyond every zone's farthest possible reach costs no rays.
+
+**Why:** these read the design doc's four fixed points exactly. Standing and walking in the open: 150 m. Still and prone in cover: the prone cap is 45 m, so never beyond 50 m, and slowly within it. Crouched in shade at 30 m: a 54 m range, 5.3 s. A marksman: 400 m. Making movement a cap as well would put a still, crouched body in shade at 22 m, contradicting the third point.
+
+**What moved:** nothing in the valley. The perception lab joins the pinned runs, in the perception lane's bench (`1a1c65ab2888e504`, `2d76d43f31015522`), which moves `BEHAVIOUR`; the tuning gains `perception`, so the golden recording is rewritten.
+
+### Foliage dims sight the same both ways (A2, drawn in A4)
+
+**Decision:** foliage is a set of volumes (cylinders for bushes, cones for canopies) that a line passes through with transmittance exp(−density × chord). `Foliage.transmittance` orders its two ends before computing, so it is symmetric to the bit; a test checks 4,000 pairs. Volumes are a world field the perception lane adds by augmentation (`world.foliage`). The valley's bushes are still opaque sight colliders and its canopies block nothing: they become volumes when perception joins the valley (A13), with generation.
+
+**Why:** today a bush hides you without blocking your view out, and a canopy hides a guard from you but not you from him. One law in both directions removes both.
+
+### Systems read the tick's events (A2)
+
+**Decision:** `TickContext.events` is the events emitted so far in the tick. A system that reads them declares `events`, and the kernel refuses one in the same phase as a system that emits unless they're ordered. Perception takes stimuli from it (footsteps, shots, barks). Events emitted in a later phase reach no reader: what must outlast a tick goes into the state.
+
+**Why:** events are the labs' contract, and perception is their first consumer inside the simulation.
+
+### The perception lab (A1)
+
+**Decision:** a camp at the west end of a 520 m field (`game/scenes/perceptionLab.ts`): a sentry sweeping the field, a patrol on the perimeter, a marksman on a 6 m tower sweeping his far zone across it; low walls at 30 m and a chest-high wall at 60 m; crates; a shelter, a tall wall and a conifer for shade; bushes and the conifer's canopy as foliage; a ridge 70 m north whose crest the camp sees against the sky; gravel round the camp and along the track; a generator. Low hills close the lab's edges, so no line ends in false sky at the world's edge.
+
+**Why:** every factor of the sight table and of hearing has a place to be tried, and the scenario runner (A3) measures in its open field.
+
+## 2026-11-08 · Lab D
+
+Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the generation lane.
+
+### The one deliberate `GEN_VERSION` bump (D1)
+
+**Decision:**
+- **Scatter by cell.** Trees, rocks and bushes are scattered on jittered grids as before, but each cell now draws from its own stream: the feature's labelled fork mixed with the cell's coordinates by integer hashing (`generation/scatter.ts`). A prop depends only on the seed, its kind and its cell, and carries that cell as its id (`Tree.cell` and the others). Before, every cell drew from one stream in visiting order, so a cell that kept its prop shifted every later cell's numbers. Now a repair that clears or adds cells (D8) changes only those cells, and generated objects keep their ids, as the survival horizon asks.
+- **The fingerprint covers the world by construction.** `worldFingerprint` hashes every field of the world except what it was built from (`spec`, `seed`) and how long it took (`genMs`): the terrain by its heights and surfaces, the colliders by their list, and everything else (features, backdrop, props, camp and routines, the spatial grid, the report, the spawn) generically, keys sorted, typed arrays by their bytes. A field any lane adds to `World` is covered the day it is added, and a class instance there is refused by name. Before, it listed what it covered by hand, and missed the backdrop, the grid, the report and most of each prop.
+- **`dsin` and `dcos` reduce exactly from 10⁶ up** (`kernel/core/detmath.ts`): Payne–Hanek in 24-bit limbs, with the 66 limbs of 2/π that a double can need, each product exact in a double. Below 10⁶ the plain reduction is kept bit for bit. `tests/detmath.test.ts` recomputes 2/π from Machin's formula in integer arithmetic, holds the new path to the engine's own `sin` and `cos` within the kernels' own error (1.5e-15) from 2²⁰ to 2¹⁰²², including the double nearest a multiple of π/2, and wraps the trigonometry while generating both valleys and every pinned run: the largest argument the simulation reaches is far below 10⁶. The one input that grows with time, a guard's head sweep, needs almost thirteen days of mission to get there.
+
+**What moved:** `GEN_VERSION` 4. TAL-4471's fingerprint is `f555512c33daea22` (`GOLDEN.world`, `GOLDEN_TAL_4471`). Two plays moved because their bots met different trees and rocks: MUD-9031 wander (`67964675cb39477e`, state `4002c5b682b8bcc8`) and TAL-4471 chaos (`fe623d33389a2f21`, state `e8037411190fc911`). TAL-4471 wander, the scenes and the math golden held. The golden recording is rewritten. The body bench's worst rise in a tick is now 0.29 m (a rock, under the 0.45 m step), and its worst overlap 2e-14 m.
+
+**Why:** the foundation pass left both changes for one deliberate bump (`docs/foundation-plan.md`, Deliberately later), so seeds change once, not twice. Lab D's repairs need scatter that stays put around them, and the camp generator adds a great deal to the world that a hand-kept list would have missed.
+
 ## 2026-11-07 · Wave 0
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.

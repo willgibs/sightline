@@ -1,12 +1,11 @@
 import type { Tuning } from '../config/tuning';
 import { SoundEngine, type ListenerPose, type SoundTiming } from '../audio/engine';
-import { makeMuffle } from '../audio/muffle';
+import { Ears } from '../audio/hearing';
 import { air } from '../sim/kernel/env';
 import type { SimEvent } from '../sim/kernel/events';
 import type { World } from '../sim/kernel/world/world';
 import type { Simulation } from '../sim/game/sim';
 import { ambientSources } from '../sim/generation';
-import type { QueryView } from '../sim/kernel/world/query';
 
 /**
  * The game's sound: the engine (audio/engine.ts) wired to the run.
@@ -23,12 +22,12 @@ import type { QueryView } from '../sim/kernel/world/query';
 export class GameSound {
   private ctx: AudioContext | null = null;
   private engine: SoundEngine | null = null;
-  private view: QueryView | null = null;
   private world: World | null = null;
   private volume = 0.8;
   private paused = true;
   private failure: string | null = null;
-  private readonly muffle = makeMuffle(() => this.view);
+  /** The player's ears, by the guards' law of sound (audio/hearing.ts). */
+  private readonly ears = new Ears();
 
   constructor(private tuning: Tuning) {
     document.addEventListener('visibilitychange', () => this.visibility());
@@ -45,7 +44,7 @@ export class GameSound {
           return;
         }
         this.ctx = new Context({ latencyHint: 'interactive' });
-        this.engine = new SoundEngine(this.ctx, { tuning: this.tuning, muffle: this.muffle });
+        this.engine = new SoundEngine(this.ctx, { tuning: this.tuning, route: this.ears.route, steady: this.ears.steady });
         this.engine.startAmbience();
         this.applyWorld();
         this.engine.setVolume(gainOf(this.volume));
@@ -58,6 +57,7 @@ export class GameSound {
   setTuning(tuning: Tuning): void {
     const radii = JSON.stringify(this.tuning.noise.ambient) !== JSON.stringify(tuning.noise.ambient);
     this.tuning = tuning;
+    this.ears.setTuning(tuning);
     this.guard(() => this.engine?.setTuning(tuning));
     // The steady sources' radii are tuning; anything else leaves them playing.
     if (radii) this.applyWorld();
@@ -66,12 +66,14 @@ export class GameSound {
   /** A new valley or scene: its steady sources and its air. */
   setWorld(world: World): void {
     this.world = world;
+    this.ears.setWorld(world, this.tuning);
     this.applyWorld();
   }
 
-  /** A new run: what muffles sound is the solids of this simulation. */
+  /** A new run: what stops sound is the solids of this simulation. */
   setSimulation(sim: Simulation): void {
-    this.view = { world: sim.world, solids: sim.solids, bodies: [] };
+    if (sim.world !== this.world) this.setWorld(sim.world);
+    this.ears.setSolids(sim.solids);
   }
 
   /** The volume setting, 0 to 1, heard on a square law: half way is a quarter of the power. */

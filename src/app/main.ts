@@ -10,6 +10,7 @@ import './styles.css';
  * Entry point. URL parameters:
  *   ?seed=TAL-4471   which valley to generate
  *   ?scene=movement-course   play a scene instead (sim/game/scenes/index.ts)
+ *   &params=...              with these parameters (a scenario: game/scenes/sightScenario.ts)
  *   ?view=debug      start in the debug view
  *   ?spawn=edge      start where the road leaves the map instead of on an overlook
  *   ?bench           run the 20-second performance flythrough and report
@@ -55,7 +56,7 @@ try {
     pixelRatio: dprParam > 0 ? Math.min(3, Math.max(0.5, dprParam)) : Math.min(window.devicePixelRatio || 1, 1.5),
     pixelRatioFollowsScreen: !(dprParam > 0),
     sceneName,
-    scene: sceneName ? SCENES[sceneName]?.() : null,
+    scene: sceneName ? SCENES[sceneName]?.(params.get('params') ?? undefined) : null,
     replayUrl: params.get('replay'),
   });
 } catch (e) {

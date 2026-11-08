@@ -39,6 +39,41 @@ function events(): { sim: Simulation; all: SimEvent[] } {
   for (const e of drop.step({ ...walk, commands: [{ kind: 'fire', lag: 0.5, yaw: 0.3, pitch: -0.1 }] })) if (e.type === 'shot') landings.push({ ...e });
   // Renumber after the bot's events, as if one run.
   landings.forEach((e, k) => all.push({ ...e, id: all.length + k + 1 }));
+  // Perception's events (lab A), one of each, from the valley's first guard, as the
+  // perception lab makes them (tests/perception-lab.test.ts runs them for real).
+  const guard = sim.guards[0]!.id;
+  const tick = sim.tick;
+  const voice = { x: 3.1, y: 1.7, z: -4.2, surface: Surface.Grass, loudness: 22 / 12, radius: 22 };
+  const perceived: SimEvent[] = [
+    { type: 'noticed', id: 0, tick, t: tick / 30, source: guard, cause: 0, target: PLAYER_ID, x: 12.5, y: 1.3, z: -40.25, distance: 42.4, zone: 'core' },
+    {
+      type: 'detected',
+      id: 0,
+      tick,
+      t: tick / 30,
+      source: guard,
+      cause: 0,
+      target: PLAYER_ID,
+      x: 12.6,
+      y: 1.3,
+      z: -40.1,
+      distance: 41.9,
+      angle: 12.3,
+      zone: 'peripheral',
+      stance: 0.6,
+      light: 0.6,
+      skyline: 1.2,
+      range: 54,
+      movement: 1,
+      cover: 0.7,
+      rate: 0.21,
+    },
+    { type: 'heard', id: 0, tick, t: tick / 30, source: guard, cause: 1, kind: 'sound', clarity: 1.7, x: 11, y: 0.3, z: -38, radius: 4.5 },
+    { type: 'alert', id: 0, tick, t: tick / 30, source: guard, cause: 0, from: 'unaware', to: 'curious', reason: 'heard' },
+    { type: 'bark', id: 0, tick, t: tick / 30, source: guard, cause: 0, ...voice, line: 3 },
+    { type: 'noise', id: 0, tick, t: tick / 30, source: PLAYER_ID, cause: 0, ...voice, loudness: 2, radius: 24 },
+  ];
+  perceived.forEach((e) => all.push({ ...e, id: all.length + 1 }));
   return { sim, all };
 }
 
@@ -61,7 +96,8 @@ describe('events', () => {
     const ids = new Set(sim.state.entities.map((e) => e.id));
     for (const e of all) expect(ids.has(e.source)).toBe(true);
     const types = new Set(all.filter((e) => e.source === PLAYER_ID).map((e) => e.type));
-    expect([...types].sort()).toEqual(['footstep', 'land', 'outcome', 'shot', 'stance']);
+    // The player drops noises from the sandbox (A10).
+    expect([...types].sort()).toEqual(['footstep', 'land', 'noise', 'outcome', 'shot', 'stance']);
     expect(all.some((e) => e.source !== PLAYER_ID && e.type === 'footstep')).toBe(true);
   });
 

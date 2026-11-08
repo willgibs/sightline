@@ -11,6 +11,7 @@ import { Simulation } from '../src/sim/game/sim';
 import { SYSTEMS } from '../src/sim/game/systems';
 import { withSystem, type System } from '../src/sim/kernel/systems';
 import { player } from '../src/sim/game/entities';
+import { PERCEPTION, giveSenses } from '../src/sim/game/perception';
 
 /**
  * The perception boundary (brain/mind.ts): a guard decides from his mind alone. Run the
@@ -22,10 +23,10 @@ import { player } from '../src/sim/game/entities';
 
 const world = generateWorld(missionSpec('TAL-4471'), T);
 
-/** Per tick, per guard: a hash of his mind and of what he decided. */
-type Trace = Array<Map<number, { mind: string; decision: string }>>;
+/** Per tick, per guard: a hash of his mind and of what he decided; and how close the player ever came to a guard. */
+type Trace = Array<Map<number, { mind: string; decision: string }>> & { closest?: number };
 
-function run(place: { x: number; z: number }, extra: System[] = []): Trace {
+function run(place: { x: number; z: number }, extra: System[] = [], senses = false): Trace {
   const trace: Trace = [];
   const mind = emptyMind();
   const probe: System = {
@@ -40,9 +41,14 @@ function run(place: { x: number; z: number }, extra: System[] = []): Trace {
       for (const g of ctx.index.of('guard')) {
         // The mind his brain just decided from: for the next tick.
         const m = guardMind(g, ctx.world, ctx.tuning, ctx.tick + 1, mind);
-        const h = new Hasher().u32(m.id).f64(m.self.x).f64(m.self.y).f64(m.self.z).f64(m.self.yaw).f64(m.self.pitch).str(m.self.stance).f64(m.self.speed);
+        const h = new Hasher().u32(m.id).f64(m.self.x).f64(m.self.y).f64(m.self.z).f64(m.self.yaw).f64(m.self.pitch).str(m.self.stance).f64(m.self.speed).f64(m.head);
         h.u32(ctx.world.camp.guards.indexOf(m.post)).u32(m.tick).f64(m.time).u32(m.percepts.length);
-        for (const p of m.percepts) h.str(p.kind).f64(p.x).f64(p.y).f64(p.z).f64(p.strength).u32(p.cause);
+        for (const p of m.percepts) h.str(p.kind).f64(p.x).f64(p.y).f64(p.z).f64(p.radius).f64(p.strength).u32(p.tick).u32(p.expires).u32(p.cause);
+        const a = m.awareness;
+        h.str(a.state).u32(a.since).u32(a.focus ? 1 : 0).f64(a.fx).f64(a.fy).f64(a.fz);
+        const b = m.belief;
+        if (b) h.f64(b.x).f64(b.y).f64(b.z).f64(b.radius).u32(b.tick).u32(b.seen ? 1 : 0).u32(b.cause);
+        else h.u32(0);
         const o = g.guard.order;
         const d = new Hasher().str(o.kind).u32(o.tick).f64(o.wishX).f64(o.wishZ).str(o.gait).f64(o.yaw).f64(o.pitch).f64(o.headYaw);
         tick.set(g.id, { mind: h.digest(), decision: d.digest() });
@@ -52,13 +58,20 @@ function run(place: { x: number; z: number }, extra: System[] = []): Trace {
   };
   // The probe goes last in its phase, after the brains it watches.
   let systems = SYSTEMS;
+  if (senses) for (const s of PERCEPTION) systems = withSystem(systems, s);
   for (const s of extra) systems = withSystem(systems, s);
   systems = withSystem(systems, probe);
   const sim = new Simulation(world, T, systems);
   placePlayer(sim, place.x, place.z);
+  if (senses) giveSenses(sim);
   const bot = new WanderBot('TAL-4471');
   const raw = neutralInput();
-  for (let i = 0; i < 1200; i++) sim.step(bot.next(sim, raw));
+  let closest = Infinity;
+  for (let i = 0; i < 1200; i++) {
+    sim.step(bot.next(sim, raw));
+    for (const g of sim.guards) closest = Math.min(closest, Math.hypot(g.body.x - sim.player.x, g.body.z - sim.player.z));
+  }
+  trace.closest = closest;
   return trace;
 }
 
@@ -87,7 +100,35 @@ function sameMinds(a: Trace, b: Trace): number {
 const here = { x: world.spawn.x, z: world.spawn.z };
 const there = { x: -world.spawn.x * 0.9, z: -world.spawn.z * 0.9 };
 
+/**
+ * Places beyond every sense of every guard (A6): farther than any zone reaches for the most
+ * exposed body there is (a marksman's far zone, against the sky, plus its edge), less the
+ * ground the bot can cover in the run, and far beyond any sound it makes.
+ */
+const S = T.perception.sight;
+const reach = S.far.range * T.visibility.skyline + S.edgeMax;
+const far1 = { x: world.playHalf * 0.95, z: world.playHalf * 0.95 };
+const far2 = { x: -world.playHalf * 0.95, z: -world.playHalf * 0.95 };
+
 describe('the perception boundary', () => {
+  it('holds for guards who see and hear: the same minds decide the same, wherever the unsensed player is', () => {
+    const a = run(far1, [], true);
+    const b = run(far2, [], true);
+    expect(a.closest).toBeGreaterThan(reach);
+    expect(b.closest).toBeGreaterThan(reach);
+    expect(leaks(a, b)).toEqual([]);
+    expect(sameMinds(a, b)).toBe(1200 * world.camp.guards.length);
+  });
+
+  it('lets perception, and only perception, bring the player into a mind', () => {
+    // Near the camp in one run, far away in the other: some minds differ (he was seen or
+    // heard), and wherever minds match, decisions do.
+    const near = run({ x: world.camp.site.x + 60, z: world.camp.site.z + 10 }, [], true);
+    const away = run(far1, [], true);
+    expect(leaks(near, away)).toEqual([]);
+    expect(sameMinds(near, away)).toBeLessThan(1200 * world.camp.guards.length);
+  });
+
   it('gives guards the same decisions wherever the unseen player is', () => {
     const a = run(here);
     const b = run(there);
@@ -112,8 +153,10 @@ describe('the perception boundary', () => {
         g.guard.order.headYaw = Math.atan2(-(p.x - g.body.x), -(p.z - g.body.z)) - g.body.yaw;
       },
     };
+    // Caught at its first decision. (His head is in his mind, so a head turned by a peek
+    // makes the two runs' minds differ from then on, and later ticks aren't comparable.)
     const a = run(here, [peek]);
     const b = run(there, [peek]);
-    expect(leaks(a, b).length).toBeGreaterThan(1000);
+    expect(leaks(a, b)[0]).toBe(`guard ${world.camp.guards.length > 0 ? a[0]!.keys().next().value : 0} at tick 1`);
   });
 });

@@ -1,6 +1,6 @@
 # Sightline: working rules
 
-The design doc is the source of truth: [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j). If you can't open it, work from its copy in `docs/design-doc.md`; the note at the top of that file says how the copy is kept current. Build phase by phase. Each system's spec, starting numbers and **Done when** test come from Part 2 of the design doc. Taste calls belong to the owner. Work proceeds on the doc's recommended defaults until the owner overrides them.
+The design doc is the source of truth: [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), which only the owner's account can open. If you can't open it, work from its copy in `docs/design-doc.md`; the note at the top of that file says how the copy is kept current. Build phase by phase. Each system's spec, starting numbers and **Done when** test come from Part 2 of the design doc. Taste calls belong to the owner. Work proceeds on the doc's recommended defaults until the owner overrides them.
 
 ## Where we are
 
@@ -86,7 +86,8 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 ## Workflow
 
 - The repository is `willgibs/sightline` on GitHub. Keep `main` green: CI runs the full check on every push and pull request, on Linux, macOS and Windows, with a cross-platform hash comparison; weekly, it adds hours of fuzzing and synctest. The repository is public, so Actions minutes are free.
-- Every push to `main` deploys to production on Vercel (sightline-willgibs.vercel.app, visible only to the owner's Vercel account); other branches get preview deploys.
+- Public, but the owner's project: it's under the MIT License (`LICENSE`), and `CONTRIBUTING.md` asks outsiders for bug reports, and for an issue before any code. Commit nothing private: no local paths, credentials or personal details. A link only the owner can open says so, and where the public copy is.
+- Every push to `main` deploys to production on Vercel, publicly at sightline-brown.vercel.app (the repository's website link); other branches get preview deploys. Vercel Authentication still covers sightline-willgibs.vercel.app and the previews, so only the owner's Vercel account can open those.
 - Commit in small, verified steps, each with its tests passing.
 - Land a pull request with `npm run land -- <number>`: it merges only a branch that is up to date with `main` and green (`docs/phase-1-plan.md`, Landing on `main`).
 - Research is a seed, not a ceiling. A lane starts from the strongest prior art in `docs/research/`, says where it falls short, builds past it, and proves the gain on its bench.

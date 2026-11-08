@@ -87,6 +87,7 @@ export const PINNED_RUNS: readonly PinnedRun[] = [
   play('MUD-9031 wander'),
   play('TAL-4471 chaos'),
   scene('movement-course', 'body', SCENES['movement-course']!),
+  scene('perception-lab', 'perception', SCENES['perception-lab']!),
   scene('spawn-tick', 'kernel', SCENES['spawn-tick']!),
   scene('kernel-alone', 'kernel', kernelAloneScene),
 ];

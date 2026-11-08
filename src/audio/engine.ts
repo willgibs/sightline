@@ -4,6 +4,7 @@ import { PLAYER_ID } from '../sim/game/entities';
 import { audibility, travelTime } from '../sim/kernel/sound';
 import { surfaceName } from '../sim/kernel/world/surfaces';
 import type { AmbientSource } from '../sim/generation';
+import { emptyRoute, type RouteFn, type SteadyFn } from './hearing';
 import { footstep, humLoop, makeNoiseBuffers, makeRand, rustle, waterLoop, windBed, type Loop, type NoiseBuffers, type Rand } from './voices';
 
 /**
@@ -15,7 +16,8 @@ import { footstep, humLoop, makeNoiseBuffers, makeRand, rustle, waterLoop, windB
  *     threshold of hearing at its radius and fades out just beyond it, so if you can hear
  *     it, a guard where you stand could too.
  *   - Distant sounds arrive late, at the speed of sound.
- *   - Sounds are placed in 3D (HRTF), and muffled when something solid is in the way.
+ *   - Sounds are placed in 3D (HRTF) where they seem to come from: round a corner, from
+ *     the doorway; through a wall, muffled (audio/hearing.ts, the guards' own law).
  *   - Your own body (footsteps, cloth) plays close and centred, at the level the
  *     simulation gives it, so you can learn your noise by ear.
  *   - A sound plays when the picture shows its moment (`SoundTiming`), not when the tick
@@ -73,7 +75,16 @@ export interface SoundOptions {
   tuning: Tuning;
   /** The mission air's speed of sound (sim/kernel/env.ts, air), m/s. Default 343. */
   speedOfSound?: number;
+  /** The old straight-line muffling, for tests; `route` replaces it. */
   muffle?: MuffleFn;
+  /**
+   * How sound reaches the listener by the guards' own law (audio/hearing.ts): level, the
+   * place it seems to come from, the route's length and whether walls muffle it. With it,
+   * the speakers hear exactly what a guard where the camera is would.
+   */
+  route?: RouteFn;
+  /** The same law for the steady sources, by their index in the world's list. */
+  steady?: SteadyFn;
   seed?: number;
 }
 
@@ -85,6 +96,8 @@ export interface SoundOptions {
 export const THRESHOLD = 0.018;
 /** Sounds fade to nothing between 1× and FADE_END× their radius. */
 export const FADE_END = 1.25;
+/** The low-pass on a sound that came through a wall, Hz. */
+const MUFFLED_CUTOFF = 900;
 /** Scheduling headroom so a sound never starts in the past. */
 export const LOOKAHEAD = 0.02;
 const MAX_VOICES = 40;
@@ -98,6 +111,9 @@ export class SoundEngine {
   private tuning: Tuning;
   private speedOfSound: number;
   private readonly muffle: MuffleFn | null;
+  private readonly route: RouteFn | null;
+  private readonly steady: SteadyFn | null;
+  private readonly heard = emptyRoute();
   private readonly rand: Rand;
   private readonly noise: NoiseBuffers;
   private readonly master: GainNode;
@@ -118,6 +134,8 @@ export class SoundEngine {
     this.tuning = opts.tuning;
     this.speedOfSound = opts.speedOfSound ?? 343;
     this.muffle = opts.muffle ?? null;
+    this.route = opts.route ?? null;
+    this.steady = opts.steady ?? null;
     this.rand = makeRand(opts.seed ?? 0x5167);
     this.noise = makeNoiseBuffers(ctx, this.rand);
 
@@ -259,6 +277,24 @@ export class SoundEngine {
    */
   spatial(x: number, y: number, z: number, radius: number, start: (out: AudioNode, when: number, amp: number) => number, lead = 0): boolean {
     const l = this.listenerPose;
+    if (this.route) {
+      // The guards' law: level along the louder route, placed where it seems to come from.
+      const r = this.route(x, y, z, radius, l.x, l.y, l.z, this.heard);
+      if (!r) return false;
+      const fade = fadeOut(radius / r.level, radius);
+      if (fade <= 0 || !this.claimVoice()) return false;
+      const when = this.ctx.currentTime + LOOKAHEAD + lead + travelTime(r.length, this.speedOfSound);
+      const panner = this.panner(r.x, r.y, r.z);
+      let out: AudioNode = panner;
+      if (r.muffled) {
+        const lp = new BiquadFilterNode(this.ctx, { type: 'lowpass', frequency: MUFFLED_CUTOFF, Q: 0.7 });
+        lp.connect(panner);
+        out = lp;
+      }
+      panner.connect(this.world);
+      this.voiceEnds.push(start(out, when, THRESHOLD * r.level * fade));
+      return true;
+    }
     const dx = x - l.x;
     const dy = y - l.y;
     const dz = z - l.z;
@@ -356,8 +392,16 @@ export class SoundEngine {
         a = { loop: make(this.ctx, filter, this.noise, this.rand), panner, filter, distance: d, muffled: false };
         this.ambient.set(s, a);
       }
-      const m = this.muffle ? this.muffle(s.x, s.y, s.z, l.x, l.y, l.z) : null;
       a.distance = d;
+      if (this.steady) {
+        // The guards' law, as for any sound: the masking a guard there would hear.
+        const r = this.steady(this.sources.indexOf(s), l.x, l.y, l.z, this.heard);
+        a.muffled = r?.muffled ?? false;
+        a.filter.frequency.setTargetAtTime(a.muffled ? MUFFLED_CUTOFF : 20000, now, 0.1);
+        a.loop.setLevel(r ? THRESHOLD * r.level * fadeOut(s.radius / r.level, s.radius) : 0, AMBIENT_REFRESH);
+        continue;
+      }
+      const m = this.muffle ? this.muffle(s.x, s.y, s.z, l.x, l.y, l.z) : null;
       a.muffled = m !== null;
       a.filter.frequency.setTargetAtTime(m ? m.cutoff : 20000, now, 0.1);
       a.loop.setLevel(THRESHOLD * audibility(s.radius, d) * fadeOut(d, s.radius) * (m ? m.gain : 1), AMBIENT_REFRESH);

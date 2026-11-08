@@ -33,8 +33,8 @@ export const BENCH_GOLDEN: PinnedBench = {
       "runs with a broken promise (of 4)": 0,
       "bodies under the terrain": 0,
       "bodies inside something solid": 0,
-      "worst overlap (m)": 0,
-      "worst rise in a tick (m)": 0.02614027438236377,
+      "worst overlap (m)": 2.2093438190040615e-14,
+      "worst rise in a tick (m)": 0.28554800812780456,
       "worst gain on steep ground (m)": 0
     },
     "runs": {
@@ -46,8 +46,40 @@ export const BENCH_GOLDEN: PinnedBench = {
     }
   },
   "perception": {
-    "metrics": {},
-    "runs": {}
+    "metrics": {
+      "grid pairs checked": 2739816,
+      "grid pairs filling slower with more exposure": 0,
+      "standing, walking, in the open: seen to (m)": 155.75,
+      "still, prone, in cover: seen to (m)": 46.75,
+      "crouched, walking, in shade, 30 m: seconds": 5.33333333,
+      "a marksman's far zone: seen to (m)": 405.75,
+      "least seconds from the first cue to 100%, outside contact": 1.5,
+      "steepest edge: rate change per metre": 0.122196796,
+      "steepest edge: rate change per degree": 0.113636364,
+      "seed · grid pairs checked": 2739816,
+      "seed · grid pairs filling slower with more exposure": 0,
+      "seed · standing, walking, in the open: seen to (m)": 150,
+      "seed · still, prone, in cover: seen to (m)": 150,
+      "seed · crouched, walking, in shade, 30 m: seconds": 8.88888889,
+      "seed · a marksman's far zone: seen to (m)": 400,
+      "seed · least seconds from the first cue to 100%, outside contact": 0.468416667,
+      "seed · steepest edge: rate change per metre": 0.301129235,
+      "seed · steepest edge: rate change per degree": 0.954545455,
+      "sight scenarios as expected (of 15)": 15,
+      "foliage: pairs that differ by direction (of 2000)": 0,
+      "hearing: speakers and a guard at the same place differ (of 200)": 0,
+      "crack at 300 m: least degrees off the shooter": 55.438591,
+      "crack at 300 m: most degrees off the shooter": 57.2126615,
+      "seed · crack at 300 m: degrees off the shooter": 0
+    },
+    "runs": {
+      "perception-lab": {
+        "work": {
+          "motor": { "rays": 0, "nodes": 0, "bodies": 10800 },
+          "perception-sight": { "rays": 25723, "nodes": 0, "bodies": 0 }
+        }
+      }
+    }
   },
   "brain": {
     "metrics": {},

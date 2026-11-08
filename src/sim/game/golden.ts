@@ -19,20 +19,22 @@ export const GOLDEN = {
   /** Bits of every deterministic math function over 4,000 inputs each. */
   detmath: '8d55144e8e74968f',
   /** Everything generation decides for TAL-4471 (also pinned in tests/world.test.ts). */
-  world: '589085a8b5ce974d',
+  world: 'f555512c33daea22',
   /** 60 s of play: the person-like bot in two valleys, the fuzzing bot in one. */
   play: {
     'TAL-4471 wander': { behaviour: '688ae4eddeadae3a', state: '4c04325e4eca45c6' },
-    'MUD-9031 wander': { behaviour: '6e7045d91ca788ae', state: '0beac8712fcd45a4' },
-    'TAL-4471 chaos': { behaviour: '746cd8eaaa80aa4b', state: '5031fb7d0451b494' },
+    'MUD-9031 wander': { behaviour: '67964675cb39477e', state: '4002c5b682b8bcc8' },
+    'TAL-4471 chaos': { behaviour: 'fe623d33389a2f21', state: 'e8037411190fc911' },
   },
   /**
    * Scenes run by their own drivers, each pinning its lane (benches.ts): the movement
-   * course covers stairs, drops, ramps, ceilings, crawling and surfaces; spawn timing,
+   * course covers stairs, drops, ramps, ceilings, crawling and surfaces; the perception
+   * lab, guards seeing and hearing a walker who ends in a bush; spawn timing,
    * bodies spawned inside a tick; the kernel alone, a run with every lane switched off.
    */
   scenes: {
     'movement-course': { behaviour: '40c97133a0ef732d', state: 'a72123b8c4cb29d8' },
+    'perception-lab': { behaviour: '0dfa42645814f21a', state: '6625deddfd28368b' },
     'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '2535df87754d14eb' },
     'kernel-alone': { behaviour: '0698e581024f5b35', state: 'b51b84477d71dbf1' },
   },

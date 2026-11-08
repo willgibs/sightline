@@ -64,6 +64,7 @@ export function replaySimulation<S extends Simulation = Simulation>(rec: Recordi
   const scene = opts.scene;
   if (h.scene && (!scene || scene.name !== h.scene.name)) return `made in the scene '${h.scene.name}', which this build doesn't have`;
   if (h.scene && scene && scene.version !== h.scene.version) return `made in version ${h.scene.version} of the scene '${h.scene.name}'; this build has version ${scene.version}`;
+  if (h.scene && scene && (scene.params ?? '') !== h.scene.params) return `made in the scene '${h.scene.name}' with parameters '${h.scene.params}', not '${scene.params ?? ''}'`;
   const game = h.scene && scene ? scene.game : opts.game;
   if (!game) return 'no game was given to re-simulate it in';
   if (!force && h.behaviour !== game.behaviour) {

@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import { keepRoutine, standStill, type GuardMind, type Order } from '../brain';
+import { keepRoutine, react, standStill, type GuardMind, type MindAwareness, type Order } from '../brain';
 import type { Percept } from '../perception';
 import type { World } from '../kernel/world/world';
 import { createBody, type BodyState } from '../body';
@@ -35,29 +35,36 @@ export function createGuard(world: World, solids: Solids, index: number, tuning:
 type Writable<T> = { -readonly [K in keyof T]: T[K] };
 
 const NO_PERCEPTS: readonly Percept[] = [];
+/** The awareness of a guard without senses: unaware, attending to nothing. */
+const UNAWARE: Readonly<MindAwareness> = Object.freeze({ state: 'unaware', since: 0, focus: false, fx: 0, fy: 0, fz: 0 });
 
 /**
- * What a guard's brain gets to decide from (brain/mind.ts): his own body, his post, the
- * static world, the time, and his percepts. Built here, on this side of the perception
- * boundary, from his own state and perception's output; the brain never sees the rest.
- * Writes into `out`, which is reused.
+ * What a guard's brain gets to decide from (brain/mind.ts): his own body and head, his
+ * post, the static world, the time, and what perception made of the world for him: his
+ * percepts, his awareness and his belief. Built here, on this side of the perception
+ * boundary, from his own state; the brain never sees the rest. Writes into `out`, which is
+ * reused.
  */
 export function guardMind(g: GuardEntity, world: World, tuning: Tuning, tick: number, out: Writable<GuardMind>): GuardMind {
   out.id = g.id;
   out.self = g.body;
+  out.head = g.guard.headYaw;
   out.post = world.camp.guards[g.guard.spawn]!;
   out.world = world;
   out.tuning = tuning;
   out.tick = tick;
   out.time = tick / tuning.sim.tickHz;
-  out.percepts = NO_PERCEPTS;
+  const s = g.senses;
+  out.percepts = s ? s.percepts : NO_PERCEPTS;
+  out.awareness = s ? s.awareness : UNAWARE;
+  out.belief = s ? s.belief : null;
   return out;
 }
 
 /** A mind for guardMind to fill: every field is written on each use. */
 export function emptyMind(): Writable<GuardMind> {
   const unset = null as never;
-  return { id: 0, self: unset, post: unset, world: unset, tuning: unset, tick: 0, time: 0, percepts: NO_PERCEPTS };
+  return { id: 0, self: unset, head: 0, post: unset, world: unset, tuning: unset, tick: 0, time: 0, percepts: NO_PERCEPTS, awareness: UNAWARE, belief: null };
 }
 
 /** Scratch: the mind a guard's brain decides from, rewritten for each decision. */
@@ -65,8 +72,10 @@ const mind = emptyMind();
 
 /**
  * A guard's brain decides his order for `tick` (the one after now) from his mind alone:
- * today, keep to the routine. Writes the order into his state.
+ * with senses, lab A's minimal reactions to his awareness (which keep to the routine while
+ * he's unaware); without, the routine. Writes the order into his state.
  */
 export function think(g: GuardEntity, world: World, tuning: Tuning, tick: number): Order {
-  return keepRoutine(guardMind(g, world, tuning, tick, mind), g.guard.order);
+  const m = guardMind(g, world, tuning, tick, mind);
+  return g.senses ? react(m, g.guard.order) : keepRoutine(m, g.guard.order);
 }

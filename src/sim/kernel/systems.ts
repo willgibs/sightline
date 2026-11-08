@@ -1,7 +1,7 @@
 import type { Tuning } from '../../config/tuning';
 import type { DebugDraw } from './debugDraw';
 import type { Rng } from './core/rng';
-import { EVENTS, type EventDraft, type EventType } from './events';
+import { EVENTS, type EventDraft, type EventType, type SimEvent } from './events';
 import type { TickInput } from './input';
 import { popDue, scheduleAt, ticksAfter, type Scheduled } from './schedule';
 import type { Entity, EntityId, EntityIndex, SimState } from './state';
@@ -68,6 +68,14 @@ export interface TickContext {
 
   /** Records an event and returns its id, for the events it causes. A system emits only the types it declares. */
   emit(e: EventDraft): number;
+  /**
+   * The events emitted so far in this tick, in order: what perception takes as stimuli
+   * (a footstep, a shot, a bark). A system that reads them declares `events` in its
+   * reads, and the kernel orders it after every system in its phase that emits. Events
+   * emitted in a later phase reach no reader this tick, and none next tick: anything
+   * that must outlast its tick goes into the state.
+   */
+  readonly events: readonly SimEvent[];
   /** Schedules `kind` to run in the 'schedule' phase `seconds` from now (at least one tick). */
   schedule(seconds: number, kind: string, a?: number, b?: number): void;
   /**
@@ -117,10 +125,13 @@ export interface TickContext {
  *   *.<field>[.<field>…]       that field of every kind that has it, such as *.body
  *   @<channel>[.<kind>]        a channel (TickContext.channel), or one kind's entries in it
  *   input                      this tick's input, read only
+ *   events                     this tick's events so far (TickContext.events), read only:
+ *                              a system writes them only by emitting
  *
  * Two paths overlap when one is a prefix of the other, with `*` and `entities` standing for
  * any kind. Two systems in a phase conflict when one writes what the other reads or
- * writes, or both emit events (event ids follow the order they run in).
+ * writes, or both emit events (event ids follow the order they run in), or one emits
+ * events the other reads.
  */
 export interface Access {
   readonly reads: readonly string[];
@@ -202,7 +213,7 @@ export function planSystems(systems: readonly System[], tickHz: number): number[
 }
 
 /** State roots that aren't entity kinds. */
-const ROOTS = new Set(['schedule', 'outcome', 'rng', 'entities', 'input']);
+const ROOTS = new Set(['schedule', 'outcome', 'rng', 'entities', 'input', 'events']);
 const SEGMENT = /^(\*|[A-Za-z_][A-Za-z0-9_]*)$/;
 
 function checkAccess(s: System): void {
@@ -216,6 +227,7 @@ function checkAccess(s: System): void {
     }
   }
   for (const path of s.writes) if (path === 'input' || path.startsWith('input.')) throw new Error(`System '${s.name}' writes the input, which is read only`);
+  for (const path of s.writes) if (path === 'events' || path.startsWith('events.')) throw new Error(`System '${s.name}' writes the events, which it may only emit`);
   for (const type of s.emits) if (!(type in EVENTS)) throw new Error(`System '${s.name}' emits '${type}', which is no event type`);
 }
 
@@ -260,10 +272,12 @@ export function accessConflicts(systems: readonly System[]): string[] {
     }
     for (const a of earlier.values()) {
       if (ordered.has(a.name)) continue;
+      const reads = (x: System): boolean => x.reads.some((p) => p === 'events' || p.startsWith('events.'));
       const why =
         touches(a.writes, [...b.reads, ...b.writes]) ??
         touches(b.writes, a.reads) ??
-        (a.emits.length > 0 && b.emits.length > 0 ? 'both emit events' : null);
+        (a.emits.length > 0 && b.emits.length > 0 ? 'both emit events' : null) ??
+        ((a.emits.length > 0 && reads(b)) || (b.emits.length > 0 && reads(a)) ? 'one emits events the other reads' : null);
       if (why) out.push(`'${a.name}' and '${b.name}' in '${b.phase}' (${why})`);
     }
   }
