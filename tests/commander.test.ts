@@ -15,6 +15,8 @@ import type { World } from '../src/sim/kernel/world/world';
 import { campHeight, campWorld } from '../src/sim/game/scenes/campBrain';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { Faction } from '../src/sim/kernel/state';
+import { sunDirection } from '../src/sim/kernel/env';
+import { yawFromDirection } from '../src/sim/kernel/core/math';
 import { testGuard, testWorld } from './fixtures';
 
 /**
@@ -411,6 +413,37 @@ describe('radio check-ins', () => {
     const world = worldWith(guards(G(0, 0), G(10, 0), G(-10, 0, 'radio-operator')));
     const { events } = checkins(world, 20, undefined, true);
     expect(events.some((e) => e.type === 'checkin')).toBe(false);
+  });
+});
+
+describe("a marksman's scope (E8)", () => {
+  function flash(role: 'marksman' | 'patrol', sweeping: boolean, away: boolean): number {
+    const sim = new Simulation(worldWith(guards([0, 0, role])), T, SYSTEMS);
+    giveSenses(sim);
+    giveBrains(sim);
+    const sun = sunDirection(sim.world.spec.env, 0, { x: 0, y: 0, z: 0 });
+    expect(sun.y).toBeGreaterThan(0);
+    const l = Math.hypot(sun.x, sun.z);
+    const [ux, uz] = [sun.x / l, sun.z / l];
+    placePlayer(sim, ux * 60, uz * 60);
+    const g = sim.guards[0]!;
+    g.body.yaw = away ? yawFromDirection(-ux, -uz) : yawFromDirection(ux, uz);
+    g.guard.headYaw = 0;
+    if (sweeping) {
+      g.brain!.act = 'task';
+      g.brain!.task = { id: 1, kind: 'sweep', x: ux * 60, z: uz * 60, issued: 0, cause: 0 };
+    }
+    return sim.snapshot().guards[9]!;
+  }
+
+  it('flashes at the player when he sweeps toward him with the sun behind the player', () => {
+    expect(flash('marksman', true, false)).toBeGreaterThan(0);
+  });
+
+  it('shows nothing when he looks away, or when he is not glassing, or is not a marksman', () => {
+    expect(flash('marksman', true, true)).toBe(0);
+    expect(flash('marksman', false, false)).toBe(0);
+    expect(flash('patrol', true, false)).toBe(0);
   });
 });
 

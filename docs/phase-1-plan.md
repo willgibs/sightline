@@ -804,7 +804,7 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
     - the commander fuses them, in a fixed order, into an ellipse that shrinks with repeated shots.
 
     About 26 m of relocation at ±5° and 300 m then emerges with no meter.
-  - **Counter-snipers hunt.** They move to overlooking posts, sweep candidate perches in the order of belief, and glint.
+  - **Counter-snipers hunt.** They move to overlooking posts, sweep candidate perches in the order of belief, and glint (done: a marksman on a sweep flashes at the player, by lab B's `glint`, in the honest view; `game/sim.ts`, `render/guardMeshes.ts`).
   - **The reaction is visible.** A shot from 300 m gets a visible reaction inside the window: Halo's playtests found that sniping makes AI look oblivious.
   - **Reinforcements** arrive by truck after a delay, as a squad that hunts.
 - [x] E9 · Found bodies and adaptation within a mission (`brain/commander.ts`, `brain/brain.ts`). All of it comes through A's perception, and only from incidents the player caused and could see.
