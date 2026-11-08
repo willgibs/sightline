@@ -2,7 +2,7 @@
   "name": "sightline",
   "version": "0.0.1",
   "private": true,
-  "description": "A first-person stealth-sniper game. Phase 0: foundations.",
+  "description": "A first-person stealth-sniper game.",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
@@ -22,7 +22,8 @@
     "golden": "tsx src/headless/golden.ts",
     "scene": "tsx src/headless/scene.ts",
     "fuzz": "tsx src/headless/fuzz.ts",
-    "playtest": "tsx src/headless/playtest.ts"
+    "playtest": "tsx src/headless/playtest.ts",
+    "look": "tsx src/headless/look.ts"
   },
   "dependencies": {
     "three": "0.186.1"

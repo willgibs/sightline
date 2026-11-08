@@ -10,4 +10,7 @@ coverage/
 
 # Playtest sessions saved by the dev server
 playtests/
+
+# Pictures from npm run look
+shots/
 .vitest/
