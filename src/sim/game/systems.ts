@@ -1,9 +1,9 @@
 import { intentFor, motorSystem, poseAt, type PoseSample } from '../body';
-import { keepRoutine, type GuardDecision } from '../brain';
+import { carryOut } from '../brain';
 import { dcos, dsin } from '../kernel/core/detmath';
 import { scheduleSystem, type ScheduleHandler, type System } from '../kernel/systems';
 import { player } from './entities';
-import { emptyMind, guardMind } from './guards';
+import { think } from './guards';
 import { playerIntent } from './player';
 
 /**
@@ -16,10 +16,6 @@ import { playerIntent } from './player';
 export const SCHEDULE_HANDLERS: Readonly<Record<string, ScheduleHandler>> = {};
 
 const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
-
-/** Scratch: a guard's mind and decision, rewritten for each guard. */
-const mind = emptyMind();
-const decision: GuardDecision = { move: { tick: 0, wishX: 0, wishZ: 0, gait: 'idle', yaw: 0, pitch: 0 }, headYaw: 0 };
 
 /** The player's commands, resolved against what was on screen when they were given. */
 const playerCommands: System = {
@@ -65,23 +61,32 @@ const playerIntentSystem: System = {
   },
 };
 
-/**
- * Guards keep to their routines (brain lane) until a brain says otherwise (lab E). Each
- * decides from his mind alone: the perception boundary (brain/mind.ts).
- */
-const guardRoutines: System = {
-  name: 'guard-routines',
+/** Every guard carries out his current order: what his body intends this tick, and where he turns his head. */
+const guardOrders: System = {
+  name: 'guard-orders',
   phase: 'intent',
-  reads: ['guard.body', 'guard.guard.spawn'],
+  reads: ['guard.guard.order'],
   writes: ['guard.guard.headYaw', '@intents.guard'],
   emits: [],
   run(ctx) {
-    for (const g of ctx.index.of('guard')) {
-      decision.move = intentFor(ctx, g.id);
-      keepRoutine(guardMind(g, ctx.world, ctx.tuning, ctx.tick, mind), decision);
-      g.guard.headYaw = decision.headYaw;
-    }
+    for (const g of ctx.index.of('guard')) g.guard.headYaw = carryOut(g.guard.order, ctx.tick, intentFor(ctx, g.id));
   },
 };
 
-export const SYSTEMS: readonly System[] = [scheduleSystem(SCHEDULE_HANDLERS), playerCommands, playerIntentSystem, guardRoutines, motorSystem];
+/**
+ * Every guard's brain decides his order for the next tick, after the world has moved and
+ * been perceived: today, keep to the routine (brain lane), until lab E's brain can pull
+ * him off it. Each decides from his mind alone: the perception boundary (brain/mind.ts).
+ */
+const guardBrains: System = {
+  name: 'guard-brains',
+  phase: 'decide',
+  reads: ['guard.body', 'guard.guard.spawn'],
+  writes: ['guard.guard.order'],
+  emits: [],
+  run(ctx) {
+    for (const g of ctx.index.of('guard')) think(g, ctx.world, ctx.tuning, ctx.tick + 1);
+  },
+};
+
+export const SYSTEMS: readonly System[] = [scheduleSystem(SCHEDULE_HANDLERS), playerCommands, playerIntentSystem, guardOrders, motorSystem, guardBrains];

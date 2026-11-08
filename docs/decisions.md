@@ -6,6 +6,14 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 The seams of `docs/phase-1-plan.md`, Wave 0, landed on `main` one step at a time.
 
+### Brains decide after perceiving, and steer through orders (W0.3)
+
+**Decision:** a guard's brain runs in the 'decide' phase, after the world has moved and been perceived, and gives an order for the next tick. The order is plain data in the guard's state (`guard.order`, `brain/orders.ts`), and 'intent' carries out the current order every tick until the brain gives another. Each guard spawns with his first order, for tick 1, decided the same way from where he stands.
+
+**What moved:** `STATE_SCHEMA` 7. The four `state` fingerprints in `src/sim/game/selftest.ts` (TAL-4471 wander `4c04325e4eca45c6`, MUD-9031 wander `0beac8712fcd45a4`, TAL-4471 chaos `5031fb7d0451b494`, the movement course `a72123b8c4cb29d8`), and the golden recording, rewritten. Every `behaviour` fingerprint held: the order the brain gives at the end of tick N is exactly what the routine gave at the start of tick N + 1, since nothing moves a guard between the two. In the golden recording, the input, event and state-sample tracks are byte for byte the same.
+
+**Why:** brains then decide from what the tick perceived, never from a world that hasn't moved yet, and lab E's orders that last many ticks (go somewhere, follow a path) have their place: an order kind, carried out in 'intent'. Orders are the brain lane's edge with the body lane. The no-omniscience probe now watches in 'decide', and compares the orders given.
+
 ### The kernel boundary, the lanes and the game (W0.2)
 
 **Decision:** `src/sim` is now `kernel/`, five lanes (`generation/`, `body/`, `perception/`, `brain/`, `ballistics/`) and `game/`, with the lane map as data in `src/sim/lanes.ts`. Every golden held: the selftest's fingerprints, TAL-4471's, the golden recording (rewritten byte for byte by `npm run golden`), and the 20-minute CI hash `e9311dda2ac00379`.

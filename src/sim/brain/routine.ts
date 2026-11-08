@@ -1,17 +1,18 @@
 import { routinePose, type RoutinePose } from '../generation';
-import type { GuardDecision, GuardMind } from './mind';
+import type { GuardMind } from './mind';
+import type { Order } from './orders';
 
 /**
- * The simplest brain: keep to the routine (generation/routine.ts), a pure function of mission
- * time. Each tick, aim to be where the routine puts him at the end of it: the routine's
- * own velocity, plus whatever closes a gap he has fallen behind (shoved, or slowed by a
- * slope), no faster than he may hurry. Labs A and E add brains that can pull a guard off
+ * The simplest brain: keep to the routine (generation/routine.ts), a pure function of
+ * mission time. Each tick, it orders him to be where the routine puts him at the end of
+ * the next: the routine's own velocity, plus whatever closes a gap he has fallen behind
+ * (shoved, or slowed by a slope), no faster than he may hurry. Labs A and E add brains that can pull a guard off
  * his routine; one who returns rejoins it where it says he should be.
  */
 
 const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
 
-export function keepRoutine(mind: GuardMind, out: GuardDecision): GuardDecision {
+export function keepRoutine(mind: GuardMind, out: Order): Order {
   const { self, tuning } = mind;
   const dt = 1 / tuning.sim.tickHz;
   routinePose(mind.post.routine, mind.time, pose);
@@ -26,13 +27,13 @@ export function keepRoutine(mind: GuardMind, out: GuardDecision): GuardDecision 
   }
   // A few millimetres off is standing still, not walking.
   const walking = pose.moving || w > 0.05;
-  const m = out.move;
-  m.tick = mind.tick;
-  m.wishX = walking ? wx : 0;
-  m.wishZ = walking ? wz : 0;
-  m.gait = walking ? 'walk' : 'idle';
-  m.yaw = pose.yaw;
-  m.pitch = 0;
+  out.kind = 'move';
+  out.tick = mind.tick;
+  out.wishX = walking ? wx : 0;
+  out.wishZ = walking ? wz : 0;
+  out.gait = walking ? 'walk' : 'idle';
+  out.yaw = pose.yaw;
+  out.pitch = 0;
   out.headYaw = pose.headYaw;
   return out;
 }

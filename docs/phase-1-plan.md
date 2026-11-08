@@ -294,7 +294,7 @@ The kernel boundary goes first, so everything after it lands in its final place.
   - Every system declares what it reads, writes and emits, with one writer per state subtree. A test fails when two systems in a phase touch the same path with no declared order.
   - The simulation no longer spawns the player and the guards itself; the game's setup does.
   - A scene with every lane off still steps, hashes, saves, restores and replays. Two simulations stepped in alternation keep their own hashes.
-- [ ] W0.3 · Brains decide after perceiving.
+- [x] W0.3 · Brains decide after perceiving.
   - The routine moves from the 'intent' phase to 'decide', and becomes an order.
   - 'decide' at tick N plans tick N + 1. 'intent' carries out the current order, with an initial order for tick 1.
   - Behaviour must not move: the `behaviour` goldens hold. The state does: `STATE_SCHEMA` 7, and the golden recording is rewritten.

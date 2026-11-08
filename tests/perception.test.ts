@@ -10,14 +10,14 @@ import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
 import { SYSTEMS } from '../src/sim/game/systems';
 import { withSystem, type System } from '../src/sim/kernel/systems';
-import { intents } from '../src/sim/body';
 import { player } from '../src/sim/game/entities';
 
 /**
  * The perception boundary (brain/mind.ts): a guard decides from his mind alone. Run the
  * same valley twice with the player in two places no guard can perceive; wherever the
- * two runs give a guard the same mind, his decisions must match bit for bit. A brain
- * that peeks at the player's true position fails this.
+ * two runs give a guard the same mind, the order his brain gives must match bit for bit.
+ * A brain that peeks at the player's true position fails this. The probe watches in
+ * 'decide', where brains decide, after them.
  */
 
 const world = generateWorld(missionSpec('TAL-4471'), T);
@@ -30,20 +30,21 @@ function run(place: { x: number; z: number }, extra: System[] = []): Trace {
   const mind = emptyMind();
   const probe: System = {
     name: 'test-probe',
-    phase: 'intent',
-    reads: ['guard.body', 'guard.guard', '@intents.guard'],
+    phase: 'decide',
+    reads: ['guard.body', 'guard.guard'],
     writes: [],
     emits: [],
-    after: ['guard-routines', ...extra.map((s) => s.name)],
+    after: ['guard-brains', ...extra.map((s) => s.name)],
     run(ctx) {
       const tick = new Map<number, { mind: string; decision: string }>();
       for (const g of ctx.index.of('guard')) {
-        const m = guardMind(g, ctx.world, ctx.tuning, ctx.tick, mind);
+        // The mind his brain just decided from: for the next tick.
+        const m = guardMind(g, ctx.world, ctx.tuning, ctx.tick + 1, mind);
         const h = new Hasher().u32(m.id).f64(m.self.x).f64(m.self.y).f64(m.self.z).f64(m.self.yaw).f64(m.self.pitch).str(m.self.stance).f64(m.self.speed);
         h.u32(ctx.world.camp.guards.indexOf(m.post)).u32(m.tick).f64(m.time).u32(m.percepts.length);
         for (const p of m.percepts) h.str(p.kind).f64(p.x).f64(p.y).f64(p.z).f64(p.strength).u32(p.cause);
-        const i = intents(ctx).get(g.id)!;
-        const d = new Hasher().f64(i.wishX).f64(i.wishZ).str(i.gait).f64(i.yaw).f64(i.pitch).f64(g.guard.headYaw);
+        const o = g.guard.order;
+        const d = new Hasher().str(o.kind).u32(o.tick).f64(o.wishX).f64(o.wishZ).str(o.gait).f64(o.yaw).f64(o.pitch).f64(o.headYaw);
         tick.set(g.id, { mind: h.digest(), decision: d.digest() });
       }
       trace.push(tick);
@@ -97,18 +98,18 @@ describe('the perception boundary', () => {
   });
 
   it('catches a brain that peeks at the player', () => {
-    // A leaky brain, outside the boundary: the first guard turns his head toward the player's true position.
+    // A leaky brain, outside the boundary: the first guard is ordered to turn his head toward the player's true position.
     const peek: System = {
       name: 'test-peek',
-      phase: 'intent',
+      phase: 'decide',
       reads: ['player.body', 'guard.body'],
-      writes: ['guard.guard.headYaw'],
+      writes: ['guard.guard.order.headYaw'],
       emits: [],
-      after: ['player-intent', 'guard-routines'],
+      after: ['guard-brains'],
       run(ctx) {
         const g = ctx.index.of('guard')[0]!;
         const p = player(ctx.index).body;
-        g.guard.headYaw = Math.atan2(-(p.x - g.body.x), -(p.z - g.body.z)) - g.body.yaw;
+        g.guard.order.headYaw = Math.atan2(-(p.x - g.body.x), -(p.z - g.body.z)) - g.body.yaw;
       },
     };
     const a = run(here, [peek]);

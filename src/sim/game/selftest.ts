@@ -39,13 +39,13 @@ export const GOLDEN = {
   world: '589085a8b5ce974d',
   /** 60 s of play: the person-like bot in two valleys, the fuzzing bot in one. */
   play: {
-    'TAL-4471 wander': { behaviour: '688ae4eddeadae3a', state: '39fe453390264713' },
-    'MUD-9031 wander': { behaviour: '6e7045d91ca788ae', state: '0eafba4add5cd892' },
-    'TAL-4471 chaos': { behaviour: '746cd8eaaa80aa4b', state: 'f6d2366fb5000e02' },
+    'TAL-4471 wander': { behaviour: '688ae4eddeadae3a', state: '4c04325e4eca45c6' },
+    'MUD-9031 wander': { behaviour: '6e7045d91ca788ae', state: '0beac8712fcd45a4' },
+    'TAL-4471 chaos': { behaviour: '746cd8eaaa80aa4b', state: '5031fb7d0451b494' },
   },
   /** Scenes run by their own drivers: the movement course covers stairs, drops, ramps, ceilings, crawling and surfaces. */
   scenes: {
-    'movement-course': { behaviour: '40c97133a0ef732d', state: '70ef697b932eeac5' },
+    'movement-course': { behaviour: '40c97133a0ef732d', state: 'a72123b8c4cb29d8' },
   },
 } as const;
 
