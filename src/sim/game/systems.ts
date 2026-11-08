@@ -1,12 +1,15 @@
 import { intentFor, motorSystem, poseAt, type PoseSample } from '../body';
-import { carryOut } from '../brain';
+import { carryOut, type NavAllowance } from '../brain';
 import { dcos, dsin } from '../kernel/core/detmath';
 import { Faction } from '../kernel/state';
-import { scheduleSystem, type ScheduleHandler, type System } from '../kernel/systems';
+import { scheduleSystem, type Access, type ScheduleHandler, type System, type TickContext } from '../kernel/systems';
 import { Blocks } from '../kernel/world/colliders';
 import { emptyHit, raycast } from '../kernel/world/query';
 import { Surface } from '../kernel/world/surfaces';
 import { player } from './entities';
+import { drawBrain } from './brains';
+import { guardFire } from './combat';
+import { checkinDeadline, checkinReply, commanderOf, orderDeliver, radioDeliver, raiseAlarm, reinforceArrive, speak, targetEscapes } from './comms';
 import { think } from './guards';
 import { playerIntent } from './player';
 import { PERCEPTION } from './perception';
@@ -18,8 +21,14 @@ import { SHOOTING_SYSTEMS } from './shooting';
  * in a phase that touch the same data with no declared order between them.
  */
 
-/** Handlers for scheduled entries. Empty until a lab schedules its first effect. */
-export const SCHEDULE_HANDLERS: Readonly<Record<string, ScheduleHandler>> = {};
+/** Handlers for scheduled entries, by kind (kernel/schedule.ts): a radio call's delivery, and what later labs schedule. */
+export const SCHEDULE_HANDLERS: Readonly<Record<string, ScheduleHandler>> = {
+  'radio-deliver': radioDeliver,
+  'order-deliver': orderDeliver,
+  'checkin-reply': checkinReply,
+  'checkin-deadline': checkinDeadline,
+  'reinforce-arrive': reinforceArrive,
+};
 
 const pose: PoseSample = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, eyeHeight: 0 };
 
@@ -138,22 +147,58 @@ const guardOrders: System = {
 
 /**
  * Every guard's brain decides his order for the next tick, after the world has moved and
- * been perceived: today, keep to the routine (brain lane), until lab E's brain can pull
- * him off it. Each decides from his mind alone: the perception boundary (brain/mind.ts).
+ * been perceived: lab E's brain where the camp brain runs (a guard with `brain`), lab A's
+ * minimal reactions where only perception does, otherwise the routine (brain lane). Each
+ * decides from his mind alone: the perception boundary (brain/mind.ts). A change of what
+ * he's doing is an 'act', with its reason and its cause.
  */
 const guardBrains: System = {
   name: 'guard-brains',
   phase: 'decide',
-  reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.senses'],
-  writes: ['guard.guard.order'],
-  emits: [],
+  reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.senses', 'guard.brain'],
+  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'commander.camp.devices', 'commander.camp.level', 'commander.camp.since', 'schedule', 'entities', 'bullet.bullet'],
+  emits: ['act', 'call', 'shot', 'report', 'alarm', 'siren', 'level'],
   run(ctx) {
-    for (const g of ctx.index.of('guard')) think(g, ctx.world, ctx.tuning, ctx.tick + 1);
+    const nav = navAllowance(ctx);
+    const devices = commanderOf(ctx)?.camp.devices;
+    // Where the boxes stand, and nothing of their state: a guard learns the alarm is up from the siren.
+    const facts = devices ? { alarms: devices.alarms.map((a) => ({ x: a.x, z: a.z })), escape: devices.escape } : undefined;
+    for (const g of [...ctx.index.of('guard')]) {
+      const change = think(g, ctx.world, ctx.tuning, ctx.tick + 1, () => ctx.draw(g.id, 'brain', (rng) => rng.next()), nav, facts);
+      if (change) {
+        g.brain!.event = ctx.emit({ type: 'act', source: g.id, cause: change.cause, from: change.from, to: change.to, why: change.why, x: change.x, z: change.z, weight: change.weight });
+      }
+      if (g.brain) {
+        if (g.brain.fire) {
+          guardFire(ctx, g, g.brain.fire);
+          g.brain.fire = null;
+        }
+        if (g.brain.raise >= 0) {
+          raiseAlarm(ctx, g);
+          g.brain.raise = -1;
+        }
+        if (g.brain.aboard) targetEscapes(ctx, g);
+        speak(ctx, g);
+        ctx.debug((draw) => drawBrain(draw, ctx, g));
+      }
+    }
   },
 };
 
+/** What the tick's guards may spend on routes (rule 18): a fresh allowance every tick, shared in id order. */
+function navAllowance(ctx: TickContext): NavAllowance {
+  return ctx.channel('nav', () => ({ work: ctx.work, searches: { left: ctx.tuning.brain.nav.searchesPerTick } }));
+}
+
+/** What the schedule's handlers touch beyond the schedule (kernel/systems.ts, scheduleSystem). */
+const SCHEDULED_ACCESS = {
+  reads: ['commander.camp', 'guard', 'solid.solid'],
+  writes: ['commander.camp', 'guard.brain.told', 'guard.brain.task', 'guard.brain.thinkAt', 'guard.senses.awareness', 'guard.senses.belief', 'rng.awareness', 'entities', 'guard.body'],
+  emits: ['radio', 'checkin', 'reinforce'],
+} as const satisfies Access;
+
 export const SYSTEMS: readonly System[] = [
-  scheduleSystem(SCHEDULE_HANDLERS),
+  scheduleSystem(SCHEDULE_HANDLERS, SCHEDULED_ACCESS),
   playerCommands,
   SHOOTING_SYSTEMS.rifle,
   sandboxDrops,

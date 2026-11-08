@@ -58,6 +58,8 @@ export interface PendingSound {
   cause: number;
   /** What it sounded like: a step, a shot, a voice, a noise. */
   kind: 'sound' | 'shot' | 'voice';
+  /** The sound it came from: the event type, or 'crack' for a bullet's passing (E8 takes a bearing from a report, not from an impact). */
+  sound: string;
   /** How clearly: its level over the masked threshold (1 at the edge of hearing). */
   clarity: number;
   /** A voice's own level for listeners (a bark's line: perception/barks.ts); 0 for other sounds. */

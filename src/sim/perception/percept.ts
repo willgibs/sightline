@@ -34,6 +34,8 @@ export interface Percept {
   expires: number;
   /** The event behind it (the footstep, the detection), or 0. */
   cause: number;
+  /** A heard percept's sound: the event type, or 'crack' (E8 takes a bearing from a report, not from an impact). */
+  sound?: string;
 }
 
 /**

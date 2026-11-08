@@ -19,6 +19,28 @@ function capped(amp: number): number {
   return Math.min(amp, 1);
 }
 
+/** The camp's siren: a two-tone wail that climbs and falls, for a few seconds. */
+export function siren(ctx: BaseAudioContext, out: AudioNode, when: number, amp: number): number {
+  const voice = new GainNode(ctx, { gain: 0 });
+  voice.connect(out);
+  const osc = new OscillatorNode(ctx, { type: 'sawtooth', frequency: 420 });
+  osc.connect(voice);
+  const gain = voice.gain;
+  const peak = capped(amp) * 0.5;
+  gain.setValueAtTime(0, when);
+  gain.linearRampToValueAtTime(peak, when + 0.4);
+  const end = when + 6;
+  for (let k = 0; k < 4; k++) {
+    osc.frequency.linearRampToValueAtTime(520, when + 0.75 + k * 1.5);
+    osc.frequency.linearRampToValueAtTime(420, when + 1.5 + k * 1.5);
+  }
+  gain.setValueAtTime(peak, end - 0.4);
+  gain.linearRampToValueAtTime(0, end);
+  osc.start(when);
+  osc.stop(end);
+  return end;
+}
+
 export function report(ctx: BaseAudioContext, out: AudioNode, noise: NoiseBuffers, rand: Rand, when: number, amp: number, suppressed: boolean): number {
   const voice = new GainNode(ctx, { gain: capped(amp) });
   voice.connect(out);
