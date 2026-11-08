@@ -2,6 +2,44 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · Lab A: perception and awareness
+
+Built on the `lab-a-perception` branch to `docs/phase-1-plan.md`, section A. Until A13 the lab runs only in its scene (`?scene=perception-lab`) and its scenarios, so the valley's goldens hold.
+
+### Sight: zones, caps and rates, with ramped edges (A2)
+
+**Decision:**
+- **How the table is read** (owner, Nov 7, made exact): each zone has a range for the reference body (standing, walking, lit, in the open): core ±30° to 150 m, peripheral ±60° to 25 m, and a marksman's far zone ±2.5° to 400 m. The most inclusive zone at the body's angle sets the rate. **Stance, light and the sky behind are range caps**; **movement and the share of the body in view are rate factors**. Inside a range the meter fills in 2 s at the eye growing linearly to 8 s at the edge.
+- **Every edge ramps:** a cone's over 4°, a range's over 8% of it (2 to 12 m).
+- **Telegraphed by construction:** outside a 2.5 m contact zone the rate is capped at 0.7 / 1.5 s, so the first cue (30%) always comes at least 1.5 s before 100%. Inside contact, a body is noticed in any direction, in 0.8 s.
+- **Each part at its own range.** Rays go to head, chest and feet (weights 0.2, 0.5, 0.3), each through foliage; a part with open sky behind it is seen up to 1.5× farther. Summing parts, rather than scaling the range by the sky's share of what's visible, keeps the model monotone: more of you in view never fills more slowly.
+- **Sky ramps too:** a line on past a body counts as sky as it rises through level (±0.5°), and ground behind it counts partly from 750 m and fully past 1,500 m.
+- **One ray is enough** to start the meter, in every stance: the share in view already slows a sliver, and a minimum would be a cliff. The minimum stays a knob in tuning.
+- **Light is the ground's** beneath the body (owner): the environment's light 5 cm above the feet, with foliage between it and the sun casting shade where it passes less than half.
+- **A distant guard skips perception:** a body beyond every zone's farthest possible reach costs no rays.
+
+**Why:** these read the design doc's four fixed points exactly. Standing and walking in the open: 150 m. Still and prone in cover: the prone cap is 45 m, so never beyond 50 m, and slowly within it. Crouched in shade at 30 m: a 54 m range, 5.3 s. A marksman: 400 m. Making movement a cap as well would put a still, crouched body in shade at 22 m, contradicting the third point.
+
+**What moved:** nothing in the valley. The perception lab joins the pinned runs, in the perception lane's bench (`1a1c65ab2888e504`, `2d76d43f31015522`), which moves `BEHAVIOUR`; the tuning gains `perception`, so the golden recording is rewritten.
+
+### Foliage dims sight the same both ways (A2, drawn in A4)
+
+**Decision:** foliage is a set of volumes (cylinders for bushes, cones for canopies) that a line passes through with transmittance exp(−density × chord). `Foliage.transmittance` orders its two ends before computing, so it is symmetric to the bit; a test checks 4,000 pairs. Volumes are a world field the perception lane adds by augmentation (`world.foliage`). The valley's bushes are still opaque sight colliders and its canopies block nothing: they become volumes when perception joins the valley (A13), with generation.
+
+**Why:** today a bush hides you without blocking your view out, and a canopy hides a guard from you but not you from him. One law in both directions removes both.
+
+### Systems read the tick's events (A2)
+
+**Decision:** `TickContext.events` is the events emitted so far in the tick. A system that reads them declares `events`, and the kernel refuses one in the same phase as a system that emits unless they're ordered. Perception takes stimuli from it (footsteps, shots, barks). Events emitted in a later phase reach no reader: what must outlast a tick goes into the state.
+
+**Why:** events are the labs' contract, and perception is their first consumer inside the simulation.
+
+### The perception lab (A1)
+
+**Decision:** a camp at the west end of a 520 m field (`game/scenes/perceptionLab.ts`): a sentry sweeping the field, a patrol on the perimeter, a marksman on a 6 m tower sweeping his far zone across it; low walls at 30 m and a chest-high wall at 60 m; crates; a shelter, a tall wall and a conifer for shade; bushes and the conifer's canopy as foliage; a ridge 70 m north whose crest the camp sees against the sky; gravel round the camp and along the track; a generator. Low hills close the lab's edges, so no line ends in false sky at the world's edge.
+
+**Why:** every factor of the sight table and of hearing has a place to be tried, and the scenario runner (A3) measures in its open field.
+
 ## 2026-11-08 · Lab D
 
 Phase 1's camp generator (`docs/phase-1-plan.md`, section D), built in the generation lane.

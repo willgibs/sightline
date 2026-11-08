@@ -47,7 +47,14 @@ export const BENCH_GOLDEN: PinnedBench = {
   },
   "perception": {
     "metrics": {},
-    "runs": {}
+    "runs": {
+      "perception-lab": {
+        "work": {
+          "motor": { "rays": 0, "nodes": 0, "bodies": 10800 },
+          "perception-sight": { "rays": 15787, "nodes": 0, "bodies": 0 }
+        }
+      }
+    }
   },
   "brain": {
     "metrics": {},

@@ -1,6 +1,7 @@
 import type { Scene as KernelScene } from '../../kernel/scene';
 import type { Simulation } from '../sim';
 import { movementCourse } from './movementCourse';
+import { perceptionLab } from './perceptionLab';
 import { spawnTick } from './spawnTick';
 
 /** A scene of Sightline (kernel/scene.ts): its game is SIGHTLINE, and its runs are the game's simulations. */
@@ -12,6 +13,7 @@ export type Scene = KernelScene<Simulation>;
  */
 export const SCENES: Readonly<Record<string, () => Scene>> = {
   'movement-course': movementCourse,
+  'perception-lab': perceptionLab,
   'spawn-tick': spawnTick,
 };
 

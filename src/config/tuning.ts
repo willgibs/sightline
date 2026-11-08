@@ -159,6 +159,91 @@ export const defaultTuning = {
     conePeripheralDeg: 120,
   },
 
+  // Perception and awareness (lab A, sim/perception). The sight table's multipliers stay in
+  // `visibility`; this is how they're read (owner, Nov 7): stance, light and the sky behind
+  // you scale a zone's range, movement and the share of you in view scale how fast the
+  // meter fills inside it, time grows linearly with distance, and every edge ramps.
+  perception: {
+    sight: {
+      // Each zone's range is for the reference body: standing, walking, lit, in the open.
+      // The most inclusive zone sets the range at each angle off the gaze (Blacklist).
+      core: { halfDeg: 30, range: 150 }, // design doc: a core cone of about 60°; 150 m in daylight
+      peripheral: { halfDeg: 60, range: 25 }, // owner: peripheral vision covers only a short range
+      far: { halfDeg: 2.5, range: 400 }, // a marksman's binoculars: about 400 m in a narrow cone
+      edgeDeg: 4, // a cone's edge ramps over this many degrees
+      edgeShare: 0.08, // a range's edge ramps over this share of the range,
+      edgeMin: 2, // but no less than this many metres
+      edgeMax: 12, // and no more
+      // Seconds to fill the meter at no distance, and at the range's edge: linear between.
+      fill: { near: 2, edge: 8 },
+      // How much each ray counts toward the share of the body in view.
+      parts: { head: 0.2, chest: 0.5, feet: 0.3 },
+      // Rays that must be clear of anything solid before the meter moves at all. One for
+      // every stance: the share in view already slows a sliver, and a gate would be a cliff.
+      minClear: { stand: 1, crouch: 1, prone: 1 },
+      // Close enough to touch: noticed in any direction, and quickly. Drawn in the debug view.
+      contact: { range: 2.5, ramp: 0.5, seconds: 0.8 },
+      cue: 0.3, // below this nothing shows (design doc)
+      minCueSeconds: 1.5, // outside contact, the first cue comes at least this long before 100%
+      hold: 1.5, // seconds the meter holds after the body leaves view,
+      decay: 0.12, // then falls this much per second
+      skylineReach: 1500, // a line on past the body that hits nothing this far ends in open sky
+      skylineRampDeg: 0.5, // it counts as sky from this far below level to this far above, ramping
+      groundLift: 0.05, // light is taken this far above the ground beneath the body (owner)
+      shadeBelow: 0.5, // foliage that lets through less sun than this casts shade
+    },
+    // Foliage dims sight by the length of the line through it, the same both ways:
+    // transmittance exp(−density × length).
+    foliage: {
+      bush: 1.3, // per metre: a 1.6 m bush lets through about an eighth
+      canopy: 0.7, // per metre: a 4 m conifer canopy lets through about a twentieth
+    },
+    hearing: {
+      maxExpansions: 120000, // site-grid cells one sound's flood may expand (rule 18)
+      wallLossDb: 12, // the straight route loses this much per wall it passes through (as Rainbow Six Siege's does)
+      terrainLossDb: 15, // and this much where the ground is in the way
+      maxWalls: 4, // through more walls than this, the straight route is silent
+      maskDb: 17, // a steady sound hides anything more than this far below it (psychoacoustics: 15–20 dB)
+      // A heard sound gives a guess, not a fix: its place is blurred by a share of its distance,
+      // more by how much longer its path was than a straight line.
+      blur: { min: 0.5, distance: 0.08, detour: 0.6 },
+      lift: 0.3, // sounds start this far above where they are, clear of the ground they're on
+      keep: 6, // seconds a heard sound stays a percept
+    },
+    // The awareness ladder (design doc · Individual awareness): Thief's and The Dark Mod's.
+    awareness: {
+      // The level each state starts at, of the meter or of the evidence (combat: seen, at 1).
+      levels: { curious: 0.3, suspicious: 0.55, searching: 0.8 },
+      // A rise waits this long in the state it rises from: telegraphed reaction time.
+      dwell: { unaware: 0, curious: 0.6, suspicious: 0.8, searching: 0.6 },
+      // A fall steps down one state after this long without a new stimulus.
+      rampDown: { curious: 6, suspicious: 10, searching: 20, combat: 30 },
+      spread: 0.25, // each ramp-down varies by up to this share, from the guard's own stream
+      grace: 2.5, // seconds after a rise in which weaker stimuli are ignored,
+      graceBeat: 1.25, // unless one beats the last rise by this factor,
+      graceCount: 3, // or this many arrive, which counts as a stronger stimulus
+      repeat: 0.2, // how much a repeated stimulus adds
+      // What one heard sound raises him to, at the edge of hearing and when clear (clarity 4).
+      sound: { faint: 0.3, clear: 0.62 },
+      shot: 0.8, // a shot heard: searching
+      glimpse: 0.8, // having seen you at 100%: searching, once he loses you
+      floor: 0.15, // after a search he never settles below this (design doc: a raised baseline)
+      sharp: 1.25, // and his eyes are this much quicker
+      // Minimal reactions (A7), until lab E's brain: how he turns and moves at each state.
+      turnRate: 3.5, // rad/s, body
+      headRate: 5, // rad/s, head
+      headLimitDeg: 75, // the head turns this far before the body follows
+      approach: 1.5, // m/s, walking to look
+      hurry: 2.2, // m/s, searching
+      arrive: 1.5, // metres: close enough to the spot to stop and look
+      scanDeg: 40, // looking around a spot, either side
+      scanPeriod: 4, // seconds per sweep
+      believedSpeed: 1.5, // m/s: how fast he assumes an intruder could have moved since
+    },
+    // Barks: each line is a voice (a sound the others hear), at most once in this long.
+    barks: { cooldown: 8, radius: 22, shout: 60 },
+  },
+
   guards: {
     // Their bodies are bodies.guard; this is how they keep to their routines (sim/game/guards.ts).
     catchUp: 1.5, // how much faster than walking a guard may hurry back to his routine

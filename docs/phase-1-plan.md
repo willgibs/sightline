@@ -384,11 +384,11 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - **Readable:** the owner beats the rules-only predictor on borderline trials (A12).
 
 **Milestones:**
-- [ ] A1 · The lab scene.
+- [x] A1 · The lab scene.
   - It holds a sentry, a patrol, a marksman post, cover, shade, a skyline ridge, gravel and grass, and a generator.
   - It grows with each milestone.
   - Handmade worlds have no foliage yet (`generation/handmade.ts`), so the scene adds it or uses generated terrain.
-- [ ] A2 · Sight: the detection meter, restructured (owner, Nov 7).
+- [x] A2 · Sight: the detection meter, restructured (owner, Nov 7).
   - Stance and light are range caps, and peripheral vision is a short-range zone. Time grows linearly with distance inside each zone, and each edge ramps over a few metres instead of a cliff.
   - Rays go to head, chest and feet, with a minimum number clear per stance.
   - Light is taken at the ground beneath the body (owner).

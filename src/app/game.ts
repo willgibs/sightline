@@ -3,7 +3,7 @@ import type { Tuning } from '../config/tuning';
 import { FixedStepClock } from '../sim/kernel/core/clock';
 import { headingDegrees, lerp, moveTowards } from '../sim/kernel/core/math';
 import { headBob } from '../sim/body';
-import { exposure } from '../sim/perception';
+import { tableExposure } from '../sim/perception';
 import { lightAt } from '../sim/kernel/env';
 import { generateWorld, simTuningKey, worldTuningKey } from '../sim/generation';
 import type { World } from '../sim/kernel/world/world';
@@ -911,7 +911,7 @@ export class Game {
     // The light where the player's chest is: in the sun, or shaded by terrain or something solid.
     const light = lightAt(w, this.sim.solids, w.spec.env, this.sim.tick / T.sim.tickHz, p.x, p.y + p.eyeHeight * 0.75, p.z, T.visibility);
     const lightName = light === T.visibility.light.lit ? 'sun' : light === T.visibility.light.shade ? 'shade' : light === T.visibility.light.dusk ? 'dusk' : 'dark';
-    const exp = exposure(p, T.bodies.player, T, light);
+    const exp = tableExposure(p, T.bodies.player, T, light);
     const V = T.visibility;
     const moveFactor = p.gait === 'idle' ? V.movement.still : p.gait === 'sprint' ? V.movement.sprinting : V.movement.moving;
     const sizes = this.replay ? null : (this.recorder?.sizes ?? null);
