@@ -545,7 +545,7 @@ Playable at `?scene=shooting-range`. Design doc: Weapons, tools and ballistics; 
     - Range a walker with the binoculars (F, then click), then dial the zero (↑ ↓) to the nearest 100 m and hold the rest, or keep 100 m and hold over with the dope card.
     - Read the wind from the flags (from the west, a full crosswind) and hold into it; lead a walker about 1.8 mil at 300 m.
     - Hear the strike come back about 1.3 s after the shot at 300 m; watch the dust on a miss and correct like a spotter.
-    - Press H to try the arcade and simulation instruments; the run's end lists what decided every shot.
+    - Press H to try the arcade and simulation instruments; the run's end gives every shot a row of range, lead, wind and sway, in mils.
   - **The bench against the seed** (`npm run bench`, lane ballistics):
 
     | Measure | The seed | Target | Measured |
