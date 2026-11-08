@@ -1,4 +1,4 @@
-import { defaultTuning } from '../config/tuning';
+import { defaultTuning, type Tuning } from '../config/tuning';
 import { knownAnswerProblems } from '../sim/kernel/core/known';
 import { normalizeSeed } from '../sim/kernel/core/seed';
 import type { SpawnKind } from '../sim/kernel/mission';
@@ -16,6 +16,8 @@ import './styles.css';
  *   ?bench           run the 20-second performance flythrough and report
  *   ?dpr=2           render resolution multiplier, 0.5 to 3 (default: device ratio, capped at 1.5)
  *   ?replay=playtests/<name>.slrec   watch a recording (in development, any session in playtests/)
+ *   ?hz=60           run the simulation at another tick rate (every rate is per second); ?hz=blind
+ *                    flips a coin between 30 and 60, for a blind comparison (the debug panel says which)
  */
 const params = new URLSearchParams(window.location.search);
 const canvas = document.querySelector<HTMLCanvasElement>('#view')!;
@@ -42,6 +44,19 @@ if (mathProblems.length > 0) {
   );
 }
 
+/**
+ * ?hz=<n> runs the simulation at another tick rate, since every rate in tuning is per second
+ * (rule 17); ?hz=blind flips a coin between 30 and 60 for a blind comparison of feel (C9).
+ * Recordings carry their tuning, so such a run replays as what it was.
+ */
+function tickRateChoice(tuning: Tuning, hz: string | null): Tuning {
+  const n = hz === 'blind' ? (Math.random() < 0.5 ? 30 : 60) : Number(hz);
+  if (!hz || !Number.isFinite(n) || n < 15 || n > 240 || !Number.isInteger(n)) return tuning;
+  const out = structuredClone(tuning);
+  out.sim.tickHz = n;
+  return out;
+}
+
 let game: Game;
 try {
   game = new Game({
@@ -49,7 +64,7 @@ try {
     hud: document.querySelector<HTMLElement>('#hud')!,
     overlay,
     seed: normalizeSeed(params.get('seed')),
-    tuning: defaultTuning,
+    tuning: tickRateChoice(defaultTuning, params.get('hz')),
     debug: params.get('view') === 'debug',
     spawn: (params.get('spawn') === 'edge' ? 'edge' : 'overlook') as SpawnKind,
     bench: params.has('bench'),

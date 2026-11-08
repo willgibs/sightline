@@ -631,7 +631,7 @@ Playable at `?scene=movement-lab`; the movement course stays as a regression tes
   - E's sabotage uses the same action.
 - [ ] C7 · The player's own light and noise, read from the world.
   - The drawn shade and your own footsteps, at their simulated loudness.
-  - An audit that every cell's surface tag matches its drawn material. Hunt shipped silent footsteps from mis-tagged surfaces.
+  - An audit that every cell's surface tag matches its drawn material (`tests/surface-audit.test.ts`). Hunt shipped silent footsteps from mis-tagged surfaces.
   - A small cue on the body, only for what the world can't show (ambient masking and light from behind), and only if the trials fail without it.
 - [ ] C8 · Noise and visibility trials, with A's trial mode.
 - [ ] C9 · Feel: whether 30 Hz interpolation is responsive enough, and whether moving feels deliberate. Since every rate is per second, a blind comparison of 30 and 60 Hz is possible in the owner's sitting.

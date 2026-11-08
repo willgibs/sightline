@@ -345,7 +345,19 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
 function drawController(d: DebugDraw, b: BodyState, spec: BodySpec, world: World, tanMax: number): void {
   const r = spec.radius;
   const y = b.y + 0.04;
-  d.circle(b.x, y, b.z, r, b.sliding ? 'bad' : 'info');
+  if (b.lying > 0) {
+    // The chain of circles the body is, lying down, and the axis it pivots on.
+    const circles = footprint(b, spec, feetCircles);
+    for (let k = 0; k < circles.length; k++) {
+      const C = circles[k]!;
+      d.circle(b.x + C.x, b.y + C.rise + 0.04, b.z + C.z, C.r, 'info');
+    }
+    const head = circles[0]!;
+    const heel = circles[circles.length - 1]!;
+    d.line(b.x + head.x, y, b.z + head.z, b.x + heel.x, y, b.z + heel.z, 'info');
+  } else {
+    d.circle(b.x, y, b.z, r, b.sliding ? 'bad' : 'info');
+  }
   for (let k = 0; k < RIM.length; k++) {
     const px = b.x + RIM[k]![0] * r;
     const pz = b.z + RIM[k]![1] * r;
@@ -357,7 +369,8 @@ function drawController(d: DebugDraw, b: BodyState, spec: BodySpec, world: World
   const tone = b.sliding ? 'bad' : b.slopeTan > tanMax * 0.8 ? 'warn' : 'muted';
   const on = b.standingOn >= 0 ? ' · on an object' : '';
   const lean = b.lean !== 0 ? ` · lean ${b.lean > 0 ? 'right' : 'left'} ${Math.abs(b.lean).toFixed(2)} m` : '';
-  d.label(b.x, b.y + bodyHeight(b, spec) + 0.35, b.z, `slope ${slope.toFixed(0)}° of ${spec.maxSlopeDeg}°${b.sliding ? ' · sliding' : ''}${on} · ${b.motor}${lean}`, tone);
+  const lying = b.lying > 0 && b.lying < 1 ? ` · lying ${(b.lying * 100).toFixed(0)}%` : '';
+  d.label(b.x, b.y + bodyHeight(b, spec) + 0.35, b.z, `slope ${slope.toFixed(0)}° of ${spec.maxSlopeDeg}°${b.sliding ? ' · sliding' : ''}${on} · ${b.motor}${lean}${lying}`, tone);
   if (b.lean !== 0) {
     // The eye, where the lean has put it: the head guards target.
     const eye = eyeOf(b, spec, leanEye);
