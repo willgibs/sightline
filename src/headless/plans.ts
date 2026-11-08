@@ -9,18 +9,22 @@
  *   ... --out <file.json>                                  writes everything as JSON too
  *   ... --simulate                                         runs each camp's certified way in in the simulation, with lab A's real perception
  *   ... --briefs <dir>                                     writes the reviewers' briefs: what recon would show, each reviewer's camps in its own order
- *   ... --evaluate <dir>                                   reads reviews.json there (reviewer → camp letter → signature), and checks them
+ *   ... --evaluate <dir>                                   reads reviews.json there (reviewer → camp letter → signature), checks each plan on D's model and runs each rifle plan in the simulation
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { defaultTuning } from '../config/tuning';
 import { Rng } from '../sim/kernel/core/rng';
 import { randomSeed } from '../sim/kernel/core/seed';
-import { analyzeCamp, buildRaster, campMission, campPlans, generateWorld, planOn, routinePose, sameSignature, type AnalysisParts, type CampAnalysis, type Plan, type PlanSignature, type RoutinePose } from '../sim/generation';
+import { analyzeCamp, buildRaster, campMission, campPlans, generateWorld, planOn, sameSignature, writtenShots, type AnalysisParts, type CampAnalysis, type Plan, type PlanSignature, type WrittenShots } from '../sim/generation';
 import type { World } from '../sim/kernel/world/world';
 import { createBody } from '../sim/body';
 import { keepRoutine } from '../sim/brain';
 import { emptyMind, guardMind } from '../sim/game/guards';
+import { MarksmanDriver, type Step } from '../sim/game/bots/marksman';
+import { player } from '../sim/game/entities';
+import { placePlayer } from '../sim/game/setup';
+import { arm } from '../sim/game/shooting';
 import { PERCEPTION, giveSenses } from '../sim/game/perception';
 import { SIGHTLINE, type Simulation } from '../sim/game/sim';
 import type { Scene } from '../sim/game/scenes';
@@ -156,7 +160,6 @@ function reconOf(row: Row): object {
     const dz = z - c.site.z;
     return { forward: Math.round(dx * L.ux + dz * L.uz), right: Math.round(dx * L.vx + dz * L.vz) };
   };
-  const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
   const round = (v: number, d = 0): number => Number(v.toFixed(d));
   /** A yaw as a bearing in the camp's frame: 0 toward the gate, 90 to its right. */
   const facing = (yaw: number): number => {
@@ -187,16 +190,16 @@ function reconOf(row: Row): object {
           legs.push({ hold: [round(leg.t0), round(leg.t1)], at: frame(leg.x, leg.z), faces: facing(leg.yawTo) });
         }
       }
-      routinePose(g.routine, 0, pose);
       return { id, role: g.role, onTower: g.elevated, offsetSeconds: round(g.routine.offset ?? 0), periodSeconds: round(g.routine.period), legs };
     }),
   };
 }
 
 /**
- * The reviewers' plans, checked (lab D's exit test): does each work on its camp, do the
- * reviewers agree (three of four fields match), do any two camps share a signature, and is
- * each camp's plan clearly worse on the others (the regret matrix)?
+ * The reviewers' plans, checked (lab D's exit test): does each work on its camp, on D's model
+ * and, for a rifle plan, by a marksman's shots in the simulation; do the reviewers agree
+ * (three of four fields match); do any two camps share a signature; and is each camp's plan
+ * clearly worse on the others (the regret matrix)?
  */
 function evaluateReviews(dir: string, list: Row[]): void {
   const key = JSON.parse(readFileSync(path.join(dir, 'key.json'), 'utf8')) as Record<string, Record<string, string>>;
@@ -210,19 +213,32 @@ function evaluateReviews(dir: string, list: Row[]): void {
     for (const [label, sig] of Object.entries(reviews[name]!)) m.set(key[name]![label]!, sig);
     plans.set(name, m);
   }
+  const isRifle = (sig: PlanSignature): boolean => sig.tool.startsWith('rifle');
+  const riskOn = (sig: PlanSignature, r: Row): number => (isRifle(sig) ? (writtenShots(sig, r.world.camp, r.analysis, r.parts, G)?.risk ?? 1) : planOn(sig, r.world.camp, r.analysis, r.parts, G));
   console.log(`\nReviews by ${reviewers.length} agents of ${list.length} camps`);
   let works = 0;
   let total = 0;
+  let rifles = 0;
+  let fell = 0;
   for (const name of reviewers) {
     for (const [seed, sig] of plans.get(name)!) {
       const r = bySeed.get(seed)!;
-      const risk = planOn(sig, r.world.camp, r.analysis, r.parts, G);
+      const shots = isRifle(sig) ? writtenShots(sig, r.world.camp, r.analysis, r.parts, G) : null;
+      const risk = isRifle(sig) ? (shots?.risk ?? 1) : planOn(sig, r.world.camp, r.analysis, r.parts, G);
       total++;
       if (risk < 1) works++;
-      console.log(`  ${name} ${seed} [${show(sig)}] ${risk < 1 ? `works, risk ${risk.toFixed(2)}` : 'cannot be carried out'}`);
+      let run = '';
+      if (shots) {
+        rifles++;
+        const result = fireInSimulation(r, shots);
+        if (result.fell) fell++;
+        run = ` · ${result.text}`;
+      }
+      console.log(`  ${name} ${seed} [${show(sig)}] ${risk < 1 ? `works on the model, risk ${risk.toFixed(2)}` : 'cannot be carried out on the model'}${run}`);
     }
   }
-  console.log(`plans that work on their camps: ${works} of ${total}`);
+  console.log(`plans that work on their camps, on D's model: ${works} of ${total}`);
+  console.log(`rifle plans whose shots dropped their guards in the simulation: ${fell} of ${rifles}`);
   // Agreement: pairs of reviewers on one camp whose signatures match on three of four fields.
   let agreeing = 0;
   let pairs = 0;
@@ -237,21 +253,94 @@ function evaluateReviews(dir: string, list: Row[]): void {
   console.log(`agreement between reviewers on a camp (three of four fields): ${agreeing} of ${pairs}`);
   for (const name of reviewers) {
     const sigs = list.map((r) => plans.get(name)!.get(r.seed)!);
+    const shared: string[] = [];
     let same = 0;
-    for (let a = 0; a < sigs.length; a++) for (let b = a + 1; b < sigs.length; b++) if (sameSignature(sigs[a]!, sigs[b]!)) same++;
+    for (let a = 0; a < sigs.length; a++) {
+      for (let b = a + 1; b < sigs.length; b++) {
+        if (!sameSignature(sigs[a]!, sigs[b]!)) continue;
+        same++;
+        shared.push(`${list[a]!.seed}=${list[b]!.seed}`);
+      }
+    }
     // Regret: this reviewer's plans asked of the other camps.
     let worse = 0;
     let n = 0;
     list.forEach((j, x) => {
-      const own = planOn(sigs[x]!, j.world.camp, j.analysis, j.parts, G);
+      const own = riskOn(sigs[x]!, j);
       list.forEach((_, y) => {
         if (x === y) return;
         n++;
-        if (planOn(sigs[y]!, j.world.camp, j.analysis, j.parts, G) - own >= 0.1) worse++;
+        if (riskOn(sigs[y]!, j) - own >= 0.1) worse++;
       });
     });
-    console.log(`${name}: camps sharing a signature: ${same} pair(s) of ${(sigs.length * (sigs.length - 1)) / 2}; another camp's plan clearly worse: ${worse} of ${n}`);
+    console.log(`${name}: camps sharing a signature: ${same} pair(s) of ${(sigs.length * (sigs.length - 1)) / 2}${same > 0 ? ` (${shared.join(', ')})` : ''}; another camp's plan clearly worse: ${worse} of ${n}`);
   }
+}
+
+/**
+ * A plan's shots, by lab B's scripted marksman from the plan's perch. Guards keep their
+ * routines: their answer to a shot is the camp brain's (lab E). A single clean shot is tried
+ * at a few moments of its run of clean samples, as a shooter would take whichever his scope
+ * shows clear: the model's 1 m cells can call a grazing line clear.
+ */
+function fireInSimulation(r: Row, shots: WrittenShots): { fell: boolean; text: string } {
+  const perch = r.analysis.perches[shots.perch]!;
+  const c = r.world.camp;
+  const dt = r.analysis.dt;
+  const cycle = r.parts.timeline.samples * dt;
+  const mind = emptyMind();
+  const hold: System = {
+    name: 'plan-hold',
+    phase: 'decide',
+    after: ['guard-brains'],
+    reads: ['guard.body', 'guard.guard'],
+    writes: ['guard.guard.order'],
+    emits: [],
+    run(ctx) {
+      for (const g of ctx.index.of('guard')) keepRoutine(guardMind(g, ctx.world, ctx.tuning, ctx.tick + 1, mind), g.guard.order);
+    },
+  };
+  const attempt = (samples: readonly number[]): { fell: boolean; text: string } => {
+    // Early shots are taken a cycle later, so the rifle is up and steady.
+    const later = samples[0]! * dt < 6 ? cycle : 0;
+    const times = samples.map((k) => k * dt + later);
+    const steps: Step[] = [
+      { at: 0.2, act: 'prone' },
+      { at: 1.5, act: 'scope' },
+      ...shots.kills.map((k, i): Step => ({ at: times[i]!, act: 'fire', target: { post: k.guard }, breath: 2 })),
+    ];
+    const scene: Scene = {
+      name: 'plan-shot',
+      version: 1,
+      title: 'A plan, fired',
+      description: '',
+      game: SIGHTLINE,
+      world: () => r.world,
+      systems: [...PERCEPTION, hold],
+      setup: (sim) => {
+        giveSenses(sim);
+        placePlayer(sim, perch.x, perch.z, c.site.x - perch.x, c.site.z - perch.z);
+        arm(player(sim.index), sim.tuning);
+      },
+      driver: () => new MarksmanDriver(steps),
+      seconds: Math.max(...times) + 4,
+    };
+    const events = runScene(scene, defaultTuning).recording.readEvents();
+    const dropped = shots.kills.filter((k) => events.some((e) => e.type === 'death' && (e as { post?: number }).post === k.guard)).length;
+    const fell = dropped === shots.kills.length;
+    const shot = events.find((e) => e.type === 'shot') as { x: number; z: number } | undefined;
+    const moved = shot ? Math.sqrt((shot.x - perch.x) * (shot.x - perch.x) + (shot.z - perch.z) * (shot.z - perch.z)) : 0;
+    const seen = events.find((e) => e.type === 'detected');
+    const impact = events.find((e) => e.type === 'impact') as { what?: string } | undefined;
+    const why = moved > 2 ? `the shooter slid ${moved.toFixed(0)} m off a perch too steep to lie on` : `${dropped} of ${shots.kills.length} fell, the bullet struck ${impact?.what ?? 'nothing'}`;
+    return { fell, text: `${fell ? `${c.guards[shots.kills[0]!.guard]!.role} fell` : `MISSED (${why})`} at ${perch.dist.toFixed(0)} m, ${times[0]!.toFixed(0)} s${seen ? `, the shooter SEEN at ${seen.t.toFixed(0)} s` : ''}` };
+  };
+  let result = attempt(shots.kills.map((k) => k.sample));
+  for (const m of shots.moments) {
+    if (result.fell) break;
+    result = attempt([m]);
+  }
+  return result;
 }
 
 /**

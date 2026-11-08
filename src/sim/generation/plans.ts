@@ -319,6 +319,66 @@ export function planOn(sig: PlanSignature, camp: Camp, a: CampAnalysis, parts: A
   return bySector(R, E, meter, rim, goalCells, goal, 2 * K, gen);
 }
 
+/** What a rifle plan written by hand comes to on a camp: the perch, the shots (guard, sample of the cycle), and how risky it is. */
+export interface WrittenShots {
+  perch: number;
+  kills: Array<{ guard: number; sample: number }>;
+  /** For a single clean shot, other moments of its run of clean samples, best first (a shooter takes whichever his scope shows clear). */
+  moments: number[];
+  risk: number;
+}
+
+/**
+ * A rifle plan a person wrote, taken at its word (the exit test's reviewers): from a perch in
+ * its sector and band, the guard it names (by role, and only where it says he stands) can be
+ * shot as its split says. 'isolated' or 'window': nobody sees him fall. 'chain': whoever does
+ * is shot inside the reaction time. 'distraction': one witness's eyes are turned away. Unlike
+ * `planOn`, it needn't take the camp apart, and its first target needn't be the one a bot
+ * would open on: a reviewer's plan only has to do what it says. Null if the camp won't allow it.
+ */
+export function writtenShots(sig: PlanSignature, camp: Camp, a: CampAnalysis, parts: AnalysisParts, gen: GenTuning): WrittenShots | null {
+  const { witnesses: W, sight: P, lines, timeline: T } = parts;
+  const K = W.samples;
+  const n = W.guards;
+  const [sector, band] = sig.opening.split(' ');
+  const [role, where] = sig.first.split('@');
+  const clean = sig.split === 'isolated' || sig.split === 'window';
+  let best: WrittenShots | null = null;
+  a.perches.forEach((p, i) => {
+    if (sectorOf(camp, p.x, p.z) !== sector || (p.dist < NEAR ? 'near' : 'far') !== band) return;
+    for (let g = 0; g < n; g++) {
+      if (camp.guards[g]!.role !== role) continue;
+      const seen = P.seen.slice(i * n * K, (i + 1) * n * K);
+      const t = T.guards[g]!;
+      if (where) for (let k = 0; k < K; k++) if (sectorOf(camp, t.x[k]!, t.z[k]!) !== where) seen[g * K + k] = 0;
+      const one: PerchSight = { perches: 1, guards: n, samples: K, seen, distance: new Float32Array(1) };
+      const r = certify([g], { W, P: one, next: nextSightings(one), masks: lines.masks }, gen);
+      if (r.certified === 'unsolved' || r.certified === 'out of sight') continue;
+      if (r.certified === 'distraction' ? sig.split !== 'distraction' : clean && r.kills.length > 1) continue;
+      const others = (q: number): number => lines.masks[g * K + (q % K)]! & ~(1 << g);
+      let how: string = r.certified === 'distraction' ? 'distraction' : r.kills.length > 1 ? 'chain' : 'window';
+      let kills = r.kills.map((k) => ({ guard: k.guard, sample: k.sample }));
+      let moments: number[] = [];
+      if (how === 'window') {
+        // Nobody ever watches him while this perch can: isolated. And the shot goes in the
+        // middle of its run of clean moments, so the bullet's flight stays inside it.
+        let watched = false;
+        for (let k = 0; k < K && !watched; k++) watched = seen[g * K + k] === 1 && others(k) !== 0;
+        if (!watched) how = 'isolated';
+        const first = r.kills[0]!.sample;
+        let last = first;
+        while (last + 1 < first + K && seen[g * K + ((last + 1) % K)] === 1 && others(last + 1) === 0) last++;
+        const at = (share: number): number => first + Math.floor((last - first) * share);
+        kills = [{ guard: g, sample: at(0.5) }];
+        moments = [at(0.25), at(0.75), first, last];
+      }
+      const risk = Math.min(0.99, SPLIT_RISK[how]! + p.dist / 2000);
+      if (!best || risk < best.risk) best = { perch: i, kills, moments, risk };
+    }
+  });
+  return best;
+}
+
 /** The risk of a way in entering only by the given rim cells, or 1 if there is none. */
 function bySector(R: Raster, E: Exposure, meter: Meter, rim: number[], goalCells: number[], goal: (c: number, t: number) => boolean, horizon: number, gen: GenTuning): number {
   const allowed = new Set(rim);
