@@ -3,7 +3,7 @@ import { clamp, lerp, smoothstep } from '../kernel/core/math';
 import type { Heightfield } from '../kernel/world/heightfield';
 import type { Noise2D } from './noise';
 import type { Point2, Polyline } from './paths';
-import type { Ford, Ridge } from './landform';
+import type { Ford, Ridge, SiteKind } from './landform';
 
 /**
  * What a valley's terrain is, as generation hands it on: its heights, its features and its
@@ -51,6 +51,9 @@ export interface TerrainFeatures {
   fords?: Ford[];
   openAngle?: number;
   openArc?: number;
+  /** The kind of site the camp stands on, and the width of its water's bed (landform.ts). */
+  kind?: SiteKind;
+  creekWidth?: number;
 }
 
 export interface Backdrop {

@@ -8,7 +8,7 @@ import { buildTimeline, exposureField, heatmaps, witnessDuty, witnessEdges, type
 import { infiltrate, rimCells, type Exposure, type Infiltration, type Meter, type Search, type Space } from './infiltrate';
 import type { Point2 } from './paths';
 import { findPerches, perchSeesDeck, perchViewshed, type PerchSpot } from './perches';
-import { buildRaster, cellOf, centreOf, frameOf, lineOfSight, type Raster } from './raster';
+import { buildRaster, cellOf, centreOf, clearShot, frameOf, type Raster } from './raster';
 
 /**
  * Lab D's analysis of a generated camp (D7): who sees whom over its cycle, what each perch
@@ -82,6 +82,8 @@ export interface PathReport {
 /** What the analysis keeps for the searches that come after it: validation's and the plans'. */
 export interface AnalysisParts {
   raster: Raster;
+  /** What actually stops sight and bullets, for the checks the raster's resolution can't answer. */
+  colliders: ColliderSet;
   timeline: Timeline;
   field: Field;
   witnesses: Witnesses;
@@ -112,7 +114,7 @@ export function analyzeCamp(
   const duty = witnessDuty(W);
 
   // --- Perches: what each sees of the guards, the target, the alarms and the escape. ---
-  const spots = findPerches(hf, camp.site, gen);
+  const spots = findPerches(hf, camp.site, gen, grid.map);
   const n = T.guards.length;
   const K = T.samples;
   const seen = new Uint8Array(spots.length * n * K);
@@ -245,7 +247,7 @@ export function analyzeCamp(
       const m = centreOf(R, c);
       const d2 = (m.x - t.x[k]!) * (m.x - t.x[k]!) + (m.z - t.z[k]!) * (m.z - t.z[k]!);
       if (d2 > close * close || d2 < touch * touch) return false;
-      return lineOfSight(R, m.x, m.y + gen.sight.crouchHead, m.z, t.x[k]!, t.chest[k]!, t.z[k]!);
+      return clearShot(R, colliders, m.x, m.y + gen.sight.crouchHead, m.z, t.x[k]!, t.chest[k]!, t.z[k]!);
     };
     infiltration = find(all, { goal, goalCells, horizon, maxExpansions: A.maxExpansions });
   }
@@ -303,7 +305,7 @@ export function analyzeCamp(
     exfil2: report(second),
     vehicle: report(vehicle),
   };
-  return { analysis, parts: { raster: R, timeline: T, field: F, witnesses: W, perches: spots, sight, lines } };
+  return { analysis, parts: { raster: R, timeline: T, field: F, witnesses: W, perches: spots, sight, lines, colliders } };
 }
 
 /** Two guards' views together: levels add, up to the most a sample holds. */

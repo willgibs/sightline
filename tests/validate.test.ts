@@ -12,7 +12,10 @@ import type { World } from '../src/sim/kernel/world/world';
  * within its budget, the same way every time.
  */
 
-const G = T.gen;
+// A camp whose crux is the way in, so that every rule below has something to ask of it.
+const TI = structuredClone(T);
+TI.gen.crux.kinds = { walk: 0, inside: 1, flush: 0, escort: 0 };
+const G = TI.gen;
 const SEEDS = ['KAL-1320', 'ZUV-2081', 'KEP-9923', 'LOT-9009', 'DEH-8489', 'FIT-3642'];
 let world: World;
 let analysis: CampAnalysis;
@@ -20,7 +23,7 @@ let parts: AnalysisParts;
 
 beforeAll(() => {
   for (const seed of SEEDS) {
-    const w = generateWorld(campMission(seed), T);
+    const w = generateWorld(campMission(seed), TI);
     if (w.report.validation!.ok && (w.report.repairs ?? []).length === 0) {
       world = w;
       break;
@@ -50,8 +53,25 @@ describe('a camp that passes validation', () => {
 });
 
 describe('each rule', () => {
-  it('long range: two perches must see half the guards and the target', () => {
-    expect(failed(check((a) => ({ ...copyPerches(a), perches: a.perches.map((p) => ({ ...p, target: 0 })) })), 'long range')).toBe(true);
+  it('the crux: a way to succeed at it must exist, and nothing else is promised', () => {
+    // No camp here is asked for a shot at the target: its perches can all be blind to him.
+    const blind = check((a) => ({ ...copyPerches(a), perches: a.perches.map((p) => ({ ...p, target: 0 })) }));
+    const crux = world.camp.crux!;
+    if (crux !== 'escort') expect(failed(blind, 'crux')).toBe(false);
+    // A buried target's camp has to have the way through that its crux needs.
+    if (crux === 'inside') expect(failed(check((a) => ({ ...a, infiltration: { ...a.infiltration, found: false } })), 'crux')).toBe(true);
+    if (crux === 'flush') {
+      const noWayToStopHim = check((a) => {
+        const b = copyPerches(a);
+        for (const p of b.perches) p.run = 0;
+        return { ...b, vehicle: { ...b.vehicle, found: false } };
+      });
+      expect(failed(noWayToStopHim, 'crux')).toBe(true);
+    }
+    if (crux === 'escort') {
+      const unseen = check((a) => ({ ...copyPerches(a), perches: a.perches.map((p) => ({ ...p, target: 0 })) }));
+      expect(failed(unseen, 'crux')).toBe(true);
+    }
   });
 
   it('infiltration, systems and the ways out: each needs its way', () => {

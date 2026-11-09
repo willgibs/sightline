@@ -3,7 +3,7 @@ import type { Camp } from './camp';
 import type { AnalysisParts, CampAnalysis, PathReport } from './campAnalysis';
 import { certify, nextSightings, type PerchSight, type Sightlines } from './clusters';
 import { infiltrate, rimCells, type Exposure, type Meter } from './infiltrate';
-import { cellOf, centreOf, lineOfSight, type Raster } from './raster';
+import { cellOf, centreOf, clearShot, lineOfSight, type Raster } from './raster';
 
 /**
  * Restricted-play bots (lab D's exit test): for each approach alone (long range, infiltration,
@@ -296,6 +296,15 @@ export function planOn(sig: PlanSignature, camp: Camp, a: CampAnalysis, parts: A
     const set = new Set(near);
     return bySector(R, E, meter, rim, near, (c) => set.has(c), 2 * K, gen);
   }
+  const { goal, goalCells } = closeShotGoal(target, parts, gen);
+  return bySector(R, E, meter, rim, goalCells, goal, 2 * K, gen);
+}
+
+/** Where a way in ends: near enough for a close shot at the target, with a clear line to him and outside his contact zone. */
+function closeShotGoal(target: number, parts: AnalysisParts, gen: GenTuning): { goal: (c: number, time: number) => boolean; goalCells: number[] } {
+  const R = parts.raster;
+  const T = parts.timeline;
+  const K = T.samples;
   const t = T.guards[target]!;
   const close = gen.analysis.closeShot;
   const touch = gen.sight.contact.range + gen.sight.contact.ramp;
@@ -314,9 +323,29 @@ export function planOn(sig: PlanSignature, camp: Camp, a: CampAnalysis, parts: A
     const k = time % K;
     const m = centreOf(R, c);
     const d2 = (m.x - t.x[k]!) * (m.x - t.x[k]!) + (m.z - t.z[k]!) * (m.z - t.z[k]!);
-    return d2 <= close * close && d2 >= touch * touch && lineOfSight(R, m.x, m.y + gen.sight.crouchHead, m.z, t.x[k]!, t.chest[k]!, t.z[k]!);
+    return d2 <= close * close && d2 >= touch * touch && clearShot(R, parts.colliders, m.x, m.y + gen.sight.crouchHead, m.z, t.x[k]!, t.chest[k]!, t.z[k]!);
   };
-  return bySector(R, E, meter, rim, goalCells, goal, 2 * K, gen);
+  return { goal, goalCells };
+}
+
+/**
+ * The way in, as carefully as can be certified: the lowest of `limits` (shares of a full meter,
+ * ascending) under which a way in exists, or null. The analysis's own way in is the first a
+ * greedy search finds, which is often a close call when a safer one exists, so its peak says
+ * little about what a careful person could do. Each limit is one bounded search (rule 18).
+ */
+export function carefulWayIn(camp: Camp, parts: AnalysisParts, gen: GenTuning, limits: readonly number[]): number | null {
+  const target = camp.objective?.target ?? -1;
+  if (target < 0) return null;
+  const A = gen.analysis;
+  const { goal, goalCells } = closeShotGoal(target, parts, gen);
+  const space = parts.raster;
+  for (const limit of limits) {
+    const meter: Meter = { levels: Math.round(A.meterLevels * limit), decay: Math.max(1, Math.round(A.meterDecay * A.meterLevels * A.dt)), still: gen.sight.still };
+    const r = infiltrate(space, parts.field, meter, { goal, goalCells, horizon: 2 * parts.timeline.samples, maxExpansions: A.maxExpansions / 4, weight: A.searchWeight });
+    if (r.found) return r.peak / A.meterLevels;
+  }
+  return null;
 }
 
 /** What a rifle plan written by hand comes to on a camp: the perch, the shots (guard, sample of the cycle), and how risky it is. */

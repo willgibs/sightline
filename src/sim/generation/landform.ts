@@ -1,12 +1,13 @@
 import type { GenTuning } from '../../config/tuning';
 import { DEG, TWO_PI, datan2, dcos, dsin, dtanDeg } from '../kernel/core/detmath';
 import { clamp, lerp, smoothstep } from '../kernel/core/math';
-import type { Rng } from '../kernel/core/rng';
+import { Rng } from '../kernel/core/rng';
 import { Heightfield } from '../kernel/world/heightfield';
 import { Surface } from '../kernel/world/surfaces';
 import { Noise2D } from './noise';
 import { catmullRom, makePolyline, pointAt, PolylineIndex, type PathHit, type Point2, type Polyline } from './paths';
 import { smin, wiggle, type TerrainResult } from './terrain';
+import { pickWeighted } from './weights';
 
 /**
  * Terrain with teeth (lab D, D3): the valley a generated camp stands in.
@@ -25,7 +26,33 @@ import { smin, wiggle, type TerrainResult } from './terrain';
  * Every feature draws from its own labelled fork (rule 3), and everything is a
  * deterministic function of the seed (detmath.ts). overwatch.ts checks the result with
  * viewsheds; generateCampWorld re-rolls a valley that fails.
+ *
+ * **The kinds of site.** That valley is one way for a camp to meet the ground, and a hundred
+ * seeds of it are a hundred rotations of one picture: nothing else about the ground differs
+ * (variety experiments). So the seed picks a kind of site, from its own stream so a valley
+ * that's re-rolled keeps its kind, and each is built from the same parts, spines, walls, a fall
+ * of the ground, a water course and a road:
+ *
+ * - **hollow** the valley above: the pad low, ridges standing over it on one side;
+ * - **spur** the pad on a promontory: the ground falls away except along a neck to the high
+ *   ground, so the shots are long and flat and the slope below the fence is dead ground;
+ * - **bend** the pad in a river's bend, the water looping round its back, crossed at fords;
+ * - **scarp** the pad under a cliff nobody can stand on: nothing to shoot from behind, every
+ *   long shot from the side its gate faces, and at most one notch to come down by;
+ * - **gorge** the pad between two such cliffs, overlooked only along its axis;
+ * - **col** the pad on a saddle: high shoulders close on either side, shots short and steep.
+ *
+ * `generateLandform` is written so that with only `hollow` weighted, it draws exactly what it
+ * always did from every stream.
  */
+
+export const SITE_KINDS = ['hollow', 'spur', 'bend', 'scarp', 'gorge', 'col'] as const;
+export type SiteKind = (typeof SITE_KINDS)[number];
+
+/** A seed's kind of site, from a root stream of its own: a valley re-rolled keeps its kind. */
+export function siteKindOf(seed: string, gen: GenTuning): SiteKind {
+  return pickWeighted(new Rng(seed, 'site'), gen.landform.sites, SITE_KINDS);
+}
 
 /** A ridge spine placed around the camp. Plain data: the crest is a polyline. */
 export interface Ridge {
@@ -45,6 +72,10 @@ export interface Ridge {
   back: number;
   /** Arc lengths along the crest of the walkable gullies down the camp face. */
   gullies: number[];
+  /** A wall: sheer on both faces and with nowhere to stand, so nobody overlooks anything from it. */
+  wall: boolean;
+  /** How much of the crest a gully takes: a notch in a wall, a dip on a spine. */
+  notch: number;
 }
 
 /** A place the creek can be crossed on foot. */
@@ -62,12 +93,13 @@ export function generateLandform(rng: Rng, gen: GenTuning): TerrainResult {
   const W = gen.world;
   const L = gen.landform;
   const padR = W.padRadius;
+  const kind = siteKindOf(rng.seed, gen);
   const relief = new Noise2D(rng.fork('relief'));
   const fine = new Noise2D(rng.fork('detail'));
   const patches = new Noise2D(rng.fork('patches'));
   const wobble = new Noise2D(rng.fork('wobble'));
 
-  // --- The spines: an open side, and two or three ridges around the rest. --------------
+  // --- The bearings: an open side, and what stands around the rest. ---------------------
   const brng = rng.fork('bearings');
   const open = brng.unit2();
   const openAngle = datan2(open.z, open.x);
@@ -75,20 +107,79 @@ export function generateLandform(rng: Rng, gen: GenTuning): TerrainResult {
   const count = brng.int(L.ridges[0]!, L.ridges[1]!);
   const closed = TWO_PI - openArc;
   const slot = closed / count;
+
+  // --- The site's own ground: how far it falls away from the pad. ------------------------
+  const srng = rng.fork('site');
+  /** How far the valley's floor lies below the pad, and how far out a spur's fall ends. */
+  let sink = 0;
+  let spurRun = 0;
+  /** What the kind of site adds to the height at (x, z), r0 from the camp's centre. */
+  let shape: (x: number, z: number, r0: number) => number = () => 0;
+  if (kind === 'spur') {
+    const S = L.spur;
+    const drop = srng.between(S.drop);
+    const run = srng.between(S.fall);
+    const neckHalf = srng.between(S.neck);
+    // The neck runs back opposite the open side, a little to one side or the other.
+    const neckAngle = openAngle + TWO_PI / 2 + srng.range(-0.3, 0.3);
+    const nx = dcos(neckAngle);
+    const nz = dsin(neckAngle);
+    const neckEnd = srng.between(S.ridgeDistance);
+    sink = drop;
+    spurRun = run;
+    shape = (x, z, r0) => {
+      const along = x * nx + z * nz;
+      const across = Math.abs(-x * nz + z * nx);
+      const neck = (1 - smoothstep(neckHalf, neckHalf + S.neckBlend, across)) * smoothstep(0, padR * 0.5, along) * (1 - smoothstep(neckEnd, neckEnd + 90, along));
+      return -drop * smoothstep(padR + 4, padR + run, r0) * (1 - neck);
+    };
+  } else if (kind === 'col') {
+    const C = L.col;
+    const drop = srng.between(C.fall);
+    const run = srng.between(C.run);
+    const ax = dcos(openAngle);
+    const az = dsin(openAngle);
+    shape = (x, z, r0) => {
+      // Only along the axis: the shoulders either side stay up.
+      const along = Math.abs(x * ax + z * az);
+      const across = Math.abs(-x * az + z * ax);
+      return -drop * smoothstep(padR, padR + run, along) * (1 - smoothstep(40, 150, across)) * smoothstep(padR * 0.5, padR, r0);
+    };
+  }
+
+  // --- The spines: two or three ridges, placed by the kind of site. ----------------------
+  /** Spines stand round the closed side, except on a col and in a gorge, which have two of their own. */
+  const spineCount = kind === 'col' || kind === 'gorge' ? 2 : count;
+  const ranges = (): { span: readonly number[]; distance: readonly number[]; height: readonly number[] } => {
+    if (kind === 'spur') return { span: L.spur.ridgeSpanDeg, distance: L.spur.ridgeDistance, height: L.spur.ridgeRise };
+    if (kind === 'bend') return { span: L.ridgeSpanDeg, distance: L.bend.ridgeDistance, height: L.bend.ridgeHeight };
+    if (kind === 'gorge') return { span: L.gorge.ridgeSpanDeg, distance: L.gorge.ridgeDistance, height: L.gorge.ridgeHeight };
+    if (kind === 'col') return { span: L.col.shoulderSpanDeg, distance: L.col.shoulderDistance, height: L.col.shoulderHeight };
+    return { span: L.ridgeSpanDeg, distance: L.ridgeDistance, height: L.ridgeHeight };
+  };
+  const R = ranges();
+  const offAxis = srng.range(0, 1) < 0.5 ? 1 : -1;
   const ridges: Ridge[] = [];
   const indices: PolylineIndex[] = [];
-  for (let k = 0; k < count; k++) {
+  for (let k = 0; k < spineCount; k++) {
     const r = rng.fork(`ridge${k}`);
-    const span = Math.min(r.between(L.ridgeSpanDeg) * DEG, slot * 0.78);
-    const angle = openAngle + openArc / 2 + slot * (k + 0.5) + r.range(-1, 1) * (slot - span) * 0.3;
+    const span = Math.min(r.between(R.span) * DEG, kind === 'col' || kind === 'gorge' ? (150 * DEG) : slot * 0.78);
+    const angle =
+      kind === 'col'
+        ? openAngle + (k === 0 ? 1 : -1) * (90 + r.range(-14, 14)) * DEG
+        : kind === 'gorge'
+          ? k === 0
+            ? openAngle + offAxis * r.between(L.gorge.offAxisDeg) * DEG
+            : openAngle + TWO_PI / 2 + r.range(-12, 12) * DEG
+          : openAngle + openArc / 2 + slot * (k + 0.5) + r.range(-1, 1) * (slot - span) * 0.3;
     const bx = dcos(angle);
     const bz = dsin(angle);
-    const dist = r.between(L.ridgeDistance);
+    const dist = r.between(R.distance);
     const length = 2 * dist * (dsin(span / 2) / dcos(span / 2));
     const front = clamp(dist - 150, 70, 120);
     // A gully's slope peaks at 1.5 × height / run (smoothstep); keep it well under the walkable 42°.
-    const gullyRun = Math.max(front, Math.min(2.2 * r.between(L.ridgeHeight), dist - 140));
-    const height = Math.min(r.between(L.ridgeHeight), 0.5 * gullyRun);
+    const gullyRun = Math.max(front, Math.min(2.2 * (sink + r.between(R.height)), dist - 140));
+    const height = Math.min(sink + r.between(R.height), 0.5 * gullyRun);
     const back = r.between(L.ridgeBack);
     const bend = r.between(L.ridgeBend);
     const tx = -bz;
@@ -108,9 +199,39 @@ export function generateLandform(rng: Rng, gen: GenTuning): TerrainResult {
       if (gullies.every((o) => Math.abs(o - s) > 70)) gullies.push(s);
     }
     gullies.sort((a, b) => a - b); // unique: no two are within 70 m
-    ridges.push({ bx, bz, angle, span, crest, height, front, gullyRun, back, gullies });
+    ridges.push({ bx, bz, angle, span, crest, height, front, gullyRun, back, gullies, wall: false, notch: 0.12 });
     indices.push(new PolylineIndex(crest, Math.max(back, gullyRun) + 10));
   }
+
+  // --- The walls: sheer rock a scarp or a gorge stands under. -----------------------------
+  const wallArcs: Array<{ centre: number; half: number }> =
+    kind === 'scarp'
+      ? [{ centre: openAngle, half: (openArc / 2) * L.wall.arcShare }]
+      : kind === 'gorge'
+        ? [1, -1].map((side) => ({ centre: openAngle + side * (TWO_PI / 4), half: srng.between(L.gorge.wallHalfDeg) * DEG }))
+        : [];
+  wallArcs.forEach((arc, q) => {
+    const r = rng.fork(`wall${q}`);
+    const dist = r.between(L.wall.distance);
+    const height = r.between(L.wall.height);
+    const front = r.between(L.wall.front);
+    const back = r.between(L.wall.back);
+    const steps = Math.max(8, Math.ceil((2 * arc.half * dist) / 10));
+    const pts: Point2[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const a = arc.centre - arc.half + (2 * arc.half * i) / steps;
+      const rr = dist + wobble.fbm(i / 14, q * 5.17 + 9.1, 2) * 10;
+      pts.push({ x: dcos(a) * rr, z: dsin(a) * rr });
+    }
+    const crest = makePolyline(pts);
+    const g = r.int(L.wall.notches[0]!, L.wall.notches[1]!);
+    const gullies: number[] = [];
+    for (let attempt = 0; gullies.length < g && attempt < 40; attempt++) gullies.push(r.range(0.3, 0.7) * crest.total);
+    // A notch's slope peaks at its height over its run; keep it well under the walkable 42°.
+    const gullyRun = Math.max(front, 2.4 * height * (1 - L.wall.notchDepth));
+    ridges.push({ bx: dcos(arc.centre), bz: dsin(arc.centre), angle: arc.centre, span: 2 * arc.half, crest, height, front, gullyRun, back, gullies, wall: true, notch: L.wall.notchDepth });
+    indices.push(new PolylineIndex(crest, Math.max(back, gullyRun) + 10));
+  });
 
   const hit: PathHit = { dist: 0, s: 0, x: 0, z: 0 };
   /** How far into a gully the last ridgeHeight call's point was: 0 on a face, 1 down its middle. */
@@ -126,8 +247,14 @@ export function generateLandform(rng: Rng, gen: GenTuning): TerrainResult {
     let crestH = rd.height * smoothstep(0, 70, Math.min(s, total - s)) * (1 + 0.12 * wobble.fbm(s / 110, 3.3 + k, 2));
     let gully = 0;
     for (const sg of rd.gullies) gully = Math.max(gully, 1 - smoothstep(L.gullyWidth * 0.5, L.gullyWidth, Math.abs(s - sg)));
-    crestH *= 1 - 0.12 * gully;
+    crestH *= 1 - rd.notch * gully;
     inGully = gully;
+    if (rd.wall) {
+      // Straight faces, so the crest is an edge with no shoulder to lie on; a notch has a long
+      // walkable run down both sides.
+      const beyond = x * x + z * z > hit.x * hit.x + hit.z * hit.z;
+      return crestH * Math.max(0, 1 - hit.dist / lerp(beyond ? rd.back : rd.front, rd.gullyRun, gully));
+    }
     const side = (x - hit.x) * rd.bx + (z - hit.z) * rd.bz;
     if (side > 0) return crestH * (1 - smoothstep(0, 1, hit.dist / rd.back));
     const f = hit.dist / rd.front;
@@ -156,28 +283,14 @@ export function generateLandform(rng: Rng, gen: GenTuning): TerrainResult {
     const edge = Math.max(Math.abs(x), Math.abs(z));
     const rim = L.rim * smoothstep(W.size / 2 - 40, W.size / 2 + 600, edge) * (0.75 + 0.5 * relief.fbm(x / 700, z / 700, 2));
     const detail = fine.fbm(x / 45, z / 45, 3) * W.detail * smoothstep(padR, padR + 40, r0);
-    return W.padHeight + floor + spine + crags + rim + detail;
+    return W.padHeight + floor + shape(x, z, r0) + spine + crags + rim + detail;
   };
 
-  // --- The road: out through the open side, the way the camp's gate faces. ------------
-  const rrng = rng.fork('road');
-  const roadAngle = openAngle + rrng.range(-0.3, 0.3) * openArc;
-  const road = { x: dcos(roadAngle), z: dsin(roadAngle) };
-  const edge = W.size * 0.6;
-  const roadCtrl: Point2[] = [
-    { x: road.x * (padR - 12), z: road.z * (padR - 12) },
-    { x: road.x * (padR + 40), z: road.z * (padR + 40) },
-  ];
-  const bendA = roadAngle + rrng.range(-0.25, 0.25);
-  roadCtrl.push({ x: dcos(bendA) * 300, z: dsin(bendA) * 300 });
-  const bendB = bendA + rrng.range(-0.2, 0.2);
-  roadCtrl.push({ x: dcos(bendB) * 520, z: dsin(bendB) * 520 }, { x: dcos(bendB) * edge, z: dsin(bendB) * edge });
-  const roadPts = wiggle(catmullRom(roadCtrl, 10), new Noise2D(rrng.fork('wiggle')), 6, [roadCtrl[0]!]);
-  const roadLine = makePolyline(roadPts);
-
-  // --- The creek: in across the open side, past the camp, out through a gap. ----------
-  const crng = rng.fork('creek');
-  const sorted = ridges.map((rd, k) => ({ k, a: wrapPositive(rd.angle - openAngle) })).sort((a, b) => a.a - b.a || a.k - b.k);
+  // --- The widest gap between spines: where the water leaves, and a scarp's road goes. ---
+  const sorted = ridges
+    .map((rd, k) => ({ k, a: wrapPositive(rd.angle - openAngle) }))
+    .filter((e) => !ridges[e.k]!.wall)
+    .sort((a, b) => a.a - b.a || a.k - b.k);
   let gapAngle = openAngle + openArc / 2 + closed / 2;
   let widest = -Infinity;
   for (let i = 0; i + 1 < sorted.length; i++) {
@@ -190,14 +303,83 @@ export function generateLandform(rng: Rng, gen: GenTuning): TerrainResult {
       gapAngle = openAngle + (from + to) / 2;
     }
   }
-  // Enter across the open side, on the far side of the road from the gap's way round.
-  const side = wrapSigned(gapAngle - roadAngle) > 0 ? -1 : 1;
-  const inAngle = roadAngle + side * crng.range(0.18, 0.4) * openArc;
-  const passAngle = inAngle + wrapSigned(gapAngle - inAngle) * crng.range(0.4, 0.6);
-  const passBy = padR + 52 + crng.range(0, 40);
+
+  // --- The road: out through the open side, the way the camp's gate faces. A scarp has its
+  // open side filled, so its road goes out between the ridges; a col and a gorge run along
+  // their axes. ------------------------------------------------------------------------
+  const rrng = rng.fork('road');
+  const roadAngle = kind === 'scarp' ? gapAngle + rrng.range(-0.12, 0.12) : kind === 'col' || kind === 'gorge' ? openAngle + rrng.range(-0.1, 0.1) : openAngle + rrng.range(-0.3, 0.3) * openArc;
+  const road = { x: dcos(roadAngle), z: dsin(roadAngle) };
+  const edge = W.size * 0.6;
+  const roadCtrl: Point2[] = [
+    { x: road.x * (padR - 12), z: road.z * (padR - 12) },
+    { x: road.x * (padR + 40), z: road.z * (padR + 40) },
+  ];
+  // A dogleg swings off the gate's axis as far as the open side allows, from its own stream.
+  const trng = rng.fork('road-turn');
+  const dogleg = (kind === 'hollow' || kind === 'spur' || kind === 'bend') && pickWeighted(trng, L.roads, ['straight', 'dogleg'] as const) === 'dogleg';
+  let turn = 0;
+  if (dogleg) {
+    const want = (trng.chance(0.5) ? 1 : -1) * trng.between(L.doglegDeg) * DEG;
+    const room = openArc / 2 - 16 * DEG;
+    turn = clamp(roadAngle + want - openAngle, -room, room) - (roadAngle - openAngle);
+  }
+  const bendA = roadAngle + turn + rrng.range(-0.25, 0.25);
+  roadCtrl.push({ x: dcos(bendA) * 300, z: dsin(bendA) * 300 });
+  const bendB = bendA + rrng.range(-0.2, 0.2);
+  roadCtrl.push({ x: dcos(bendB) * 520, z: dsin(bendB) * 520 }, { x: dcos(bendB) * edge, z: dsin(bendB) * edge });
+  const roadPts = wiggle(catmullRom(roadCtrl, 10), new Noise2D(rrng.fork('wiggle')), 6, [roadCtrl[0]!]);
+  const roadLine = makePolyline(roadPts);
+
+  // --- The water: by what way depends on the kind of site. -------------------------------
+  const crng = rng.fork('creek');
   const at = (angle: number, r: number): Point2 => ({ x: dcos(angle) * r, z: dsin(angle) * r });
-  const creekCtrl: Point2[] = [at(inAngle, edge), at(inAngle, 430), at(inAngle + (passAngle - inAngle) * 0.4, 240), at(passAngle, passBy), at(gapAngle, 250), at(gapAngle, 480), at(gapAngle, edge)];
-  const creekPts = wiggle(catmullRom(creekCtrl, 12), new Noise2D(crng.fork('wiggle')), 12, [at(passAngle, passBy)]);
+  const halfBed = (kind === 'bend' ? rng.fork('river').between(L.bend.width) : W.creekWidth) / 2;
+  let creekCtrl: Point2[];
+  let anchors: Point2[];
+  if (kind === 'bend') {
+    // A loop round the camp's back: in on one side of the road, out on the other.
+    const B = L.bend;
+    const opening = crng.between(B.openingDeg) * DEG;
+    const loop = padR + crng.between(B.loop) + halfBed;
+    const flip = crng.chance(0.5) ? 1 : -1;
+    const inA = roadAngle + flip * opening;
+    const outA = roadAngle - flip * opening;
+    const sweep = flip * (TWO_PI - 2 * opening);
+    const round = [0.2, 0.5, 0.8].map((t) => at(inA + sweep * t, loop + crng.range(-10, 10)));
+    creekCtrl = [at(inA - flip * 0.25, edge), at(inA, 430), at(inA + sweep * 0.05, loop + 70), ...round, at(outA - sweep * 0.05, loop + 70), at(outA, 430), at(outA + flip * 0.25, edge)];
+    anchors = round;
+  } else if (kind === 'scarp' || kind === 'col') {
+    // Across the front of the camp, over the road: in from one side, out by the other.
+    const passBy = kind === 'col' ? crng.between(L.col.passBy) : padR + 52 + crng.range(0, 40);
+    const flip = crng.chance(0.5) ? 1 : -1;
+    const legs = crng.range(95, 120) * DEG;
+    const passAngle = roadAngle + crng.range(-0.25, 0.25);
+    const near = at(passAngle, passBy);
+    creekCtrl = [at(passAngle + flip * legs, edge), at(passAngle + flip * legs, 430), at(passAngle + flip * 0.45 * legs, 240), near, at(passAngle - flip * 0.45 * legs, 240), at(passAngle - flip * legs, 430), at(passAngle - flip * legs, edge)];
+    anchors = [near];
+  } else if (kind === 'gorge') {
+    // Along the floor, between the camp and one wall, from one mouth to the other.
+    const side = crng.chance(0.5) ? 1 : -1;
+    const offset = crng.between(L.gorge.passBy);
+    const ax = dcos(roadAngle);
+    const az = dsin(roadAngle);
+    const point = (along: number, across: number): Point2 => ({ x: ax * along - az * across * side, z: az * along + ax * across * side });
+    const near = point(0, offset);
+    creekCtrl = [point(-edge, offset * 1.15), point(-420, offset), point(-200, offset), near, point(200, offset), point(420, offset * 1.1), point(edge, offset * 1.3)];
+    anchors = [near];
+  } else {
+    // Enter across the open side, on the far side of the road from the gap's way round.
+    const side = wrapSigned(gapAngle - roadAngle) > 0 ? -1 : 1;
+    const inAngle = roadAngle + side * crng.range(0.18, 0.4) * openArc;
+    const passAngle = inAngle + wrapSigned(gapAngle - inAngle) * crng.range(0.4, 0.6);
+    const reach = crng.range(0, 40);
+    const passBy = kind === 'spur' ? padR + spurRun + srng.between(L.spur.passBy) : padR + 52 + reach;
+    const near = at(passAngle, passBy);
+    creekCtrl = [at(inAngle, edge), at(inAngle, 430), at(inAngle + (passAngle - inAngle) * 0.4, 240), near, at(gapAngle, 250), at(gapAngle, 480), at(gapAngle, edge)];
+    anchors = [near];
+  }
+  const creekPts = wiggle(catmullRom(creekCtrl, 12), new Noise2D(crng.fork('wiggle')), 12, anchors);
   keepOff(creekPts, padR + 30);
   const creek = makePolyline(creekPts);
 
@@ -214,7 +396,8 @@ export function generateLandform(rng: Rng, gen: GenTuning): TerrainResult {
     const p = pointAt(creek, s);
     if (p.x * p.x + p.z * p.z < 340 * 340) nearS.push(s);
   }
-  const fordCount = frng.int(L.fords[0]!, L.fords[1]!);
+  const fordRange = kind === 'bend' ? L.bend.fords : L.fords;
+  const fordCount = frng.int(fordRange[0]!, fordRange[1]!);
   for (let attempt = 0; fords.filter((f) => !f.road).length < fordCount && attempt < 60 && nearS.length > 0; attempt++) {
     const s = frng.pick(nearS);
     if (fords.every((f) => Math.abs(f.s - s) > 60)) {
@@ -237,7 +420,8 @@ export function generateLandform(rng: Rng, gen: GenTuning): TerrainResult {
   // Deep enough that its banks, two or three cells of the heightfield, are a real barrier.
   const inH = baseHeight(creekCtrl[0]!.x, creekCtrl[0]!.z) - 4;
   const knotS = [0, creek.total * 0.3, creek.total * 0.5, creek.total * 0.75, creek.total];
-  const knotH = [inH, Math.min(inH - 2, W.padHeight - 1), W.padHeight - 4, W.padHeight - 5.5, W.padHeight - 8];
+  const floorH = W.padHeight - sink;
+  const knotH = [inH, Math.min(inH - 2, floorH - 1), floorH - 4, floorH - 5.5, floorH - 8];
   for (let k = 1; k < knotH.length; k++) knotH[k] = Math.min(knotH[k]!, knotH[k - 1]! - 0.5);
   const bedAt = (s: number): number => {
     for (let k = 1; k < knotS.length; k++) {
@@ -250,7 +434,6 @@ export function generateLandform(rng: Rng, gen: GenTuning): TerrainResult {
     for (const f of fords) ford = Math.max(ford, 1 - smoothstep(7, 16, Math.abs(s - f.s)));
     return lerp(L.creekBank, L.fordBank, ford);
   };
-  const halfBed = W.creekWidth / 2;
   const creekDist = new Float32Array(n * n).fill(Infinity);
   const creekIndex = new PolylineIndex(creek, 60);
   for (let j = 0; j < n; j++) {
@@ -383,6 +566,8 @@ export function generateLandform(rng: Rng, gen: GenTuning): TerrainResult {
       fords,
       openAngle,
       openArc,
+      kind,
+      creekWidth: 2 * halfBed,
     },
     backdrop: { size: bSize, cell: bCell, n: bn, heights: bHeights },
   };

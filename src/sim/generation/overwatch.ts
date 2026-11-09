@@ -83,10 +83,6 @@ export function checkValley(hf: Heightfield, features: TerrainFeatures, gen: Gen
       const ground = hf.heightAt(x, z);
       const toEye = (ground + PRONE - eyeY) / r;
       if (r >= near && toEye >= horizon && toEye >= minSlope) {
-        rayHas[k] = 1;
-        sectors[Math.floor((k * 16) / RAYS)]!++;
-        const dir = Math.floor((k * 32) / RAYS);
-        const above = ground - site.height;
         let ridge = ridges.length;
         let nearest = 160;
         for (let q = 0; q < ridges.length; q++) {
@@ -96,9 +92,17 @@ export function checkValley(hf: Heightfield, features: TerrainFeatures, gen: Gen
             ridge = q;
           }
         }
-        if (ridge < ridges.length) seenRidge[ridge] = 1;
-        const b = best[dir];
-        if (!b || above > b.heightAbovePad) best[dir] = { x, y: ground, z, dir, dist: r, heightAbovePad: above, ridge };
+        // A wall isn't overwatch, whatever can be made out on it from the camp: its faces can't
+        // be lain on, and what isn't a face is a notch or a tapering end, no ring of high ground.
+        if (ridge === ridges.length || !ridges[ridge]!.wall) {
+          rayHas[k] = 1;
+          sectors[Math.floor((k * 16) / RAYS)]!++;
+          const dir = Math.floor((k * 32) / RAYS);
+          const above = ground - site.height;
+          if (ridge < ridges.length) seenRidge[ridge] = 1;
+          const b = best[dir];
+          if (!b || above > b.heightAbovePad) best[dir] = { x, y: ground, z, dir, dist: r, heightAbovePad: above, ridge };
+        }
       }
       horizon = Math.max(horizon, (ground - eyeY) / r);
     }
@@ -116,6 +120,7 @@ export function checkValley(hf: Heightfield, features: TerrainFeatures, gen: Gen
     else longest = Math.max(longest, Math.min(RAYS, ++gap));
   }
   const openGapDeg = (longest * 360) / RAYS;
+  const spines = ridges.filter((rd) => !rd.wall).length;
   const ridgesSeen = seenRidge.reduce((a, b) => a + b, 0);
 
   // --- Ways in and out, on the map layer of the spatial grid (no colliders yet). ------
@@ -124,7 +129,7 @@ export function checkValley(hf: Heightfield, features: TerrainFeatures, gen: Gen
   const map = buildGrid(hf, empty, { minX: site.x - 1, minZ: site.z - 1, maxX: site.x + 1, maxZ: site.z + 1 }, gen).map;
   const { access, access16, exfil, steepShare } = waysInAndOut(map, site, playHalf, gen);
 
-  if (ridges.length > 0 && ridgesSeen < ridges.length) problems.push(`only ${ridgesSeen} of ${ridges.length} ridges overlook the camp`);
+  if (spines > 0 && ridgesSeen < spines) problems.push(`only ${ridgesSeen} of ${spines} ridges overlook the camp`);
   if (perchArcDeg > O.maxPerchArcDeg) problems.push(`perches over ${Math.round(perchArcDeg)}° of the horizon (at most ${O.maxPerchArcDeg}°)`);
   if (openGapDeg < O.minOpenGapDeg) problems.push(`the widest open horizon is ${Math.round(openGapDeg)}° (at least ${O.minOpenGapDeg}°)`);
   if (perchSectors === 0) problems.push('no perch overlooks the camp');
@@ -137,7 +142,7 @@ export function checkValley(hf: Heightfield, features: TerrainFeatures, gen: Gen
     runs,
     openGapDeg,
     ridgesSeen,
-    ridges: ridges.length,
+    ridges: spines,
     perches,
     access,
     access16,

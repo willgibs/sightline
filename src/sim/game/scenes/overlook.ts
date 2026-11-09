@@ -18,7 +18,8 @@ import { liveCamp } from './liveCamp';
  *                the end, someone is still standing.
  *   plan=timed   a shooter on the perch the camp's analysis certifies, who waits for a
  *                moment when the target's head is in a clear line and nobody is watching
- *                him, and takes that one shot. He must get the target.
+ *                him, and takes that one shot. Most camps bury the target (generation/crux.ts),
+ *                so on those there is no such perch and he has nothing to do.
  *
  * Both run with the whole camp brain awake (scenes/liveCamp.ts).
  */
