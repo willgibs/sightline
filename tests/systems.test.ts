@@ -396,7 +396,7 @@ describe('declared data access', () => {
     }
   }, 180_000);
 
-  it('lets every system write only what it declares, in valleys and in every scene', () => {
+  it('lets every system write only what it declares, in valleys', () => {
     const found = new Set<string>();
     const world = generateWorld(missionSpec('TAL-4471'), defaultTuning);
     for (const bot of [new ChaosBot('TAL-4471'), new WanderBot('TAL-4471')]) {
@@ -405,17 +405,22 @@ describe('declared data access', () => {
       const raw = neutralInput();
       for (let i = 0; i < 900; i++) sim.step({ ...bot.next(sim, raw), commands: i % 100 === 50 ? [{ kind: 'fire', lag: 0.5, yaw: 0, pitch: 0 }] : [] });
     }
-    // Cloning the state around every system is slow, so long scenes run shortened, without their expectations.
-    const scenes = [...Object.values(SCENES).map((make) => make()), kernelAloneScene()];
-    for (const scene of scenes) {
-      const long = (scene.seconds ?? 10) > 20;
-      const run = runScene(
-        { ...scene, ...(long ? { expect: [] } : {}), setup: (sim) => (scene.setup?.(sim as never), watchWrites(sim, found)) } as typeof scene,
-        defaultTuning,
-        long ? { seconds: 20 } : {},
-      );
-      expect(run.failures).toEqual([]);
-    }
     expect([...found]).toEqual([]);
-  }, 240_000); // every scene, with a full-tree diff around every system: Windows' runner took 68 s
+  }, 120_000);
+
+  // One test per scene: cloning the state around every system is slow, and one time limit over all of them stopped fitting on Windows' runner.
+  const scenes: Array<[string, () => Scene]> = [...(Object.entries(SCENES) as Array<[string, () => Scene]>), ['kernel-alone', () => kernelAloneScene()]];
+  it.each(scenes)('lets every system write only what it declares, in the scene %s', (_name, make) => {
+    const found = new Set<string>();
+    const scene = make();
+    // Long scenes run shortened, without their expectations.
+    const long = (scene.seconds ?? 10) > 20;
+    const run = runScene(
+      { ...scene, ...(long ? { expect: [] } : {}), setup: (sim) => (scene.setup?.(sim as never), watchWrites(sim, found)) } as typeof scene,
+      defaultTuning,
+      long ? { seconds: 20 } : {},
+    );
+    expect(run.failures).toEqual([]);
+    expect([...found]).toEqual([]);
+  }, 180_000);
 });
