@@ -635,6 +635,7 @@ export class Game {
     if (this.detached) this.setDetached(false);
     this.attack = null;
     if (this.scene?.name === 'compound') {
+      this.hud.setCompound(true);
       this.overTheCamp();
       this.attack = this.scene.driver?.() ?? null;
     }
