@@ -408,6 +408,60 @@ describe('doors (E7, A9)', () => {
   });
 });
 
+describe('getting out (the owner\'s call, Nov 8)', () => {
+  /** A live camp whose target falls at the first tick, and the player `from` metres inside the edge of the valley. */
+  function afterTheKill(from: number, kill = true): { sim: Simulation; events: SimEvent[]; run: (seconds: number, moveZ?: number) => void } {
+    const base = liveCamp('seed=LEB-2534') as Scene<Simulation>;
+    const half = world.playHalf;
+    // The rules go by the death event, whatever caused it.
+    const killer: System = {
+      name: 'test-kill',
+      phase: 'world',
+      after: ['camp-power', 'camp-devices', 'vehicle-drive'],
+      reads: [],
+      writes: ['entities'],
+      emits: ['death'],
+      run: (ctx) => {
+        if (!kill || ctx.tick !== 1) return;
+        const victim = commanderOf(ctx)!.camp.objective!.target;
+        ctx.despawn(victim);
+        ctx.emit({ type: 'death', source: ctx.state.entities[0]!.id, victim, remains: 0, post: 0, part: 'head', x: 0, y: 0, z: 0 });
+      },
+    };
+    const scene: Scene<Simulation> = { ...base, world: () => world, systems: [...(base.systems ?? []), killer], setup: (s) => (base.setup!(s), placePlayer(s, half - from, 0, 1, 0)) };
+    const sim = startScene(scene, T);
+    const events: SimEvent[] = [];
+    return {
+      sim,
+      events,
+      run: (seconds, moveZ = 0) => {
+        const input = { ...neutralInput(yawFromDirection(1, 0)), moveZ };
+        for (let i = 0; i < seconds * 30 && sim.state.outcome.status === 'playing'; i++) events.push(...sim.step(input).map((e) => ({ ...e })));
+      },
+    };
+  }
+
+  it('the target falling is not the end: it says to get out, and the run goes on', () => {
+    const { sim, events, run } = afterTheKill(60);
+    run(2);
+    expect(events.some((e) => e.type === 'objective' && e.stage === 'get-out')).toBe(true);
+    expect(commanderOf(sim)!.camp.objective!.status).toBe('done');
+    expect(sim.state.outcome.status).toBe('playing');
+  }, 60_000);
+
+  it('reaching the edge of the valley with the target down ends the mission', () => {
+    const { sim, run } = afterTheKill(T.brain.getOut.margin + 4);
+    run(6, 1);
+    expect(sim.state.outcome).toMatchObject({ status: 'succeeded', reason: 'the target is down, and you got out' });
+  }, 60_000);
+
+  it('reaching it with the target alive ends nothing', () => {
+    const { sim, run } = afterTheKill(T.brain.getOut.margin + 4, false);
+    run(6, 1);
+    expect(sim.state.outcome.status).toBe('playing');
+  }, 60_000);
+});
+
 describe('what moves never moves into a body (rule 10)', () => {
   it('a lying body counts along its whole length', () => {
     const sim = new Simulation(testWorld({ size: 60 }), T);

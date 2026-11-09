@@ -1008,6 +1008,7 @@ export class Game {
     this.curr = this.sim.snapshot(swap);
     for (const e of events) {
       if (e.type === 'outcome') this.decided = true;
+      if (e.type === 'objective') this.hud.toast('Target down. Get out: reach the edge of the valley.');
       else if (e.type === 'ranged') this.ranged = { range: e.range, at: performance.now() / 1000 };
       else if (e.type === 'shot' && e.speed > 0 && e.source === this.sim.playerId) {
         const fire = this.sim.lastInput.commands.find((c) => c.kind === 'fire');

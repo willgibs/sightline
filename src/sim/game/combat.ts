@@ -78,13 +78,19 @@ export function hurtPlayer(ctx: TickContext, p: PlayerEntity, part: BodyPart, sh
   ctx.emit({ type: 'hurt', source: shooter, cause, part, hits: p.health.hits });
 }
 
-/** The lab's rules: the player who takes enough hits dies; the objective is done if the target falls, lost if he gets away. */
+/**
+ * The lab's rules: the player who takes enough hits dies; the objective is done if the
+ * target falls, lost if he gets away. Where getting out counts (the objective's `getOut`,
+ * the owner's call on Nov 8), the target falling is only half of it: you've won when you
+ * then reach the edge of the valley alive. That's the way out lab D validates, so every
+ * camp has two.
+ */
 export const campRules: System = {
   name: 'camp-rules',
   phase: 'mission',
   reads: ['player.health', 'events', 'commander.camp'],
   writes: ['outcome', 'commander.camp.objective'],
-  emits: ['outcome'],
+  emits: ['outcome', 'objective'],
   run(ctx) {
     const p = player(ctx.index);
     const C = ctx.tuning.brain.combat;
@@ -107,10 +113,13 @@ export const campRules: System = {
       const death = ctx.events.find((e): e is Extract<SimEvent, { type: 'death' }> => e.type === 'death' && e.victim === obj.target);
       if (death) {
         obj.status = 'done';
-        decide(ctx, 'succeeded', 'the target is down', death.source, death.id);
+        if (obj.getOut) ctx.emit({ type: 'objective', source: p.id, cause: death.id, stage: 'get-out' });
+        else decide(ctx, 'succeeded', 'the target is down', death.source, death.id);
       }
     } else if (obj.status === 'escaped') {
       decide(ctx, 'failed', 'the target got away', p.id);
+    } else if (obj.status === 'done' && obj.getOut && Math.max(Math.abs(p.body.x), Math.abs(p.body.z)) >= ctx.world.playHalf - ctx.tuning.brain.getOut.margin) {
+      decide(ctx, 'succeeded', 'the target is down, and you got out', p.id);
     }
   },
 };

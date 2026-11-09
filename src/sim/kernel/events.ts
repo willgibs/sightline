@@ -354,6 +354,12 @@ export interface AlarmEvent extends EventBase {
 }
 
 /** The player finished sabotaging something (E7). Source: the player. */
+/** The mission has moved on (Lab F): the target is down, and now you have to get out. */
+export interface ObjectiveEvent extends EventBase {
+  type: 'objective';
+  stage: 'get-out';
+}
+
 export interface SabotageEvent extends EventBase {
   type: 'sabotage';
   what: 'generator' | 'radio' | 'vehicle';
@@ -415,6 +421,7 @@ export type SimEvent =
   | HurtEvent
   | AlarmEvent
   | SabotageEvent
+  | ObjectiveEvent
   | DoorEvent
   | SirenEvent
   | ReinforceEvent
@@ -544,6 +551,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   siren: { code: 98, range: 'brain', sound: true, fields: { ...SOUND } },
   hurt: { code: 96, range: 'brain', sound: false, fields: { part: { enum: every<EventOf<'hurt'>['part']>()(['head', 'torso', 'legs']) }, hits: 'u8' } },
   checkin: { code: 95, range: 'brain', sound: false, fields: { post: 'i32', stage: { enum: every<EventOf<'checkin'>['stage']>()(['call', 'answer', 'silence', 'dead']) } } },
+  objective: { code: 102, range: 'brain', sound: false, fields: { stage: { enum: every<EventOf<'objective'>['stage']>()(['get-out']) } } },
   sabotage: { code: 100, range: 'brain', sound: false, fields: { what: { enum: every<EventOf<'sabotage'>['what']>()(['generator', 'radio', 'vehicle']) }, x: 'f32', z: 'f32' } },
   door: { code: 101, range: 'brain', sound: true, fields: { ...SOUND, open: 'u8' } },
   level: { code: 94, range: 'brain', sound: false, fields: { from: { enum: LEVELS }, to: { enum: LEVELS } } },
