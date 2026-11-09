@@ -6,7 +6,7 @@ import { Faction, type EntityBase } from '../kernel/state';
 import { clearOfBodies } from '../body';
 import { Blocks, type Collider } from '../kernel/world/colliders';
 import { Cell, cellAt, cellIndex } from '../kernel/world/grid';
-import { GridSearch } from '../kernel/world/search';
+import { GridSearch, type SearchOptions } from '../kernel/world/search';
 import type { WorkCounts } from '../kernel/work';
 import { Surface } from '../kernel/world/surfaces';
 import type { World } from '../kernel/world/world';
@@ -126,7 +126,7 @@ export function yardRoute(world: World, tuning: Tuning, v: VehicleSpec, work?: W
   const k = Math.ceil(Math.max(0, v.width / 2 + F.clearance - tuning.gen.grid.bodyRadius) / L.cell);
   const closed = widen(shut, L.nx, L.nz, k);
   const open = (c: number): boolean => closed[c] === 0 && (L.flags[c]! & Cell.Walkable) !== 0;
-  const nearest = (x: number, z: number): number => {
+  const nearest = (x: number, z: number, usable: (c: number) => boolean = open): number => {
     const ci = Math.floor((x - L.x0) / L.cell);
     const cj = Math.floor((z - L.z0) / L.cell);
     const reach = Math.ceil(F.routeReach / L.cell);
@@ -135,7 +135,7 @@ export function yardRoute(world: World, tuning: Tuning, v: VehicleSpec, work?: W
     for (let j = Math.max(0, cj - reach); j <= Math.min(L.nz - 1, cj + reach); j++) {
       for (let i = Math.max(0, ci - reach); i <= Math.min(L.nx - 1, ci + reach); i++) {
         const c = j * L.nx + i;
-        if (!open(c)) continue;
+        if (!usable(c)) continue;
         const dx = L.x0 + (i + 0.5) * L.cell - x;
         const dz = L.z0 + (j + 0.5) * L.cell - z;
         const d = dx * dx + dz * dz;
@@ -147,12 +147,19 @@ export function yardRoute(world: World, tuning: Tuning, v: VehicleSpec, work?: W
     }
     return best;
   };
-  const start = nearest(v.x, v.z);
+  let start = nearest(v.x, v.z);
   const goal = nearest(gate.x, gate.z);
   if (start < 0 || goal < 0) return null;
   const cells: number[] = [];
-  const found = new GridSearch(L).path(start, goal, { cost: (_, to, length) => (open(to) ? length : -1), maxExpansions: F.routeExpansions, ...(work ? { work } : {}) }, cells);
-  if (!found.found) return null;
+  const search = new GridSearch(L);
+  const opts: SearchOptions = { cost: (_, to, length) => (open(to) ? length : -1), maxExpansions: F.routeExpansions, ...(work ? { work } : {}) };
+  if (!search.path(start, goal, opts, cells).found) {
+    // The open cell nearest its middle can be a pocket between the vehicle and a fence: start
+    // from the nearest one the gate can really be reached from.
+    search.flood([goal], opts);
+    start = nearest(v.x, v.z, (c) => open(c) && search.cost[c]! >= 0);
+    if (start < 0 || !search.path(start, goal, opts, cells).found) return null;
+  }
   const at = (c: number) => ({ x: L.x0 + ((c % L.nx) + 0.5) * L.cell, z: L.z0 + (Math.floor(c / L.nx) + 0.5) * L.cell });
   const clearLine = (a: number, b: number): boolean => {
     const p = at(a);

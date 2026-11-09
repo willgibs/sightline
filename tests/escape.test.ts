@@ -19,7 +19,8 @@ import type { World } from '../src/sim/kernel/world/world';
  * along a straight line through a wall, and four seconds later the camp called it away.
  */
 
-const SEEDS = ['LEB-2534', 'DEG-0219', 'HOT-7106'];
+// The last two are depots whose jeep is parked by a fence: the open cell nearest it is a pocket behind it.
+const SEEDS = ['LEB-2534', 'DEG-0219', 'HOT-7106', 'GUD-4772', 'PEK-0664'];
 const worlds = new Map<string, World>();
 beforeAll(() => {
   for (const seed of SEEDS) worlds.set(seed, generateWorld(campMission(seed), T));
@@ -31,7 +32,7 @@ describe('the escape vehicle', () => {
       const v = w.camp.vehicles!.find((x) => x.escape)!;
       const yard = yardRoute(w, T, v);
       expect(yard, seed).not.toBeNull();
-      const route = [...yard!, ...escapeRoute(w, T)];
+      const route = [{ x: v.x, z: v.z }, ...yard!, ...escapeRoute(w, T)];
       const view = { world: w, solids: new Solids(w.colliders), bodies: [] };
       const hit = emptyHit();
       for (let i = 1; i < route.length; i++) {
