@@ -96,7 +96,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 
 ## Workflow
 
-- The repository is `willgibs/sightline` on GitHub. Keep `main` green: CI runs the full check on every push and pull request, on Linux, macOS and Windows, with a cross-platform hash comparison; weekly, it adds hours of fuzzing and synctest. The repository is public, so Actions minutes are free.
+- The repository is `willgibs/sightline` on GitHub. Keep `main` green: a pull request runs the whole suite on Linux, in thirds side by side, and the self-test and a recorded bot run on macOS and Windows, with a cross-platform hash comparison. A push to `main` adds the whole suite on macOS and Windows; weekly, it adds hours of fuzzing and synctest. The repository is public, so Actions minutes are free.
 - Public, but the owner's project: it's under the MIT License (`LICENSE`), and `CONTRIBUTING.md` asks outsiders for bug reports, and for an issue before any code. Commit nothing private: no local paths, credentials or personal details. A link only the owner can open says so, and where the public copy is.
 - Every push to `main` deploys to production on Vercel, publicly at sightline-brown.vercel.app (the repository's website link); other branches get preview deploys. Vercel Authentication still covers sightline-willgibs.vercel.app and the previews, so only the owner's Vercel account can open those.
 - Commit in small, verified steps, each with its tests passing.
