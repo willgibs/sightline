@@ -129,8 +129,14 @@ export class Navigator {
     return this.finish(ax, az, bx, bz, out);
   }
 
-  /** Builds what routes need, ahead of the first tick: the fields are the one slow thing here. */
+  /**
+   * Builds what routes need, ahead of the first tick: the fields are the one slow thing here.
+   * Where the fine layer covers the whole map (a camp built by hand) no route has an end outside it.
+   */
   prepare(): void {
+    const s = this.site.layer;
+    const m = this.map.layer;
+    if (s.x0 <= m.x0 && s.z0 <= m.z0 && s.x0 + s.nx * s.cell >= m.x0 + m.nx * m.cell && s.z0 + s.nz * s.cell >= m.z0 + m.nz * m.cell) return;
     this.rimField();
     this.exitFields();
   }
