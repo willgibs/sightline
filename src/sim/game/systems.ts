@@ -144,14 +144,23 @@ const guardOrders: System = {
   name: 'guard-orders',
   phase: 'intent',
   after: ['player-intent'],
-  reads: ['guard.guard.order', 'guard.body'],
+  reads: ['guard.guard.order', 'guard.body', 'solid.solid'],
   writes: ['guard.guard.headYaw', '@intents.guard', 'guard.body'],
   emits: ['stance'],
   run(ctx) {
+    const speed = ctx.tuning.bodies.guard.speed;
     for (const g of ctx.index.of('guard')) {
-      g.guard.headYaw = carryOut(g.guard.order, ctx.tick, intentFor(ctx, g.id));
+      const intent = intentFor(ctx, g.id);
+      g.guard.headYaw = carryOut(g.guard.order, ctx.tick, intent);
       const want = g.guard.order.stance ?? 'stand';
       if (g.body.stance !== want && !g.body.proneTransition) requestStance(g.body, want, ctx.tuning.bodies.guard, { world: ctx.world, solids: ctx.solids, source: g.id, emit: ctx.emit });
+      // An order says how fast he'd like to go. His legs say how fast he can, down or getting up.
+      const limit = g.body.proneTransition ? 0 : g.body.stance === 'prone' ? speed.crawl : g.body.stance === 'crouch' ? speed.crouch : Infinity;
+      const wish = Math.sqrt(intent.wishX * intent.wishX + intent.wishZ * intent.wishZ);
+      if (wish > limit) {
+        intent.wishX *= limit / wish;
+        intent.wishZ *= limit / wish;
+      }
     }
   },
 };
@@ -166,7 +175,7 @@ const guardOrders: System = {
 const guardBrains: System = {
   name: 'guard-brains',
   phase: 'decide',
-  reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.senses', 'guard.brain'],
+  reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.guard.reserve', 'guard.senses', 'guard.brain'],
   writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'commander.camp.devices', 'commander.camp.level', 'commander.camp.since', 'commander.camp.objective', 'commander.camp.inbox', 'commander.camp.whistled', 'alarm.alarm.raised', 'objective.objective.status', 'vehicle.vehicle.driving', 'schedule', 'entities', 'bullet.bullet'],
   emits: ['act', 'call', 'shot', 'report', 'alarm', 'siren', 'level', 'whistle'],
   run(ctx) {

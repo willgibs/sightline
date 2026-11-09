@@ -1,4 +1,5 @@
 import type { Tuning } from '../../config/tuning';
+import { datan2 } from '../kernel/core/detmath';
 import { Blocks, footprintContains, type Collider } from '../kernel/world/colliders';
 import { Cell, cellIndex, type GridLayer } from '../kernel/world/grid';
 import { sightLine, type QueryView } from '../kernel/world/query';
@@ -11,9 +12,9 @@ import type { World } from '../kernel/world/world';
  * The Last of Us's two tiers, on Sightline's two layers: coarse routes over the 2.5 m map
  * layer, and the 0.5 m site layer over the camp, where a coarse cell can't represent a
  * doorway. Inside the site a route is found on the fine layer alone. A route with one end
- * inside comes out by a field flooded over the fine layer, and reaches the far end by one
- * flooded over the map layer, each once for the world's life; a short search over the map
- * layer joins them round the outside of the camp. The coarse layer can't see out of a
+ * inside comes out by a field flooded over the fine layer toward the side of the site the
+ * far end lies on, and reaches the far end by one flooded over the map layer, each once for
+ * the world's life; a short search over the map layer joins them outside the camp. The coarse layer can't see out of a
  * building, where its cells are a sealed pocket, and a ridge a kilometre away is beyond what
  * one search can afford. A route with neither end inside is coarse.
  *
@@ -65,9 +66,9 @@ export interface FindOptions {
 export class Navigator {
   private readonly site: GridSearch;
   private readonly map: GridSearch;
-  /** The way to the site's rim from anywhere on the map, and the way out to it from anywhere in the site: flooded the first time something asks. */
+  /** The way to the site's rim from anywhere on the map, and the way out to each side of it from anywhere in the site: flooded the first time something asks. */
   private rim: GridSearch | null = null;
-  private exit: GridSearch | null = null;
+  private exits: Int32Array[] | null = null;
   private readonly rimCells: number[] = [];
   private readonly exitCells: number[] = [];
   private readonly siteCells: number[] = [];
@@ -131,7 +132,7 @@ export class Navigator {
   /** Builds what routes need, ahead of the first tick: the fields are the one slow thing here. */
   prepare(): void {
     this.rimField();
-    this.exitField();
+    this.exitFields();
   }
 
   /**
@@ -140,13 +141,6 @@ export class Navigator {
    */
   private viaRim(ax: number, az: number, bx: number, bz: number, inA: boolean, opts: FindOptions): RouteResult {
     const site = this.site.layer;
-    const way = this.exitField();
-    const inner = this.nearestWalkable(site, inA ? ax : bx, inA ? az : bz);
-    if (inner < 0 || way.cost[inner]! < 0) return 'no-route';
-    const fine = this.exitCells;
-    fine.length = 0;
-    for (let c = inner; c !== -1; c = way.parent[c]!) fine.push(c);
-    const door = fine[fine.length - 1]!;
     const field = this.rimField();
     const map = field.layer;
     const outer = this.nearestWalkable(map, inA ? bx : ax, inA ? bz : az);
@@ -155,6 +149,22 @@ export class Navigator {
     coarse.length = 0;
     for (let c = outer; c !== -1; c = field.parent[c]!) coarse.push(c);
     const rim = coarse[coarse.length - 1]!;
+    const inner = this.nearestWalkable(site, inA ? ax : bx, inA ? az : bz);
+    if (inner < 0) return 'no-route';
+    // Out on the side he's going to, or the nearest side he can get out on.
+    const exits = this.exitFields();
+    const side = sideOf(site, cellX(map, rim), cellZ(map, rim));
+    let way: Int32Array | null = null;
+    for (let k = 0; k < SIDES && !way; k++) {
+      const turn = k % 2 === 1 ? (k + 1) / 2 : -k / 2;
+      const steps = exits[(side + turn + SIDES) % SIDES]!;
+      if (steps[inner] !== UNREACHED) way = steps;
+    }
+    if (!way) return 'no-route';
+    const fine = this.exitCells;
+    fine.length = 0;
+    for (let c = inner; c !== -1; c = way[c]!) fine.push(c);
+    const door = fine[fine.length - 1]!;
     const r = this.searchLayer(this.map, cellX(site, door), cellZ(site, door), cellX(map, rim), cellZ(map, rim), this.tuning.brain.nav.mapExpansions, opts, this.mapCells);
     if (r !== 'found') return r;
     if (inA) {
@@ -188,20 +198,30 @@ export class Navigator {
     return field;
   }
 
-  /** Every walkable site cell's way to the nearest walkable cell on the site's edge: out of a building, and through the camp's gate. */
-  private exitField(): GridSearch {
-    if (this.exit) return this.exit;
-    const field = new GridSearch(this.world.grid.site);
-    const L = field.layer;
-    const sources: number[] = [];
+  /**
+   * For each of the site's sides, every walkable site cell's next step toward the nearest
+   * walkable cell on that side's edge: out of a building, through the camp's gate, and round
+   * toward where he's going. Only the steps are kept: −1 at the edge, UNREACHED where it can't get there.
+   */
+  private exitFields(): readonly Int32Array[] {
+    if (this.exits) return this.exits;
+    const L = this.site.layer;
+    const sources: number[][] = Array.from({ length: SIDES }, () => []);
     for (let j = 0; j < L.nz; j++) {
       for (let i = 0; i < L.nx; i++) {
-        if ((i === 0 || j === 0 || i === L.nx - 1 || j === L.nz - 1) && (L.flags[j * L.nx + i]! & Cell.Walkable) !== 0) sources.push(j * L.nx + i);
+        const c = j * L.nx + i;
+        if ((i === 0 || j === 0 || i === L.nx - 1 || j === L.nz - 1) && (L.flags[c]! & Cell.Walkable) !== 0) sources[sideOf(L, cellX(L, c), cellZ(L, c))]!.push(c);
       }
     }
-    field.flood(sources, { maxExpansions: L.nx * L.nz });
-    this.exit = field;
-    return field;
+    const n = L.nx * L.nz;
+    const search = new GridSearch(L);
+    this.exits = sources.map((edge) => {
+      search.flood(edge, { maxExpansions: n });
+      const steps = new Int32Array(n);
+      for (let c = 0; c < n; c++) steps[c] = search.cost[c]! < 0 ? UNREACHED : search.parent[c]!;
+      return steps;
+    });
+    return this.exits;
   }
 
   /** Searches one layer between the nearest walkable cells to two points. */
@@ -399,6 +419,17 @@ export class Navigator {
     }
     return true;
   }
+}
+
+/** How many sides of the site a route can leave by. */
+const SIDES = 8;
+/** In an exit field: this cell can't reach that side. */
+const UNREACHED = -2;
+
+/** Which side of the layer's middle a point is on, as an eighth of a turn. */
+function sideOf(L: GridLayer, x: number, z: number): number {
+  const a = datan2(z - (L.z0 + (L.nz * L.cell) / 2), x - (L.x0 + (L.nx * L.cell) / 2));
+  return Math.floor(((a + Math.PI) / (2 * Math.PI)) * SIDES) % SIDES;
 }
 
 /** Metres of a segment checked against one lookup of the colliders. */

@@ -212,7 +212,11 @@ export const checkinDeadline: ScheduleHandler = (ctx, entry) => {
   const post = ctx.world.camp.guards[pending.post];
   if (!post) return;
   const silence = ctx.emit({ type: 'checkin', source: c.id, cause: entry.b, post: pending.post, stage: 'silence' });
-  c.camp.inbox.push({ kind: 'missing', x: post.x, y: post.y, z: post.z, radius: ctx.tuning.brain.comms.radius.missing, tick: ctx.tick, from: pending.guard, fromX: post.x, fromZ: post.z, cause: silence });
+  // A reinforcement has his own place: that's where someone goes to see.
+  const reserve = c.camp.roster.find((m) => m.id === pending.guard)?.reserve;
+  const x = reserve?.x ?? post.x;
+  const z = reserve?.z ?? post.z;
+  c.camp.inbox.push({ kind: 'missing', x, y: post.y, z, radius: ctx.tuning.brain.comms.radius.missing, tick: ctx.tick, from: pending.guard, fromX: x, fromZ: z, cause: silence });
 };
 
 const orders: CampOrder[] = [];

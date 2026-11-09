@@ -1,4 +1,4 @@
-import { emptyRoute, navigatorOf } from '../../sim/brain';
+import { emptyRoute, navigatorOf, routeLength } from '../../sim/brain';
 import { campMission, generateWorld } from '../../sim/generation';
 import type { Experiment } from '../experiment';
 import { median } from '../stats';
@@ -38,12 +38,11 @@ export const routes: Experiment = {
     for (const g of posts) {
       for (const p of perches) {
         tried++;
-        const r = arm.name === 'post to perch' ? nav.find(g.x, g.z, p.x, p.z, {}, route) : nav.find(p.x, p.z, g.x, g.z, {}, route);
+        const out = arm.name === 'post to perch';
+        const r = out ? nav.find(g.x, g.z, p.x, p.z, {}, route) : nav.find(p.x, p.z, g.x, g.z, {}, route);
         if (r === 'found') {
           counts.found++;
-          let m = 0;
-          for (let k = 2; k < route.points.length; k += 2) m += Math.sqrt((route.points[k]! - route.points[k - 2]!) ** 2 + (route.points[k + 1]! - route.points[k - 1]!) ** 2);
-          metres.push(m);
+          metres.push(routeLength(route, out ? g.x : p.x, out ? g.z : p.z));
         } else if (r === 'no-route') counts.noRoute++;
         else counts.budget++;
       }

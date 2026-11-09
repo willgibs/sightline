@@ -3,6 +3,7 @@ import { defaultTuning as T } from '../src/config/tuning';
 import { attackRun } from '../src/lab/experiments/flaws';
 import { compound } from '../src/sim/game/scenes/compound';
 import { bestOverview } from '../src/sim/game/scenes/overlook';
+import type { AttackDriver } from '../src/sim/game/attacks';
 import { compoundDrops, STIMULI, stimulus } from '../src/sim/game/drops';
 import { giveBrains } from '../src/sim/game/brains';
 import { guardFire } from '../src/sim/game/combat';
@@ -16,7 +17,7 @@ import { campMission, generateWorld } from '../src/sim/generation';
 import type { SimEvent } from '../src/sim/kernel/events';
 import { neutralInput } from '../src/sim/kernel/input';
 import { resimulate } from '../src/sim/kernel/record/resim';
-import { runScene, startScene, type Scene } from '../src/sim/kernel/scene';
+import { runScene, sceneOver, sceneTicks, startScene, type Scene } from '../src/sim/kernel/scene';
 import type { World } from '../src/sim/kernel/world/world';
 import { groundSpot } from '../src/sim/brain/ground';
 import { navigatorOf } from '../src/sim/brain/nav';
@@ -93,6 +94,29 @@ describe('a camp that fights back', () => {
     expect(events.some((e) => e.type === 'stance' && e.to === 'stand')).toBe(true);
     for (const g of sim.guards) if (g.brain && !g.brain.down) expect(g.body.stance).toBe('stand');
   }, 120_000);
+
+  it('never has a man running while he is down', () => {
+    // An order that arrives during a stand-to clears his cover and sends him off. This attack, on this camp, once had men sprinting flat.
+    const scene = compound('seed=BOR-1323&attack=suppressed-sniper') as Scene<Simulation>;
+    const sim = startScene(scene, T);
+    const driver = scene.driver!() as AttackDriver;
+    const raw = scene.game.still(sim);
+    const ticks = sceneTicks(scene, T);
+    const S = T.bodies.guard.speed;
+    const held = new Map<number, number>();
+    let moved = 0;
+    while (!sceneOver(scene, sim, ticks)) {
+      sim.step(driver.next(sim, raw));
+      for (const g of sim.guards) {
+        const limit = g.body.stance === 'prone' ? S.crawl : g.body.stance === 'crouch' ? S.crouch : Infinity;
+        const down = limit < Infinity ? (held.get(g.id) ?? 0) + 1 : 0;
+        held.set(g.id, down);
+        // A moment to slow down after getting there.
+        if (down > 15 && Math.hypot(g.body.vx, g.body.vz) > limit + 0.05) moved++;
+      }
+    }
+    expect(moved).toBe(0);
+  }, 180_000);
 
   it('gives reinforcements a place of their own, not a shared post', () => {
     // This camp's first patrol stands at one point, where a squad once ended up in a heap.

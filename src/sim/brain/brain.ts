@@ -1146,8 +1146,9 @@ function writeOrder(m: GuardMind, out: Order, wishX: number, wishZ: number, gait
   out.yaw = yaw;
   out.pitch = 0;
   out.headYaw = turnTowards(m.head, head, A.headRate * dt);
+  // Down only while he's staying put: an order or a new route can send him off with `down` still set.
   // Absent standing, so a state that has never known a guard to get down doesn't change shape.
-  if (m.brain?.down) out.stance = m.brain.down;
+  if (m.brain?.down && wishX === 0 && wishZ === 0) out.stance = m.brain.down;
   else delete out.stance;
 }
 

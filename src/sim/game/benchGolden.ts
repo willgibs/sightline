@@ -184,10 +184,10 @@ export const BENCH_GOLDEN: PinnedBench = {
         "work": {
           "motor": { "rays": 0, "nodes": 0, "bodies": 11149 },
           "bullets": { "rays": 55, "nodes": 0, "bodies": 0 },
-          "perception-hearing": { "rays": 34, "nodes": 13672, "bodies": 0 },
-          "perception-spotting": { "rays": 14799, "nodes": 0, "bodies": 0 },
+          "perception-hearing": { "rays": 34, "nodes": 14284, "bodies": 0 },
+          "perception-spotting": { "rays": 14891, "nodes": 0, "bodies": 0 },
           "perception-awareness": { "rays": 0, "nodes": 82756, "bodies": 0 },
-          "guard-brains": { "rays": 0, "nodes": 135949, "bodies": 0 }
+          "guard-brains": { "rays": 0, "nodes": 135947, "bodies": 0 }
         }
       }
     }

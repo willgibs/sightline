@@ -1,3 +1,4 @@
+import { groundSpot } from '../sim/brain';
 import { commanderOf } from '../sim/game/comms';
 import type { Attacked } from '../sim/game/attacks';
 import type { Simulation } from '../sim/game/sim';
@@ -40,6 +41,8 @@ export class FlawWatch {
   private readonly fired = new Map<number, number>();
   private readonly calls: number[] = [];
   private readonly seenSince = new Map<number, number>();
+  /** Men flat on the ground, by shot, for whom there was nowhere better: asked once each, because asking costs rays. */
+  private readonly nowhere = new Set<string>();
 
   constructor(private readonly truth: readonly Attacked[]) {}
 
@@ -89,13 +92,12 @@ export class FlawWatch {
         const dz = lastShot.from.z - g.body.z;
         const heard = sim.tuning.brain.roles[spawn.role].fight > 0 && dx * dx + dz * dz <= F.suppress.range * F.suppress.range;
         if (heard && since >= 8 && since < 9 && (this.fired.get(g.id) ?? -1) < lastShot.tick) this.add(sim, 'silent-tower', g.id, `a shot within his range ${since.toFixed(0)} s ago, and no answer`, `tower${g.id}${lastShot.tick}`);
-      } else if (spawn?.role !== 'target' && since < 20 && !BUSY.has(b.act) && speed < 0.3 && g.body.stance !== 'prone') {
-        // Not a man flat on the ground with nothing to get behind: he has done what he can.
+      } else if (spawn?.role !== 'target' && since < 20 && !BUSY.has(b.act) && speed < 0.3) {
         const y = g.body.y + g.body.eyeHeight;
         if (sightLine(view, lastShot.from.x, lastShot.from.y, lastShot.from.z, g.body.x, y, g.body.z, Blocks.Bullet)) {
           const s = (this.lined.get(g.id) ?? 0) + dt;
           this.lined.set(g.id, s);
-          if (s > 6) this.add(sim, 'in-the-line', g.id, `standing in the shooter's clear line for ${s.toFixed(0)} s (${b.act})`, `line${g.id}${lastShot.tick}`);
+          if (s > 6 && this.couldHaveMoved(sim, g.id, g.body.stance, g.body.x, g.body.z, lastShot)) this.add(sim, 'in-the-line', g.id, `standing in the shooter's clear line for ${s.toFixed(0)} s (${b.act})`, `line${g.id}${lastShot.tick}`);
         }
       } else if (since >= 20) this.lined.delete(g.id);
       let near = 0;
@@ -106,6 +108,16 @@ export class FlawWatch {
         if (s > 4) this.add(sim, 'pile-up', g.id, `${near + 1} men within 2.5 m for ${s.toFixed(0)} s (${b.act})`, `pile${g.id}${Math.floor(sim.tick / (15 * hz))}`);
       } else this.pile.delete(g.id);
     }
+  }
+
+  /** A man flat on the ground with truly nothing to get behind, from the real shooter's bearing, has done what he can. */
+  private couldHaveMoved(sim: Simulation, id: number, stance: string, x: number, z: number, shot: Attacked): boolean {
+    if (stance !== 'prone') return true;
+    const key = `${id}.${shot.tick}`;
+    if (this.nowhere.has(key)) return false;
+    if (groundSpot(sim.world, sim.tuning, x, z, shot.from.x, shot.from.z) !== null) return true;
+    this.nowhere.add(key);
+    return false;
   }
 
   /** How many of each kind. */
