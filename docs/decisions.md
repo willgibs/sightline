@@ -2,6 +2,19 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · The owner's first fight: what it found
+
+**The escape really was broken.** The owner's reading: the box "seems to run into a building, get stuck, the target gets in, marked as escaped." On LEB-2534, the camp they played, that's exactly it. The vehicle's way out was a straight line to the gate, and on 21 of 24 camps that line went through something solid. It was held up 12 m along, and four seconds later the camp counted it as away, because giving up in the road ended the same way as reaching the end of it.
+
+**Changed.** The vehicle finds a way across the yard on the site grid with room for its width (`yardRoute`), then follows the road itself, and is away only at the end of it. A vehicle with no way out of the yard counts as disabled, and that's 1 camp in 40.
+
+**The target can be found.** The debug view marks him TARGET, and TARGET aboard once he's in the vehicle.
+
+**The camp's return fire can be read.** The simulated shooter is a stand-in, so it stays small: a figure where the shots come from, and the panel measures each of the camp's rounds along the path it really flew against that spot (`fired back`: how many, the closest, how many would have struck). It can't be hurt. Being hunted is for a person to feel, from a perch (the owner, Nov 9: use whichever method really answers the question).
+
+**Input.** A tap of the scope button now leaves the scope up, so a trackpad can scope and then click to fire; holding it still peeks. Runs kept in the browser can be deleted one at a time or all together.
+
+**What this didn't fix.** On 19 of 24 camps the target is gone a median of 29 s after the first shot (fastest 21 s), which is the owner's larger point: it leaves one long shot or an ambush on the road, and neither takes the base. It's on their desk as a decision.
 ## 2026-11-09 · What the long bot runs found in the motor
 
 The weekly run on main, and the same runs on the tree crown branch, broke a body's promise in about one run in five: "gained N m on ground too steep to stand on" (rule 10). Most of it was real: a body on steep ground could step up across a triangle seam onto a higher, gentler one, by up to 45 mm, because only the destination's slope was asked about. The motor now also refuses a rise when the body starts on steep ground. The rest wasn't a broken promise at all: a mantle from steep ground rises as a mantle should, and the check now applies to bodies that stay on the ground. Six of the seven failing valleys pass an hour of play.

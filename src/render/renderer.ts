@@ -71,6 +71,7 @@ export class GameRenderer {
   private debug: DebugLayer | null = null;
   private debugOn = false;
   private collidersOn = false;
+  private shooterMark: THREE.Mesh | null = null;
   private perchesOn = false;
   private gridOn = false;
 
@@ -162,6 +163,21 @@ export class GameRenderer {
     this.debugOn = on;
     if (this.debug) this.debug.group.visible = on;
     this.guards?.setDebugTint(on);
+  }
+
+  /** A figure lying where the compound simulator's shooter last fired from; null clears it. A dev mark, in both views. */
+  setShooterMark(s: { x: number; y: number; z: number; dx: number; dz: number } | null): void {
+    if (!s) {
+      if (this.shooterMark) this.shooterMark.visible = false;
+      return;
+    }
+    if (!this.shooterMark) {
+      this.shooterMark = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.28, 1.75), new THREE.MeshBasicMaterial({ color: palette.debug.tones.bad }));
+      this.scene.add(this.shooterMark);
+    }
+    this.shooterMark.visible = true;
+    this.shooterMark.position.set(s.x, s.y - 0.15, s.z);
+    this.shooterMark.rotation.y = Math.atan2(s.dx, s.dz);
   }
 
   setColliders(on: boolean): void {
