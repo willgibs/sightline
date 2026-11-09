@@ -26,7 +26,7 @@ import type { Tuning } from '../../config/tuning';
 import { withSystem, type System } from '../kernel/systems';
 import { Surface } from '../kernel/world/surfaces';
 import { giveBrains } from './brains';
-import { campCommander, commsVoice, giveCommander } from './comms';
+import { campCommander, commanderOf, commsVoice, giveCommander } from './comms';
 import { giveSenses } from './perception';
 import { placePlayer } from './setup';
 import { SYSTEMS } from './systems';
@@ -556,7 +556,7 @@ function brainMetrics(): Record<string, number> {
     const left = sim.guards.filter((g) => start.has(g.id)).length;
     there += start.size;
     down += start.size - left;
-    if (sim.state.outcome.status === 'failed') away++;
+    if (commanderOf(sim)?.camp.objective?.status === 'escaped') away++;
     else if (left === 0) cleared++;
     const shot = overlook(`seed=${seed}&plan=timed`);
     const run = startScene(shot, T);

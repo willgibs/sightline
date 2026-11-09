@@ -1,6 +1,6 @@
-import { overlapsBody, type Collider } from '../kernel/world/colliders';
+import type { Collider } from '../kernel/world/colliders';
 import type { System, TickContext } from '../kernel/systems';
-import { bodyHeight, hasBody } from '../body';
+import { clearOfBodies } from '../body';
 import { commanderOf, squadArrives } from './comms';
 import type { VehicleEntity } from './camp';
 
@@ -25,14 +25,16 @@ function place(v: VehicleEntity, x: number, z: number, ux: number, uz: number, c
   s.y1 = ground + lift;
 }
 
+/** How far (x, z) is off the line of one leg of the road. */
+function offRoad(x: number, z: number, a: Readonly<{ x: number; z: number }>, b: Readonly<{ x: number; z: number }>): number {
+  const lx = b.x - a.x;
+  const lz = b.z - a.z;
+  const len = Math.sqrt(lx * lx + lz * lz);
+  return len > 0 ? Math.abs((x - a.x) * lz - (z - a.z) * lx) / len : Math.sqrt((x - a.x) * (x - a.x) + (z - a.z) * (z - a.z));
+}
+
 function clear(ctx: TickContext, v: VehicleEntity, x: number, z: number, ux: number, uz: number): boolean {
-  const next: Collider = { ...v.solid, x, z, ux, uz } as Collider;
-  for (const b of ctx.state.entities) {
-    if (!hasBody(b)) continue;
-    const spec = ctx.tuning.bodies[b.kind];
-    if (overlapsBody(next, b.body.x, b.body.y, b.body.z, spec.radius + 0.02, bodyHeight(b.body, spec))) return false;
-  }
-  return true;
+  return clearOfBodies({ ...v.solid, x, z, ux, uz } as Collider, ctx.state.entities, ctx.tuning.bodies);
 }
 
 export const vehicleDrive: System = {
@@ -65,12 +67,13 @@ export const vehicleDrive: System = {
       }
       const ux = dx / left;
       const uz = dz / left;
-      // Straight on if it's clear; if someone is in the road, round them.
+      // Straight on if it's clear; if someone is in the road, round them, as far off it as it will go.
+      const from = d.route[d.leg - 1]!;
       let moved = false;
-      for (const side of SWERVE) {
+      for (const side of F.swerveBy) {
         const x = v.solid.x + ux * step - uz * side * step;
         const z = v.solid.z + uz * step + ux * side * step;
-        if (side !== 0 && Math.abs(side * step) > F.swerve) continue;
+        if (side !== 0 && offRoad(x, z, from, target) > F.swerve) continue;
         if (!clear(ctx, v, x, z, ux, uz)) continue;
         place(v, x, z, ux, uz, ctx);
         moved = true;
@@ -81,15 +84,12 @@ export const vehicleDrive: System = {
   },
 };
 
-/** Sideways per metre forward, in the order they're tried: straight, then a little to each side, then more. */
-const SWERVE = [0, 0.5, -0.5, 1, -1, 2, -2];
-
 /** The truck has stopped: the squad gets down behind it (E8). */
 function dismount(ctx: TickContext, v: VehicleEntity, cause: number): void {
   const c = commanderOf(ctx);
   if (!c) return;
   const s = v.solid as Collider & { ux: number; uz: number; hx: number };
-  const back = s.hx + 1.5;
+  const back = s.hx + ctx.tuning.brain.reinforce.truck.dropBehind;
   squadArrives(ctx, c, s.x - s.ux * back, s.z - s.uz * back, s.ux, s.uz, cause);
 }
 

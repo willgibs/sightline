@@ -3,6 +3,7 @@ import type { DoorSpec, VehicleSpec } from '../generation';
 import type { Simulation as KernelSimulation } from '../kernel/sim';
 import type { System, TickContext } from '../kernel/systems';
 import { Faction, type EntityBase } from '../kernel/state';
+import { clearOfBodies } from '../body';
 import { Blocks, type Collider } from '../kernel/world/colliders';
 import { Cell, cellAt } from '../kernel/world/grid';
 import { Surface } from '../kernel/world/surfaces';
@@ -102,14 +103,17 @@ export function routeSeconds(route: ReadonlyArray<{ x: number; z: number }>, tun
   return metres / tuning.brain.alarm.flee.drive;
 }
 
-/** A truck on the road, coming in: at the first point of its route, heading for the second (E8). */
-export function spawnTruck(ctx: TickContext, route: Array<{ x: number; z: number }>, cause: number): void {
+/** A truck on the road, coming in: at the first point of its route, heading for the second (E8). False if someone is standing where it would appear. */
+export function spawnTruck(ctx: TickContext, route: Array<{ x: number; z: number }>, cause: number): boolean {
   const R = ctx.tuning.brain.reinforce.truck;
   const a = route[0]!;
   const b = route[1]!;
   const d = Math.sqrt((b.x - a.x) * (b.x - a.x) + (b.z - a.z) * (b.z - a.z)) || 1;
   const spec: VehicleSpec = { kind: 'truck', x: a.x, y: ctx.world.terrain.heightAt(a.x, a.z), z: a.z, fx: (b.x - a.x) / d, fz: (b.z - a.z) / d, length: R.length, width: R.width, height: R.height, escape: false };
-  ctx.spawn((id): VehicleEntity => ({ id, kind: 'vehicle', faction: Faction.None, vehicle: { index: -1, escape: false, driving: { route, leg: 1, waited: 0, then: 'dismount', cause } }, solid: vehicleSolid(spec) }));
+  const solid = vehicleSolid(spec);
+  if (!clearOfBodies(solid, ctx.state.entities, ctx.tuning.bodies)) return false;
+  ctx.spawn((id): VehicleEntity => ({ id, kind: 'vehicle', faction: Faction.None, vehicle: { index: -1, escape: false, driving: { route, leg: 1, waited: 0, then: 'dismount', cause } }, solid }));
+  return true;
 }
 
 /** The camp's doors and vehicles, as entities, in the camp's order: doors first. */

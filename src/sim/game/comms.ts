@@ -225,7 +225,7 @@ export const reinforceArrive: ScheduleHandler = (ctx, entry) => {
   const route = truckRoute(ctx.world, ctx.tuning);
   if (route) {
     // A generated camp's come by truck, up its road (game/escape.ts).
-    spawnTruck(ctx, route, entry.b);
+    if (!spawnTruck(ctx, route, entry.b)) ctx.schedule(ctx.tuning.brain.reinforce.truck.holdOff, 'reinforce-arrive', 0, entry.b);
     return;
   }
   // A handmade camp has no road laid out: on foot, from the edge of the map.
@@ -279,7 +279,7 @@ export function targetEscapes(ctx: TickContext, g: GuardEntity): void {
   const status = vehicle ? 'escaping' : 'escaped';
   c.camp.objective.status = status;
   for (const o of ctx.index.of('objective')) if (o.objective.target === g.id) o.objective.status = status;
-  if (vehicle) vehicle.vehicle.driving = { route: escapeRoute(ctx.world), leg: 0, waited: 0, then: 'escape', cause: 0 };
+  if (vehicle) vehicle.vehicle.driving = { route: [{ x: vehicle.solid.x, z: vehicle.solid.z }, ...escapeRoute(ctx.world)], leg: 1, waited: 0, then: 'escape', cause: 0 };
   ctx.despawn(g.id);
 }
 

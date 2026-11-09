@@ -6,7 +6,7 @@ import type { AmbientSource } from '../sim/generation';
 import { emptyRoute, type RouteFn, type SteadyFn } from './hearing';
 import { footstep, humLoop, makeNoiseBuffers, makeRand, murmur, rustle, waterLoop, windBed, type Loop, type NoiseBuffers, type Rand } from './voices';
 import { BARKS } from '../sim/perception';
-import { bolt, clatter, crack, cry, impact, report, siren } from './shotVoices';
+import { bolt, clatter, crack, cry, door, impact, report, siren } from './shotVoices';
 import { crackAt, type Crack, type Flight } from '../sim/ballistics';
 import { Surface, surfaceName } from '../sim/kernel/world/surfaces';
 
@@ -312,6 +312,8 @@ export class SoundEngine {
         this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => impact(this.ctx, out, this.noise, this.rand, when, amp, kind), lead);
       } else if (e.type === 'clatter') {
         this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => clatter(this.ctx, out, this.noise, this.rand, when, amp), lead);
+      } else if (e.type === 'door') {
+        this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => door(this.ctx, out, this.noise, this.rand, when, amp, e.open === 1), lead);
       } else if (e.type === 'cry') {
         this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => cry(this.ctx, out, this.noise, this.rand, when, amp), lead);
       } else if (e.type === 'bolt') {

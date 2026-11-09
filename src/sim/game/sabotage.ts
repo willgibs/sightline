@@ -2,7 +2,7 @@ import { dcos, dsin } from '../kernel/core/detmath';
 import type { EntityIndex } from '../kernel/state';
 import type { TickContext } from '../kernel/systems';
 import type { Tuning } from '../../config/tuning';
-import { Blocks, type RayHit } from '../kernel/world/colliders';
+import { Blocks, type BoxCollider, type RayHit } from '../kernel/world/colliders';
 import type { Solids } from '../kernel/world/solids';
 import type { World } from '../kernel/world/world';
 import type { GeneratorEntity, RadioEntity, VehicleEntity } from './camp';
@@ -31,7 +31,8 @@ interface Spot {
   own: readonly number[];
 }
 
-function spots(index: EntityIndex, world: World): Spot[] {
+/** Everything that can be sabotaged, as seen by someone standing at (x, z). */
+function spots(index: EntityIndex, world: World, x: number, z: number): Spot[] {
   const camp = world.camp;
   const out: Spot[] = [];
   const colliders = (structure: number): readonly number[] => camp.structures[structure]?.colliders ?? [];
@@ -53,9 +54,20 @@ function spots(index: EntityIndex, world: World): Spot[] {
   for (const e of index.of('vehicle')) {
     const v = camp.vehicles?.[e.vehicle.index];
     if (!v || !e.vehicle.escape || e.vehicle.disabled || e.vehicle.driving) continue;
-    out.push({ entity: e, kind: 'vehicle', x: e.solid.x, y: e.solid.y0 + 1, z: e.solid.z, own: [] });
+    // A hand meets a vehicle at the nearest point of its side, whichever side that is.
+    const at = nearestOn(e.solid as BoxCollider, x, z);
+    out.push({ entity: e, kind: 'vehicle', x: at.x, y: e.solid.y0 + 1, z: at.z, own: [e.solid.id] });
   }
   return out;
+}
+
+/** The point of a box's footprint nearest (x, z). */
+function nearestOn(c: BoxCollider, x: number, z: number): { x: number; z: number } {
+  const lx = (x - c.x) * c.ux + (z - c.z) * c.uz;
+  const lz = (z - c.z) * c.ux - (x - c.x) * c.uz;
+  const ax = Math.max(-c.hx, Math.min(c.hx, lx));
+  const az = Math.max(-c.hz, Math.min(c.hz, lz));
+  return { x: c.x + ax * c.ux - az * c.uz, z: c.z + ax * c.uz + az * c.ux };
 }
 
 const hit: RayHit = { dist: Infinity, id: -1 };
@@ -70,29 +82,22 @@ function inReach(p: PlayerEntity, index: EntityIndex, world: World, solids: Soli
   const eye = b.y + b.eyeHeight;
   let best: Spot | null = null;
   let bestD = Infinity;
-  for (const s of spots(index, world)) {
+  for (const s of spots(index, world, b.x, b.z)) {
     if (Math.abs(s.y - b.y - 1) > S.reachHeight) continue;
     const dx = s.x - b.x;
     const dz = s.z - b.z;
-    // A vehicle is reached at its side: its half-width and length come off the distance by what it is.
-    const reach = s.kind === 'vehicle' ? S.reach + vehicleHalf(s.entity as VehicleEntity, world) : S.reach;
     const d = Math.sqrt(dx * dx + dz * dz);
-    if (d > reach || d >= bestD) continue;
+    if (d > S.reach || d >= bestD) continue;
     if (d > S.underfoot && (fx * dx + fz * dz) / d < S.facingCos) continue;
     // Nothing between the eye and it but the thing itself.
     const dy = s.y - eye;
     const line = Math.sqrt(d * d + dy * dy);
     solids.raycast(b.x, eye, b.z, dx / line, dy / line, dz / line, line, Blocks.Move, hit);
-    if (hit.id >= 0 && !s.own.includes(hit.id) && s.kind !== 'vehicle') continue;
+    if (hit.id >= 0 && !s.own.includes(hit.id)) continue;
     best = s;
     bestD = d;
   }
   return best;
-}
-
-function vehicleHalf(e: VehicleEntity, world: World): number {
-  const v = world.camp.vehicles![e.vehicle.index]!;
-  return v.length / 2;
 }
 
 /** What holding use would do now, if anything: for the prompt. */

@@ -2,10 +2,9 @@ import type { Tuning } from '../../config/tuning';
 import { dcos, dsin } from '../kernel/core/detmath';
 import type { EntityId, EntityIndex } from '../kernel/state';
 import type { System, TickContext } from '../kernel/systems';
-import { overlapsBody } from '../kernel/world/colliders';
 import { Surface } from '../kernel/world/surfaces';
 import type { World } from '../kernel/world/world';
-import { bodyHeight, hasBody } from '../body';
+import { clearOfBodies } from '../body';
 import { doorSolid, type DoorEntity } from './camp';
 import type { PlayerEntity } from './entities';
 
@@ -23,13 +22,10 @@ import type { PlayerEntity } from './entities';
 function setDoor(ctx: TickContext, e: DoorEntity, open: boolean, by: EntityId): boolean {
   const spec = ctx.world.camp.doors![e.door.index]!;
   const next = doorSolid(spec, open);
-  for (const b of ctx.state.entities) {
-    if (!hasBody(b)) continue;
-    const body = ctx.tuning.bodies[b.kind];
-    if (overlapsBody(next, b.body.x, b.body.y, b.body.z, body.radius + 0.02, bodyHeight(b.body, body))) return false;
-  }
+  if (!clearOfBodies(next, ctx.state.entities, ctx.tuning.bodies)) return false;
   e.door.open = open;
-  Object.assign(e.solid, next);
+  // Its shape changes and its id doesn't: the id is how the motor and the renderer find it.
+  Object.assign(e.solid, next, { id: e.solid.id });
   const R = ctx.tuning.brain.doors.radius;
   ctx.emit({ type: 'door', source: by, x: spec.x, y: spec.y + 1, z: spec.z, surface: Surface.Wood, loudness: R / ctx.tuning.noise.radiusPerUnit, radius: R, open: open ? 1 : 0 });
   return true;

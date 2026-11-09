@@ -544,7 +544,7 @@ export const defaultTuning = {
       use: 0.7, // seconds to throw the switch, standing at it
       role: { sentry: 0.6, patrol: 0.5, marksman: 0, 'radio-operator': 0.3, officer: 0.5, worker: 1, target: 0 },
       sirenRadius: 1200,
-      flee: { pace: 4.6, arrive: 1.2, boardGap: 0.8, drive: 9, swerve: 4, giveWay: 4 }, // the target's run for the vehicle at lockdown (m/s, how close counts as aboard, the gap beside it to get in; then its speed on the way out, how far it swerves round someone in the road, and the seconds before it barges through)
+      flee: { pace: 4.6, arrive: 1.2, boardGap: 0.8, drive: 9, swerve: 4, swerveBy: [0, 0.5, -0.5, 1, -1, 2, -2], giveWay: 4 }, // the target's run for the vehicle at lockdown (m/s, how close counts as aboard, the gap beside it to get in; then its speed on the way out, how far off the road it goes round someone, sideways per metre forward in the order it tries them, and the seconds before it barges through)
       retry: 10, // seconds before he'll try the alarm again, after a run that came to nothing
       claimWithin: 3, // metres from the box for someone's shout to count as claiming it
       sirenHeight: 3, // metres above the box's foot that the horn sounds from
@@ -572,7 +572,7 @@ export const defaultTuning = {
       count: 3, // guards in the squad
       spread: 3.5, // metres between them when they arrive
       edgeMargin: 14, // metres inside the map's edge where they arrive, up the camp's road
-      truck: { length: 6.2, width: 2.3, height: 2.9, every: 25, stopShort: 14 }, // their truck (metres): its size, a waypoint this often along the road, and where it stops short of the gate
+      truck: { length: 6.2, width: 2.3, height: 2.9, every: 25, stopShort: 14, dropBehind: 1.5, holdOff: 1 }, // their truck (metres): its size, a waypoint this often along the road, where it stops short of the gate, how far behind it the squad gets down; and the seconds it holds off if someone is standing where it would appear
     },
     // Counter-sniper (E8): triangulating shots from bearings (triangulate.ts) and hunting the shooter.
     sniper: {

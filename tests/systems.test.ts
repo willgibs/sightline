@@ -18,7 +18,11 @@ import { SCENES } from '../src/sim/game/scenes';
 import { generateWorld } from '../src/sim/generation';
 import { missionSpec } from '../src/sim/kernel/mission';
 import { kernelAloneScene } from '../src/sim/kernel/alone';
-import { runScene } from '../src/sim/kernel/scene';
+import { runScene, type Scene } from '../src/sim/kernel/scene';
+import { boardingPoint } from '../src/sim/game/camp';
+import { commanderOf } from '../src/sim/game/comms';
+import type { GuardEntity } from '../src/sim/game/entities';
+import { liveCamp } from '../src/sim/game/scenes/liveCamp';
 import { Blocks } from '../src/sim/kernel/world/colliders';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testWorld, tuningCopy } from './fixtures';
@@ -303,6 +307,16 @@ describe('declared data access', () => {
       return out;
     }
     if (Array.isArray(a) && Array.isArray(b)) {
+      // Entities are matched by id: a despawn shifts the rest along, and mustn't hide what else changed.
+      if (path.length === 1 && path[0] === 'entities') {
+        const now = new Map((b as Array<{ id: number }>).map((e, j) => [e.id, j]));
+        if (a.length !== b.length || (a as Array<{ id: number }>).some((e) => !now.has(e.id))) out.push(path);
+        for (const e of a as Array<{ id: number }>) {
+          const j = now.get(e.id);
+          if (j !== undefined) changes(e, b[j], [...path, j], out);
+        }
+        return out;
+      }
       if (a.length !== b.length) out.push(path);
       else a.forEach((x, i) => changes(x, b[i], [...path, i], out));
       return out;
@@ -350,6 +364,36 @@ describe('declared data access', () => {
     const scene = { ...base, setup: (sim: Simulation) => (base.setup!(sim), watchWrites(sim, found)) };
     runScene(scene, defaultTuning);
     expect([...found]).toEqual([]);
+  }, 180_000);
+
+  it('lets every system write only what it declares, when the target boards or finds his vehicle dead', () => {
+    for (const disabled of [false, true]) {
+      const found = new Set<string>();
+      const base = liveCamp('seed=LEB-2534') as Scene<Simulation>;
+      const scene: Scene<Simulation> = {
+        ...base,
+        seconds: 6,
+        expect: [],
+        setup: (sim) => {
+          base.setup!(sim);
+          const c = commanderOf(sim)!;
+          const spec = sim.world.camp.vehicles!.find((x) => x.escape)!;
+          sim.index.of('vehicle').find((v) => v.vehicle.escape)!.vehicle.disabled = disabled;
+          const at = boardingPoint(sim.world, spec, defaultTuning);
+          const target = sim.index.get(c.camp.objective!.target) as GuardEntity;
+          target.body.x = at.x;
+          target.body.z = at.z;
+          target.body.y = sim.world.terrain.heightAt(at.x, at.z);
+          target.brain!.sirenAt = 0;
+          c.camp.level = 'lockdown';
+          watchWrites(sim, found);
+        },
+      };
+      const run = runScene(scene, defaultTuning);
+      const status = commanderOf(run.sim as Simulation)!.camp.objective!.status;
+      expect(status).toBe(disabled ? 'open' : 'escaping');
+      expect([...found]).toEqual([]);
+    }
   }, 180_000);
 
   it('lets every system write only what it declares, in valleys and in every scene', () => {

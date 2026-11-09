@@ -454,20 +454,30 @@ export interface EventSpec<E> {
   fields: { readonly [F in keyof Payload<E>]-?: FieldCodec };
 }
 
-const GAITS = ['crawl', 'crouch', 'walk', 'sprint'] as const;
-const ZONES = ['core', 'peripheral', 'far', 'contact', 'none'] as const satisfies readonly SightZone[];
-const AWARE = ['unaware', 'curious', 'suspicious', 'searching', 'combat'] as const satisfies readonly AwarenessName[];
-const REASONS = ['seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'body', 'glint', 'outage', 'door'] as const satisfies readonly AlertReason[];
-const SPOTS = ['body', 'glint', 'outage', 'door'] as const satisfies readonly SpotKind[];
-const HEARD = ['sound', 'shot', 'voice'] as const satisfies readonly HeardKind[];
-const STANCES = ['stand', 'crouch', 'prone'] as const satisfies readonly StanceName[];
+/**
+ * A table of a field's names, stored by index (only add at the end), that names its whole
+ * union. With `satisfies` alone a forgotten name compiles, and then throws when the event
+ * is written, in the middle of a run.
+ */
+const every =
+  <U extends string>() =>
+  <const T extends readonly U[]>(names: T, ..._all: [U] extends [T[number]] ? [] : [missing: Exclude<U, T[number]>]): T =>
+    names;
+
+const GAITS = every<StepGait>()(['crawl', 'crouch', 'walk', 'sprint']);
+const ZONES = every<SightZone>()(['core', 'peripheral', 'far', 'contact', 'none']);
+const AWARE = every<AwarenessName>()(['unaware', 'curious', 'suspicious', 'searching', 'combat']);
+const REASONS = every<AlertReason>()(['seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'body', 'glint', 'outage', 'door']);
+const SPOTS = every<SpotKind>()(['body', 'glint', 'outage', 'door']);
+const HEARD = every<HeardKind>()(['sound', 'shot', 'voice']);
+const STANCES = every<StanceName>()(['stand', 'crouch', 'prone']);
 const SOUND = { x: 'f32', y: 'f32', z: 'f32', surface: 'u8', loudness: 'f32', radius: 'f32' } as const;
-const LEVELS = ['calm', 'uneasy', 'alert', 'lockdown'] as const satisfies readonly LevelCode[];
-const REPORT_CODES = ['contact', 'heard', 'shot', 'body', 'missing', 'clear', 'claim', 'outage'] as const satisfies readonly ReportCode[];
-const ACT_NAMES = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee'] as const satisfies readonly ActCode[];
-const ACT_WHY_NAMES = ['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered', 'body', 'glint', 'siren'] as const satisfies readonly ActReason[];
-const STRIKES = ['terrain', 'collider', 'body'] as const satisfies readonly StrikeKind[];
-const PARTS = ['none', 'head', 'torso', 'legs'] as const satisfies readonly PartName[];
+const LEVELS = every<LevelCode>()(['calm', 'uneasy', 'alert', 'lockdown']);
+const REPORT_CODES = every<ReportCode>()(['contact', 'heard', 'shot', 'body', 'missing', 'clear', 'claim', 'outage']);
+const ACT_NAMES = every<ActCode>()(['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee']);
+const ACT_WHY_NAMES = every<ActReason>()(['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered', 'body', 'glint', 'siren', 'outage', 'door']);
+const STRIKES = every<StrikeKind>()(['terrain', 'collider', 'body']);
+const PARTS = every<PartName>()(['none', 'head', 'torso', 'legs']);
 
 export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   footstep: { code: 1, range: 'foundation', sound: true, fields: { ...SOUND, gait: { enum: GAITS } } },
@@ -479,7 +489,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
     sound: false,
     fields: { x: 'f64', y: 'f64', z: 'f64', dx: 'f64', dy: 'f64', dz: 'f64', speed: 'f64', drag: 'f64', wx: 'f64', wz: 'f64' },
   },
-  outcome: { code: 5, range: 'foundation', sound: false, fields: { status: { enum: ['succeeded', 'failed'] } } },
+  outcome: { code: 5, range: 'foundation', sound: false, fields: { status: { enum: every<OutcomeEvent['status']>()(['succeeded', 'failed']) } } },
   noticed: { code: 10, range: 'perception', sound: false, fields: { target: 'u32', x: 'f32', y: 'f32', z: 'f32', distance: 'f32', zone: { enum: ZONES } } },
   detected: {
     code: 11,
@@ -518,7 +528,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
     code: 32,
     range: 'ballistics',
     sound: false,
-    fields: { victim: 'u32', remains: 'u32', post: 'i32', part: { enum: ['head', 'torso', 'legs'] }, x: 'f32', y: 'f32', z: 'f32' },
+    fields: { victim: 'u32', remains: 'u32', post: 'i32', part: { enum: every<EventOf<'death'>['part']>()(['head', 'torso', 'legs']) }, x: 'f32', y: 'f32', z: 'f32' },
   },
   cry: { code: 33, range: 'ballistics', sound: true, fields: { ...SOUND } },
   ranged: { code: 34, range: 'ballistics', sound: false, fields: { range: 'f32', x: 'f32', y: 'f32', z: 'f32', what: { enum: ['none', ...STRIKES] } } },
@@ -528,13 +538,13 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   drag: { code: 51, range: 'body', sound: true, fields: { ...SOUND } },
   call: { code: 91, range: 'brain', sound: true, fields: { ...SOUND, radio: 'u8', say: { enum: REPORT_CODES } } },
   radio: { code: 92, range: 'brain', sound: false, fields: { kind: { enum: REPORT_CODES }, x: 'f32', z: 'f32', radius: 'f32' } },
-  order: { code: 93, range: 'brain', sound: false, fields: { to: 'u32', task: { enum: ['investigate', 'search', 'check', 'sweep', 'cover'] }, x: 'f32', z: 'f32' } },
-  alarm: { code: 97, range: 'brain', sound: false, fields: { box: 'u8', stage: { enum: ['raised', 'dead'] } } },
+  order: { code: 93, range: 'brain', sound: false, fields: { to: 'u32', task: { enum: every<TaskCode>()(['investigate', 'search', 'check', 'sweep', 'cover']) }, x: 'f32', z: 'f32' } },
+  alarm: { code: 97, range: 'brain', sound: false, fields: { box: 'u8', stage: { enum: every<EventOf<'alarm'>['stage']>()(['raised', 'dead']) } } },
   reinforce: { code: 99, range: 'brain', sound: false, fields: { count: 'u8', x: 'f32', z: 'f32' } },
   siren: { code: 98, range: 'brain', sound: true, fields: { ...SOUND } },
-  hurt: { code: 96, range: 'brain', sound: false, fields: { part: { enum: ['head', 'torso', 'legs'] }, hits: 'u8' } },
-  checkin: { code: 95, range: 'brain', sound: false, fields: { post: 'i32', stage: { enum: ['call', 'answer', 'silence', 'dead'] } } },
-  sabotage: { code: 100, range: 'brain', sound: false, fields: { what: { enum: ['generator', 'radio', 'vehicle'] }, x: 'f32', z: 'f32' } },
+  hurt: { code: 96, range: 'brain', sound: false, fields: { part: { enum: every<EventOf<'hurt'>['part']>()(['head', 'torso', 'legs']) }, hits: 'u8' } },
+  checkin: { code: 95, range: 'brain', sound: false, fields: { post: 'i32', stage: { enum: every<EventOf<'checkin'>['stage']>()(['call', 'answer', 'silence', 'dead']) } } },
+  sabotage: { code: 100, range: 'brain', sound: false, fields: { what: { enum: every<EventOf<'sabotage'>['what']>()(['generator', 'radio', 'vehicle']) }, x: 'f32', z: 'f32' } },
   door: { code: 101, range: 'brain', sound: true, fields: { ...SOUND, open: 'u8' } },
   level: { code: 94, range: 'brain', sound: false, fields: { from: { enum: LEVELS }, to: { enum: LEVELS } } },
   act: { code: 90, range: 'brain', sound: false, fields: { from: { enum: ACT_NAMES }, to: { enum: ACT_NAMES }, why: { enum: ACT_WHY_NAMES }, x: 'f32', z: 'f32', weight: 'f32' } },

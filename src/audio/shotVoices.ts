@@ -132,3 +132,13 @@ export function clatter(ctx: BaseAudioContext, out: AudioNode, noise: NoiseBuffe
   end = Math.max(end, burst(ctx, voice, noise.white, rand, when + 0.03, 'bandpass', 1600, 1, 0.01, 0.07, 0.25));
   return end;
 }
+
+/** A door: the latch, then, opened, a short creak of the hinge, or, shut, the leaf meeting its frame. */
+export function door(ctx: BaseAudioContext, out: AudioNode, noise: NoiseBuffers, rand: Rand, when: number, amp: number, open: boolean): number {
+  const voice = new GainNode(ctx, { gain: capped(amp) });
+  voice.connect(out);
+  let end = burst(ctx, voice, noise.white, rand, when, 'bandpass', 2600 + rand() * 400, 3, 0.001, 0.02, 0.7);
+  if (open) return Math.max(end, burst(ctx, voice, noise.white, rand, when + 0.03, 'bandpass', 900 + rand() * 200, 9, 0.06, 0.28, 0.35));
+  end = Math.max(end, thump(ctx, voice, when + 0.01, 110, 0.12, 0.9));
+  return Math.max(end, burst(ctx, voice, noise.white, rand, when + 0.012, 'lowpass', 500, 0.7, 0.003, 0.09, 0.6));
+}

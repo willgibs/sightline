@@ -668,8 +668,10 @@ function currentReport(m: GuardMind): Report {
   let rank = -1;
   let own: Percept | null = null;
   for (const p of m.percepts) {
-    // A body beats a shot, a muzzle's report beats a crack or a strike, and a voice says the least.
-    const r = p.kind === 'body' ? 6 : p.kind === 'outage' ? 2.5 : p.kind === 'shot' ? (p.sound === 'report' ? 5 : p.sound === 'crack' ? 4 : 3) : p.kind === 'sight' ? 2 : p.kind === 'sound' || p.kind === 'glint' ? 1 : 0;
+    // A body beats a shot, a muzzle's report beats a crack or a strike, and a voice says the
+    // least. Equipment found dead is worth saying only with nothing fresher: he remembers it
+    // for minutes, and someone in front of him is news.
+    const r = p.kind === 'body' ? 6 : p.kind === 'outage' ? 0.5 : p.kind === 'shot' ? (p.sound === 'report' ? 5 : p.sound === 'crack' ? 4 : 3) : p.kind === 'sight' ? 2 : p.kind === 'sound' || p.kind === 'glint' ? 1 : 0;
     if (r <= rank) continue;
     rank = r;
     own = p;

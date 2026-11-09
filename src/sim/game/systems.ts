@@ -162,7 +162,7 @@ const guardBrains: System = {
   name: 'guard-brains',
   phase: 'decide',
   reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.senses', 'guard.brain'],
-  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'commander.camp.devices', 'commander.camp.level', 'commander.camp.since', 'commander.camp.objective', 'alarm.alarm.raised', 'objective.objective.status', 'schedule', 'entities', 'bullet.bullet'],
+  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'commander.camp.devices', 'commander.camp.level', 'commander.camp.since', 'commander.camp.objective', 'commander.camp.inbox', 'alarm.alarm.raised', 'objective.objective.status', 'vehicle.vehicle.driving', 'schedule', 'entities', 'bullet.bullet'],
   emits: ['act', 'call', 'shot', 'report', 'alarm', 'siren', 'level'],
   run(ctx) {
     const nav = navAllowance(ctx);

@@ -28,6 +28,7 @@ export { canMantle, mantleAt } from './mantle';
 export { climbPrompt, ladderInReach, ladderLine, ladderLinks, ladderTop, laddersOf, type Ladder, type LadderLink, type LadderState } from './ladder';
 export { requestStance } from './stance';
 export { intentFor, intents, motorSystem } from './system';
+export { clearOfBodies } from './chain';
 export { bodyShape, bodyShapeAt, eyeOf, hipHeight, queryBodies, type ShapePose } from './shape';
 export { bobDepth, headBob, stridePhase, type BobDepths } from './bob';
 export { InvariantWatch, OVERLAP_TOLERANCE, STEEP_TOLERANCE, type InvariantReport } from './invariants';
