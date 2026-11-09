@@ -2,6 +2,22 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · Getting out of the line, getting down, and routes off the camp
+
+**The flaw detectors found it.** Standing in the shooter's line was the largest flaw. Most of it wasn't men misled by a suppressed shot, as we'd written: it was men on the fence, whose nearest cover was 14 to 35 m away, with a search that gave up at about 11 m. They stood in the open for a minute. The search now walks up to 40 m, looks at fewer spots the farther it goes, and counts rays as well as cells (rule 18).
+
+**Guards can change stance.** It looks first for a spot that hides a man crouched, because he can fight from there. A fold of ground that only hides him lying flat is taken when it's at least 8 m nearer. With nothing at all, he gets down where he stands. Orders carry an optional stance, the snapshot carries what his shape needs, and he's drawn where his shape is in any stance (rule 14, `tests/guardMeshes.test.ts`).
+
+**What moved** (`npm run experiment -- flaws`, 8 camps): in the line, against a sniper, 5.5 to 0.9 men per run; a suppressed sniper 9.4 to 1.8; relocating 5.1 to 1.0; sabotage 4.3 to 0.9. It costs no more to run. A man flat in the open is no longer counted: he's done what he can.
+
+**Reinforcements have a place of their own.** They used to borrow the first patrol's post, and one camp's first patrol stands at a single point, so a squad of three ended up in a heap with him (pile-up 3.0 per run). Each now goes back to where he got down from the truck. A phase along the patrol's loop didn't help: a post with no route has no loop.
+
+**Routes off the camp, and why fields.** A camp can't hunt on a ridge it can't route to, and only 74% of routes from a post to a listed perch were found (`npm run experiment -- routes`): 21% none, because the coarse layer's cells inside a building are a sealed pocket, and 6% ran out of budget. Going out through the fine layer first took it to 92%, but a fine search around a fence with one gate took up to 170 ms. So a route with one end in the camp now uses two fields, each flooded once for the world's life: a fine one from anywhere in the site to its edge, a coarse one from the rim to anywhere on the map, joined by a short coarse search round the outside of the camp. 99% are found, at about 0.5 ms each, against 13 to 29 ms for a fine search. Most of what was left was checking a long segment against every collider in its box, so a segment now looks up colliders a stretch at a time. The fields are built before the first tick. A route with a priced or closed door doesn't use them: they're the open camp's.
+
+**Still wrong:** 1% of routes find nothing because the perch itself isn't reachable on the map layer. Worth checking against the world work, which is changing perches.
+
+**The ladder hasn't moved, and shouldn't have been expected to** (`npm run experiment -- ladder`, 16 camps × 3 rolls): shoot once and leave 31 of 48 (27 before), shoot and relocate 10 (13), careless 6 (7), perfect and static 0. Men getting out of the line makes a second shot harder, and a plan that only needs one isn't touched by it. What beats that plan is a camp that comes after him, which is step 2.
+
 ## 2026-11-08 · The lab bench finished (F0): forks, dice, and a shooter with a person's limits
 
 **A fork is re-simulation plus one intervention** (`src/lab/fork.ts`, `npm run whatif`). A branch starts again from tick 0 with a fresh driver or the recorded inputs, plays to the fork, has one change made between two ticks (the player moved, a guard taken out, a part switched off from that tick on, a number patched), and goes on. It doesn't restore mid-run: bots keep memory outside the state, the recorder won't start at a later tick, and `restore` keeps the tuning and the work counts. A branch that changes nothing is the same run, bit for bit, and `tests/fork.test.ts` holds it to that. A branch isn't a recording: an instrument's change doesn't flow through the input (rule 5).

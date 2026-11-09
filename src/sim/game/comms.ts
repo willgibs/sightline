@@ -1,4 +1,4 @@
-import { REPORT_KINDS, alertRung, createBrain, createCamp, digest, fuseShots, mapMass, plan, spreadCamp, standStill, type CampMind, type CampOrder, type CampState, type Report, type Task, type Told, type Via } from '../brain';
+import { REPORT_KINDS, alertRung, createBrain, createCamp, digest, fuseShots, mapMass, navigatorOf, plan, spreadCamp, standStill, type CampMind, type CampOrder, type CampState, type Report, type Task, type Told, type Via } from '../brain';
 import type { DebugDraw } from '../kernel/debugDraw';
 import type { SimEvent } from '../kernel/events';
 import { createBody } from '../body';
@@ -37,6 +37,8 @@ declare module '../kernel/state' {
 
 /** Puts a commander in a run: the camp's single memory (E4, E5). */
 export function giveCommander(sim: Simulation): CommanderEntity {
+  // Ahead of the first tick: the first man sent up a ridge mustn't be what makes a frame late.
+  navigatorOf(sim.world, sim.tuning).prepare();
   const site = sim.world.camp.site;
   const camp = createCamp(site.x, site.z, sim.tuning);
   for (const g of sim.guards) {

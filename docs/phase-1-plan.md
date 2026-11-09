@@ -306,6 +306,7 @@ The design is `docs/camp-engine.md`, section 8. Scored with a shooter limited to
   | Any time | C, first sitting, and feel (C9) | `?trials=OWNER-C1&lab=movement`, then `?scene=movement-lab`, with `&hz=blind` | 15 min |
   | A few days later | A and C, second sittings | `?trials=OWNER-A2` and `?trials=OWNER-C2&lab=movement` | 25 min |
   | Once E7 and E8 are on `main` | E, and D's three camps | `?scene=live-camp&params=seed=LEB-2534`, then `KUV-9210` and `HUM-0755` | 25 min |
+  | Any time | F, the first fight | `?scene=compound&params=seed=LEB-2534%26attack=sniper`, then `?scene=live-camp&params=seed=LEB-2534%26perch=1&lab`. What did the camp do, why did you move, what would you do next? | 15 min |
 
   What each sitting asks is in its lab's section. Lab A's questions wait until after its first sitting.
 
@@ -1008,9 +1009,13 @@ Added on Nov 8, the owner's call. *Labs pass* requires it. Design and reasoning:
 - [ ] F1 · The first fight. Fifteen minutes in the owner's hands: what did the camp do, why did you move, what would you do next?
   - [x] A camp that fights (`camp.fights`, `off=fight` for the old one): a whistle heard at 600 m, men who leave the line for spots no listed perch toward the threat can see and come back after a stand-to of 45–60 s, tower men who fire back at the believed point, a near miss that knocks you off your rest, a muzzle flash anyone looking can see.
   - [x] The compound simulator (`?scene=compound`): the camp with no player, and stimuli dropped anywhere. Attack scripts, and flaw detectors (`npm run flaws`, `npm run experiment -- flaws`).
-  - [ ] Drive the flaws down. Standing in the shooter's line is the largest today, and most of it is men misled by a suppressed shot's crack.
+  - [x] Men get out of the line from up to 40 m away and get down when they arrive, crouched or flat by what hides them. Standing in the line fell from 5.5 to 0.9 men per run against a sniper.
+  - [x] Reinforcements have a place of their own, so a squad no longer stands in a heap.
+  - [ ] Drive the rest of the flaws down. What's left is mostly men caught by a shot they couldn't place.
   - [ ] The owner's sitting.
-- [ ] F2 · The camp hunts. Stance for guards, Picture and Command, sections that sweep, routes that reach the ridges, cut-offs on the road, fallbacks.
+- [ ] F2 · The camp hunts. Picture and Command, sections that sweep, cut-offs on the road, fallbacks.
+  - [x] Stance for guards.
+  - [x] Routes that reach the ridges: 99% of post-to-perch routes found (`npm run experiment -- routes`), at about 0.5 ms each.
 - [ ] F3 · The camp has means. The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels.
 - [ ] F4 · If play asks for it. Mortar, smoke, hardening, Memory, decoys, and the rest of the sandboxes.
 
