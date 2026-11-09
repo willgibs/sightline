@@ -2,6 +2,20 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · What the first sitting showed: the simulator was misreading its own shooter
+
+The owner's first sitting of the compound simulator: "kill shots from hundreds of meters away, through tree cover. Zero line of sight, near perfect accuracy."
+
+**What was really happening.** The script's shooter was on a ridge 200 to 290 m from the camp, and its shots went over the treetops. The panel measured everything from the idle player, parked 736 m away at the corner of the map, so it read as a 736 m shot through forest, and F3 put the camera back there. A tool that says the wrong thing costs a sitting.
+
+**Changed.**
+- The panel measures from the real shooter, the last muzzle, and says where that is. The label `shooter` marks it in the debug view, and 7 looks along the last shot from there.
+- In the compound scene, leaving the debug view stays over the camp: its player is only parked.
+- The scripted sniper is a person: it shoots only at someone in a clear line, at the chest, with 0.8 mrad of error, every 8 s, and otherwise holds fire. It used to fire at the middle of the camp when it could see nobody.
+- The flaw detector holds a man only to what his camp could know. Of the 19 "in the line" flags against the fair sniper, none was exposed from where his camp believed the shots came from. He'd gone to cover from the wrong ridge, or had no idea. That's the honest uncertainty the owner asked for, not a defect. In-the-line per run: sniper 0, suppressed 2.0, relocating 0.9.
+
+**Still true, and next:** tree crowns stop nothing on generated maps (11% of perch-to-post lines the simulation calls clear pass through crowns too thick to see through). The law to build: if you can't see through it, you can't shoot through it.
+
 ## 2026-11-08 · The world pillar: the target is buried, and camps are built around a crux
 
 **Why.** The reviewers found the same best plan in 29 of 30 camps. The owner's ruling on what that plan rested on: "If the target can always be seen from every perch, that effectively makes every mission 1-shot from success from nearly every vantage point. That effectively forces the easiest map of all time across generations, where it likely has to fall into a low-building compound within a valley. Very bad rule that forces both generic map design, and no real challenge to reach a target. Much smarter to bury target behind the challenges inherent to the base takedown." So lab D's rule that every camp offers two perches on the target is gone. The design doc's validation rules ("three or more viable approaches") need the owner's edit to match.
