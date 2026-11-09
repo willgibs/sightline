@@ -1,4 +1,5 @@
-import { dcos, dsin } from '../kernel/core/detmath';
+import { dcos, dlog, dsin } from '../kernel/core/detmath';
+import { Rng } from '../kernel/core/rng';
 import { neutralInput, type InputFrame } from '../kernel/input';
 import type { Driver } from '../kernel/scene';
 import type { StimulusCommand } from '../kernel/commands';
@@ -16,9 +17,16 @@ import type { Simulation } from './sim';
  * can't: it only ever gets the sound, the sight, the bullet or the body.
  */
 
+/** How far off a person's shot is, radians, one standard deviation: good, from a rest, with range and wind judged by eye. */
+const AIM_ERROR = 0.0008;
+/** Seconds between a person's shots: finding the next man, ranging him, holding. */
+const SHOT_GAP = 8;
+/** How far up the body he aims, as a share of the eye's height: the chest. */
+const CHEST = 0.75;
+
 export interface AttackStep {
   at: number;
-  make(sim: Simulation): StimulusCommand | null;
+  make(sim: Simulation, rng: Rng): StimulusCommand | null;
 }
 
 interface Point {
@@ -62,21 +70,34 @@ function twoPerches(sim: Simulation): [Perch, Perch] {
   return [a, other];
 }
 
-/** A shot from a perch at the first guard in a clear line from it, or at the camp's centre if there's none. */
-function shotAtSomeone(sim: Simulation, perch: Perch, what: StimulusName): StimulusCommand {
+/** One draw from a normal distribution with this standard deviation. */
+function normal(rng: Rng, sigma: number): number {
+  return sigma * Math.sqrt(-2 * dlog(Math.max(1e-12, rng.next()))) * dcos(2 * Math.PI * rng.next());
+}
+
+/**
+ * A shot from a perch at the first guard in a clear line from it, at his chest and with a
+ * person's error, or no shot at all: someone who can see nobody has nothing to shoot at.
+ */
+function shotAtSomeone(sim: Simulation, perch: Perch, what: StimulusName, rng: Rng): StimulusCommand | null {
   const from = proneEye(sim, perch);
-  // Terrain and solids only: a body in the line is what he's aiming at.
+  // Terrain and solids only: a body in the line is what he's aiming at. He has to see the
+  // man, and the round has to be able to get there.
   const view = { world: sim.world, solids: sim.solids, bodies: [] };
   for (const g of sim.guards) {
-    const y = g.body.y + g.body.eyeHeight;
-    if (sightLine(view, from.x, from.y, from.z, g.body.x, y, g.body.z, Blocks.Bullet)) return stimulus(what, { x: g.body.x, y: y - 0.1, z: g.body.z }, from);
+    const y = g.body.y + g.body.eyeHeight * CHEST;
+    if (!sightLine(view, from.x, from.y, from.z, g.body.x, y, g.body.z, Blocks.Sight | Blocks.Bullet)) continue;
+    const dx = g.body.x - from.x;
+    const dy = y - from.y;
+    const dz = g.body.z - from.z;
+    const off = AIM_ERROR * Math.sqrt(dx * dx + dy * dy + dz * dz);
+    return stimulus(what, { x: g.body.x + normal(rng, off), y: y + normal(rng, off), z: g.body.z + normal(rng, off) }, from);
   }
-  const s = sim.world.camp.site;
-  return stimulus(what, { x: s.x, y: sim.world.terrain.heightAt(s.x, s.z) + 1, z: s.z }, from);
+  return null;
 }
 
 function shots(times: readonly number[], perch: (sim: Simulation) => Perch, what: StimulusName = 'shot'): AttackStep[] {
-  return times.map((at) => ({ at, make: (sim) => shotAtSomeone(sim, perch(sim), what) }));
+  return times.map((at) => ({ at, make: (sim, rng) => shotAtSomeone(sim, perch(sim), what, rng) }));
 }
 
 const first = (sim: Simulation): Perch => twoPerches(sim)[0];
@@ -92,14 +113,14 @@ function aroundTheFence(sim: Simulation, turn: number): Point {
   return { x, y: sim.world.terrain.heightAt(x, z), z };
 }
 
-const everyFive = (from: number, n: number): number[] => Array.from({ length: n }, (_, k) => from + k * 5);
+const volley = (from: number, n: number): number[] => Array.from({ length: n }, (_, k) => from + k * SHOT_GAP);
 
 export const ATTACKS: Readonly<Record<string, AttackStep[]>> = {
   'one-shot': shots([12], first),
-  sniper: shots(everyFive(12, 8), first),
-  'suppressed-sniper': shots(everyFive(12, 8), first, 'suppressed-shot'),
-  relocating: [...shots(everyFive(12, 3), first), ...shots(everyFive(50, 3), second), ...shots(everyFive(95, 3), first)],
-  'two-fronts': [...shots(everyFive(12, 3), first), ...[20, 28, 36].map((at, k) => ({ at, make: (sim: Simulation) => stimulus('noise', aroundTheFence(sim, 0.3 + k * 0.1)) }))],
+  sniper: shots(volley(12, 8), first),
+  'suppressed-sniper': shots(volley(12, 8), first, 'suppressed-shot'),
+  relocating: [...shots(volley(12, 3), first), ...shots(volley(50, 3), second), ...shots(volley(95, 3), first)],
+  'two-fronts': [...shots(volley(12, 3), first), ...[20, 28, 36].map((at, k) => ({ at, make: (sim: Simulation) => stimulus('noise', aroundTheFence(sim, 0.3 + k * 0.1)) }))],
   noises: [0, 1, 2, 3, 4, 5].map((k) => ({ at: 12 + k * 12, make: (sim: Simulation) => stimulus('noise', aroundTheFence(sim, k / 6)) })),
   'silent-kills': [15, 40, 65].map((at) => ({
     at,
@@ -116,7 +137,7 @@ export const ATTACKS: Readonly<Record<string, AttackStep[]>> = {
         return d ? stimulus('sabotage', { x: d.x, y: d.y, z: d.z }) : null;
       },
     },
-    ...shots(everyFive(30, 3), first),
+    ...shots(volley(30, 3), first),
   ],
   quiet: [],
 };
@@ -126,6 +147,7 @@ export class AttackDriver implements Driver<Simulation> {
   readonly truth: Attacked[] = [];
   private k = 0;
   private readonly steps: AttackStep[];
+  private rng: Rng | null = null;
 
   constructor(name: string) {
     const steps = ATTACKS[name];
@@ -139,7 +161,8 @@ export class AttackDriver implements Driver<Simulation> {
     const commands: StimulusCommand[] = [];
     const now = sim.tick / sim.tuning.sim.tickHz;
     while (this.k < this.steps.length && this.steps[this.k]!.at <= now) {
-      const c = this.steps[this.k++]!.make(sim);
+      this.rng ??= new Rng(sim.world.seed, 'attack');
+      const c = this.steps[this.k++]!.make(sim, this.rng);
       if (!c) continue;
       commands.push(c);
       this.truth.push({ tick: sim.tick, what: (['noise', 'body', 'shot', 'suppressed-shot', 'kill', 'sabotage'] as const)[c.what]!, from: { x: c.fromX, y: c.fromY, z: c.fromZ }, at: { x: c.x, y: c.y, z: c.z } });
