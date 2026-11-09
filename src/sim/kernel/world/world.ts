@@ -1,5 +1,6 @@
 import type { MissionSpec } from '../mission';
 import type { ColliderSet } from './colliders';
+import type { FoliageVolume } from './foliage';
 import type { SpatialGrid } from './grid';
 import type { Heightfield } from './heightfield';
 
@@ -21,4 +22,8 @@ export interface World {
   grid: SpatialGrid;
   /** Half-size of the playable square; beyond it is out of bounds. */
   playHalf: number;
+  /** Tree crowns (foliage.ts), as plain data so the world's fingerprint covers them; none if absent. */
+  crowns?: readonly FoliageVolume[];
+  /** How much crown (density × length) a line of sight or a bullet gets through before it's stopped. */
+  crownStop?: number;
 }

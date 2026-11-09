@@ -16,7 +16,7 @@ import { validateAndRepair, type Repaired } from './repair';
 import { blockVehicles, buildCompound, paintRoad, placeFixtures } from './compound';
 import { generateLandform } from './landform';
 import { checkValley, type Overwatch } from './overwatch';
-import { scatterProps, type Props } from './props';
+import { scatterProps, treeCrowns, type Props } from './props';
 import { campWalkStart, siteBounds } from './site';
 import { chooseSpawn } from './spawn';
 import { staffCamp } from './staffing';
@@ -84,6 +84,8 @@ export function generateCampWorld(spec: MissionSpec, tuning: Tuning, clock?: () 
     backdrop: terrain.backdrop,
     colliders,
     props,
+    crowns: treeCrowns(props.trees, G),
+    crownStop: G.props.crownStop,
     camp,
     report,
     spawn,
@@ -115,12 +117,12 @@ function buildCamp(seed: string, attempt: number, terrain: TerrainResult, G: Tun
   const grid = buildGrid(terrain.heightfield, colliders, siteBounds(camp, colliders, Math.max(G.grid.siteMargin, G.analysis.margin + 2)), G);
   // Staffing searches the grid (its chokepoints, its patrols' paths) and sees through the
   // analysis raster (who would see whom drop), so it shapes the camp's clusters as it goes.
-  let raster = buildRaster(camp, terrain.heightfield, colliders, grid.site, G.analysis.cell, G.analysis.margin);
+  let raster = buildRaster(camp, terrain.heightfield, colliders, grid.site, G, props.trees);
   let views = perchViews(raster, terrain.heightfield, camp.site, G, grid.map, campWalkStart(camp));
   placeFixtures(camp, colliders, terrain.heightfield, raster, views, G, fork('fixtures'));
   colliders.build();
   blockVehicles(camp, grid, G);
-  raster = buildRaster(camp, terrain.heightfield, colliders, grid.site, G.analysis.cell, G.analysis.margin);
+  raster = buildRaster(camp, terrain.heightfield, colliders, grid.site, G, props.trees);
   views = perchViews(raster, terrain.heightfield, camp.site, G, grid.map, campWalkStart(camp));
   staffCamp(camp, terrain.heightfield, grid, raster, views, G, spec, fork('staff'), fork('routines'));
   const repaired = validateAndRepair(camp, terrain.heightfield, colliders, grid, raster, G, fork('repair'));

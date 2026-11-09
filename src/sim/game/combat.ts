@@ -1,5 +1,5 @@
 import type { BulletEntity } from '../ballistics';
-import { ballisticOf, flightAt, launch, solveAim, vec3, zeroOf } from '../ballistics';
+import { ballisticOf, flightAt, flightEnd, launch, solveAim, vec3, zeroOf } from '../ballistics';
 import { eyeOf, startle } from '../body';
 import { dcos, dsin } from '../kernel/core/detmath';
 import { air, windAt } from '../kernel/env';
@@ -104,6 +104,9 @@ export function nearMiss(ctx: TickContext, e: BulletEntity, now: number): void {
   const dz = from.z + vz * s - head.z;
   const d2 = dx * dx + dy * dy + dz * dz;
   if (d2 > N.radius * N.radius) return;
+  // A round something stopped short of him never went past him.
+  const closest = shot.swept + (now - shot.swept) * s;
+  if (flightEnd(shot.flight, closest, 1 / ctx.tuning.sim.tickHz, ctx.query()) < closest) return;
   shot.passed = true;
   if (you.vitals) startle(you.vitals, ctx.tuning.vitals);
   if (you.rifle) {

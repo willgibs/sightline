@@ -96,12 +96,27 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      # With no pin changed there's nothing to explain: a pinned run that had moved anyway would fail the tests.
+      - id: pins
+        shell: bash
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: |
+          if git diff --quiet "$BASE" HEAD -- src/sim/game/golden.ts src/sim/game/benchGolden.ts; then
+            echo "No pin changed, so nothing to explain."
+            echo "changed=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=yes" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.pins.outputs.changed == 'yes'
+        uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
-      - shell: bash
+      - if: steps.pins.outputs.changed == 'yes'
+        run: npm ci
+      - if: steps.pins.outputs.changed == 'yes'
+        shell: bash
         run: npm run explain -- --base "${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}" --summary "$GITHUB_STEP_SUMMARY"
 
   platforms:

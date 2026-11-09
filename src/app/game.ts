@@ -18,7 +18,7 @@ import type { UsePrompt } from '../sim/game/use';
 import type { SimEvent } from '../sim/kernel/events';
 import { normalizeSeed } from '../sim/kernel/core/seed';
 import { Blocks, type Collider } from '../sim/kernel/world/colliders';
-import { emptyHit, raycast } from '../sim/kernel/world/query';
+import { emptyHit, raycast, IGNORE_CROWNS } from '../sim/kernel/world/query';
 import { entityOfCollider } from '../sim/kernel/world/solids';
 import { Surface, surfaceName } from '../sim/kernel/world/surfaces';
 import { GameRenderer, type CameraPose } from '../render/renderer';
@@ -1331,7 +1331,9 @@ export class Game {
             ? entityOfCollider(hit.id) >= 0
               ? `solid ${entityOfCollider(hit.id)}`
               : colliderLabel(this.sim.solids.get(hit.id))
-            : 'terrain';
+            : hit.what === 'crown'
+              ? 'tree crown'
+              : 'terrain';
       this.aim = (this.aim ?? new THREE.Vector3()).set(hit.x, hit.y, hit.z);
       this.aimText = `${t < 10 ? t.toFixed(1) : Math.round(t)} m · ${what}`;
     } else {
@@ -1505,7 +1507,7 @@ export class Game {
     const yaw = this.input.yaw;
     const pitch = this.input.pitch;
     const d = this.mouseFree ? this.renderer.rayThrough(this.input.mouseX, this.input.mouseY, window.innerWidth, window.innerHeight) : { x: -Math.sin(yaw) * Math.cos(pitch), y: Math.sin(pitch), z: -Math.cos(yaw) * Math.cos(pitch) };
-    const hit = raycast({ world: this.world, solids: this.sim.solids, bodies: this.sim.queryBodies() }, this.fly.x, this.fly.y, this.fly.z, d.x, d.y, d.z, 2000, Blocks.All, emptyHit());
+    const hit = raycast({ world: this.world, solids: this.sim.solids, bodies: this.sim.queryBodies() }, this.fly.x, this.fly.y, this.fly.z, d.x, d.y, d.z, 2000, Blocks.All, emptyHit(), -1, IGNORE_CROWNS);
     if (hit.what === 'none') {
       this.hud.toast('Nothing there to drop it on');
       return;

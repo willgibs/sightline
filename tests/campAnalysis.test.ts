@@ -20,7 +20,7 @@ let world: World;
 let raster: Raster;
 beforeAll(() => {
   world = generateWorld(campMission('MUD-9031'), T);
-  raster = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, T.gen.analysis.cell, T.gen.analysis.margin);
+  raster = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, T.gen, world.props.trees);
 }, 120_000);
 
 /** The exact answer: the heightfield's own raycast, then every collider that stops sight, then parked vehicles. */
@@ -76,8 +76,8 @@ describe("a perch's viewshed", () => {
     let n = 0;
     const r = new Rng('perch-check');
     for (const w of [world, generateWorld(campMission('KOR-1188'), T), generateWorld(campMission('BNC-0303'), T)]) {
-      const R = w === world ? raster : buildRaster(w.camp, w.terrain, w.colliders, w.grid.site, T.gen.analysis.cell, T.gen.analysis.margin);
-      const perches = findPerches(w.terrain, w.camp.site, T.gen, w.grid.map).slice(0, 8);
+      const R = w === world ? raster : buildRaster(w.camp, w.terrain, w.colliders, w.grid.site, T.gen, w.props.trees);
+      const perches = findPerches(w.terrain, w.camp.site, T.gen, w.grid.map, R.canopy).slice(0, 8);
       expect(perches.length).toBeGreaterThan(4);
       const L = w.camp.layout!;
       for (const p of perches) {
@@ -129,7 +129,7 @@ describe('a tower', () => {
     expect(clear).toBeGreaterThan(8);
     // And some perch sees his chest over the parapet.
     const chest = tower.y + T.gen.sight.chest;
-    expect(findPerches(world.terrain, world.camp.site, T.gen, world.grid.map).some((p) => perchSeesDeck(raster, world.terrain, p, tower.x, chest, tower.z))).toBe(true);
+    expect(findPerches(world.terrain, world.camp.site, T.gen, world.grid.map, raster.canopy).some((p) => perchSeesDeck(raster, world.terrain, p, tower.x, chest, tower.z))).toBe(true);
   });
 });
 

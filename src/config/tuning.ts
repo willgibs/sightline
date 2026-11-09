@@ -12,6 +12,10 @@
  *
  * Units: metres, seconds, degrees (where named *Deg), multipliers otherwise.
  */
+
+/** How much a conifer's crown dims a line, per metre of it: a 4 m crown lets through about a twentieth. */
+const CROWN_DENSITY = 0.7;
+
 export const defaultTuning = {
   sim: {
     tickHz: 30, // fixed simulation rate (design doc · Platform and architecture)
@@ -37,6 +41,12 @@ export const defaultTuning = {
     props: {
       treeSpacing: 6, // jittered-grid cell for tree candidates
       treeCover: 0.42, // share of forest cells that grow a tree
+      crownDensity: CROWN_DENSITY,
+      crownInset: 0.9, // a crown is drawn with seven flat sides: what stops a line stays inside them, so nothing is stopped by a gap you can see through
+      // Past this much crown (density × length) a line is stopped there, sight and bullets
+      // alike: about 1.1 m of it, which is nearly all of what's drawn, leaving the thin tip and rim.
+      crownStop: 0.8,
+      canopyCell: 2, // metres: the height map of the crowns a perch's view is worked out against
       rockSpacing: 13,
       bushSpacing: 7,
     },
@@ -593,7 +603,7 @@ export const defaultTuning = {
     // transmittance exp(−density × length).
     foliage: {
       bush: 1.3, // per metre: a 1.6 m bush lets through about an eighth
-      canopy: 0.7, // per metre: a 4 m conifer canopy lets through about a twentieth
+      canopy: CROWN_DENSITY, // per metre
     },
     hearing: {
       maxExpansions: 120000, // site-grid cells one sound's flood may expand (rule 18)

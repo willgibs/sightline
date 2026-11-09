@@ -6,6 +6,8 @@ import type { World } from '../src/sim/kernel/world/world';
 import { makeTerrainSample } from '../src/sim/kernel/world/heightfield';
 import { missionSpec } from '../src/sim/kernel/mission';
 import { CellStreams } from '../src/sim/generation/scatter';
+import { scatterProps } from '../src/sim/generation/props';
+import { ColliderSet } from '../src/sim/kernel/world/colliders';
 import { Rng } from '../src/sim/kernel/core/rng';
 
 const fingerprint = worldFingerprint;
@@ -64,15 +66,18 @@ describe('world generation', () => {
   it('scatters by cell: a prop depends only on the seed, its kind and its cell', () => {
     // Half the tree cover keeps a subset of the trees, each exactly as it was: no cell's
     // numbers depend on what its neighbours drew, so a repair touches only its own cells.
+    // (The scatter alone, as whole worlds may settle on different attempts at their camps.)
     const sparse = structuredClone(defaultTuning);
     sparse.gen.props.treeCover *= 0.5;
-    const w = generateWorld(missionSpec('TAL-4471'), sparse);
-    const before = new Map(tal.props.trees.map((t) => [t.cell, t]));
-    expect(w.props.trees.length).toBeLessThan(tal.props.trees.length * 0.7);
-    for (const t of w.props.trees) expect(t).toEqual(before.get(t.cell));
+    const scatter = (gen: typeof defaultTuning.gen) => scatterProps(new Rng('TAL-4471', 'props'), tal.terrain, tal.features, new ColliderSet(gen.world.size), gen);
+    const full = scatter(defaultTuning.gen);
+    const half = scatter(sparse.gen);
+    const before = new Map(full.trees.map((t) => [t.cell, t]));
+    expect(half.trees.length).toBeLessThan(full.trees.length * 0.7);
+    for (const t of half.trees) expect(t).toEqual(before.get(t.cell));
     // Rocks and bushes didn't move at all.
-    expect(w.props.rocks).toEqual(tal.props.rocks);
-    expect(w.props.bushes).toEqual(tal.props.bushes);
+    expect(half.rocks).toEqual(full.rocks);
+    expect(half.bushes).toEqual(full.bushes);
     // And a cell's stream is the same whatever order cells are visited in.
     const a = new CellStreams(new Rng('TAL-4471'), 'trees');
     const b = new CellStreams(new Rng('TAL-4471'), 'trees');
@@ -138,4 +143,4 @@ describe('world generation', () => {
   });
 });
 
-const GOLDEN_TAL_4471 = 'e1c01b804d7cd226';
+const GOLDEN_TAL_4471 = '317ed710bbcc8526';

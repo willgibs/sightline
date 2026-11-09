@@ -4,6 +4,7 @@ import { cellIndex, type GridLayer } from '../kernel/world/grid';
 import { makeTerrainSample, type Heightfield } from '../kernel/world/heightfield';
 import { GridSearch } from '../kernel/world/search';
 import type { Site } from './site';
+import { canopyTop, type Canopy } from './props';
 import { frameOf, lineOfSight, type Raster } from './raster';
 
 /**
@@ -12,7 +13,8 @@ import { frameOf, lineOfSight, type Raster } from './raster';
  *
  * The list comes from a radial sweep from the camp's eye (as D3's checks do): every prone
  * shooter's eye 150–560 m out that clears the terrain's horizon, looks down into the camp,
- * and can be walked to from it is a candidate, and candidates are thinned to one per
+ * and can be walked to from it is a candidate (tree crowns count as ground here, a shooter's
+ * view being stopped by them: props.ts, Canopy), and candidates are thinned to one per
  * `perchSpacing` metres, the steepest view kept. Up to `perches` of them, the steepest
  * first, wherever they are.
  *
@@ -32,7 +34,7 @@ export interface PerchSpot {
   heightAbovePad: number;
 }
 
-export function findPerches(hf: Heightfield, site: Site, gen: GenTuning, map: GridLayer, start: { x: number; z: number } = site): PerchSpot[] {
+export function findPerches(hf: Heightfield, site: Site, gen: GenTuning, map: GridLayer, canopy: Canopy, start: { x: number; z: number } = site): PerchSpot[] {
   const O = gen.overwatch;
   const A = gen.analysis;
   const eyeY = site.height + 1.6;
@@ -69,6 +71,11 @@ export function findPerches(hf: Heightfield, site: Site, gen: GenTuning, map: Gr
         if (!old || toEye > (old.eye - eyeY) / old.dist) buckets.set(key, spot);
       }
       horizon = Math.max(horizon, (ground - eyeY) / r);
+      // Crowns are narrow: they're read more often than the ground.
+      for (let s = r; s < r + 2.5; s += canopy.cell / 2) {
+        const stops = canopyTop(canopy, site.x + d.x * s, site.z + d.z * s);
+        if (stops !== -Infinity) horizon = Math.max(horizon, (stops - eyeY) / s);
+      }
     }
   }
   // The steepest views first; ties by place, so the order is the same everywhere.
@@ -130,7 +137,13 @@ export function perchViewshed(R: Raster, hf: Heightfield, p: PerchSpot): Float32
       const inside = a >= minA && a < maxA && b >= minB && b < maxB;
       if (!inside) {
         horizon = Math.max(horizon, (hf.heightAt(p.x + wx * d, p.z + wz * d) - p.eye) / d);
-        d += R.cell * 2.5;
+        // Crowns are narrow: they're read more often than the ground.
+        const stride = R.cell * 2.5;
+        for (let s = d; s < d + stride; s += R.canopy.cell / 2) {
+          const stops = canopyTop(R.canopy, p.x + wx * s, p.z + wz * s);
+          if (stops !== -Infinity) horizon = Math.max(horizon, (stops - p.eye) / s);
+        }
+        d += stride;
         continue;
       }
       const i = Math.floor((a - R.a0) / R.cell);
@@ -156,7 +169,7 @@ export interface PerchViews {
 }
 
 export function perchViews(R: Raster, hf: Heightfield, site: Site, gen: GenTuning, map: GridLayer, start: { x: number; z: number } = site): PerchViews {
-  const spots = findPerches(hf, site, gen, map, start);
+  const spots = findPerches(hf, site, gen, map, R.canopy, start);
   return { spots, views: spots.map((p) => perchViewshed(R, hf, p)) };
 }
 
@@ -195,5 +208,8 @@ export function perchSeesDeck(R: Raster, hf: Heightfield, p: PerchSpot, x: numbe
   const dy = y - p.eye;
   const dz = z - p.z;
   const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-  return hf.raycast(p.x, p.eye, p.z, dx / d, dy / d, dz / d, d) >= d - 0.5;
+  if (hf.raycast(p.x, p.eye, p.z, dx / d, dy / d, dz / d, d) < d - 0.5) return false;
+  // The crowns on the way: most of the line is high above them, so a walk along it is cheap.
+  for (let s = 0; s < d; s += R.canopy.cell / 2) if (p.eye + (dy * s) / d < canopyTop(R.canopy, p.x + (dx * s) / d, p.z + (dz * s) / d)) return false;
+  return true;
 }

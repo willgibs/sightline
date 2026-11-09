@@ -54,7 +54,7 @@ export function parseOverlook(text: string | undefined): OverlookParams {
 /** The cleanest certified shot at the target, on this camp, from any perch: where, and when in the cycle. */
 export function timedShot(world: World, tuning: Parameters<Scene['world']>[0]): { shots: WrittenShots; x: number; z: number; dt: number; unwatched: boolean[] } | null {
   const G = tuning.gen;
-  const raster = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, G.analysis.cell, G.analysis.margin);
+  const raster = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, G, world.props.trees);
   const { analysis, parts } = analyzeCamp(world.camp, world.terrain, world.colliders, world.grid, G, raster);
   // The cleanest kind of shot the camp allows: nobody watching, or else a witness dropped in time, or one distracted.
   const certified = (split: 'window' | 'chain' | 'distraction'): WrittenShots | null => {
