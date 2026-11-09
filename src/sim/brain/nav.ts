@@ -10,8 +10,12 @@ import type { World } from '../kernel/world/world';
  * Navigation (E1): where a guard walks, on the one grid search (kernel/world/search.ts).
  * The Last of Us's two tiers, on Sightline's two layers: coarse routes over the 2.5 m map
  * layer, and the 0.5 m site layer over the camp, where a coarse cell can't represent a
- * doorway. Inside the site a route is found on the fine layer alone; a route that leaves
- * the site is coarse, with its ends refined from the site's edge to the start or the goal.
+ * doorway. Inside the site a route is found on the fine layer alone. A route with one end
+ * inside comes out by a field flooded over the fine layer, and reaches the far end by one
+ * flooded over the map layer, each once for the world's life; a short search over the map
+ * layer joins them round the outside of the camp. The coarse layer can't see out of a
+ * building, where its cells are a sealed pocket, and a ridge a kilometre away is beyond what
+ * one search can afford. A route with neither end inside is coarse.
  *
  * A route is found by A* with the search's fixed tie-breaks and an iteration budget (rule
  * 18): it says when it ran out, and finding no route is an answer, never a stall. The
@@ -61,6 +65,11 @@ export interface FindOptions {
 export class Navigator {
   private readonly site: GridSearch;
   private readonly map: GridSearch;
+  /** The way to the site's rim from anywhere on the map, and the way out to it from anywhere in the site: flooded the first time something asks. */
+  private rim: GridSearch | null = null;
+  private exit: GridSearch | null = null;
+  private readonly rimCells: number[] = [];
+  private readonly exitCells: number[] = [];
   private readonly siteCells: number[] = [];
   private readonly mapCells: number[] = [];
   private readonly raw: number[] = [];
@@ -107,11 +116,86 @@ export class Navigator {
       // A fine search that ran out of budget falls back on the coarse layer.
       if (r === 'no-route') return 'no-route';
     }
+    // A priced or closed door isn't in the fields: they're the open camp's.
+    if (inA !== inB && !opts.cost) {
+      const via = this.viaRim(ax, az, bx, bz, inA, opts);
+      return via === 'found' ? this.finish(ax, az, bx, bz, out) : via;
+    }
     // Coarse: over the map layer, refined at either end inside the site.
     const r = this.searchLayer(this.map, ax, az, bx, bz, N.mapExpansions, opts, this.mapCells);
     if (r !== 'found') return r;
     this.stitch(ax, az, bx, bz, inA, inB, opts);
     return this.finish(ax, az, bx, bz, out);
+  }
+
+  /**
+   * A route with one end inside the site: out by the fine field to the site's edge, by the
+   * coarse field between the rim and the far end, and joined by a search round the camp.
+   */
+  private viaRim(ax: number, az: number, bx: number, bz: number, inA: boolean, opts: FindOptions): RouteResult {
+    const site = this.site.layer;
+    const way = this.exitField();
+    const inner = this.nearestWalkable(site, inA ? ax : bx, inA ? az : bz);
+    if (inner < 0 || way.cost[inner]! < 0) return 'no-route';
+    const fine = this.exitCells;
+    fine.length = 0;
+    for (let c = inner; c !== -1; c = way.parent[c]!) fine.push(c);
+    const door = fine[fine.length - 1]!;
+    const field = this.rimField();
+    const map = field.layer;
+    const outer = this.nearestWalkable(map, inA ? bx : ax, inA ? bz : az);
+    if (outer < 0 || field.cost[outer]! < 0) return 'no-route';
+    const coarse = this.rimCells;
+    coarse.length = 0;
+    for (let c = outer; c !== -1; c = field.parent[c]!) coarse.push(c);
+    const rim = coarse[coarse.length - 1]!;
+    const r = this.searchLayer(this.map, cellX(site, door), cellZ(site, door), cellX(map, rim), cellZ(map, rim), this.tuning.brain.nav.mapExpansions, opts, this.mapCells);
+    if (r !== 'found') return r;
+    if (inA) {
+      this.appendCells(site, fine);
+      this.appendCells(map, this.mapCells);
+      for (let k = coarse.length - 1; k >= 0; k--) this.pushRaw(cellX(map, coarse[k]!), cellZ(map, coarse[k]!));
+    } else {
+      this.appendCells(map, coarse);
+      for (let k = this.mapCells.length - 1; k >= 0; k--) this.pushRaw(cellX(map, this.mapCells[k]!), cellZ(map, this.mapCells[k]!));
+      for (let k = fine.length - 1; k >= 0; k--) this.pushRaw(cellX(site, fine[k]!), cellZ(site, fine[k]!));
+    }
+    return 'found';
+  }
+
+  /** Every walkable map cell's way to the nearest walkable cell just inside the site's edge. */
+  private rimField(): GridSearch {
+    if (this.rim) return this.rim;
+    const field = new GridSearch(this.world.grid.map);
+    const map = field.layer;
+    const site = this.site.layer;
+    const inside = (x: number, z: number): boolean => cellIndex(site, x, z) >= 0;
+    const sources: number[] = [];
+    for (let c = 0; c < map.nx * map.nz; c++) {
+      if ((map.flags[c]! & Cell.Walkable) === 0) continue;
+      const x = cellX(map, c);
+      const z = cellZ(map, c);
+      if (inside(x, z) && !(inside(x + map.cell, z) && inside(x - map.cell, z) && inside(x, z + map.cell) && inside(x, z - map.cell))) sources.push(c);
+    }
+    field.flood(sources, { maxExpansions: map.nx * map.nz });
+    this.rim = field;
+    return field;
+  }
+
+  /** Every walkable site cell's way to the nearest walkable cell on the site's edge: out of a building, and through the camp's gate. */
+  private exitField(): GridSearch {
+    if (this.exit) return this.exit;
+    const field = new GridSearch(this.world.grid.site);
+    const L = field.layer;
+    const sources: number[] = [];
+    for (let j = 0; j < L.nz; j++) {
+      for (let i = 0; i < L.nx; i++) {
+        if ((i === 0 || j === 0 || i === L.nx - 1 || j === L.nz - 1) && (L.flags[j * L.nx + i]! & Cell.Walkable) !== 0) sources.push(j * L.nx + i);
+      }
+    }
+    field.flood(sources, { maxExpansions: L.nx * L.nz });
+    this.exit = field;
+    return field;
   }
 
   /** Searches one layer between the nearest walkable cells to two points. */
@@ -285,12 +369,19 @@ export class Navigator {
     const map = world.grid.map;
     const r = G.bodyRadius;
     const ids = this.ids;
-    world.colliders.query(Math.min(ax, bx) - r, Math.min(az, bz) - r, Math.max(ax, bx) + r, Math.max(az, bz) + r, ids);
     const step = this.tuning.brain.nav.sampleStep;
     const n = Math.max(1, Math.ceil(len / step));
+    // Colliders are looked up a stretch at a time: the whole of a long segment's box holds most of a forest.
+    const stretch = Math.max(1, Math.ceil(CLEAR_STRETCH / step));
     for (let s = 1; s <= n; s++) {
       const px = ax + (dx * s) / n;
       const pz = az + (dz * s) / n;
+      if ((s - 1) % stretch === 0) {
+        const e = Math.min(n, s + stretch - 1);
+        const qx = ax + (dx * e) / n;
+        const qz = az + (dz * e) / n;
+        world.colliders.query(Math.min(px, qx) - r, Math.min(pz, qz) - r, Math.max(px, qx) + r, Math.max(pz, qz) + r, ids);
+      }
       const fine = cellIndex(site, px, pz);
       const flags = fine >= 0 ? site.flags[fine]! : map.flags[cellIndex(map, px, pz)] ?? 0;
       if ((flags & Cell.Walkable) === 0) return false;
@@ -303,6 +394,9 @@ export class Navigator {
     return true;
   }
 }
+
+/** Metres of a segment checked against one lookup of the colliders. */
+const CLEAR_STRETCH = 8;
 
 function cellX(L: GridLayer, c: number): number {
   return L.x0 + ((c % L.nx) + 0.5) * L.cell;
