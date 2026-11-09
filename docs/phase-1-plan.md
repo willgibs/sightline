@@ -275,6 +275,8 @@ The design is `docs/camp-engine.md`, section 8. Scored with a shooter limited to
 
 ## The owner's time
 
+The [Sightline Desk](https://claude.ai/artifact/RB4pjU2qNsYE3zCuBYYb7f), which only the owner's account can open, is the working list of what's waiting on the owner; this section is its public record.
+
 - **Each lab ends** with:
   - a playable link on the deployment (`?scene=<name>`, or `?explore`);
   - a short note of what to try;

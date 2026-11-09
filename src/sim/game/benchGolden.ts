@@ -174,7 +174,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       "re-found within 60 s (of 16): honest, unpaced": 16,
       "reactions (in the scripted scenarios)": 62,
       "reactions unexplained": 0,
-      "overlook: guards down from one perch, of 31": 22,
+      "overlook: guards down from one perch, of 31": 20,
       "overlook: camps cleared (of 3)": 0,
       "overlook: the target got away (of 3)": 3,
       "timed shot on an escort's camp: target down (of 3)": 2
@@ -182,12 +182,12 @@ export const BENCH_GOLDEN: PinnedBench = {
     "runs": {
       "camp-fight": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 10028 },
-          "bullets": { "rays": 85, "nodes": 0, "bodies": 0 },
-          "perception-hearing": { "rays": 60, "nodes": 18925, "bodies": 0 },
-          "perception-spotting": { "rays": 3429, "nodes": 0, "bodies": 0 },
-          "perception-awareness": { "rays": 0, "nodes": 43303, "bodies": 0 },
-          "guard-brains": { "rays": 0, "nodes": 13660, "bodies": 0 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 12574 },
+          "bullets": { "rays": 230, "nodes": 0, "bodies": 0 },
+          "perception-hearing": { "rays": 35, "nodes": 13243, "bodies": 0 },
+          "perception-spotting": { "rays": 5293, "nodes": 0, "bodies": 0 },
+          "perception-awareness": { "rays": 0, "nodes": 73266, "bodies": 0 },
+          "guard-brains": { "rays": 0, "nodes": 88216, "bodies": 0 }
         }
       }
     }

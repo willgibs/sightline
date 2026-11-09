@@ -62,6 +62,8 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 
 ## Checking work
 
+**Test what's settled, measure what's still moving** (the owner, Nov 9): free iteration where the ideas are still changing, thorough tests as things solidify, so problems don't compound or snowball. Foundations (the kernel, the motor, determinism, the lanes' contracts) get full tests and pins. Behaviour still being found (a camp's reactions, tuning, a sandbox) gets invariants and experiments, and its exact outcomes are pinned once a person has played the step and it has settled.
+
 - `npm run check`: typecheck plus all tests. Must pass before you hand anything back.
 - `npm run test:browser`: tests that need a real browser (Web Audio, WebGL, each browser's JavaScript engine), run in Chromium through Playwright. On a new machine, install the browser once with `npx playwright install chromium`. CI also runs them in Firefox and WebKit (`BROWSERS=chromium,firefox,webkit`), and the self-test under Bun, on every push. After changing a footstep voice, recalibrate: `VITE_CALIBRATE=1 npm run test:browser -- calibrate`.
 - `npm run sim -- --minutes 10`: bot run, recording and bit-exact re-simulation, with timing. Add `--profile` for the time each system takes.
