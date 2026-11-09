@@ -203,7 +203,7 @@ Every plan on this ladder should be possible, and the outcomes should fall in th
 | Force and flank | Draws the QRF out, then goes in where they left | Wins often |
 | Patient planner | Recon, then all of the above in the right order, then out by a route chosen first | Wins most, cleanly |
 
-Today's camp, with person-limited shooters (`npm run experiment -- ladder`, 16 camps × 3 rolls of the dice, the mission's rule): shoot once and leave wins 39 of 48, shoot and relocate 22, careless 7, and the perfect static shooter none, because he can't get out. That isn't yet the order the table wants. `docs/decisions.md`, *The lab bench finished*, has the rest.
+Today's camp, with the first fight in it and person-limited shooters (`npm run experiment -- ladder`, 16 camps × 3 rolls of the dice, the mission's rule): shoot once and leave wins 27 of 48 (10 shot dead on the way), shoot and relocate 13, careless 7, and the perfect static shooter none, because he can't get out. That isn't yet the order the table wants. `docs/decisions.md`, *The lab bench finished*, has the rest.
 
 Plays we want to exist, and to be able to measure:
 - Shoot the crew before they get rounds off.
@@ -227,6 +227,10 @@ Plays we want to exist, and to be able to measure:
 The owner's idea: test engines, and combinations of engines, in small environments that play almost like mini-games. They're development instruments, for our near-term purposes of testing, proving and hardening the foundation. They aren't features: no scoreboards, no polish, nothing that has to last. Each can be retired when it has done its job. Developer tooling and lab architecture get built as freely as this needs.
 
 The architecture is unusually good for this. A run is deterministic, every entity has its own random stream, and a run can be saved, restored and forked. Turn one engine off and everything that changes is that engine's doing.
+
+### The compound simulator comes first
+
+The owner's framing, Nov 8: the camp in its core form has no player in it. `?scene=compound` is a live camp, a fly camera, and keys that drop a noise, a body, a shot from where you are, a guard dropping, or equipment going dead, wherever you're pointing. A person can watch the whole defence answer, in real time, from any angle. Attack scripts (`src/sim/game/attacks.ts`) do the same headless. Flaw detectors (`src/lab/flaws.ts`) watch each run and flag what a defender plainly wouldn't do: standing in the shooter's line, a tower that doesn't answer, men stuck or piled up, a camp that never comes back out. `npm run flaws -- <seed> <attack>` lists each moment with the address to watch it. The number to drive to zero is `npm run experiment -- flaws`. See `docs/pillars.md`.
 
 ### What a sandbox is
 
@@ -328,8 +332,8 @@ These are scored with the person-limited shooter, not the perfect one, and every
 
 | Step | Builds | What you play | Size |
 | --- | --- | --- | --- |
-| **0 · The bench** | Done: experiments, switches, gauges, the panel, the way out, forking a run, re-rolling the dice on one camp, a shooter limited to what a person can do, a fight pinned on the bench. Still to come: a cap on route-finding per tick | Today's camp with the panel on: the "before" | Medium |
-| **1 · The first fight** | A signal you can hear, men who leave the line and come back, tower men who fire back, near misses that knock you off your rest, the flash | Fifteen minutes, three questions: what did the camp do, why did you move, what would you do next? | Medium |
+| **0 · The bench** | Done: experiments, switches, gauges, the panel, the way out, forking a run, re-rolling the dice on one camp, a shooter limited to what a person can do, a fight pinned on the bench | Today's camp with the panel on: the "before" | Medium |
+| **1 · The first fight** | Built: a whistle you can hear, men who leave the line and come back, tower men who fire back, near misses that knock you off your rest, a muzzle flash anyone looking can see. The compound simulator and its flaw detectors. So far: a perfect shooter's kills fall from 8.7 to 7.0 of 9.6, and the share of guards in his line 20 s after a shot from 61% to 41% | The compound simulator first, then a real perch. Fifteen minutes, three questions: what did the camp do, why did you move, what would you do next? | Medium |
 | **2 · The camp hunts** | Stance for guards, Picture and Command, sections that sweep, routes that reach the ridges, cut-offs on the road, the fallbacks | Getting out, with someone coming | Large |
 | **3 · The camp has means** | The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels | Break the Chain, The Duel | Large |
 | **4 · If play asks for it** | Mortar, smoke, hardening, Memory, decoys, Second Front, Be the Camp, the tournament | | Large |
@@ -353,6 +357,7 @@ Step 4 waits for evidence. The owner named artillery, so the mortar stays on the
 | 7 | When you're shot at, what happens to you? | A near miss knocks the rifle off its rest and raises your heart rate. No screen effects |
 | 9 | Tower men can't leave their towers. Do they stay and fight from behind a parapet? | Yes |
 | 10 | Should a camp that expects attack keep its target out of the open, so the ridge shot isn't there for free? | Yes, by preparedness level |
+| 11 | Should each seed be generated from a decisive problem, replacing today's guarantee that a perch can see the target? Research says the sameness across seeds is structural (`docs/research/notes/foundations/world_variety.md`). It reopens part of the Nov 8 call, which chose the camp's reactions over the generator | Measure first (an agent is on it), then decide |
 | 8 | Hidden traits, such as the odd fanatic who doesn't break, stop players solving morale but cut against "predict the camp" | None to begin with: training is visible |
 
 ## 11. Beyond the camp

@@ -22,6 +22,7 @@ The foundation pass that followed is done.
 
   The plan's rules for landing on `main` apply to every branch.
 - Keep the plan's checkboxes current as work lands, as the foundation plan was kept.
+- **The three pillars** (`docs/pillars.md`): world, camp, player. The camp in its core form has no player: `?scene=compound` drops shots, sounds and bodies on it, and a player is one way of providing those inputs. Keep perception and the camp's knowledge generic over what produces a stimulus.
 - **Lab F, the camp fights back** (the owner's call, Nov 8), is the sixth lab, and *Labs pass* requires it. `docs/camp-engine.md` is its design: how a camp fights back, as engines, and sandboxes as development instruments for proving them. Every step has to be human-playable, not only good on paper. `docs/lab-opportunities.md` lists where each lab tests less than the best idea on hand.
 
 **Phase 1:** six labs, each an isolated wireframe scene built to its exit test.
@@ -71,6 +72,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 - `npm run explain` (or `-- --base <ref>`): for every pinned run that moved since `origin/main`, the first divergent tick, the state paths that differ there, and each lane's work and metrics before and after. CI prints it for every pull request and push. `npm run trace -- --run <name>` is the per-tick trace it compares.
 - `npm run playtest`: every session in `playtests/` (the dev build saves each run there as it goes), re-simulated, checked and summarized with its telemetry. `-- <file|dir>` for others.
 - `npm run experiment` (or `-- <name>`, `--camps N`, `--jobs N`): the lab bench (`src/lab`): the same camps run several ways and compared seed by seed, with intervals. The numbers behind a decision should be one command away, so an experiment that informs a call goes here, not in a throwaway script.
+- `npm run flaws -- <seed> <attack>`: the compound simulator's flaw report for one camp: each moment the camp did something a defender plainly wouldn't, with the address to watch it. `npm run experiment -- flaws` runs every attack against many camps.
 - `npm run scene` (or `-- <name>`, `-- --list`): every scene in `src/sim/game/scenes` headless, by its own driver, checking its expectations and re-simulating its recording. `?scene=<name>` plays one in the browser. A regression test that needs more than one tick belongs in a scene.
 - `npm run sim -- --replay <file>`: re-simulate a recording saved in the browser; it says where a run diverged, or why it can't re-simulate in this build.
 - `npm run trials -- <seed>`: a sitting of trial mode (A12), trial by trial, with its key; `--shots` draws every freeze frame into `shots/trials/<seed>/` with what the simulation recorded there, for the agents' pre-screen. `npm run playtest` scores sittings from their recordings or saved files.

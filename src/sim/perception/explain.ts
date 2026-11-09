@@ -43,6 +43,7 @@ export function describe(e: SimEvent): string {
     case 'spotted':
       if (e.what === 'outage') return `saw equipment stopped, ${m(e.distance)} m away`;
       if (e.what === 'door') return `saw a door not as it was left, ${m(e.distance)} m away`;
+      if (e.what === 'muzzle') return `saw a muzzle flash, ${m(e.distance)} m away`;
       return e.what === 'body' ? `saw a body, ${m(e.distance)} m away` : `saw a flash from a lens, ${m(e.distance)} m away`;
     case 'alert':
       return `${e.from} → ${e.to}: ${e.reason}`;
@@ -84,6 +85,10 @@ export function describe(e: SimEvent): string {
       return `alarm box ${e.box}: ${e.stage}`;
     case 'sabotage':
       return `the ${e.what} was sabotaged`;
+    case 'whistle':
+      return `the camp's whistle, heard to ${m(e.radius)} m`;
+    case 'passed':
+      return `a round passed ${m(e.distance)} m from your head`;
     case 'objective':
       return 'the target is down: now get out';
     case 'door':

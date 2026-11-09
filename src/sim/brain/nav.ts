@@ -257,6 +257,11 @@ export class Navigator {
   }
 
   /** True if something solid breaks the line from (ax, az) to (bx, bz) at height `h` above the ground, at both ends. */
+  /** True if nothing that stops sight lies between two points in the world. */
+  seesPoint(ax: number, ay: number, az: number, bx: number, by: number, bz: number): boolean {
+    return sightLine(this.view, ax, ay, az, bx, by, bz, Blocks.Sight);
+  }
+
   blockedFrom(ax: number, az: number, bx: number, bz: number, h: number): boolean {
     const w = this.world;
     const ay = w.terrain.heightAt(ax, az) + h;

@@ -55,7 +55,7 @@ export function liveCamp(params?: string): Scene {
   const p = parseLiveCamp(params);
   return switchedOff({
     name: 'live-camp',
-    version: 2,
+    version: 3,
     params: formatLiveCamp(p),
     title: `A live camp (${p.seed})`,
     description: `A generated camp with the whole camp brain awake: guards who see, hear, talk and search, a commander, radio check-ins, alarm boxes that can be cut off at the generator, and a target who runs for his vehicle at lockdown. You have the rifle.`,
@@ -66,6 +66,7 @@ export function liveCamp(params?: string): Scene {
       giveBrains(sim);
       giveCommander(sim);
       giveCampDevices(sim);
+      commanderOf(sim)!.camp.fights = true;
       // Here, as in the missions to come, the job isn't done until you're out: at the end of the road.
       const road = truckRoute(sim.world, sim.tuning);
       if (road) commanderOf(sim)!.camp.objective!.getOut = { x: road[0]!.x, z: road[0]!.z };

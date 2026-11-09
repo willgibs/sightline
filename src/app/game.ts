@@ -33,6 +33,9 @@ import { BrowserStore, DevInbox, PlaytestCapture, type StoredRun } from './playt
 import { LabPanel } from './labPanel';
 import { CampGauges } from '../lab/gauges';
 import { commanderOf } from '../sim/game/comms';
+import { stimulus, type StimulusName } from '../sim/game/drops';
+import type { Command } from '../sim/kernel/commands';
+import type { Driver } from '../sim/kernel/scene';
 import { Replay, REPLAY_SOUND_SPEED } from './replay';
 import { Timeline } from './timeline';
 import { frameSpan, type SoundTiming } from '../audio/engine';
@@ -171,6 +174,10 @@ export class Game {
   /** With &lab in a camp scene: what the camp is doing to you, and the switches (labPanel.ts). */
   private gauges: CampGauges | null = null;
   private labPanel: LabPanel | null = null;
+  /** The attack script a compound simulator is running, if any. */
+  private attack: Driver<Simulation> | null = null;
+  /** Stimuli waiting for the next tick (the compound simulator). */
+  private readonly drops: Command[] = [];
   private clock: FixedStepClock;
   private readonly stats = new FrameStats();
   private readonly raw = neutralInput();
@@ -599,9 +606,9 @@ export class Game {
     this.cues.clear();
     this.exitReplayMode();
     this.sim = this.scene ? startScene(this.scene, this.tuning, this.world) : new Simulation(this.world, this.tuning);
-    if (this.opts.lab && this.scene && commanderOf(this.sim)) {
+    if (this.scene && commanderOf(this.sim) && (this.opts.lab || this.scene.name === 'compound')) {
       this.gauges = new CampGauges(this.sim);
-      this.labPanel ??= new LabPanel(document.body, this.scene.params ?? '');
+      this.labPanel ??= new LabPanel(document.body, this.scene.params ?? '', this.scene.name === 'compound' ? (what) => this.dropAtCrosshair(what) : null);
     }
     const recorder = new Recorder(this.sim, BUILD);
     this.recorder = recorder;
@@ -626,6 +633,12 @@ export class Game {
     const drop = site.height + 1 - (p.y + p.eyeHeight);
     this.input.pitch = dist > 1 ? Math.max(-0.35, Math.min(0.1, Math.atan2(drop, dist))) : 0;
     if (this.detached) this.setDetached(false);
+    this.attack = null;
+    if (this.scene?.name === 'compound') {
+      this.hud.setCompound(true);
+      this.overTheCamp();
+      this.attack = this.scene.driver?.() ?? null;
+    }
   }
 
   /** Hot-reloaded tuning (dev only). */
@@ -978,6 +991,15 @@ export class Game {
   private tick(): void {
     const frozen = this.detached || this.bench !== null;
     this.input.sampleTick(this.raw, frozen, this.sim.tick);
+    if (this.attack) {
+      // An attack script plays alongside whatever you drop by hand.
+      const scripted = this.attack.next(this.sim, { ...this.raw });
+      this.drops.push(...(scripted.commands ?? []));
+    }
+    if (this.drops.length > 0) {
+      this.raw.commands = [...this.raw.commands, ...this.drops];
+      this.drops.length = 0;
+    }
     // In trial mode the trial moves the player; the mouse only looks.
     if (this.trial) {
       this.trial.input(this.sim, this.raw);
@@ -1358,6 +1380,33 @@ export class Game {
     return g ? `${this.world.camp.guards[g.guard.spawn]?.role ?? 'guard'} ${id}` : `entity ${id}`;
   }
 
+  /** The compound simulator opens with the camera already up above the camp, looking down on it. */
+  private overTheCamp(): void {
+    this.setDetached(true);
+    const s = this.world.camp.site;
+    this.fly.set(s.x, this.world.terrain.heightAt(s.x, s.z) + 70, s.z + 110);
+    this.input.yaw = 0;
+    this.input.pitch = -0.55;
+  }
+
+  /** The compound simulator: something happens where the fly camera is pointing, and a shot comes from the camera itself. */
+  private dropAtCrosshair(what: StimulusName): void {
+    if (!this.sim) return;
+    if (!this.detached) this.setDetached(true);
+    const yaw = this.input.yaw;
+    const pitch = this.input.pitch;
+    const dx = -Math.sin(yaw) * Math.cos(pitch);
+    const dy = Math.sin(pitch);
+    const dz = -Math.cos(yaw) * Math.cos(pitch);
+    const hit = raycast({ world: this.world, solids: this.sim.solids, bodies: this.sim.queryBodies() }, this.fly.x, this.fly.y, this.fly.z, dx, dy, dz, 2000, Blocks.All, emptyHit());
+    if (hit.what === 'none') {
+      this.hud.toast('Nothing there to drop it on');
+      return;
+    }
+    this.drops.push(stimulus(what, { x: hit.x, y: hit.y, z: hit.z }, { x: this.fly.x, y: this.fly.y, z: this.fly.z }));
+    this.hud.toast(`${what}, at ${hit.x.toFixed(0)}, ${hit.z.toFixed(0)}`);
+  }
+
   /** The heading of the way out, once the target is down and there's somewhere to go; null otherwise. */
   private wayOutHeading(): number | null {
     if (!this.sim) return null;
@@ -1625,6 +1674,12 @@ export class Game {
       if (!xs.every((x) => typeof x === 'number' && Number.isFinite(x))) throw new TypeError(`sightline.${what}() takes finite numbers, got ${xs.map(String).join(', ')}`);
     };
     return {
+      /** The compound simulator: drops a stimulus at a world point, from another (`what`: game/drops.ts). */
+      drop: (what: StimulusName, x: number, y: number, z: number, fromX = x, fromY = y, fromZ = z) => {
+        ready('drop');
+        finite('drop', x, y, z, fromX, fromY, fromZ);
+        this.drops.push(stimulus(what, { x, y, z }, { x: fromX, y: fromY, z: fromZ }));
+      },
       play: () => {
         ready('play');
         this.sound.unlock();

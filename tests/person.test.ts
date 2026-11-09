@@ -193,7 +193,7 @@ describe('the ladder', () => {
     // Nobody can shoot back, and the target has nowhere to run, so this is about the walk.
     const quiet = tuningCopy();
     for (const role of Object.keys(quiet.brain.combat.range) as Array<keyof typeof quiet.brain.combat.range>) quiet.brain.combat.range[role] = 0;
-    const sc = ladder('seed=HOF-3956&plan=leave&off=truck,alarm') as Scene<Simulation>;
+    const sc = ladder('seed=HOF-3956&plan=leave&off=truck,alarm,fight') as Scene<Simulation>;
     const sim = startScene(sc, quiet);
     const driver = sc.driver!();
     const raw = sc.game.still(sim);
