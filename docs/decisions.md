@@ -2,6 +2,39 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · The lab bench finished (F0): forks, dice, and a shooter with a person's limits
+
+**A fork is re-simulation plus one intervention** (`src/lab/fork.ts`, `npm run whatif`). A branch starts again from tick 0 with a fresh driver or the recorded inputs, plays to the fork, has one change made between two ticks (the player moved, a guard taken out, a part switched off from that tick on, a number patched), and goes on. It doesn't restore mid-run: bots keep memory outside the state, the recorder won't start at a later tick, and `restore` keeps the tuning and the work counts. A branch that changes nothing is the same run, bit for bit, and `tests/fork.test.ts` holds it to that. A branch isn't a recording: an instrument's change doesn't flow through the input (rule 5).
+
+**The dice are `tuning.sim.dice`, 0 by default.** Every entity's stream is forked once more by label, so 0 moves no fingerprint, no entity's numbers depend on another's, and generation, which reads only `tuning.gen`, can't move. `--dice N` runs each camp N times. Each camp still counts once, by its mean, because N rolls of 12 camps aren't 12 × N independent camps; the report also gives each number's split between the camp and luck. In the ladder, whether shoot-once-and-leave wins is two thirds luck (34% camp), while whether the target gets away is 57% to 100% the camp, by plan.
+
+**Decisions rest on a shooter limited to a person** (`game/bots/playerView.ts`, `game/bots/person.ts`, the `ladder` scene). `PlayerView` gives a bot only what a player could know: bodies in a clear line, at the distance they are, its own state, the map, and only with glass on a man whether he's the target. The shooter takes seconds to find a man, range him and hold, misses from its own stream, and can engage only who it sees; a test keeps its imports behind the view. Its numbers are starting values, to be set against real sittings. It's still generous: it starts on a good perch, knows the map and the way out, never panics and never mistakes who's who. "Perfect and static" is the old bot, the upper limit of what one perch could do.
+
+**What the ladder found on today's camp** (`npm run experiment -- ladder`, 16 camps × 3 rolls of the dice, the mission's own rule: the target down and you out):
+
+| Plan | Won | Target shot | Target got away | Shot dead | Time to win | Rounds at him |
+| --- | --- | --- | --- | --- | --- | --- |
+| Careless | 7 of 48 | 8 | 36 | 3 | 377 s | 15.4 |
+| Shoot once and leave | **39 of 48** | 41 | 5 | 2 | 435 s | 21.9 |
+| Perfect and static | 0 of 48 | 4 | 42 | 0 | never gets out | 0 |
+| Shoot and relocate | 22 of 48 | 22 | 23 | 0 | 379 s | 10.1 |
+
+Shoot once and leave is what wins: best on 8 of the 16 camps and tied on 5, as the design predicted and doesn't want. It really walks out, a median 435 s from the start of the run. Of the 9 it loses, 5 are the target getting away and 2 the shooter shot dead; a guard detected him in 15 of 48. Careless shot the target in 8 runs and got out of 7 of them.
+
+**What moving buys, by fork** (`-- relocate`, `-- relocate-quiet`, 16 camps × 3 rolls, the perfect shooter on the best overview, forked 2 s after his first shot):
+
+| | Rounds at him | Detected | Nearest guard | Estimate off at the end |
+| --- | --- | --- | --- | --- |
+| Stays and keeps firing | 0 | 0 of 48 | 278 m | 60 m |
+| Moved 30 m, instantly | 0 | 0 of 45 | 277 m | 72 m |
+| Moved 100 m, instantly | 0 | 0 of 48 | 260 m | 113 m |
+| Walks 30 m | 0 | 0 of 48 | 277 m | 71 m |
+| Walks 100 m | 0 | 0 of 48 | 255 m | 94 m |
+
+Against a shooter who fires once and holds fire (`relocate-quiet`), with the whole camp left alive, the same: 0 rounds, 0 detections and 251 to 264 m in every arm; the estimate is 69 m off for him staying, 76 m for 30 m, 125 m for 100 m. Today's camp puts nothing on a perch at all, so a move buys nothing there is to buy. The estimate worsens by less than the distance moved (7 to 12 m for 30 m, 34 to 56 m for 100 m), and nobody acts on it. This is the number F1 and F2 have to change.
+
+**What moved:** no fingerprint, no behaviour. The brain lane's bench gains its first pinned run, `camp-fight` (the first 45 s of a shooter on an overlook, 2 s in the self-test), and with it `BEHAVIOUR`, which is a digest of every pinned run: recordings made before this are refused with the reason, as they are for the new tuning key too. The golden recording is rewritten for both. The full ladder runs weekly in CI (`ladder`); a pull request plays only the `ladder` scene's canary.
+
 ## 2026-11-08 · Lab F: the owner's calls, and what review changed
 
 **The owner's calls:** a sixth lab, required by *Labs pass*; firing gives you away a little; a mission ends when you get out. Sandboxes are near-term development instruments, not shipped games, and every step has to be human-playable.

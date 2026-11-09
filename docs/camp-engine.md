@@ -203,6 +203,8 @@ Every plan on this ladder should be possible, and the outcomes should fall in th
 | Force and flank | Draws the QRF out, then goes in where they left | Wins often |
 | Patient planner | Recon, then all of the above in the right order, then out by a route chosen first | Wins most, cleanly |
 
+Today's camp, with person-limited shooters (`npm run experiment -- ladder`, 16 camps × 3 rolls of the dice, the mission's rule): shoot once and leave wins 39 of 48, shoot and relocate 22, careless 7, and the perfect static shooter none, because he can't get out. That isn't yet the order the table wants. `docs/decisions.md`, *The lab bench finished*, has the rest.
+
 Plays we want to exist, and to be able to measure:
 - Shoot the crew before they get rounds off.
 - Use their own mortar to mask your movement.
@@ -326,7 +328,7 @@ These are scored with the person-limited shooter, not the perfect one, and every
 
 | Step | Builds | What you play | Size |
 | --- | --- | --- | --- |
-| **0 · The bench** | Done: experiments, switches, gauges, the panel, the way out. Still to come: forking a run, re-rolling the dice on one camp, a shooter limited to what a person can do, a cap on route-finding per tick, a fight pinned on the bench | Today's camp with the panel on: the "before" | Medium |
+| **0 · The bench** | Done: experiments, switches, gauges, the panel, the way out, forking a run, re-rolling the dice on one camp, a shooter limited to what a person can do, a fight pinned on the bench. Still to come: a cap on route-finding per tick | Today's camp with the panel on: the "before" | Medium |
 | **1 · The first fight** | A signal you can hear, men who leave the line and come back, tower men who fire back, near misses that knock you off your rest, the flash | Fifteen minutes, three questions: what did the camp do, why did you move, what would you do next? | Medium |
 | **2 · The camp hunts** | Stance for guards, Picture and Command, sections that sweep, routes that reach the ridges, cut-offs on the road, the fallbacks | Getting out, with someone coming | Large |
 | **3 · The camp has means** | The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels | Break the Chain, The Duel | Large |

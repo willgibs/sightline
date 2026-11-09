@@ -999,10 +999,11 @@ Added on Nov 8, the owner's call. *Labs pass* requires it. Design and reasoning:
   - [x] Gauges, and the lab panel (`&lab`).
   - [x] A mission ends when you get out (the owner's call): on the live camp, at the end of the road, marked on the compass once the target is down.
   - [x] Trial briefs name only the action (see the exit tests).
-  - [ ] Fork a run: re-simulation plus one intervention.
-  - [ ] Re-roll the dice on one camp: a salt in the tuning.
-  - [ ] A shooter limited to what a person can do, through a view of what a player could see; "shoot once and leave" on the ladder.
-  - [ ] A cap on route-finding per tick (the worst tick today is 56 ms), and a camp fight pinned on the bench.
+  - [x] Fork a run: re-simulation plus one intervention (`src/lab/fork.ts`, `npm run whatif`). `npm run experiment -- relocate` and `-- relocate-quiet` use it for what moving buys.
+  - [x] Re-roll the dice on one camp: `tuning.sim.dice`, and `--dice N` on every experiment, which says how much of each number is the camp and how much is luck.
+  - [x] A shooter limited to what a person can do, through a view of what a player could see (`game/bots/playerView.ts`, `game/bots/person.ts`), and the ladder of plans (`npm run experiment -- ladder`, the `ladder` scene), which really walks out.
+  - [x] A camp fight pinned on the bench (`camp-fight`, the brain lane's first pinned run), kept short for CI. The full ladder runs weekly.
+  - [ ] A cap on route-finding per tick (the worst tick today is 56 ms).
 - [ ] F1 · The first fight. A signal you can hear at range, men who leave the line and come back, tower men who fire back, near misses that knock you off your rest, the flash. Fifteen minutes in the owner's hands: what did the camp do, why did you move, what would you do next?
 - [ ] F2 · The camp hunts. Stance for guards, Picture and Command, sections that sweep, routes that reach the ridges, cut-offs on the road, fallbacks.
 - [ ] F3 · The camp has means. The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels.
