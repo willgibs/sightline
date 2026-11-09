@@ -114,7 +114,7 @@ describe('a sitting', () => {
   });
 
   it('says in its brief what the player will do and who watches', () => {
-    for (const t of trials) expect(t.brief).toMatch(/^You .* \d+ m from (a sentry|a marksman with binoculars)\. Will he see you within 8 seconds\?$/);
+    for (const t of trials) expect(t.brief).toMatch(/^You [^.]*\. The guard is (a sentry|a marksman with binoculars)\. Will he see you within 8 seconds\?$/);
   });
 });
 

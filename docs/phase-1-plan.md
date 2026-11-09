@@ -176,6 +176,7 @@ The statistics behind these protocols are in `docs/research/foundations.md`. A p
 
 - **Trial mode** in the perception lab draws trials from a seeded space of situations: the guard's role and gaze, distance, stance, movement, light, cover and skyline.
   - Each trial states what the player will do (for example, crouch-walk to the crate) and runs about 8 s.
+    - A trial's brief names only the action, and the guard's job (Nov 8). The light, the cover, the sky behind you, the ground and the distance have to be read from the scene: stating them would test the sight table, not the honest view.
   - The question is yes or no: will the guard see you before the trial ends?
 - **There are two kinds of freeze.**
   - Some trials freeze at the start, before any cue, and are judged from the situation.
