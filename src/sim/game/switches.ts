@@ -1,3 +1,4 @@
+import { cancelScheduled } from '../kernel/schedule';
 import type { Scene } from '../kernel/scene';
 import { commanderOf } from './comms';
 import type { Simulation } from './sim';
@@ -27,34 +28,56 @@ export function parseSwitches(text: string): CampSwitch[] {
   return CAMP_SWITCHES.filter((s) => asked.includes(s));
 }
 
-/** A scene with these parts of its camp switched off. */
-export function switchedOff(scene: Scene<Simulation>, off: readonly CampSwitch[]): Scene<Simulation> {
+/**
+ * A scene with these parts of its camp switched off, from the start or, for a fork of a
+ * run (src/lab/fork.ts), once tick `from` has run: nothing before it changes, and the fork
+ * calls `takeAway` at that moment.
+ */
+export function switchedOff(scene: Scene<Simulation>, off: readonly CampSwitch[], from = 0): Scene<Simulation> {
   if (off.length === 0) return scene;
   const setup = scene.setup;
   const has = (s: CampSwitch): boolean => off.includes(s);
   return {
     ...scene,
-    systems: (scene.systems ?? []).map((s) => ((has('commander') && s.name === 'camp-commander') || (has('radio') && s.name === 'camp-checkins') ? { ...s, run() {} } : s)),
+    systems: (scene.systems ?? []).map((s) =>
+      (has('commander') && s.name === 'camp-commander') || (has('radio') && s.name === 'camp-checkins')
+        ? {
+            ...s,
+            run(ctx, dt) {
+              if (ctx.tick <= from) s.run(ctx, dt);
+            },
+          }
+        : s,
+    ),
     setup: (sim) => {
       setup?.(sim);
-      const camp = commanderOf(sim)!.camp;
-      // No set, no net, no check-ins. The commander's the one who calls reinforcements, so `commander` takes them too.
-      if (has('radio')) {
-        for (const r of [...sim.index.of('radio')]) sim.despawn(r.id);
-        camp.netWorking = false;
-      }
-      if (has('alarm')) {
-        for (const a of [...sim.index.of('alarm')]) sim.despawn(a.id);
-        camp.devices.alarms.length = 0;
-      }
-      // Nothing to run for: the vehicle stays parked, and the target stays where he is.
-      if (has('truck')) camp.devices.escape = null;
-      // The first fight (Lab F): a camp that only does what lab E built.
-      if (has('fight')) delete camp.fights;
-      // Already called, as far as the commander knows: it never calls them again.
-      if (has('reinforce')) camp.reinforceCalled = 0;
-      // Not an absence: the generator is cut before the run starts, as sabotage would, and whoever passes it notices.
-      if (has('power')) for (const g of sim.index.of('generator')) g.generator.running = false;
+      if (from === 0) takeAway(sim, off);
     },
   };
+}
+
+/** Makes these parts of a camp absent, between ticks: at the start of a run, or partway through one in a fork. */
+export function takeAway(sim: Simulation, off: readonly CampSwitch[]): void {
+  const has = (s: CampSwitch): boolean => off.includes(s);
+  const camp = commanderOf(sim)!.camp;
+  // No set, no net, no check-ins. The commander's the one who calls reinforcements, so `commander` takes them too.
+  if (has('radio')) {
+    for (const r of [...sim.index.of('radio')]) sim.despawn(r.id);
+    camp.netWorking = false;
+  }
+  if (has('alarm')) {
+    for (const a of [...sim.index.of('alarm')]) sim.despawn(a.id);
+    camp.devices.alarms.length = 0;
+  }
+  // Nothing to run for: the vehicle stays parked, and the target stays where he is.
+  if (has('truck')) camp.devices.escape = null;
+  // The first fight (Lab F): a camp that only does what lab E built.
+  if (has('fight')) delete camp.fights;
+  // Already called, as far as the commander knows: it never calls them again, and any on their way don't come.
+  if (has('reinforce')) {
+    camp.reinforceCalled = 0;
+    cancelScheduled(sim.state.schedule, 'reinforce-arrive');
+  }
+  // Not an absence: the generator is cut before the run starts, as sabotage would, and whoever passes it notices.
+  if (has('power')) for (const g of sim.index.of('generator')) g.generator.running = false;
 }

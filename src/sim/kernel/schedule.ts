@@ -51,6 +51,22 @@ export function scheduleAt(s: ScheduleState, now: number, tick: number, kind: st
   q[i] = e;
 }
 
+/**
+ * Takes every entry of `kind` off the queue, keeping the order of the rest: for a tool that
+ * takes a part of a run away partway through (src/lab/fork.ts), so what it had already set
+ * going doesn't arrive anyway. Returns how many were taken.
+ */
+export function cancelScheduled(s: ScheduleState, kind: string): number {
+  const q = s.queue;
+  const kept = q.filter((e) => e.kind !== kind);
+  const taken = q.length - kept.length;
+  if (taken === 0) return 0;
+  q.length = 0;
+  // Laid out in due order, a binary heap needs no sifting. `seq` breaks the ties and is unchanged.
+  for (const e of kept.sort((a, b) => a.tick - b.tick || a.seq - b.seq)) q.push(e);
+  return taken;
+}
+
 /** Ticks from now until `seconds` have passed: at least one, so a delay always lands in a later tick. */
 export function ticksAfter(seconds: number, dt: number): number {
   return Math.max(1, Math.round(seconds / dt));

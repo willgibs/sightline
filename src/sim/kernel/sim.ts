@@ -137,7 +137,7 @@ export class Simulation {
       },
       draw: <T>(id: EntityId, purpose: string, use: (rng: Rng) => T): T => {
         const key = `${id}.${purpose}`;
-        const words = ctx.state.rng[key] ?? new Rng(world.seed, `entity${id}`).fork(purpose).stateWords();
+        const words = ctx.state.rng[key] ?? this.firstWords(id, purpose);
         this.draws.setStateWords(words);
         const out = use(this.draws);
         ctx.state.rng[key] = this.draws.stateWords();
@@ -170,6 +170,18 @@ export class Simulation {
   /** The tuning this simulation runs on: a frozen copy. Change it with setTuning. */
   get tuning(): Tuning {
     return this.current;
+  }
+
+  /**
+   * Where an entity's stream for a purpose starts: forked by label from the world's seed,
+   * so it depends on nothing else's draws (rule 3). The tuning's dice fork every entity
+   * once more, which gives the same camp other luck; dice 0 is the plain fork, so it moves
+   * no fingerprint. A run reads them only as each stream first appears.
+   */
+  private firstWords(id: EntityId, purpose: string): [number, number, number, number] {
+    const entity = new Rng(this.world.seed, `entity${id}`);
+    const dice = this.current.sim.dice;
+    return (dice === 0 ? entity : entity.fork(`dice${dice}`)).fork(purpose).stateWords();
   }
 
   /** Inside a tick, only a system that declares it writes `entities` may spawn or despawn. */
