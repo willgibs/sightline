@@ -207,6 +207,12 @@ export class GameRenderer {
     return { x: ((v.x + 1) / 2) * width, y: ((1 - v.y) / 2) * height };
   }
 
+  /** The direction from the camera through a point on the screen, in CSS pixels. */
+  rayThrough(x: number, y: number, width: number, height: number): { x: number; y: number; z: number } {
+    const v = this.projected.set((x / width) * 2 - 1, 1 - (y / height) * 2, 0.5).unproject(this.camera).sub(this.camera.position).normalize();
+    return { x: v.x, y: v.y, z: v.z };
+  }
+
   render(prev: Snapshot, curr: Snapshot, alpha: number, time: number, pose: CameraPose, aim: THREE.Vector3 | null): void {
     const cam = this.camera;
     cam.position.set(pose.x, pose.y, pose.z);

@@ -607,5 +607,6 @@ function drawSight(draw: DebugDraw, ctx: TickContext, g: GuardEntity, x: Exposur
   const text =
     `${Math.round(m * 100)}% · ${where} · ${x.light ? lightName(x.light, T) : 'light not taken'} · ${(x.cover * 100).toFixed(0)}% in view` +
     `${x.skyline > 1 ? ` · sky ×${x.skyline.toFixed(2)}` : ''} · ${x.rate > 0 ? `${(1 / x.rate).toFixed(1)} s to fill${x.capped ? ' (capped)' : ''}` : 'not filling'}`;
-  draw.label(b.x, b.y + b.eyeHeight + 0.6, b.z, text, m >= 1 ? 'bad' : m >= S.cue ? 'warn' : 'muted');
+  // Short over the world, unless it's filling or you're looking right at him.
+  draw.label(b.x, b.y + b.eyeHeight + 0.6, b.z, m > 0 ? `${Math.round(m * 100)}%` : '', m >= 1 ? 'bad' : m >= S.cue ? 'warn' : 'muted', text);
 }
