@@ -1,11 +1,13 @@
 name: CI
 
-# Every push and pull request runs the full check on Linux, macOS and Windows, and the
-# final simulation hashes from all three must match: a recording made anywhere has to
-# replay identically everywhere. (The repository is public, so these minutes are free.)
-# Once a week, and on demand, bots also play fresh valleys for hours, checking the
-# motor's promises every tick, and the synctest saves, restores and re-steps for hours
-# more. (engines.yml runs the browsers' and Bun's engines on every push.)
+# Test what's settled, and don't make a pull request wait for what it can't break (the
+# owner, Nov 9). A pull request runs the whole suite on Linux, in thirds side by side, and
+# on macOS and Windows the self-test and a recorded bot run, whose final hashes must match
+# Linux's: a recording made anywhere has to replay identically everywhere. A push to main
+# and the weekly run add the whole suite on macOS and Windows. Once a week, and on demand,
+# bots also play fresh valleys for hours, checking the motor's promises every tick, and the
+# synctest saves, restores and re-steps for hours more. (engines.yml runs the browsers'
+# and Bun's engines on every push.) The repository is public, so these minutes are free.
 on:
   push:
     branches: [main]
@@ -19,8 +21,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Check (Linux)
+  tests:
+    name: Tests (${{ matrix.shard }} of 3)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -30,7 +36,21 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run check
+      - if: matrix.shard == 1
+        run: npm run typecheck
+      - run: npx vitest run --shard=${{ matrix.shard }}/3
+
+  build:
+    name: Build, and a recorded bot run (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
       - run: npm run build
       - name: 20-minute bot run, recorded and re-simulated
         shell: bash
@@ -99,7 +119,11 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run check
+      - name: The whole suite, on main and in the weekly run
+        if: github.event_name != 'pull_request'
+        run: npm run check
+      - name: Self-test, in this platform's engine
+        run: npm run selftest
       - name: 20-minute bot run, recorded and re-simulated
         shell: bash
         run: npm run sim -- --minutes 20 | tee sim.log && grep '^hash' sim.log | awk '{print $2}' > hash-${{ matrix.os }}.txt
@@ -171,7 +195,7 @@ jobs:
 
   same-everywhere:
     name: Same hash on every platform
-    needs: [check, platforms]
+    needs: [build, platforms]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -182,3 +206,19 @@ jobs:
         run: |
           cat hash-*.txt
           test "$(cat hash-*.txt | sort -u | wc -l)" -eq 1
+
+  # One name for a branch rule to require, whichever jobs ran.
+  all:
+    name: All checks
+    if: always()
+    needs: [tests, build, up-to-date, explain, platforms, same-everywhere]
+    runs-on: ubuntu-latest
+    steps:
+      - shell: bash
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) exit 1 ;; esac
+          done
