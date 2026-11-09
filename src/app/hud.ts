@@ -89,6 +89,11 @@ export class Hud {
     this.root.classList.toggle('is-debug', on);
   }
 
+  /** The compound simulator wants the camp in view: its readings are in the lab panel, so the long debug text goes. */
+  setCompound(on: boolean): void {
+    this.root.classList.toggle('is-compound', on);
+  }
+
   setVisible(on: boolean): void {
     this.root.classList.toggle('is-hidden', !on);
   }

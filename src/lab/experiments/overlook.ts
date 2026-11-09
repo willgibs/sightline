@@ -1,4 +1,5 @@
 import { commanderOf } from '../../sim/game/comms';
+import { player } from '../../sim/game/entities';
 import { overlook } from '../../sim/game/scenes/overlook';
 import type { Simulation } from '../../sim/game/sim';
 import { sceneOver, sceneTicks, startScene, type Scene } from '../../sim/kernel/scene';
@@ -23,10 +24,12 @@ export const friction: Experiment = {
   about: 'what pressure a camp puts on a perfect shooter who stays on one perch',
   series: SERIES,
   camps: 30,
-  arms: [{ name: 'as built' }],
+  arms: [{ name: 'fights back' }, { name: 'as lab E left it', off: 'fight' }],
   measures: [
     { key: 'down', label: 'guards down', kind: 'mean' },
     { key: 'incoming', label: 'rounds at him', kind: 'mean' },
+    { key: 'near', label: 'near misses', kind: 'mean' },
+    { key: 'hurt', label: 'hit', kind: 'rate' },
     { key: 'found', label: 'detected', kind: 'rate' },
     { key: 'nearest', label: 'nearest guard (m)', kind: 'median' },
     { key: 'error', label: 'estimate off at 30 s (m)', kind: 'median' },
@@ -52,6 +55,8 @@ export const friction: Experiment = {
     return {
       down: r.guardsDown,
       incoming: r.roundsAtYou,
+      near: r.nearMisses,
+      hurt: player(sim.index).health!.hits > 0 ? 1 : 0,
       found: r.detected ? 1 : 0,
       nearest: r.nearestEver,
       error,
@@ -112,7 +117,7 @@ export const gallery: Experiment = {
   about: 'share of standing guards still in a clear line from the perch, after one kill',
   series: SERIES,
   camps: 30,
-  arms: [{ name: 'as built' }],
+  arms: [{ name: 'fights back' }, { name: 'as lab E left it', off: 'fight' }],
   measures: MARKS.map((t) => ({ key: `at${t}`, label: `share at +${t} s`, kind: 'mean' as const })),
   run(seed, arm, tuning) {
     const sc = scene(seed, arm);

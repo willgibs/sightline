@@ -1,0 +1,182 @@
+import { beforeAll, describe, expect, it } from 'vitest';
+import { defaultTuning as T } from '../src/config/tuning';
+import { attackRun } from '../src/lab/experiments/flaws';
+import { compound } from '../src/sim/game/scenes/compound';
+import { bestOverview } from '../src/sim/game/scenes/overlook';
+import { compoundDrops, STIMULI, stimulus } from '../src/sim/game/drops';
+import { giveBrains } from '../src/sim/game/brains';
+import { guardFire } from '../src/sim/game/combat';
+import { campCommander, commanderOf, commsVoice, giveCommander } from '../src/sim/game/comms';
+import { giveSenses } from '../src/sim/game/perception';
+import { Simulation } from '../src/sim/game/sim';
+import { SYSTEMS } from '../src/sim/game/systems';
+import { withSystem, type System } from '../src/sim/kernel/systems';
+import { testGuard, testWorld } from './fixtures';
+import { campMission, generateWorld } from '../src/sim/generation';
+import type { SimEvent } from '../src/sim/kernel/events';
+import { neutralInput } from '../src/sim/kernel/input';
+import { resimulate } from '../src/sim/kernel/record/resim';
+import { runScene, startScene, type Scene } from '../src/sim/kernel/scene';
+import type { World } from '../src/sim/kernel/world/world';
+import { groundSpot } from '../src/sim/brain/ground';
+import { navigatorOf } from '../src/sim/brain/nav';
+
+/** The first fight (Lab F), and the compound simulator it's tested in: no player needed. */
+
+let world: World;
+beforeAll(() => {
+  world = generateWorld(campMission('LEB-2534'), T);
+});
+
+const eye = (w: World, p: { x: number; z: number }): { x: number; y: number; z: number } => ({ x: p.x, y: w.terrain.heightAt(p.x, p.z) + T.bodies.player.eyeHeight.prone, z: p.z });
+
+/** A camp hit by one shot from its best overview, at the site's middle, with what happened over `seconds`. */
+function oneShot(seconds: number, off = ''): { sim: Simulation; events: SimEvent[]; from: { x: number; y: number; z: number } } {
+  const scene = { ...(compound(`seed=LEB-2534${off ? `&off=${off}` : ''}`) as Scene<Simulation>), world: () => world };
+  const sim = startScene(scene, T, world);
+  const from = eye(world, bestOverview(world));
+  const s = world.camp.site;
+  const at = { x: s.x, y: world.terrain.heightAt(s.x, s.z) + 1, z: s.z };
+  const events: SimEvent[] = [];
+  for (let i = 0; i < seconds * 30; i++) {
+    const commands = i === 30 ? [stimulus('shot', at, from)] : [];
+    events.push(...sim.step({ ...neutralInput(), commands }).map((e) => ({ ...e })));
+  }
+  return { sim, events, from };
+}
+
+describe('a camp that fights back', () => {
+  it('answers a shot: a whistle, men going to ground, and tower men firing back', () => {
+    const { events } = oneShot(14);
+    expect(events.filter((e) => e.type === 'whistle').length).toBeGreaterThan(0);
+    expect(events.some((e) => e.type === 'act' && e.to === 'cover')).toBe(true);
+    expect(events.some((e) => e.type === 'act' && e.to === 'suppress')).toBe(true);
+    expect(events.filter((e) => e.type === 'shot').length).toBeGreaterThan(1);
+  }, 120_000);
+
+  it('does none of it with the fight switched off', () => {
+    const { events } = oneShot(14, 'fight');
+    expect(events.some((e) => e.type === 'whistle')).toBe(false);
+    expect(events.some((e) => e.type === 'act' && e.to === 'suppress')).toBe(false);
+    expect(events.filter((e) => e.type === 'shot')).toHaveLength(1);
+  }, 120_000);
+
+  it('comes back out once it has been quiet a while', () => {
+    const { sim } = oneShot(T.brain.fight.drill.standTo.max + 25);
+    expect(sim.guards.some((g) => g.brain?.act === 'cover')).toBe(false);
+  }, 120_000);
+
+  it('lets a watching man see a muzzle flash and believe where it came from', () => {
+    // One sentry in the open, looking south, and a shot from straight in front of him.
+    const guards = [testGuard({ id: 0, role: 'sentry', x: 0, y: 0, z: 0, faceX: 0, faceZ: 1, elevated: false, route: null, routeStart: 0, scanPhase: 0, scanScale: 0 })];
+    const w = testWorld({ size: 240, spawn: { x: -100, z: -100 }, camp: { structures: [], guards, fenceHalf: 0 } });
+    let systems: readonly System[] = SYSTEMS;
+    for (const s of [commsVoice, campCommander, compoundDrops]) systems = withSystem(systems, s);
+    const sim = new Simulation(w, T, systems);
+    giveSenses(sim);
+    giveBrains(sim);
+    giveCommander(sim);
+    commanderOf(sim)!.camp.fights = true;
+    const events: SimEvent[] = [];
+    const from = { x: 0, y: 1.2, z: 60 };
+    events.push(...sim.step({ ...neutralInput(), commands: [stimulus('shot', { x: 20, y: 1, z: 0 }, from)] }).map((e) => ({ ...e })));
+    events.push(...sim.step(neutralInput()).map((e) => ({ ...e })));
+    expect(events.some((e) => e.type === 'spotted' && e.what === 'muzzle')).toBe(true);
+    const belief = sim.guards[0]!.senses!.belief!;
+    expect(Math.hypot(belief.x - from.x, belief.z - from.z)).toBeLessThan(3);
+  }, 60_000);
+
+  it('hides a man from every listed perch toward the threat, with the real rays', () => {
+    const p = bestOverview(world);
+    const nav = navigatorOf(world, T);
+    let found = 0;
+    for (const g of world.camp.guards) {
+      if (g.elevated) continue;
+      const spot = groundSpot(world, T, g.x, g.z, p.x, p.z);
+      if (!spot) continue;
+      found++;
+      const e = eye(world, p);
+      expect(nav.seesPoint(e.x, e.y, e.z, spot.x, world.terrain.heightAt(spot.x, spot.z) + T.bodies.guard.eyeHeight.stand, spot.z)).toBe(false);
+    }
+    expect(found).toBeGreaterThan(0);
+  }, 60_000);
+});
+
+describe('a near miss', () => {
+  /** A guard 30 m from the player fires a round `off` metres past his head. */
+  function fireAtPlayer(off: number): { sim: Simulation; events: SimEvent[] } {
+    const base = compound('seed=LEB-2534') as Scene<Simulation>;
+    const fire: System = {
+      name: 'test-fire',
+      phase: 'commands',
+      after: ['compound-drops'],
+      reads: [],
+      writes: ['entities', 'rng.aim', 'bullet.bullet'],
+      emits: ['shot', 'report'],
+      run: (ctx) => {
+        if (ctx.tick !== 2) return;
+        const you = ctx.index.of('player')[0]!;
+        const g = ctx.index.of('guard')[0]!;
+        guardFire(ctx, g, { x: you.body.x, y: you.body.y + you.body.eyeHeight, z: you.body.z + off });
+      },
+    };
+    const scene: Scene<Simulation> = {
+      ...base,
+      world: () => world,
+      systems: [...(base.systems ?? []), fire],
+      setup: (s) => {
+        base.setup!(s);
+        const you = s.index.of('player')[0]!;
+        const g = s.index.of('guard')[0]!;
+        g.body.x = you.body.x + 30;
+        g.body.z = you.body.z;
+        g.body.y = world.terrain.heightAt(g.body.x, g.body.z);
+      },
+    };
+    const sim = startScene(scene, T, world);
+    const you = sim.index.of('player')[0]!;
+    you.rifle!.rest = 1;
+    const events: SimEvent[] = [];
+    for (let i = 0; i < 12; i++) events.push(...sim.step(neutralInput()).map((e) => ({ ...e })));
+    return { sim, events };
+  }
+
+  it('knocks the rifle off its rest and jolts the heart', () => {
+    const { sim, events } = fireAtPlayer(1.5);
+    const you = sim.index.of('player')[0]!;
+    expect(events.some((e) => e.type === 'passed')).toBe(true);
+    expect(you.rifle!.rest).toBeLessThan(0.5);
+    expect(you.rifle!.shaken).toBeGreaterThan(0);
+    expect(you.vitals!.heartRate).toBeGreaterThan(T.vitals.restingHr + 5);
+  }, 60_000);
+
+  it('does nothing when it goes wide', () => {
+    expect(fireAtPlayer(20).events.some((e) => e.type === 'passed')).toBe(false);
+  }, 60_000);
+});
+
+describe('the compound simulator', () => {
+  it('runs an attack with no player, and its recording re-simulates', () => {
+    const scene = compound('seed=LEB-2534&attack=one-shot') as Scene<Simulation>;
+    const run = runScene({ ...scene, world: () => world, seconds: 30 }, T);
+    expect(commanderOf(run.sim)!.camp.level).not.toBe('calm');
+    expect(resimulate(run.recording, { scene: { ...scene, world: () => world } }).ok).toBe(true);
+  }, 120_000);
+
+  it('keeps every kind of stimulus recordable', () => {
+    const scene = { ...(compound('seed=LEB-2534') as Scene<Simulation>), world: () => world, seconds: 3 };
+    const s = world.camp.site;
+    const at = { x: s.x, y: world.terrain.heightAt(s.x, s.z) + 1, z: s.z };
+    const run = runScene({ ...scene, driver: () => ({ next: (sim: Simulation, out) => {
+      Object.assign(out, neutralInput());
+      out.commands = sim.tick < STIMULI.length ? [stimulus(STIMULI[sim.tick]!, at, { x: at.x + 100, y: at.y + 10, z: at.z })] : [];
+      return out;
+    } }) }, T);
+    expect(run.failures).toEqual([]);
+    expect(resimulate(run.recording, { scene }).ok).toBe(true);
+  }, 120_000);
+
+  it('finds nothing to complain about in a camp left alone', () => {
+    expect(attackRun('LEB-2534', 'quiet', T).flaws).toEqual([]);
+  }, 120_000);
+});

@@ -887,6 +887,10 @@ body.exploring #overlay {
   color: #ffe9b0;
 }
 
+#hud.is-compound.is-debug .debug-panel {
+  display: none;
+}
+
 /* The lab panel (&lab): a development instrument, out of the way of the view. */
 .lab-panel {
   position: fixed;

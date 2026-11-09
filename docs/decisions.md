@@ -2,6 +2,18 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · The first fight, and a camp with no player in it
+
+**Decision:** a camp that fights back is a flag on the camp (`fights`), so lab E's scenes are untouched, and the compound simulator (`?scene=compound`) tests it with no player at all: stimuli dropped by a person or a script, all through commands, so runs record and re-simulate. The owner's framing: the camp is the core, and a player is one way of providing its inputs.
+
+**What it took.** A man hiding from where he first heard the shot hides from the crack, which points the wrong way (a median 46° off the real bearing). He now waits a moment for the report and hides from every listed perch near it, as a soldier is taught to. That took men really hidden from the shooter from 64% to 77%.
+
+**What it did** (30 camps, a perfect shooter who stays): guards down 8.7 to 7.0 of 9.6; the share in his line 20 s after a shot 61% to 41%; rounds at him 0 to 3.8. It isn't a win yet: he's still never hit.
+
+**The muzzle flash comes from the report, wherever it was fired**, so it's the input and not the player that's seen.
+
+**What moved:** the brain's bench (guards down from one perch, 22 to 12 of 27). Nothing else pinned. Live camp is scene version 3.
+
 ## 2026-11-08 · Lab F: the owner's calls, and what review changed
 
 **The owner's calls:** a sixth lab, required by *Labs pass*; firing gives you away a little; a mission ends when you get out. Sandboxes are near-term development instruments, not shipped games, and every step has to be human-playable.

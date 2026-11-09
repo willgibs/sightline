@@ -84,6 +84,21 @@ export interface ShotDropCommand {
   pitch: number;
 }
 
+/**
+ * The compound simulator (Lab F): something happens at a place in the world with nobody
+ * there to do it. `what` indexes the game's list of stimuli (game/drops.ts).
+ */
+export interface StimulusCommand {
+  kind: 'stimulus';
+  what: number;
+  x: number;
+  y: number;
+  z: number;
+  fromX: number;
+  fromY: number;
+  fromZ: number;
+}
+
 /** One click of the scope's zero dial, up or down; fit or take off the suppressor. */
 export interface ZeroUpCommand {
   kind: 'zeroUp';
@@ -95,11 +110,11 @@ export interface SuppressorCommand {
   kind: 'suppressor';
 }
 
-export type Command = FireCommand | NoiseCommand | BodyDropCommand | RangeCommand | ThrowCommand | ZeroUpCommand | ZeroDownCommand | SuppressorCommand | ShotDropCommand | ClimbCommand | UseCommand;
+export type Command = StimulusCommand | FireCommand | NoiseCommand | BodyDropCommand | RangeCommand | ThrowCommand | ZeroUpCommand | ZeroDownCommand | SuppressorCommand | ShotDropCommand | ClimbCommand | UseCommand;
 export type CommandKind = Command['kind'];
 
 /** How a command field is stored and quantized. */
-export type CommandField = 'lag' | 'yaw' | 'pitch';
+export type CommandField = 'lag' | 'yaw' | 'pitch' | 'number';
 
 export interface CommandSpec<C> {
   /** Identifies the kind in recordings. Never reuse a retired code. */
@@ -119,6 +134,7 @@ export const COMMANDS: { readonly [K in CommandKind]: CommandSpec<Extract<Comman
   zeroDown: { code: 33, range: 'ballistics', fields: {} },
   suppressor: { code: 34, range: 'ballistics', fields: {} },
   shotDrop: { code: 35, range: 'ballistics', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
+  stimulus: { code: 90, range: 'brain', fields: { what: 'number', x: 'number', y: 'number', z: 'number', fromX: 'number', fromY: 'number', fromZ: 'number' } },
   climb: { code: 50, range: 'body', fields: {} },
   use: { code: 51, range: 'body', fields: {} },
 };
@@ -140,6 +156,8 @@ export function quantField(codec: CommandField, v: number): number {
       return quantYaw(finite);
     case 'pitch':
       return quantPitch(finite);
+    case 'number':
+      return Math.fround(finite);
   }
 }
 

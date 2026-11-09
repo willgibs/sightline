@@ -162,13 +162,13 @@ const guardBrains: System = {
   name: 'guard-brains',
   phase: 'decide',
   reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.senses', 'guard.brain'],
-  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'commander.camp.devices', 'commander.camp.level', 'commander.camp.since', 'commander.camp.objective', 'commander.camp.inbox', 'alarm.alarm.raised', 'objective.objective.status', 'vehicle.vehicle.driving', 'schedule', 'entities', 'bullet.bullet'],
-  emits: ['act', 'call', 'shot', 'report', 'alarm', 'siren', 'level'],
+  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'commander.camp.devices', 'commander.camp.level', 'commander.camp.since', 'commander.camp.objective', 'commander.camp.inbox', 'commander.camp.whistled', 'alarm.alarm.raised', 'objective.objective.status', 'vehicle.vehicle.driving', 'schedule', 'entities', 'bullet.bullet'],
+  emits: ['act', 'call', 'shot', 'report', 'alarm', 'siren', 'level', 'whistle'],
   run(ctx) {
     const nav = navAllowance(ctx);
     const devices = commanderOf(ctx)?.camp.devices;
     // Where the boxes stand, and nothing of their state: a guard learns the alarm is up from the siren.
-    const facts = devices ? { alarms: devices.alarms.map((a) => ({ x: a.x, z: a.z })), escape: devices.escape } : undefined;
+    const facts = devices ? { alarms: devices.alarms.map((a) => ({ x: a.x, z: a.z })), escape: devices.escape, fights: commanderOf(ctx)?.camp.fights === true } : undefined;
     for (const g of [...ctx.index.of('guard')]) {
       const change = think(g, ctx.world, ctx.tuning, ctx.tick + 1, () => ctx.draw(g.id, 'brain', (rng) => rng.next()), nav, facts);
       if (change) {
@@ -193,7 +193,7 @@ const guardBrains: System = {
 
 /** What the tick's guards may spend on routes (rule 18): a fresh allowance every tick, shared in id order. */
 function navAllowance(ctx: TickContext): NavAllowance {
-  return ctx.channel('nav', () => ({ work: ctx.work, searches: { left: ctx.tuning.brain.nav.searchesPerTick } }));
+  return ctx.channel('nav', () => ({ work: ctx.work, searches: { left: ctx.tuning.brain.nav.searchesPerTick }, nodesAtStart: ctx.work.nodes }));
 }
 
 /** What the schedule's handlers touch beyond the schedule (kernel/systems.ts, scheduleSystem). */

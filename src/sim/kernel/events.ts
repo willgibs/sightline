@@ -166,7 +166,7 @@ export interface ClatterEvent extends EventBase, SoundFields {
 }
 
 /** What a guard can catch sight of that isn't a person: a body, the flash from a lens, equipment that has stopped, or a door not as it was left. */
-export type SpotKind = 'body' | 'glint' | 'outage' | 'door';
+export type SpotKind = 'body' | 'glint' | 'outage' | 'door' | 'muzzle';
 
 /** A guard caught sight of something (perception, A9): where, and how far off. It's the cause of what he does about it. */
 export interface SpottedEvent extends EventBase {
@@ -210,15 +210,15 @@ export type SightZone = 'core' | 'peripheral' | 'far' | 'contact' | 'none';
 /** The awareness ladder's states (perception/senses.ts). */
 export type AwarenessName = 'unaware' | 'curious' | 'suspicious' | 'searching' | 'combat';
 /** Why a guard's awareness changed (perception/awareness.ts). */
-export type AlertReason = 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm' | 'body' | 'glint' | 'outage' | 'door';
+export type AlertReason = 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm' | 'body' | 'glint' | 'outage' | 'door' | 'muzzle';
 /** What a heard sound sounded like (perception/hearing.ts). */
 export type HeardKind = 'sound' | 'shot' | 'voice';
 /** What a guard can be doing, and why he changed (brain/brain.ts, ACTS and ACT_WHYS). Stored by index: only add at the end. */
-export type ActCode = 'routine' | 'return' | 'look' | 'investigate' | 'search' | 'hold' | 'report' | 'task' | 'engage' | 'cover' | 'alarm' | 'flank' | 'flee';
+export type ActCode = 'routine' | 'return' | 'look' | 'investigate' | 'search' | 'hold' | 'report' | 'task' | 'engage' | 'cover' | 'alarm' | 'flank' | 'flee' | 'suppress';
 export type ReportCode = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear' | 'claim' | 'outage';
 export type TaskCode = 'investigate' | 'search' | 'check' | 'sweep' | 'cover';
 export type LevelCode = 'calm' | 'uneasy' | 'alert' | 'lockdown';
-export type ActReason = 'start' | 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm' | 'arrived' | 'nothing' | 'stalled' | 'no-route' | 'lost' | 'told' | 'report' | 'ordered' | 'body' | 'glint' | 'outage' | 'door' | 'siren';
+export type ActReason = 'start' | 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm' | 'arrived' | 'nothing' | 'stalled' | 'no-route' | 'lost' | 'told' | 'report' | 'ordered' | 'body' | 'glint' | 'outage' | 'door' | 'siren' | 'muzzle';
 
 /**
  * A guard's detection meter rose through the cue (30%): the first sign shows, at the
@@ -354,6 +354,18 @@ export interface AlarmEvent extends EventBase {
 }
 
 /** The player finished sabotaging something (E7). Source: the player. */
+/** The camp's whistle (Lab F): heard across the valley, by the camp and by you. */
+export interface WhistleEvent extends EventBase, SoundFields {
+  type: 'whistle';
+}
+
+/** A camp's round passed close by the player's head (Lab F). */
+export interface PassedEvent extends EventBase {
+  type: 'passed';
+  /** Metres from the head at its closest. */
+  distance: number;
+}
+
 /** The mission has moved on (Lab F): the target is down, and now you have to get out. */
 export interface ObjectiveEvent extends EventBase {
   type: 'objective';
@@ -422,6 +434,8 @@ export type SimEvent =
   | AlarmEvent
   | SabotageEvent
   | ObjectiveEvent
+  | WhistleEvent
+  | PassedEvent
   | DoorEvent
   | SirenEvent
   | ReinforceEvent
@@ -474,15 +488,15 @@ const every =
 const GAITS = every<StepGait>()(['crawl', 'crouch', 'walk', 'sprint']);
 const ZONES = every<SightZone>()(['core', 'peripheral', 'far', 'contact', 'none']);
 const AWARE = every<AwarenessName>()(['unaware', 'curious', 'suspicious', 'searching', 'combat']);
-const REASONS = every<AlertReason>()(['seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'body', 'glint', 'outage', 'door']);
-const SPOTS = every<SpotKind>()(['body', 'glint', 'outage', 'door']);
+const REASONS = every<AlertReason>()(['seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'body', 'glint', 'outage', 'door', 'muzzle']);
+const SPOTS = every<SpotKind>()(['body', 'glint', 'outage', 'door', 'muzzle']);
 const HEARD = every<HeardKind>()(['sound', 'shot', 'voice']);
 const STANCES = every<StanceName>()(['stand', 'crouch', 'prone']);
 const SOUND = { x: 'f32', y: 'f32', z: 'f32', surface: 'u8', loudness: 'f32', radius: 'f32' } as const;
 const LEVELS = every<LevelCode>()(['calm', 'uneasy', 'alert', 'lockdown']);
 const REPORT_CODES = every<ReportCode>()(['contact', 'heard', 'shot', 'body', 'missing', 'clear', 'claim', 'outage']);
-const ACT_NAMES = every<ActCode>()(['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee']);
-const ACT_WHY_NAMES = every<ActReason>()(['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered', 'body', 'glint', 'siren', 'outage', 'door']);
+const ACT_NAMES = every<ActCode>()(['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee', 'suppress']);
+const ACT_WHY_NAMES = every<ActReason>()(['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered', 'body', 'glint', 'siren', 'outage', 'door', 'muzzle']);
 const STRIKES = every<StrikeKind>()(['terrain', 'collider', 'body']);
 const PARTS = every<PartName>()(['none', 'head', 'torso', 'legs']);
 
@@ -551,6 +565,8 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   siren: { code: 98, range: 'brain', sound: true, fields: { ...SOUND } },
   hurt: { code: 96, range: 'brain', sound: false, fields: { part: { enum: every<EventOf<'hurt'>['part']>()(['head', 'torso', 'legs']) }, hits: 'u8' } },
   checkin: { code: 95, range: 'brain', sound: false, fields: { post: 'i32', stage: { enum: every<EventOf<'checkin'>['stage']>()(['call', 'answer', 'silence', 'dead']) } } },
+  whistle: { code: 103, range: 'brain', sound: true, fields: { ...SOUND } },
+  passed: { code: 104, range: 'brain', sound: false, fields: { distance: 'f32' } },
   objective: { code: 102, range: 'brain', sound: false, fields: { stage: { enum: every<EventOf<'objective'>['stage']>()(['get-out']) } } },
   sabotage: { code: 100, range: 'brain', sound: false, fields: { what: { enum: every<EventOf<'sabotage'>['what']>()(['generator', 'radio', 'vehicle']) }, x: 'f32', z: 'f32' } },
   door: { code: 101, range: 'brain', sound: true, fields: { ...SOUND, open: 'u8' } },

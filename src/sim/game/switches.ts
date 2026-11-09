@@ -15,7 +15,7 @@ import type { Simulation } from './sim';
  * differently draws differently, as he should.
  */
 
-export const CAMP_SWITCHES = ['commander', 'radio', 'alarm', 'truck', 'reinforce', 'power'] as const;
+export const CAMP_SWITCHES = ['commander', 'radio', 'alarm', 'truck', 'reinforce', 'fight', 'power'] as const;
 
 export type CampSwitch = (typeof CAMP_SWITCHES)[number];
 
@@ -49,6 +49,8 @@ export function switchedOff(scene: Scene<Simulation>, off: readonly CampSwitch[]
       }
       // Nothing to run for: the vehicle stays parked, and the target stays where he is.
       if (has('truck')) camp.devices.escape = null;
+      // The first fight (Lab F): a camp that only does what lab E built.
+      if (has('fight')) delete camp.fights;
       // Already called, as far as the commander knows: it never calls them again.
       if (has('reinforce')) camp.reinforceCalled = 0;
       // Not an absence: the generator is cut before the run starts, as sabotage would, and whoever passes it notices.

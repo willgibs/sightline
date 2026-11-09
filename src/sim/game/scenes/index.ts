@@ -2,6 +2,7 @@ import type { Scene as KernelScene } from '../../kernel/scene';
 import type { Simulation } from '../sim';
 import { ladderTower } from './ladderTower';
 import { campBrain } from './campBrain';
+import { compound } from './compound';
 import { CAMP_SCENARIOS, campScenario } from './campScenario';
 import { campSystems } from './campSystems';
 import { liveCamp } from './liveCamp';
@@ -25,6 +26,7 @@ export type Scene = KernelScene<Simulation>;
 export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   'ladder-tower': ladderTower,
   'camp-brain': campBrain,
+  compound,
   'camp-scenario': campScenario,
   'movement-course': movementCourse,
   'movement-lab': movementLab,

@@ -66,6 +66,10 @@ export interface CampDevices {
 export interface CampState {
   /** The mission's objective (E7): the target's entity id and whether he's still to be got, a stand-in until lab D's. */
   /** `getOut`: the mission isn't won when the target falls, but when the player then reaches this place (Lab F). */
+  /** A camp that fights back (Lab F): absent for a camp that doesn't. */
+  fights?: true;
+  /** The tick of the last blast on the whistle. */
+  whistled?: number;
   objective: { target: number; status: 'open' | 'done' | 'escaping' | 'escaped'; getOut?: { x: number; z: number } } | null;
   /** The camp's devices (E7): where they are and whether they work. On a generated camp, kept current from lab D's entities (`game/comms.ts`, campDevices). */
   devices: CampDevices;

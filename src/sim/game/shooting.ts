@@ -36,7 +36,7 @@ import type { System, TickContext } from '../kernel/systems';
 import { Blocks } from '../kernel/world/colliders';
 import { emptyHit, raycast } from '../kernel/world/query';
 import { SURFACE_NAMES, Surface } from '../kernel/world/surfaces';
-import { hurtPlayer } from './combat';
+import { hurtPlayer, nearMiss } from './combat';
 import { player, type GuardEntity, type PlayerEntity } from './entities';
 import { bodiesAt } from './remains';
 
@@ -372,13 +372,48 @@ function kill(ctx: TickContext, g: GuardEntity, s: Strike, bullet: BulletEntity,
   ctx.despawn(g.id);
 }
 
+/**
+ * The compound simulator's shot (Lab F): a match round from a place, at a point, with its
+ * report, its crack and its strike, and nobody there to have fired it.
+ */
+export function fireFrom(ctx: TickContext, p: PlayerEntity, from: { x: number; y: number; z: number }, at: { x: number; y: number; z: number }, suppressed: boolean): void {
+  const T = ctx.tuning;
+  const B = T.ballistics;
+  const t = (ctx.tick - 1) / T.sim.tickHz;
+  const env = ctx.world.spec.env;
+  const a = air(env);
+  windAt(env, t, wind);
+  const kit = { load: B.rifle.load, zero: B.rifle.zero.start };
+  const b = ballisticOf(kit, T, a.density, wind);
+  const zero = zeroOf(kit, T, a.density);
+  eye.x = from.x;
+  eye.y = from.y;
+  eye.z = from.z;
+  solveAim(eye, at, 0, 0, zero, b, B.maxFlight, aim);
+  const flight = launch({ x: 0, y: 0, z: 0, dx: 0, dy: 0, dz: 0, t: 0, v0: 0, k: 0, g: 0, wx: 0, wz: 0 }, eye, aim, zero, b, t);
+  const shotId = ctx.emit({ type: 'shot', source: p.id, t, x: eye.x, y: eye.y, z: eye.z, dx: flight.dx, dy: flight.dy, dz: flight.dz, speed: b.v0, drag: b.k, wx: b.wx, wz: b.wz });
+  const radius = suppressed ? B.sound.suppressedReport : B.sound.report;
+  ctx.emit({ type: 'report', source: p.id, t, cause: shotId, x: eye.x, y: eye.y, z: eye.z, surface: Surface.Dirt, loudness: radius / T.noise.radiusPerUnit, radius, suppressed: suppressed ? 1 : 0 });
+  const bullet = ctx.spawn((id): BulletEntity => ({ id, kind: 'bullet', faction: p.faction, bullet: { shooter: p.id, shot: shotId, flight, swept: t } }));
+  flyAndStrike(ctx, bullet, (ctx.tick - 1) / T.sim.tickHz);
+}
+
+/** The compound simulator's silent kill (Lab F): a guard is simply down, with a body where he stood. */
+export function dropGuard(ctx: TickContext, g: GuardEntity, source: number): void {
+  const t = ctx.tick / ctx.tuning.sim.tickHz;
+  const b = g.body;
+  const remains = ctx.spawn((id) => ({ id, kind: 'remains' as const, faction: Faction.Camp, remains: { of: g.id, post: g.guard.spawn, x: b.x, y: b.y, z: b.z, yaw: b.yaw, eye: b.eyeHeight, vx: b.vx, vz: b.vz, fell: t, part: 'torso' as const, carriedBy: 0, hidden: false } }));
+  ctx.emit({ type: 'death', source, t, victim: g.id, remains: remains.id, post: g.guard.spawn, part: 'torso', x: b.x, y: b.y, z: b.z });
+  ctx.despawn(g.id);
+}
+
 /** Every bullet flies on through the tick. */
 const bulletsSystem: System = {
   name: 'bullets',
   phase: 'projectiles',
   reads: ['bullet.bullet', '*.body', 'guard.guard.spawn', 'remains.remains', 'solid.solid'],
-  writes: ['bullet.bullet', 'entities', 'rng.wound', 'player.health'],
-  emits: ['impact', 'death', 'cry', 'hurt'],
+  writes: ['bullet.bullet', 'entities', 'rng.wound', 'player.health', 'player.rifle', 'player.vitals'],
+  emits: ['impact', 'death', 'cry', 'hurt', 'passed'],
   run(ctx) {
     const now = ctx.tick / ctx.tuning.sim.tickHz;
     // Bullets in id order; striking despawns them, so go through a copy.
@@ -396,6 +431,7 @@ const bulletsSystem: System = {
           eye.z = sight.z;
         }
       });
+      nearMiss(ctx, bullet, now);
       flyAndStrike(ctx, bullet, now);
     }
   },
@@ -443,7 +479,11 @@ const aimSystem: System = {
       draw.point(x, eye.y - 0.15, z, 0.05, rested ? 'good' : 'muted');
     });
     const restStep = dt / Math.max(S.restTime, 1e-6);
-    rifle.rest = rested ? Math.min(1, rifle.rest + restStep) : Math.max(0, rifle.rest - restStep);
+    if (rifle.shaken !== undefined) {
+      if (rifle.shaken > dt) rifle.shaken -= dt;
+      else delete rifle.shaken;
+    }
+    rifle.rest = rested && rifle.shaken === undefined ? Math.min(1, rifle.rest + restStep) : Math.max(0, rifle.rest - restStep);
     // The sway at the tick's end, with the two before kept.
     pushSway(rifle);
     swaySample(rifle, vitals, body, ctx.tick / T.sim.tickHz, p.id, T, rifle.sway);

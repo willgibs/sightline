@@ -29,6 +29,8 @@ export interface RifleState {
   /** The load in the magazine (a key of tuning.ballistics.loads). */
   load: string;
   suppressed: boolean;
+  /** Seconds left of being knocked off a rest by a near miss (Lab F): absent otherwise. */
+  shaken?: number;
   /** Seconds left fitting or taking off the suppressor; no shooting until it's done. */
   fitting: number;
   /** How far the scope is up, 0 to 1. */
