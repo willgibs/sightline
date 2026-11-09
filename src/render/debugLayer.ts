@@ -8,6 +8,7 @@ import { GUARD_FIELDS, type Snapshot } from '../sim/game/sim';
 import { routinePose, type RoutinePose } from '../sim/generation';
 import { Cell } from '../sim/kernel/world/grid';
 import { Blocks } from '../sim/kernel/world/colliders';
+import { crownsOf } from '../sim/kernel/world/foliage';
 import type { DebugShape } from '../sim/kernel/debugDraw';
 import { disposeTree } from './dispose';
 import { palette } from './palette';
@@ -60,6 +61,7 @@ export class DebugLayer {
   private readonly shots: Array<{ line: THREE.LineSegments; material: THREE.LineBasicMaterial; start: number; active: boolean }> = [];
   private nextShot = 0;
   private readonly hit = { dist: Infinity, id: -1 };
+  private readonly through = { depth: 0 };
   private readonly aim: THREE.LineSegments;
   private colliders: THREE.LineSegments | null = null;
   private perches: THREE.Group | null = null;
@@ -292,7 +294,8 @@ export class DebugLayer {
     const w = this.world;
     const terrain = w.terrain.raycast(x, y, z, dx, dy, dz, SHOT_RANGE);
     const object = w.colliders.raycast(x, y, z, dx, dy, dz, SHOT_RANGE, Blocks.Bullet, this.hit).dist;
-    const d = Math.min(terrain, object, SHOT_RANGE);
+    const crown = crownsOf(w).stopAlong(x, y, z, dx, dy, dz, SHOT_RANGE, w.crownStop ?? Infinity, this.through, true);
+    const d = Math.min(terrain, object, crown, SHOT_RANGE);
     const pos = shot.line.geometry.getAttribute('position') as THREE.BufferAttribute;
     const hx = x + dx * d;
     const hy = y + dy * d;
@@ -524,6 +527,23 @@ function buildColliderLines(world: World): THREE.LineSegments {
     move: new THREE.Color('#1971c2'),
     sight: new THREE.Color('#2f9e44'),
   };
+  // What stops a line among the trees, drawn as the simulation has it: a cone for each crown.
+  const crown = new THREE.Color('#2f9e44');
+  for (const v of world.crowns ?? []) {
+    const ring = 8;
+    for (let k = 0; k < ring; k++) {
+      const a0 = (k / ring) * Math.PI * 2;
+      const a1 = ((k + 1) / ring) * Math.PI * 2;
+      const ax = v.x + Math.sin(a0) * v.r;
+      const az = v.z + Math.cos(a0) * v.r;
+      pos.push(ax, v.y0, az, v.x + Math.sin(a1) * v.r, v.y0, v.z + Math.cos(a1) * v.r);
+      col.push(crown.r, crown.g, crown.b, crown.r, crown.g, crown.b);
+      if (k % 2 === 0) {
+        pos.push(ax, v.y0, az, v.x, v.y1, v.z);
+        col.push(crown.r, crown.g, crown.b, crown.r, crown.g, crown.b);
+      }
+    }
+  }
   for (const c of world.colliders.list) {
     const color = c.flags === Blocks.Sight ? colors.sight : c.flags & Blocks.Sight ? colors.all : colors.move;
     const seg = (ax: number, ay: number, az: number, bx: number, by: number, bz: number) => {

@@ -1,7 +1,7 @@
 import type { World } from '../kernel/world/world';
 import { defaultTuning } from '../../config/tuning';
 import { InvariantWatch, bodyHeight, bodyShape, createBody, eyeOf, mantleAt, stepMotor, type Cylinder, type MotorContext } from '../body';
-import { analyzeCamp, buildWorld, campMission, cruxOf, generateWorld, infiltrate, spaceTimeSearch } from '../generation';
+import { analyzeCamp, buildRaster, buildWorld, campMission, cruxOf, generateWorld, infiltrate, spaceTimeSearch } from '../generation';
 import type { LayerName } from '../lanes';
 import { LAYERS } from '../lanes';
 import { Hasher } from '../kernel/core/hash';
@@ -130,8 +130,9 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
       // (the analysis itself runs a greedy search first, which finds a way sooner still).
       if (hardest) {
         const w = hardest;
-        sipp = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, undefined, (S, E, M, Q) => infiltrate(S, E, M, { ...Q, weight: 1 })).analysis.infiltration.expanded;
-        plain = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, undefined, spaceTimeSearch).analysis.infiltration.expanded;
+        const R = buildRaster(w.camp, w.terrain, w.colliders, w.grid.site, defaultTuning.gen, w.props.trees);
+        sipp = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, R, (S, E, M, Q) => infiltrate(S, E, M, { ...Q, weight: 1 })).analysis.infiltration.expanded;
+        plain = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, R, spaceTimeSearch).analysis.infiltration.expanded;
       }
       return {
         [`lab D valleys valid at the first attempt (of ${GENERATION_SEEDS.length})`]: campFirst,

@@ -90,7 +90,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
   interface Plan {
     role: GuardRole;
     /** A post: where he holds, and what he watches. */
-    post?: { at: Point2; look: number; scan: ScanKind; elevated?: number };
+    post?: { at: Point2; look: number; scan: ScanKind; elevated?: number; door?: true };
     /** A route: its stops, the legs between them, and which of the patrols on it he is. */
     stops?: Stop[];
     legs?: Point2[][];
@@ -174,7 +174,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
 
   // Sentry posts: inside the gate, then the narrowest passages between the camp's zones.
   const gate = L.openings.find((o) => o.kind === 'gate')!;
-  const sentryPosts: Array<{ at: Point2; look: number }> = [{ at: at(gate.a - 4, gate.b + gate.width / 2 + 1.5), look: lookAt(at(gate.a - 4, gate.b), at(gate.a + 10, gate.b)) }];
+  const sentryPosts: Array<{ at: Point2; look: number; door?: true }> = [{ at: at(gate.a - 4, gate.b + gate.width / 2 + 1.5), look: lookAt(at(gate.a - 4, gate.b), at(gate.a + 10, gate.b)) }];
   // Where the crux isn't the way in, his doors are held first: whoever means to reach him
   // has a man to deal with on each, so getting in isn't the cheap answer it would otherwise
   // be. On an escort's camp the target walks out of that door, so the man stands at its
@@ -185,7 +185,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
       const d = camp.doors![k]!;
       const front = step(d, gen.crux.doorPost);
       const post = { x: front.x + d.ux * aside, z: front.z + d.uz * aside };
-      sentryPosts.unshift({ at: post, look: lookAt(post, { x: post.x - d.nx * 4, z: post.z - d.nz * 4 }) });
+      sentryPosts.unshift({ at: post, look: lookAt(post, { x: post.x - d.nx * 4, z: post.z - d.nz * 4 }), door: true });
     }
   }
   const zones = [at(0, 0), at(-HA + lane, 0), at(0, -HB + lane), at(0, HB - lane), at(HA - lane - 2, gate.b)];
@@ -233,7 +233,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
       if (r) plans.push({ role, stops: r.stops.map((s) => ({ ...s, dwell: s.dwell * 4 })), legs: r.legs, loop: `worker${workerIndex}` });
     } else if (role === 'sentry') {
       const p = sentryPosts[sentryIndex++];
-      if (p) plans.push({ role, post: { at: p.at, look: p.look, scan: 'sweep' } });
+      if (p) plans.push({ role, post: { at: p.at, look: p.look, scan: 'sweep', ...(p.door ? { door: true as const } : {}) } });
     } else if (role === 'patrol') {
       // The perimeter first, twice, then the yard and the alleys.
       const order = ['perimeter', 'yard', 'perimeter', 'back', 'left', 'right'];
@@ -852,6 +852,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
       scanPhase: routine.scanPhase,
       scanScale: 1,
       routine,
+      ...(plan.post?.door ? { holdsDoor: true as const } : {}),
     };
     camp.guards.push(spawn);
   }

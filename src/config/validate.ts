@@ -55,6 +55,7 @@ const BOUNDS: ReadonlyArray<readonly [path: string, min: number, max: number, in
   ['gen.props.rockSpacing', 1, 1000],
   ['gen.props.bushSpacing', 1, 1000],
   ['gen.props.treeCover', 0, 1],
+  ['gen.props.canopyCell', 1, 64],
   ['gen.walkableSlopeDeg', 1, 89],
   // Budgets that size searches inside a tick (rule 18), so a hostile recording can't hang a guard's brain.
   ['brain.nav.siteExpansions', 1, 500000, true],
