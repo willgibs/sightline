@@ -20,7 +20,7 @@ const hit = emptyHit();
 const shape = emptyShape();
 const eye = { x: 0, y: 0, z: 0 };
 
-/** How many guards stand in a clear line from a point, as a bullet would find them: the player's eye, unless you name another. */
+/** How many guards stand in a clear line from a point, one a shooter could use: he can see them and a round can reach them. From the player's eye, unless you name another. */
 export function inClearLine(sim: Simulation, from?: Point): number {
   const view = { world: sim.world, solids: sim.solids, bodies: sim.queryBodies() };
   let count = 0;
@@ -35,7 +35,7 @@ export function inClearLine(sim: Simulation, from?: Point): number {
     const dy = shape.head.y - eye.y;
     const dz = shape.head.z - eye.z;
     const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    raycast(view, eye.x, eye.y, eye.z, dx / d, dy / d, dz / d, d + 1, Blocks.Bullet, hit, sim.playerId);
+    raycast(view, eye.x, eye.y, eye.z, dx / d, dy / d, dz / d, d + 1, Blocks.Sight | Blocks.Bullet, hit, sim.playerId);
     if (hit.what === 'body' && hit.id === g.id) count++;
   }
   return count;

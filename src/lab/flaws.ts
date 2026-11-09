@@ -22,6 +22,9 @@ import { sightLine } from '../sim/kernel/world/query';
 
 type LineView = Parameters<typeof sightLine>[0];
 
+/** A line a shooter could use: he can see along it, and a round can get down it. */
+const CLEAR_LINE = Blocks.Sight | Blocks.Bullet;
+
 export const FLAW_KINDS = ['deaf', 'in-the-line', 'stuck', 'hiding-on', 'silent-tower', 'pile-up', 'friendly-fire', 'chatter'] as const;
 export type FlawKind = (typeof FLAW_KINDS)[number];
 
@@ -98,7 +101,7 @@ export class FlawWatch {
         if (heard && since >= 8 && since < 9 && (this.fired.get(g.id) ?? -1) < lastShot.tick) this.add(sim, 'silent-tower', g.id, `a shot within his range ${since.toFixed(0)} s ago, and no answer`, `tower${g.id}${lastShot.tick}`);
       } else if (spawn?.role !== 'target' && since < 20 && !BUSY.has(b.act) && speed < 0.3) {
         const y = g.body.y + g.body.eyeHeight;
-        if (sightLine(view, lastShot.from.x, lastShot.from.y, lastShot.from.z, g.body.x, y, g.body.z, Blocks.Bullet)) {
+        if (sightLine(view, lastShot.from.x, lastShot.from.y, lastShot.from.z, g.body.x, y, g.body.z, CLEAR_LINE)) {
           const s = (this.lined.get(g.id) ?? 0) + dt;
           this.lined.set(g.id, s);
           if (s > 6 && this.openToWhatTheyBelieve(sim, view, g.body.x, g.body.y + g.body.eyeHeight, g.body.z) && this.couldHaveMoved(sim, g.id, g.body.stance, g.body.x, g.body.z, lastShot)) this.add(sim, 'in-the-line', g.id, `standing in the shooter's clear line for ${s.toFixed(0)} s (${b.act})`, `line${g.id}${lastShot.tick}`);
@@ -122,7 +125,7 @@ export class FlawWatch {
   private openToWhatTheyBelieve(sim: Simulation, view: LineView, x: number, y: number, z: number): boolean {
     const est = commanderOf(sim)?.camp.shots.estimate;
     if (!est) return false;
-    return sightLine(view, est.x, sim.world.terrain.heightAt(est.x, est.z) + sim.tuning.bodies.player.eyeHeight.prone, est.z, x, y, z, Blocks.Bullet);
+    return sightLine(view, est.x, sim.world.terrain.heightAt(est.x, est.z) + sim.tuning.bodies.player.eyeHeight.prone, est.z, x, y, z, CLEAR_LINE);
   }
 
   /** A man flat on the ground with truly nothing to get behind, from the real shooter's bearing, has done what he can. */

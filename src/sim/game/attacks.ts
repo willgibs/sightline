@@ -81,11 +81,12 @@ function normal(rng: Rng, sigma: number): number {
  */
 function shotAtSomeone(sim: Simulation, perch: Perch, what: StimulusName, rng: Rng): StimulusCommand | null {
   const from = proneEye(sim, perch);
-  // Terrain and solids only: a body in the line is what he's aiming at.
+  // Terrain and solids only: a body in the line is what he's aiming at. He has to see the
+  // man, and the round has to be able to get there.
   const view = { world: sim.world, solids: sim.solids, bodies: [] };
   for (const g of sim.guards) {
     const y = g.body.y + g.body.eyeHeight * CHEST;
-    if (!sightLine(view, from.x, from.y, from.z, g.body.x, y, g.body.z, Blocks.Bullet)) continue;
+    if (!sightLine(view, from.x, from.y, from.z, g.body.x, y, g.body.z, Blocks.Sight | Blocks.Bullet)) continue;
     const dx = g.body.x - from.x;
     const dy = y - from.y;
     const dz = g.body.z - from.z;
