@@ -1077,7 +1077,11 @@ export class Game {
     }
     if (this.gauges) {
       this.gauges.observe(this.sim, events);
-      if (this.sim.tick % LAB_PANEL_EVERY === 0) this.labPanel!.update(this.gauges.read(this.sim));
+      if (this.sim.tick % LAB_PANEL_EVERY === 0) {
+        this.labPanel!.update(this.gauges.read(this.sim));
+        // The compound simulator's shooter has no body of its own: this marks where it's firing from.
+        if (this.scene?.name === 'compound') this.renderer.setShooterMark(this.gauges.lastShot);
+      }
     }
     const swap = this.prev;
     this.prev = this.curr;
@@ -1304,6 +1308,15 @@ export class Game {
     if (shot) {
       const at = this.renderer.project(shot.x, shot.y + 1.2, shot.z, w, h);
       if (at) this.drawnLabels.push({ x: at.x, y: at.y, text: 'shooter', color: palette.debug.tones.bad });
+    }
+    // The target, findable among the labels; once he's aboard, what he's aboard.
+    const objective = this.sim.index.of('objective')[0]?.objective;
+    if (objective) {
+      const him = this.sim.index.get(objective.target);
+      const carrying = objective.status === 'escaping' ? this.sim.index.of('vehicle').find((v) => v.vehicle.escape) : undefined;
+      const where = him && 'body' in him ? { x: him.body.x, y: him.body.y + him.body.eyeHeight + 1.4, z: him.body.z } : carrying ? { x: carrying.solid.x, y: carrying.solid.y1 + 1.2, z: carrying.solid.z } : null;
+      const at = where && this.renderer.project(where.x, where.y, where.z, w, h);
+      if (at) this.drawnLabels.push({ x: at.x, y: at.y, text: him ? 'TARGET' : 'TARGET aboard', color: palette.debug.tones.warn });
     }
     if (closest >= 0) this.drawnLabels[closest]!.text = this.drawnLabels[closest]!.detail!;
     this.hud.setLabels(this.drawnLabels);
@@ -1719,11 +1732,15 @@ export class Game {
       .then(() => store.list())
       .then((runs) =>
         this.overlay.setKept(
-          runs.slice(0, 3).map((r) => ({
+          runs.slice(0, 5).map((r) => ({
             text: keptLabel(r),
             save: () => this.download(r.recording, `sightline-${r.name}.slrec`),
             watch: () => this.openReplayFile(Object.assign(r.recording, { name: r.name })),
+            forget: () => void store.remove(r.name).then(() => this.showKept()),
           })),
+          () => {
+            if (window.confirm(`Delete all ${runs.length} runs kept in this browser?`)) void Promise.all(runs.map((r) => store.remove(r.name))).then(() => this.showKept());
+          },
         ),
       )
       .catch(() => undefined);
