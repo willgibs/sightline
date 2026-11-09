@@ -2,6 +2,14 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · An experiment builds each camp once
+
+**Why.** An experiment runs the same camps several ways, and every run built its camp again: seconds of generation for a fraction of a second of play. `quiet-kill` has ten arms, so it built each camp ten times.
+
+**Changed.** The runner hands a process all of one camp's runs together, and an experiment may keep the world it last built for its next run (`src/lab/worlds.ts`, one world a process). A world is only read once it's built, and depends on nothing but its mission and the generation half of the tuning, so arms and rolls of the dice can share it. `ladder`, `flaws` and `quiet-kill` do. The overlook experiments don't, because their scene keeps a plan from the building.
+
+**Measured,** the same command before and after, on six camps and six processes: `quiet-kill` 135 s to 40 s, `ladder` 22 s to 14 s. The reports are the same to the character.
+
 ## 2026-11-09 · The way-in search, a fifth quicker, bit for bit
 
 **Why.** Generation spends about two fifths of its time in the search that certifies a way in (`generation/infiltrate.ts`): 41% over five camps profiled, more than anything else.

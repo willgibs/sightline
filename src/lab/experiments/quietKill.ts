@@ -10,6 +10,7 @@ import { startScene, type Scene } from '../../sim/kernel/scene';
 import { Blocks } from '../../sim/kernel/world/colliders';
 import { sightLine } from '../../sim/kernel/world/query';
 import type { Experiment } from '../experiment';
+import { keptWorld } from '../worlds';
 
 /**
  * One guard down, three ways, and what the rest of the camp knows about it: the design's
@@ -150,7 +151,7 @@ export const quietKill: Experiment = {
     const a = arm as QuietArm;
     const T = withShots(tuning, a.shots, a.subsonicFrom !== undefined, a.whistle);
     const scene = compound(`seed=${seed}&attack=quiet`) as Scene<Simulation>;
-    const sim = startScene(scene, T);
+    const sim = startScene(scene, T, keptWorld(`live-camp:${seed}`, T, scene.world));
     const raw = scene.game.still(sim);
     const hz = T.sim.tickHz;
     const from = overview(sim);
