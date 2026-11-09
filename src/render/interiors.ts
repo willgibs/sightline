@@ -12,9 +12,9 @@ import { bushGeometry, bushMatrix, canopyGeometry, canopyMatrix } from './worldM
  * Instead, the one the eye is in shows its inner faces, translucent: you can tell you're
  * in it, and you still see out.
  *
- * Seeing out is what the simulation says today: a canopy blocks no sight, and a bush hides
- * you from a guard's eyes but nothing hides a guard from yours. Lab A decides what
- * foliage does to sight in both directions, and this follows.
+ * Seeing out is what the simulation says: a line from an eye inside a crown isn't charged
+ * for that crown (kernel/world/foliage.ts), so you do see out, and a round you fire does
+ * leave. A bush hides you from a guard's eyes, and nothing hides a guard from yours.
  */
 
 /** Grid cell for finding the foliage near the eye, metres. */

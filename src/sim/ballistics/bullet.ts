@@ -27,6 +27,8 @@ export interface BulletState {
   swept: number;
   /** It has already passed close by someone (Lab F): once is enough. */
   passed?: true;
+  /** How much tree crown it has been through so far, on the way to the line's limit. */
+  crown?: number;
 }
 
 export interface BulletEntity extends EntityBase {
@@ -114,6 +116,7 @@ const flightStrike = emptyStrike();
 export function flightEnd(f: Flight, until: number, dt: number, world: QueryView): number {
   flightProbe.flight = f;
   flightProbe.swept = f.t;
+  delete flightProbe.crown;
   const struck = fly(flightProbe, until, dt, world, (_, out) => ((out.length = 0), out), flightStrike);
   return struck ? struck.t : until;
 }
@@ -129,7 +132,8 @@ function sweepPiece(b: BulletState, t0: number, t1: number, still: QueryView, bo
   const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
   if (len < 1e-9) return false;
   // The terrain and the colliders don't move: one ray along the chord.
-  raycast(still, p0.x, p0.y, p0.z, dx / len, dy / len, dz / len, len, Blocks.Bullet, hit);
+  raycast(still, p0.x, p0.y, p0.z, dx / len, dy / len, dz / len, len, Blocks.Bullet, hit, -1, b.crown ?? 0);
+  const crown = hit.depth;
   let best = hit.what === 'none' ? Infinity : hit.dist / len;
   if (best < Infinity) {
     out.what = hit.what === 'terrain' ? 'terrain' : 'collider';
@@ -168,7 +172,10 @@ function sweepPiece(b: BulletState, t0: number, t1: number, still: QueryView, bo
       }
     }
   }
-  if (best === Infinity) return false;
+  if (best === Infinity) {
+    if (crown > 0) b.crown = (b.crown ?? 0) + crown;
+    return false;
+  }
   out.t = t0 + (t1 - t0) * best;
   out.x = p0.x + dx * best;
   out.y = p0.y + dy * best;

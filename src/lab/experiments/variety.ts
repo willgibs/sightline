@@ -119,7 +119,7 @@ export function describe(world: World, tuning: Tuning): Descriptors {
   const site = camp.site;
   const layout = camp.layout!;
   const analysis: CampAnalysis = world.report.camp!;
-  const raster = buildRaster(camp, hf, world.colliders, world.grid.site, G.analysis.cell, G.analysis.margin);
+  const raster = buildRaster(camp, hf, world.colliders, world.grid.site, G, world.props.trees);
   const { parts } = analyzeCamp(camp, hf, world.colliders, world.grid, G, raster);
   const eye = site.height + 1.6;
 

@@ -196,6 +196,23 @@ describe('a near miss', () => {
   it('does nothing when it goes wide', () => {
     expect(fireAtPlayer(20).events.some((e) => e.type === 'passed')).toBe(false);
   }, 60_000);
+
+  it('does nothing when something stopped the round short of him', () => {
+    const saved = [world.crowns, world.crownStop] as const;
+    const you = { x: T.gen.world.size, z: T.gen.world.size };
+    try {
+      // A thick crown between the guard and the player: the round ends there.
+      const probe = fireAtPlayer(1.5);
+      you.x = probe.sim.index.of('player')[0]!.body.x;
+      you.z = probe.sim.index.of('player')[0]!.body.z;
+      world.crowns = [{ kind: 'cyl', x: you.x + 15, z: you.z, y0: -500, y1: 500, r: 4, density: T.gen.props.crownDensity }];
+      world.crownStop = T.gen.props.crownStop;
+      expect(fireAtPlayer(1.5).events.some((e) => e.type === 'passed')).toBe(false);
+    } finally {
+      world.crowns = saved[0];
+      world.crownStop = saved[1];
+    }
+  }, 60_000);
 });
 
 describe('the compound simulator', () => {

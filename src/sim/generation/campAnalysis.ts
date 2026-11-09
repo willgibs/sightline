@@ -8,7 +8,7 @@ import { buildTimeline, exposureField, heatmaps, witnessDuty, witnessEdges, type
 import { infiltrate, rimCells, type Exposure, type Infiltration, type Meter, type Search, type Space } from './infiltrate';
 import type { Point2 } from './paths';
 import { findPerches, perchSeesDeck, perchViewshed, type PerchSpot } from './perches';
-import { buildRaster, cellOf, centreOf, clearShot, frameOf, type Raster } from './raster';
+import { cellOf, centreOf, clearShot, frameOf, type Raster } from './raster';
 
 /**
  * Lab D's analysis of a generated camp (D7): who sees whom over its cycle, what each perch
@@ -99,11 +99,11 @@ export function analyzeCamp(
   colliders: ColliderSet,
   grid: SpatialGrid,
   gen: GenTuning,
-  raster?: Raster,
+  raster: Raster,
   search: (S: Space, E: Exposure, M: Meter, Q: Search) => Infiltration = infiltrate,
 ): { analysis: CampAnalysis; parts: AnalysisParts } {
   const A = gen.analysis;
-  const R = raster ?? buildRaster(camp, hf, colliders, grid.site, A.cell, A.margin);
+  const R = raster;
   const T = buildTimeline(camp, R, gen);
   const target = camp.objective?.target ?? -1;
   // Everyone's view but the target's (for the way out, once he's dead), and with his.
@@ -114,7 +114,7 @@ export function analyzeCamp(
   const duty = witnessDuty(W);
 
   // --- Perches: what each sees of the guards, the target, the alarms and the escape. ---
-  const spots = findPerches(hf, camp.site, gen, grid.map);
+  const spots = findPerches(hf, camp.site, gen, grid.map, R.canopy);
   const n = T.guards.length;
   const K = T.samples;
   const seen = new Uint8Array(spots.length * n * K);

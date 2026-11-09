@@ -2,6 +2,22 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · What you can't see through, you can't shoot through
+
+**Why.** The owner's first sitting found kill shots "through tree cover". Those shots had really gone over the treetops, but the worry was right: on a generated map a tree's crown stopped nothing. Of the lines from perches to posts that the simulation called clear, 11% passed through more crown than anyone could see through, and a bullet went through at no cost. "The fact that it can happen invites lots of problems."
+
+**The law.** A crown is foliage: it dims a line by exp(−density × chord), the law perception's bushes already use. Past `gen.props.crownStop` (0.8, about 1.1 m of crown) the line is stopped there, sight and bullets alike, so a thin tip or rim only dims it and nearly all of what's drawn stops it. A bullet is swept piece by piece, so it adds up what it has been through (`BulletState.crown`). It ends on wood, among the branches.
+
+**Left as they are, on purpose.** Sound isn't stopped. A thrown stone falls through branches. Bushes keep their own law: they hide you and don't stop a round, which is concealment rather than cover. Crowns don't cast simulated shade on generated maps, because the ground's shade isn't drawn there, and what's drawn is what's simulated.
+
+**Where it lives.** `kernel/world/foliage.ts` (moved from the perception lane, since `raycast` is the kernel's), `World.crowns` and `World.crownStop`, built by generation so the fingerprint covers them. `sightLine` and perception weigh a crown from the line's two ends, so the answer is the same bit for bit whichever end is the eye. A line looks only at the cells it crosses, and of those only the ones whose foliage reaches its height: it costs very little over a forest of 6,500 trees.
+
+**The crown round your eye doesn't count.** A line from inside a crown, or to a point inside one, isn't charged for that crown: someone with their head among the low branches has parted them. They see out, as the view from inside a crown is drawn (`render/interiors.ts`), a round they fire leaves, and they can be seen. Without this a player standing under a low tree could see a guard, fire, and hit nothing.
+
+**The generator knows.** Perches and their views treat crowns as ground (`Canopy`, a height map of how high they stop a line), so a perch behind a wall of trees is no longer listed as one. Crowns are narrow and steep, so the map is the highest each crown comes in a cell and it's read every metre. Of the lines from listed perches to posts that rock and wood leave clear, 98.3% are open at the real limit (20 camps).
+
+**What review changed.** An independent review checked the walk and the chords against brute force and found no bug in the law. It found these at the edges, all fixed: perches read the map too coarsely (the figure above was 93.6%); an eye inside a crown, as above; a round stopped short of a man still counted as a near miss, which was already true of walls; the tools that drop something where you point landed it in the branches; the debug shot line ran on past the crown; and the canopy cell had no bound, so a corrupt recording could size an allocation.
+
 ## 2026-11-08 · The world pillar: the target is buried, and camps are built around a crux
 
 **Why.** The reviewers found the same best plan in 29 of 30 camps. The owner's ruling on what that plan rested on: "If the target can always be seen from every perch, that effectively makes every mission 1-shot from success from nearly every vantage point. That effectively forces the easiest map of all time across generations, where it likely has to fall into a low-building compound within a valley. Very bad rule that forces both generic map design, and no real challenge to reach a target. Much smarter to bury target behind the challenges inherent to the base takedown." So lab D's rule that every camp offers two perches on the target is gone. The design doc's validation rules ("three or more viable approaches") need the owner's edit to match.

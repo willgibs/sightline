@@ -4,7 +4,7 @@ import { dcos, dsin } from '../kernel/core/detmath';
 import { Faction } from '../kernel/state';
 import { scheduleSystem, type Access, type ScheduleHandler, type System, type TickContext } from '../kernel/systems';
 import { Blocks } from '../kernel/world/colliders';
-import { emptyHit, raycast } from '../kernel/world/query';
+import { emptyHit, IGNORE_CROWNS, raycast } from '../kernel/world/query';
 import { Surface } from '../kernel/world/surfaces';
 import { campPower, objectiveStatus } from './camp';
 import { player } from './entities';
@@ -102,7 +102,7 @@ const sandboxDrops: System = {
       const dx = -dsin(c.yaw) * cp;
       const dy = dsin(c.pitch);
       const dz = -dcos(c.yaw) * cp;
-      const hit = raycast(ctx.query(), pose.x, pose.y + pose.eyeHeight, pose.z, dx, dy, dz, S.reach, Blocks.Sight, look, p.id);
+      const hit = raycast(ctx.query(), pose.x, pose.y + pose.eyeHeight, pose.z, dx, dy, dz, S.reach, Blocks.Sight, look, p.id, IGNORE_CROWNS); // a tool that drops something on the ground, through the branches
       if (hit.what === 'none') continue;
       if (c.kind === 'bodyDrop') {
         const t = ctx.tick / ctx.tuning.sim.tickHz;
