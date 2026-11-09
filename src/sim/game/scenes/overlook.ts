@@ -5,6 +5,7 @@ import type { World } from '../../kernel/world/world';
 import { OverlookShooter, TimedShooter } from '../bots/overlook';
 import { commanderOf } from '../comms';
 import { placePlayer } from '../setup';
+import { parseSwitches, switchedOff, type CampSwitch } from '../switches';
 import type { Simulation } from '../sim';
 import type { Scene } from '.';
 import { liveCamp } from './liveCamp';
@@ -29,16 +30,19 @@ export interface OverlookParams {
   plan: OverlookPlan;
   /** Seconds between the clearing shooter's shots: perfect aim at a person's pace by default, 1.5 for as fast as the bolt allows. */
   pace: number;
+  /** Parts of the camp switched off, for measuring what they add (game/switches.ts). */
+  off: CampSwitch[];
 }
 
 export function parseOverlook(text: string | undefined): OverlookParams {
-  const p: OverlookParams = { seed: 'LEB-2534', plan: 'clear', pace: 5 };
+  const p: OverlookParams = { seed: 'LEB-2534', plan: 'clear', pace: 5, off: [] };
   for (const part of (text ?? '').split('&')) {
     if (!part) continue;
     const [key, value] = part.split('=');
     if (key === 'seed' && value) p.seed = value;
     else if (key === 'plan' && (value === 'clear' || value === 'timed')) p.plan = value;
     else if (key === 'pace' && Number.isFinite(Number(value)) && Number(value) > 0) p.pace = Number(value);
+    else if (key === 'off') p.off = parseSwitches(value ?? '');
     else throw new Error(`An overlook scenario doesn't know '${part}'`);
   }
   return p;
@@ -85,10 +89,10 @@ export function overlook(params?: string): Scene {
     if (p.plan === 'timed') plan = timedShot(world, tuning);
     return world;
   };
-  return {
+  return switchedOff({
     ...base,
     name: 'overlook',
-    params: `seed=${p.seed}&plan=${p.plan}&pace=${p.pace}`,
+    params: `seed=${p.seed}&plan=${p.plan}&pace=${p.pace}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}`,
     title: p.plan === 'clear' ? `One overlook, one shooter (${p.seed})` : `A timed shot at the target (${p.seed})`,
     description:
       p.plan === 'clear'
@@ -119,7 +123,7 @@ export function overlook(params?: string): Scene {
             },
           ]
         : [],
-  };
+  }, p.off);
 }
 
 export const OVERLOOK_TABLE: readonly string[] = ['LEB-2534', 'KUV-9210', 'HUM-0755'].flatMap((seed) => [`seed=${seed}&plan=clear`, `seed=${seed}&plan=timed`]);

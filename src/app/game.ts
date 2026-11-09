@@ -30,6 +30,9 @@ import { InputController } from './input';
 import { Overlay } from './overlay';
 import { GameSound } from './sound';
 import { BrowserStore, DevInbox, PlaytestCapture, type StoredRun } from './playtest';
+import { LabPanel } from './labPanel';
+import { CampGauges } from '../lab/gauges';
+import { commanderOf } from '../sim/game/comms';
 import { Replay, REPLAY_SOUND_SPEED } from './replay';
 import { Timeline } from './timeline';
 import { frameSpan, type SoundTiming } from '../audio/engine';
@@ -77,9 +80,13 @@ export interface GameOptions {
   trials?: string | null;
   /** Start that sitting over, forgetting any answers kept in this browser. */
   trialsFresh?: boolean;
+  /** Show the lab panel in a camp scene (&lab): the gauges and the engine switches. */
+  lab?: boolean;
 }
 
 const TIME_SCALES = [0.25, 0.5, 1, 2, 4, 8];
+/** Ticks between updates of the lab panel: a ray per guard each time. */
+const LAB_PANEL_EVERY = 15;
 /** Seconds of unsaved play after which closing the tab asks first (in the deployed game). */
 const UNSAVED_WARNING_SECONDS = 60;
 
@@ -161,6 +168,9 @@ export class Game {
   private readonly soundTiming: SoundTiming = { shown: 0, scale: 1, hold: 0 };
   /** About how long a frame takes: jumps to a long frame, eases back over a second or so. */
   private frameSpan = 0;
+  /** With &lab in a camp scene: what the camp is doing to you, and the switches (labPanel.ts). */
+  private gauges: CampGauges | null = null;
+  private labPanel: LabPanel | null = null;
   private clock: FixedStepClock;
   private readonly stats = new FrameStats();
   private readonly raw = neutralInput();
@@ -589,6 +599,10 @@ export class Game {
     this.cues.clear();
     this.exitReplayMode();
     this.sim = this.scene ? startScene(this.scene, this.tuning, this.world) : new Simulation(this.world, this.tuning);
+    if (this.opts.lab && this.scene && commanderOf(this.sim)) {
+      this.gauges = new CampGauges(this.sim);
+      this.labPanel ??= new LabPanel(document.body, this.scene.params ?? '');
+    }
     const recorder = new Recorder(this.sim, BUILD);
     this.recorder = recorder;
     this.sound.setSimulation(this.sim);
@@ -982,6 +996,10 @@ export class Game {
       this.recorder?.recordFault(this.sim);
       this.fail('tick', e);
       return;
+    }
+    if (this.gauges) {
+      this.gauges.observe(this.sim, events);
+      if (this.sim.tick % LAB_PANEL_EVERY === 0) this.labPanel!.update(this.gauges.read(this.sim));
     }
     const swap = this.prev;
     this.prev = this.curr;

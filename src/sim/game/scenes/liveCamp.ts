@@ -5,6 +5,7 @@ import { campCheckins, campCommander, campDevices, commanderOf, commsVoice, give
 import { player } from '../entities';
 import { vehicleDrive } from '../escape';
 import { arm } from '../shooting';
+import { parseSwitches, switchedOff, type CampSwitch } from '../switches';
 import { SIGHTLINE } from '../sim';
 import type { Scene } from '.';
 
@@ -23,9 +24,11 @@ import type { Scene } from '.';
 export interface LiveCampParams {
   seed: string;
   difficulty: number;
+  /** Parts of the camp switched off, for measuring what they add (game/switches.ts). */
+  off: CampSwitch[];
 }
 
-const DEFAULTS: LiveCampParams = { seed: 'LEB-2534', difficulty: defaultCampSpec().difficulty };
+const DEFAULTS: LiveCampParams = { seed: 'LEB-2534', difficulty: defaultCampSpec().difficulty, off: [] };
 
 export function parseLiveCamp(text: string | undefined): LiveCampParams {
   const p: LiveCampParams = { ...DEFAULTS };
@@ -37,18 +40,19 @@ export function parseLiveCamp(text: string | undefined): LiveCampParams {
       const d = Number(value);
       if (!Number.isFinite(d) || d < 0 || d > 1) throw new Error(`A live camp's difficulty is between 0 and 1, not '${value}'`);
       p.difficulty = d;
-    } else throw new Error(`A live camp doesn't know '${part}'`);
+    } else if (key === 'off') p.off = parseSwitches(value ?? '');
+    else throw new Error(`A live camp doesn't know '${part}'`);
   }
   return p;
 }
 
 export function formatLiveCamp(p: LiveCampParams): string {
-  return `seed=${p.seed}&difficulty=${p.difficulty}`;
+  return `seed=${p.seed}&difficulty=${p.difficulty}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}`;
 }
 
 export function liveCamp(params?: string): Scene {
   const p = parseLiveCamp(params);
-  return {
+  return switchedOff({
     name: 'live-camp',
     version: 1,
     params: formatLiveCamp(p),
@@ -87,5 +91,5 @@ export function liveCamp(params?: string): Scene {
         },
       },
     ],
-  };
+  }, p.off);
 }
