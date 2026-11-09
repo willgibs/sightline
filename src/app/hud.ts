@@ -1,21 +1,25 @@
+import { DevDock } from './devDock';
 import { headingDegrees } from '../sim/kernel/core/math';
 import { labelKeys } from './keys';
 import { ActionMap, keysHtml, type Action } from './actions';
 
 /**
  * The heads-up display. The honest view shows only what the shipped game will: a
- * compass strip. The debug view adds a dense readout panel, a key legend and a
- * rangefinder tag at the aim point.
+ * compass strip. The debug view adds panels docked at the edges (devDock.ts), a key
+ * legend and a rangefinder tag at the aim point.
  */
 export class Hud {
   private readonly compass: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
-  private readonly panel: HTMLElement;
   private readonly legend: HTMLElement;
   private readonly reticle: HTMLElement;
   private readonly range: HTMLElement;
   private readonly toastEl: HTMLElement;
   private readonly promptEl: HTMLElement;
+  /** The slim panels at the edges of the screen in the debug view (devDock.ts). */
+  readonly dock: DevDock;
+  private readonly panelBodies = new Map<string, string>();
+  private readonly extraKeys: HTMLElement;
   /** Labels systems drew (sim/debugDraw.ts), placed over the world in the debug view. */
   private readonly labelLayer: HTMLElement;
   private readonly labels: HTMLElement[] = [];
@@ -31,7 +35,6 @@ export class Hud {
   ) {
     root.innerHTML = `
       <canvas class="compass" width="440" height="34"></canvas>
-      <pre class="debug-panel"></pre>
       <div class="legend"></div>
       <div class="replay-legend"></div>
       <div class="reticle"></div>
@@ -41,8 +44,10 @@ export class Hud {
       <div class="debug-labels"></div>`;
     this.compass = root.querySelector('.compass')!;
     this.ctx = this.compass.getContext('2d')!;
-    this.panel = root.querySelector('.debug-panel')!;
+    this.dock = new DevDock(root, `${map.describe('mouseFree')} mouse · ${map.describe('dockHide')} panels`);
     this.legend = root.querySelector('.legend')!;
+    this.extraKeys = document.createElement('span');
+    this.extraKeys.className = 'legend-extra';
     this.reticle = root.querySelector('.reticle')!;
     this.range = root.querySelector('.range')!;
     this.toastEl = root.querySelector('.toast')!;
@@ -60,9 +65,12 @@ export class Hud {
       [['dropBody'], 'drop a body'],
       [['shotDrop'], 'drop a shot'],
       [['mark'], 'mark moment'],
+      [['mouseFree'], 'mouse'],
+      [['dockHide'], 'panels'],
     ];
     this.legend.innerHTML = legend.map(([actions, text]) => `<span>${keysHtml(map, actions)}${text}</span>`).join('');
     labelKeys(this.legend);
+    this.legend.appendChild(this.extraKeys);
     // Watching a replay: its own keys, in either view.
     const replayLegend: Array<[Action[], string]> = [
       [['replayPlay'], 'play or pause'],
@@ -87,11 +95,6 @@ export class Hud {
 
   setDebug(on: boolean): void {
     this.root.classList.toggle('is-debug', on);
-  }
-
-  /** The compound simulator wants the camp in view: its readings are in the lab panel, so the long debug text goes. */
-  setCompound(on: boolean): void {
-    this.root.classList.toggle('is-compound', on);
   }
 
   setVisible(on: boolean): void {
@@ -163,8 +166,39 @@ export class Hud {
     ctx.fill();
   }
 
+  /**
+   * The debug view's readouts, as blocks of lines separated by a blank line, each block a
+   * section of the dock. A block starting with a word in capitals is titled by it ("CAMP ·
+   * calm"); what follows on that line is the section's first line, its summary when closed.
+   */
   setPanel(text: string): void {
-    if (this.panel.textContent !== text) this.panel.textContent = text;
+    const blocks = text.split(/\n{2,}/).filter((b) => b !== '').map(panelBlock);
+    const shown = new Set<string>();
+    for (const [order, { title, body }] of blocks.entries()) {
+      const id = `panel-${title}`;
+      shown.add(id);
+      this.panelBodies.set(id, body);
+      // What you most often want to watch starts open; the rest wait to be asked for.
+      this.dock.add({ id, title, side: 'left', order, open: title === 'Perception' || title === 'Camp', text: () => this.panelBodies.get(id) ?? '', summary: () => (this.panelBodies.get(id) ?? '').split('\n')[0] ?? '' });
+    }
+    for (const id of this.panelBodies.keys()) {
+      if (shown.has(id)) continue;
+      this.dock.remove(id);
+      this.panelBodies.delete(id);
+    }
+    this.dock.refresh();
+  }
+
+  /** The legend's own keys for what's running now (the compound simulator's drops, say), after the standard ones. */
+  setExtraKeys(keys: ReadonlyArray<readonly [string, string]>): void {
+    this.extraKeys.textContent = '';
+    for (const [key, text] of keys) {
+      const span = document.createElement('span');
+      const k = document.createElement('kbd');
+      k.textContent = key;
+      span.append(k, text);
+      this.extraKeys.appendChild(span);
+    }
   }
 
   setRange(text: string | null): void {
@@ -179,8 +213,13 @@ export class Hud {
     this.toastTimer = window.setTimeout(() => this.toastEl.classList.remove('is-on'), 2200);
   }
 
-  /** Shows these labels at these screen positions (CSS pixels); the rest of the pool hides. At most 64. */
-  setLabels(items: ReadonlyArray<{ x: number; y: number; text: string; color: string }>): void {
+  /**
+   * Shows these labels at these screen positions (CSS pixels); the rest of the pool hides.
+   * At most 64. Each moves up just enough not to sit on one already placed, so a crowd
+   * stays readable.
+   */
+  setLabels(given: ReadonlyArray<{ x: number; y: number; text: string; color: string }>): void {
+    const items = spreadLabels(given);
     const n = Math.min(items.length, 64);
     while (this.labels.length < n) {
       const el = document.createElement('div');
@@ -202,7 +241,50 @@ export class Hud {
     }
   }
 
+  /** The lab panel shows in the honest view too: it's something you read while playing. */
+  setLab(on: boolean): void {
+    this.root.classList.toggle('is-lab', on);
+  }
+
   get reticleEl(): HTMLElement {
     return this.reticle;
   }
+}
+
+const capitalize = (s: string): string => s.charAt(0) + s.slice(1).toLowerCase();
+
+/** A block of the debug view's readouts: its title, and its lines without the title. */
+export function panelBlock(block: string, k: number): { title: string; body: string } {
+  if (k === 0) return { title: 'Run', body: block };
+  const end = block.indexOf('\n');
+  const first = end < 0 ? block : block.slice(0, end);
+  const rest = end < 0 ? '' : block.slice(end + 1);
+  const mark = first.indexOf(' · ');
+  const word = mark < 0 ? first : first.slice(0, mark);
+  if (!/^[A-Z][A-Z ]*$/.test(word)) return { title: `More ${k}`, body: block };
+  const after = mark < 0 ? '' : first.slice(mark + 3);
+  return { title: capitalize(word), body: after !== '' && rest !== '' ? `${after}\n${rest}` : after + rest };
+}
+
+/** Label boxes, by a rough width for the mono font: enough to keep a crowd from stacking. */
+const LABEL_HEIGHT = 15;
+const LABEL_CHAR = 6;
+
+/** Moves each label up, nearest the viewer's centre first, until it clears those already placed. */
+function spreadLabels<T extends { x: number; y: number; text: string }>(given: readonly T[]): T[] {
+  const placed: Array<{ x: number; y: number; w: number }> = [];
+  const out: T[] = [];
+  for (const item of given) {
+    if (item.text === '') continue;
+    const w = item.text.length * LABEL_CHAR + 12;
+    let y = item.y;
+    for (let tries = 0; tries < 8; tries++) {
+      const hit = placed.find((p) => Math.abs(p.x - item.x) < (p.w + w) / 2 && Math.abs(p.y - y) < LABEL_HEIGHT);
+      if (!hit) break;
+      y = hit.y - LABEL_HEIGHT;
+    }
+    placed.push({ x: item.x, y, w });
+    out.push({ ...item, y });
+  }
+  return out;
 }

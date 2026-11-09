@@ -90,6 +90,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 - To drive the hooks from a script, use `openGame()` in `src/headless/browser.ts`. It starts its own server and browser and evaluates expressions with the hooks in scope.
 - `?replay=playtests/<name>.slrec` watches a kept session in the dev build.
 - `&lab` in the address of a camp scene shows the lab panel: what the camp is doing to you, and engine switches (`off=` in the scene's parameters). It shows the truth, so a blind sitting leaves it off.
+- The dev panels dock at the edges of the screen (`src/app/devDock.ts`), so the world stays visible: a new readout is one `dock.add` call, and removing it is one line. Tab frees the mouse to click them with the world still running (the compound simulator's drop keys then act under the pointer); I hides them.
 - Look at the result. Render the honest and debug views and judge them, rather than trusting that code which compiles also reads well. A headless browser draws at a few frames a second, so judge feel and frame rate on a real machine.
 
 ## Workflow
