@@ -31,7 +31,7 @@ A new type that uses an existing shape is data alone. A new shape is one functio
 | --- | --- | --- | --- | --- |
 | inside: dig him out | 2 | 5 | 1 | 3 |
 | flush: make him run | 2 | 2 | 4 | 3 |
-| escort: he walks with eyes on him | 2 | 0.5 | 4 | 3 |
+| escort: he walks with eyes on him | 2 | 0 | 4 | 3 |
 
 | Ground | yard | keep | depot | farm |
 | --- | --- | --- | --- | --- |
@@ -42,7 +42,7 @@ A new type that uses an existing shape is data alone. A new shape is one functio
 | gorge | 1 | 1 | 4 | 1 |
 | col | 2 | 3 | 2 | 1 |
 
-(A keep on a spur is a keep on a hilltop: the ground falls away round the pad, except along its neck.)
+(A keep on a spur is a keep on a hilltop: the ground falls away round the pad, except along its neck. A keep has no weight on an *escort* camp: walled in the middle of a walled plot, no perch ever has him long enough for that crux to be a crux, and validation says so.)
 
 ## 4. The three new places
 

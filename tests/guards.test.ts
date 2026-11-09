@@ -38,10 +38,15 @@ describe('routines', () => {
     for (const w of worlds) {
       const ids = w.camp.guards.map((g) => g.id);
       expect(new Set(ids).size).toBe(ids.length);
-      const holds = w.camp.guards
-        .filter((g) => g.route)
-        .map((g) => g.routine.legs.filter((l) => l.kind === 'hold').map((l) => l.t1 - l.t0).join());
-      expect(new Set(holds).size).toBe(holds.length);
+      // Two patrols on one loop walk it half a period apart, on the same stops; each other walker has pauses of his own.
+      const walkers = w.camp.guards.filter((g) => g.route);
+      const holds = walkers.map((g) => g.routine.legs.filter((l) => l.kind === 'hold').map((l) => l.t1 - l.t0).join());
+      const routes = walkers.map((g) => JSON.stringify(g.route));
+      for (let a = 0; a < walkers.length; a++) {
+        for (let b = a + 1; b < walkers.length; b++) {
+          if (routes[a] !== routes[b]) expect(holds[a]).not.toBe(holds[b]);
+        }
+      }
     }
   });
 
