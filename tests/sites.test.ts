@@ -21,10 +21,11 @@ import { makeTerrainSample } from '../src/sim/kernel/world/heightfield';
  * keep their heights, since every new kind draws only from new streams (rule 3).
  */
 
-/** A valley of one kind: the seed's own, with the other kinds' weights set to nothing. */
+/** A valley of one kind: the seed's own, with the other kinds' weights set to nothing. The compound stays the plain yard, whatever the type weights say. */
 function only(kind: SiteKind): Tuning {
   const t = structuredClone(T);
   for (const k of SITE_KINDS) t.gen.landform.sites[k] = k === kind ? 1 : 0;
+  for (const type of ['keep', 'depot', 'farm'] as const) for (const c of ['walk', 'inside', 'flush', 'escort'] as const) t.gen.compound.types[type].cruxes[c] = 0;
   return t;
 }
 
@@ -137,9 +138,10 @@ describe('camps of every kind', () => {
   ];
   const tuned = (c: (typeof cases)[number]): Tuning => {
     const t = only(c.kind);
-    for (const k of ['yard', 'long', 'wide', 'tight'] as const) t.gen.compound.plots[k] = k === c.plot ? 1 : 0;
-    for (const k of ['chain', 'screen', 'fort'] as const) t.gen.compound.perimeters[k] = k === c.perimeter ? 1 : 0;
-    for (const k of ['open', 'packed'] as const) t.gen.compound.fills[k] = k === c.fill ? 1 : 0;
+    const yard = t.gen.compound.types.yard;
+    for (const k of ['yard', 'long', 'wide', 'tight'] as const) yard.plots[k] = k === c.plot ? 1 : 0;
+    for (const k of ['chain', 'screen', 'fort', 'fields'] as const) yard.perimeters[k] = k === c.perimeter ? 1 : 0;
+    for (const k of ['open', 'packed'] as const) yard.fills[k] = k === c.fill ? 1 : 0;
     return t;
   };
 

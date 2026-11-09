@@ -155,17 +155,10 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
 
   // Patrol loops on the lanes: the perimeter, the yard, and the alleys around each side.
   const lane = gen.compound.lane / 2;
-  const y = L.yard;
   const HA = L.halfA;
   const HB = L.halfB;
-  const loops: Array<{ name: string; pts: Point2[] }> = [
-    { name: 'perimeter', pts: [at(HA - lane, HB - lane), at(-HA + lane, HB - lane), at(-HA + lane, -HB + lane), at(HA - lane, -HB + lane)] },
-    { name: 'yard', pts: [at(y - 1, y - 1), at(-y + 1, y - 1), at(-y + 1, -y + 1), at(y - 1, -y + 1)] },
-    { name: 'back', pts: [at(-y - 1, HB - lane), at(-HA + lane, HB - lane), at(-HA + lane, -HB + lane), at(-y - 1, -HB + lane)] },
-    // Each loop runs the lanes it shares with the perimeter the same way round, so patrols never meet head on.
-    { name: 'left', pts: [at(-HA + lane, -y - 1), at(-HA + lane, -HB + lane), at(HA - lane, -HB + lane), at(HA - lane, -y - 1)] },
-    { name: 'right', pts: [at(HA - lane, y + 1), at(HA - lane, HB - lane), at(-HA + lane, HB - lane), at(-HA + lane, y + 1)] },
-  ];
+  // The plot's own loops (plots.ts): for a plain yard, the perimeter, the yard and the alleys.
+  const loops = L.loops.map((l) => ({ name: l.name, pts: l.pts.map((p) => at(p.x, p.z)) }));
   const centre = at(0, 0);
   const outward = (p: Point2): number => lookAt(centre, p) + 180 * DEG; // facing out, away from the middle
   const routes = loops
@@ -187,6 +180,11 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
       const post = { x: front.x + d.ux * aside, z: front.z + d.uz * aside };
       sentryPosts.unshift({ at: post, look: lookAt(post, { x: post.x - d.nx * 4, z: post.z - d.nz * 4 }) });
     }
+  }
+  // A gate besides the first has a man inside it, too.
+  for (const g of L.openings.filter((o) => o.kind === 'gate').slice(1)) {
+    const inward = g.side === 'back' ? 4 : -4;
+    sentryPosts.push({ at: at(g.a + inward, g.b + g.width / 2 + 1.5), look: lookAt(at(g.a + inward, g.b), at(g.a - inward * 2.5, g.b)) });
   }
   const zones = [at(0, 0), at(-HA + lane, 0), at(0, -HB + lane), at(0, HB - lane), at(HA - lane - 2, gate.b)];
   for (let i = 0; i < zones.length; i++) {

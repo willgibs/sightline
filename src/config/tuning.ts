@@ -149,15 +149,93 @@ export const defaultTuning = {
 
     // The compound (lab D, D4; sim/generation/compound.ts): the core mission's archetype, as data
     // a logging camp or a comms relay can follow. A plot (the fence, its gate and breach, towers,
-    // the road in) and parcels around a central yard, each filled from a handmade module.
+    // the road in) and parcels around its open heart, each filled from a handmade module.
     // Sizes are metres: buildings are [length, depth, wall height].
     compound: {
-      // The camp's plan, each part a relative weight from a stream of its own: the shape of its
-      // plot, what its perimeter is made of, how full its yard is. `yard`, `chain` and `open` are
-      // the compound as first built.
-      plots: { yard: 3, long: 2, wide: 2, tight: 2 },
-      perimeters: { chain: 3, screen: 2, fort: 1 },
-      fills: { open: 3, packed: 2 },
+      // The kinds of place a camp can be (sim/generation/plots.ts, docs/compound-types.md): a seed
+      // picks one from how well each suits its crux and its ground. A type names a plot shape
+      // (`shape`, one function in plots.ts) and what stands on it; a new type on an old shape is
+      // data alone. With only `yard` weighted, the generator draws exactly what it always did.
+      // `cruxes` and `sites`: relative fit (the seed's type is weighted by their product).
+      // `plots`, `perimeters`, `fills`: the type's own plan, each a relative weight.
+      // `half`: the plot's half-sizes along the gate's axis, then across it, 0 for the plan's plot;
+      // `heart`: the half-size of its open heart (yard, bailey, farmyard), 0 for the usual yard.
+      types: {
+        // The compound as first built: seven slots round an open yard, one gate, one breach.
+        yard: {
+          shape: 'yard',
+          cruxes: { walk: 1, inside: 2, flush: 2, escort: 2 },
+          sites: { hollow: 3, spur: 1, bend: 2, scarp: 2, gorge: 1, col: 2 },
+          plots: { yard: 3, long: 2, wide: 2, tight: 2 },
+          perimeters: { chain: 3, screen: 2, fort: 1, fields: 0 },
+          fills: { open: 3, packed: 2 },
+          half: [0, 0, 0, 0],
+          heart: 0,
+          gateWidth: 8,
+          breachWidth: 4,
+          breachSides: ['back', 'left', 'right'],
+          towers: [2, 4],
+          vehicleDoorGap: 0, // metres his vehicle keeps off every door: the plain yard's never needed it
+          modules: { hq: [12, 9, 3.2], barracks: [18, 8, 3], mess: [13, 9, 3], storage: [13, 10, 4.4], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
+        },
+        // A keep on a hilltop: a tight walled plot, one narrow gate, and in the middle of it the
+        // target's building, standing in a ring of open ground with the outbuildings against the wall.
+        keep: {
+          shape: 'bailey',
+          cruxes: { walk: 0, inside: 5, flush: 2, escort: 0 },
+          sites: { hollow: 1, spur: 5, bend: 1, scarp: 2, gorge: 1, col: 3 },
+          plots: { yard: 0, long: 0, wide: 0, tight: 1 },
+          perimeters: { chain: 0, screen: 0, fort: 1, fields: 0 },
+          fills: { open: 3, packed: 1 },
+          half: [40, 46, 40, 46],
+          heart: 15,
+          gateWidth: 5,
+          breachWidth: 2.4,
+          breachSides: ['back', 'left', 'right'],
+          towers: [2, 4],
+          vehicleDoorGap: 3,
+          modules: { hq: [16, 12, 6.2], barracks: [16, 8, 3], mess: [12, 8, 3], storage: [12, 9, 3.6], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
+        },
+        // A depot strung along a road: a long plot with the road running right through it, gate to
+        // gate, long sheds on both sides with their doors on the road. The road is the yard.
+        depot: {
+          shape: 'spine',
+          cruxes: { walk: 0, inside: 1, flush: 4, escort: 4 },
+          sites: { hollow: 2, spur: 1, bend: 1, scarp: 2, gorge: 4, col: 2 },
+          plots: { yard: 0, long: 1, wide: 0, tight: 0 },
+          perimeters: { chain: 3, screen: 2, fort: 0, fields: 0 },
+          fills: { open: 2, packed: 3 },
+          half: [58, 66, 30, 36],
+          heart: 10,
+          gateWidth: 8,
+          breachWidth: 4,
+          breachSides: ['left', 'right'],
+          towers: [2, 3],
+          vehicleDoorGap: 3,
+          modules: { hq: [13, 9, 3.4], barracks: [20, 9, 3], mess: [13, 9, 3], storage: [24, 11, 5], radio: [7, 5, 2.8], shed: [6, 4, 2.6] },
+        },
+        // A farm and its outbuildings: no fence, a farmhouse, a barn and a byre round a small
+        // farmyard, then huts scattered across the plot, low field walls, a silo a marksman holds.
+        farm: {
+          shape: 'steading',
+          cruxes: { walk: 0, inside: 3, flush: 3, escort: 3 },
+          sites: { hollow: 3, spur: 1, bend: 3, scarp: 1, gorge: 1, col: 1 },
+          plots: { yard: 0, long: 0, wide: 1, tight: 0 },
+          perimeters: { chain: 0, screen: 0, fort: 0, fields: 1 },
+          fills: { open: 1, packed: 0 },
+          half: [44, 52, 46, 56],
+          heart: 9,
+          gateWidth: 6,
+          breachWidth: 6,
+          breachSides: ['back', 'left', 'right'],
+          towers: [1, 1],
+          vehicleDoorGap: 3,
+          modules: { hq: [13, 10, 3.2], barracks: [18, 8, 3.2], mess: [12, 8, 3], storage: [22, 12, 7], radio: [6, 5, 2.8], shed: [6, 5, 2.6] },
+        },
+      },
+      fieldWall: 1.1, // a farm's field walls: low enough to see over, and to crawl behind
+      fieldRun: [14, 30], // metres of wall between gaps
+      fieldGap: [5, 11], // metres of gap
       plotLong: [58, 66], // half-size along a long plot's length
       plotNarrow: [30, 36], // and across it
       plotTight: [36, 42], // half-sizes of a tight plot
@@ -167,22 +245,14 @@ export const defaultTuning = {
       coverPacked: [18, 30], // clusters of containers and crates in a packed yard
       fenceHalf: [44, 52], // half-sizes of the perimeter, along the gate axis and across it
       fenceHeight: 2.2,
-      gateWidth: 8,
-      breachWidth: 4,
       lane: 7, // clear ground inside the fence, where the perimeter patrols walk
       road: 8, // the road from the gate to the yard
       yard: 13, // half-size of the open yard at the centre
-      towers: [2, 4], // watchtowers at the corners
       towerDeck: 6, // height of a tower's deck
       ladderGap: 0.8, // the gap in a tower's rail at the top of its ladder, or a climber can't step onto the deck
       wallThickness: 0.2,
       doorWidth: 1.5, // wide enough for the 0.5 m grid to pass a body through at any angle
       doorHeight: 2.1,
-      hq: [12, 9, 3.2], // the target's building
-      barracks: [18, 8, 3],
-      mess: [13, 9, 3],
-      storage: [13, 10, 4.4],
-      radio: [6, 5, 2.8], // the radio room; its antenna, on its most hidden wall
       mast: 2, // the antenna's height: a whip well below the roof line (radio room 2.8 m), so the building hides it
       fixtureDoorGap: 2, // metres a wall fixture keeps from a door
       screenDepth: 1.6, // a buried target's door has a short wall this far inside it: no straight line through the door
@@ -192,7 +262,6 @@ export const defaultTuning = {
       escapeClearance: 3, // metres his vehicle keeps off the skeleton's way in
       overviewShare: 0.15, // a perch that sees this much of the camp's ground counts as an overview, which fixtures hide from first
       alarmSpacing: 15, // metres between alarm boxes
-      shed: [5, 4, 2.6], // the generator's shed: a roof on posts
       lights: [3, 5], // light poles around the yard, on the generator's circuit
       alarms: [2, 3], // alarm boxes, on the generator's circuit
       cover: [5, 9], // clusters of containers, crates and sandbags

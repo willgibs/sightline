@@ -7,6 +7,7 @@ import { buildGrid, type SpatialGrid } from '../kernel/world/grid';
 import type { World } from '../kernel/world/world';
 import type { TerrainReport } from './analysis';
 import type { Camp } from './camp';
+import { compoundTypeOf } from './plots';
 import { cruxOf } from './crux';
 import { campSpecProblems, type CampSpec } from './campSpec';
 import { perchViews } from './perches';
@@ -103,7 +104,10 @@ interface BuiltCamp {
 function buildCamp(seed: string, attempt: number, terrain: TerrainResult, G: Tuning['gen'], spec: CampSpec): BuiltCamp {
   const fork = (label: string): Rng => new Rng(seed, attempt === 0 ? label : `${label}#${attempt}`);
   const colliders = new ColliderSet(G.world.size);
-  const camp = buildCompound(fork('camp'), terrain.heightfield, terrain.features, colliders, G, spec, cruxOf(seed, G));
+  const crux = cruxOf(seed, G);
+  // The kind of place it is, for its crux and its ground (plots.ts): a camp rebuilt keeps it.
+  const type = compoundTypeOf(seed, crux, terrain.features.kind ?? 'hollow', G);
+  const camp = buildCompound(fork('camp'), terrain.heightfield, terrain.features, colliders, G, spec, crux, type);
   const props = scatterProps(fork('props'), terrain.heightfield, terrain.features, colliders, G);
   colliders.build();
   // The fine grid covers the ground the analysis looks at: the camp and its margin.

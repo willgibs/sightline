@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import { analyzeCamp, buildRaster, campMission, campPlans, carefulWayIn, generateWorld, pointAt, SITE_KINDS, type CampAnalysis } from '../../sim/generation';
+import { analyzeCamp, buildRaster, campMission, campPlans, carefulWayIn, COMPOUND_TYPES, generateWorld, pointAt, SITE_KINDS, type CampAnalysis } from '../../sim/generation';
 import { cellIndex } from '../../sim/kernel/world/grid';
 import { GridSearch } from '../../sim/kernel/world/search';
 import type { World } from '../../sim/kernel/world/world';
@@ -72,7 +72,11 @@ export interface Descriptors {
   riskFirstIn: number;
   /** Whether the best shot at the target comes from the high ground. */
   shotHigh: number;
-  /** The camp's kind of site, its plan's plot and perimeter, and its crux. */
+  /** How many openings its perimeter has, and how far his building stands from the nearest of them, metres. */
+  openings: number;
+  targetDepth: number;
+  /** The kind of place it is, its kind of site, its plan's plot and perimeter, and its crux. */
+  type: string;
   kind: string;
   plot: string;
   perimeter: string;
@@ -285,6 +289,13 @@ export function describe(world: World, tuning: Tuning): Descriptors {
   let flushRisk = analysis.vehicle.found ? Math.min(0.99, SABOTAGE_FIRST + 0.7 * analysis.vehicle.peak) : 1;
   for (const p of P) if (p.run >= G.validation.interceptSeconds) flushRisk = Math.min(flushRisk, Math.min(0.99, ON_THE_RUN + p.dist / 2000));
 
+  let targetDepth = Infinity;
+  for (const o of layout.openings) {
+    const ox = site.x + layout.ux * o.a + layout.vx * o.b;
+    const oz = site.z + layout.uz * o.a + layout.vz * o.b;
+    targetDepth = Math.min(targetDepth, Math.sqrt((ox - hq.x) * (ox - hq.x) + (oz - hq.z) * (oz - hq.z)));
+  }
+
   return {
     prominence: site.height - ring / ringN,
     skyline: skySum / BEARINGS,
@@ -319,6 +330,9 @@ export function describe(world: World, tuning: Tuning): Descriptors {
     },
     riskFirstIn: inf.seconds < Infinity ? inf.risk : 1,
     shotHigh: shotAngle >= HIGH_DEGREES ? 1 : 0,
+    openings: layout.openings.length,
+    targetDepth,
+    type: layout.type,
     kind: world.features.kind ?? 'none',
     plot: layout.plan.plot,
     perimeter: layout.plan.perimeter,
@@ -345,12 +359,19 @@ export function plainTuning(t: Tuning): Tuning {
   const L = out.gen.landform;
   for (const k of Object.keys(L.sites) as Array<keyof typeof L.sites>) L.sites[k] = 0;
   L.sites.hollow = 1;
-  const C = out.gen.compound;
+  const C = out.gen.compound.types.yard;
   C.plots = { yard: 1, long: 0, wide: 0, tight: 0 };
-  C.perimeters = { chain: 1, screen: 0, fort: 0 };
+  C.perimeters = { chain: 1, screen: 0, fort: 0, fields: 0 };
   C.fills = { open: 1, packed: 0 };
   L.roads = { straight: 1, dogleg: 0 };
   out.gen.crux.kinds = { walk: 1, inside: 0, flush: 0, escort: 0 };
+  return out;
+}
+
+/** The generator with its compound types switched off: every camp the plain yard. */
+export function yardOnly(t: Tuning): Tuning {
+  const out = structuredClone(t);
+  for (const k of ['keep', 'depot', 'farm'] as const) out.gen.compound.types[k].cruxes = { walk: 0, inside: 0, flush: 0, escort: 0 };
   return out;
 }
 
@@ -365,11 +386,13 @@ const AS_BUILT: Arm = { name: 'as built' };
 const PLAIN: Arm = { name: 'plain' };
 /** The new ground and plans, with every camp still promising the target to the ridges: what variety of layout does on its own. */
 const NO_CRUX: Arm = { name: 'layout only' };
-const ARMS = [PLAIN, AS_BUILT];
+/** Every camp the plain yard: the generator as it was before compound types (docs/compound-types.md). */
+const YARD_ONLY: Arm = { name: 'yard only' };
+const ARMS = [PLAIN, YARD_ONLY, AS_BUILT];
 
-/** The camps of the arm: the generator as it is, with its cruxes switched off, or with every kind of variety switched off. */
+/** The camps of the arm: the generator as it is, with its types or its cruxes switched off, or with every kind of variety switched off. */
 function camp(seed: string, arm: Arm, tuning: Tuning): { world: World; t: Tuning } {
-  const t = arm.name === PLAIN.name ? plainTuning(tuning) : arm.name === NO_CRUX.name ? withoutCruxes(tuning) : tuning;
+  const t = arm.name === PLAIN.name ? plainTuning(tuning) : arm.name === NO_CRUX.name ? withoutCruxes(tuning) : arm.name === YARD_ONLY.name ? yardOnly(tuning) : tuning;
   return { world: generateWorld(campMission(seed), t), t };
 }
 
@@ -391,7 +414,7 @@ function bands(of: Numeric, unit: string, edges: readonly number[], scale = 1, d
 }
 
 /** The bands of a categorical descriptor: one per value. */
-function kinds(of: 'kind' | 'plot' | 'perimeter' | 'fill' | 'crux', values: readonly string[]): Band[] {
+function kinds(of: 'type' | 'kind' | 'plot' | 'perimeter' | 'fill' | 'crux', values: readonly string[]): Band[] {
   return values.map((v) => ({ label: v, has: (d) => d[of] === v }));
 }
 
@@ -446,9 +469,12 @@ export const varietyCompound = table('variety-compound', 'the compound, and how 
   ['aspect', bands('aspect', '', [1.2, 1.6], 1, 1)],
   ['blocked', bands('blocked', '%', [0.08, 0.15], 100)],
   ['road off axis', bands('roadOff', '°', [15, 45])],
+  ['type', kinds('type', COMPOUND_TYPES)],
   ['plot', kinds('plot', ['yard', 'long', 'wide', 'tight'])],
-  ['perimeter', kinds('perimeter', ['chain', 'screen', 'fort'])],
+  ['perimeter', kinds('perimeter', ['chain', 'screen', 'fort', 'fields'])],
   ['yard', kinds('fill', ['open', 'packed'])],
+  ['gates', bands('openings', '', [2.5])],
+  ['deep', bands('targetDepth', 'm', [25, 45])],
 ]);
 
 export const varietyTarget = table('variety-target', "the target's day: where he goes, and what can be seen of him", [
@@ -466,7 +492,7 @@ export const varietyFamilies: Experiment = {
   about: 'which family of plan is best on a camp, and how much worse it is to hold to one regardless',
   series: SERIES,
   camps: CAMPS,
-  arms: [PLAIN, NO_CRUX, AS_BUILT],
+  arms: [PLAIN, NO_CRUX, YARD_ONLY, AS_BUILT],
   measures: [
     ...FAMILIES.map((f): Measure => ({ key: `best ${f}`, label: `best: ${f}`, kind: 'rate' })),
     ...FAMILIES.map((f): Measure => ({ key: `regret ${f}`, label: `regret: ${f}`, kind: 'mean' })),
@@ -501,4 +527,12 @@ export const varietyCruxes = table(
   [AS_BUILT],
 );
 
-export const VARIETY = [varietyGround, varietyPerches, varietyViews, varietyCompound, varietyTarget, varietyFamilies, varietyCruxes];
+/** Which family of plan is best on a camp, by the kind of place it is: a camp is one cell of this table, its type and the family best on it. */
+export const varietyTypes = table(
+  'variety-types',
+  'which family of plan is best on a camp, by the kind of place it is',
+  COMPOUND_TYPES.map((type): readonly [string, Band[]] => [type, FAMILIES.map((f) => ({ label: f, has: (d) => d.type === type && bestFamily(d) === f }))]),
+  [AS_BUILT],
+);
+
+export const VARIETY = [varietyGround, varietyPerches, varietyViews, varietyCompound, varietyTarget, varietyFamilies, varietyCruxes, varietyTypes];
