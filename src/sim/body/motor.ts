@@ -694,8 +694,19 @@ function rimPush(world: World, x: number, z: number, feet: number, r: number, st
     // Back off along the downhill direction far enough to drop the rim point below a step.
     const s = Math.max(sample.slopeTan, 1e-6);
     const back = Math.min(r, excess / s + 1e-4);
-    px -= (sample.gx / s) * back;
-    pz -= (sample.gz / s) * back;
+    let bx = -(sample.gx / s) * back;
+    let bz = -(sample.gz / s) * back;
+    // The ground at the rim point isn't always the face: where a scarp is narrower than the
+    // body, it's the top of it, and that ground's own downhill can point further onto the
+    // top. Backing off is away from the high ground, toward the body's centre, and never the
+    // other way: a body sliding along the foot of a low ledge was otherwise carried up onto
+    // it, most of a step in a tick (the fuzz run's ROK-8470, Nov 9).
+    if (bx * ux + bz * uz > 0) {
+      bx = -ux * back;
+      bz = -uz * back;
+    }
+    px += bx;
+    pz += bz;
   }
   const l2 = px * px + pz * pz;
   if (l2 < 1e-16) return false;

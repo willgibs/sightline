@@ -268,3 +268,45 @@ describe('height gained on steep ground, measured where it is gained', () => {
     expect(lifted(face, -0.52, -0.5).report.first).toBeNull();
   });
 });
+
+describe('the foot of a low ledge', () => {
+  /**
+   * The fuzz run's ROK-8470 (Nov 9): a body sliding down the last of a near-vertical face,
+   * with the top of it less than a step above its feet's reach and narrower than its own
+   * radius away. The terrain inside its rim was the top of the ledge, not the face, and that
+   * ground fell away from the edge, so "back off downhill" pointed onto it: the body was
+   * carried 1.2 m sideways and 0.43 m up in one tick, onto ground it had no way to climb to.
+   */
+  // A top that falls gently away from its edge at x = 0, a face 0.2 m wide and 1 m high, low ground beyond.
+  const ledge = testWorld({ size: 24, cell: 0.2, height: (x) => (x <= 0 ? 1 + x * 0.06 : x >= 0.2 ? 0 : 1 - x * 5), spawn: { x: 8, z: 0.1 } });
+
+  it('is not a way up onto it', () => {
+    let tried = 0;
+    for (const below of [0.46, 0.48, 0.52, 0.6]) {
+      for (const z of [0.05, 0.1, 0.15]) {
+        const sim = new Simulation(ledge, T);
+        const watch = new InvariantWatch(sim);
+        const p = sim.player;
+        // On the face, with the top `below` metres above its feet: within its rim, and more than a step up.
+        p.x = below / 5;
+        p.z = z;
+        p.y = ledge.terrain.heightAt(p.x, p.z);
+        expect(1 - p.y).toBeCloseTo(below, 3);
+        p.vx = p.vz = 0;
+        p.standingOn = -1;
+        p.motor = 'ground';
+        for (let i = 0; i < 20; i++) {
+          watch.beforeTick();
+          sim.step(neutralInput(p.yaw));
+          watch.afterTick();
+          // Never onto the top, and never up.
+          expect(p.x).toBeGreaterThan(0);
+          expect(p.y).toBeLessThanOrEqual(1 - below + 1e-6);
+        }
+        tried++;
+        expect(watch.report.first).toBeNull();
+      }
+    }
+    expect(tried).toBe(12);
+  });
+});

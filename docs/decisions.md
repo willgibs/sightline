@@ -2,6 +2,16 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · The foot of a low ledge is no way up it
+
+**What the new watch found.** Measured where it's gained (the entry below), one run in about fifty still broke the promise, and this one was real: a body sliding down the last of a near-vertical face was carried 1.2 m sideways and 0.43 m up onto the ledge above it in one tick (ROK-8470, tick 286). Terrain rising more than a step inside a body's rim backs it off "downhill", by the ground at the rim point. Where a scarp is narrower than the body, that ground is the top of the ledge, not its face, and if the top falls away from its edge, downhill pointed onto it. Anything under a step high could be mounted that way.
+
+**Changed.** Backing off never goes toward the high ground: where the rim point's own downhill would, the body backs off toward its own centre. It's the same push everywhere else.
+
+**What moved.** `SIM_VERSION` 13, and the golden recording is rewritten for it. No pinned run met the case, so no fingerprint and no bench number moved. `tests/steep.test.ts` holds a handmade ledge to it, and fails without the change.
+
+**Checked.** 40 fresh valleys with both bots for 15 minutes each, the movement scenes and 200 ladder towers: 3.7 million ticks, 34 hours of play, every promise held (`npm run fuzz -- --seeds 40 --minutes 15`). The worst gain on steep ground was 2.0 mm, the motor's own allowance.
+
 ## 2026-11-09 · The steep-ground promise, measured where it's kept
 
 **What was happening.** Long bot runs stopped on "gained N m on ground too steep to stand on" about one time in five (5 of 24 runs of 12 minutes, on fresh valleys), and nobody knew why. In all five the motor had done nothing wrong. The body had slid off a steep triangle, across it or down it, onto a walkable one that rose the way it was going, and every millimetre was gained on the walkable one. The watch charged the whole tick's rise to where the tick began. It started with the valleys' scarps and gorges, which put steep and walkable triangles side by side far more often.
