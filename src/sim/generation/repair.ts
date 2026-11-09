@@ -85,7 +85,7 @@ function attemptsFor(camp: Camp, validation: Validation, raster: Raster, parts: 
   // The perches behind any broken perch rule: a post can be moved out of their sight.
   const offending = [...new Set(validation.rules.filter((r) => !r.ok).flatMap((r) => r.perches))];
   const out: Attempt[] = [];
-  const timing = failed.some((r) => r === 'two ways out' || r === 'infiltration' || r === 'systems' || r === 'clusters' || r === 'perch witnessed' || r === 'long range');
+  const timing = failed.some((r) => r === 'two ways out' || r === 'infiltration' || r === 'systems' || r === 'clusters' || r === 'perch witnessed' || r === 'crux');
   const posting = failed.some((r) => r === 'perch coverage' || r === 'perch witnessed' || r === 'two ways out' || r === 'infiltration' || r === 'clusters' || r === 'systems');
   camp.guards.forEach((g, index) => {
     if (timing && g.routine.offset !== undefined) {

@@ -143,6 +143,15 @@ export function surveyWorld(w: World, n = 160): Survey {
     if (r.validation) stats['rules failed'] = r.validation.failed.length;
     if (r.repairs) stats['repairs'] = r.repairs.length;
   }
+  // What kind of ground and camp this is, one stat each, so the explorer's card shows it.
+  if (w.features.kind) stats[`site: ${w.features.kind}`] = 1;
+  const plan = w.camp.layout?.plan;
+  if (plan) {
+    stats[`plot: ${plan.plot}`] = 1;
+    stats[`perimeter: ${plan.perimeter}`] = 1;
+    stats[`fill: ${plan.fill}`] = 1;
+  }
+  if (w.camp.crux) stats[`crux: ${w.camp.crux}`] = 1;
   const extra: Pick<Survey, 'ridges' | 'fords' | 'doors' | 'vehicles' | 'skeleton' | 'analysis'> = {};
   if (w.features.ridges) {
     extra.ridges = w.features.ridges.map((rd) => ({

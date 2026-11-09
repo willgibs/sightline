@@ -7,11 +7,14 @@ import type { Heightfield } from '../kernel/world/heightfield';
 import { Surface } from '../kernel/world/surfaces';
 import type { Camp, Structure, StructureKind } from './camp';
 import type { CampSpec } from './campSpec';
+import { buried, needsWayIn, type CruxKind } from './crux';
 import { segmentDistance, type Point2 } from './paths';
 import { overviewPerches, type PerchViews } from './perches';
 import { cellOf, type Raster } from './raster';
+import type { SiteKind } from './landform';
 import type { Site } from './site';
 import type { TerrainFeatures } from './terrain';
+import { pickWeighted } from './weights';
 
 /**
  * The compound (lab D, D4): the core mission's archetype, laid out as plots and parcels
@@ -40,6 +43,13 @@ import type { TerrainFeatures } from './terrain';
  * Coordinates are (a, b) in the site's frame (site.ts): a runs from the centre toward the
  * gate, b across. Everything is placed through `at`, so the camp stands wherever its
  * site does (rule 15). Each part draws from its own labelled fork (rule 3).
+ *
+ * **The plan.** A camp's plan (`layout.plan`) says the shape of its plot (long along the gate's
+ * axis, wide across it, small and tight, or the square yard it started as), what stands round it
+ * (chain link, a solid wall on the sides facing the ridges, a wall all round), and how full its
+ * yard is. A wall and a packed yard stop what a perch can see, which is what makes a plan
+ * matter more than a shape. With every plan weighted to `yard`, `chain` and `open`, the compound
+ * draws just what it always did.
  */
 
 export type Side = 'front' | 'back' | 'left' | 'right';
@@ -176,11 +186,32 @@ export interface Skeleton {
   target: Point2;
 }
 
+export interface CampPlan {
+  /** The shape of its plot: as first built, long along the gate's axis, wide across it, or small and tight. */
+  plot: 'yard' | 'long' | 'wide' | 'tight';
+  /** What stands round it: chain link, a wall on the sides facing the ridges, a wall all round. */
+  perimeter: 'chain' | 'screen' | 'fort';
+  /** How full the yard is: scattered cover, or packed with containers. */
+  fill: 'open' | 'packed';
+}
+
+/** A camp's plan, from its own stream. A gorge's compound runs along it; a scarp's along the foot of its wall. */
+function choosePlan(rng: Rng, gen: GenTuning, kind: SiteKind | undefined): CampPlan {
+  const C = gen.compound;
+  let plot = pickWeighted(rng, C.plots, ['yard', 'long', 'wide', 'tight'] as const);
+  if (kind === 'gorge' && plot === 'wide') plot = 'long';
+  if (kind === 'scarp' && plot === 'long') plot = 'wide';
+  return { plot, perimeter: pickWeighted(rng, C.perimeters, ['chain', 'screen', 'fort'] as const), fill: pickWeighted(rng, C.fills, ['open', 'packed'] as const) };
+}
+
 export interface CampLayout {
   archetype: CampSpec['archetype'];
-  /** Fence half-sizes along the gate axis (a) and across (b). */
+  /** How it was planned: the shape of its plot, its perimeter, how full its yard is. */
+  plan: CampPlan;
+  /** Fence half-sizes along the gate axis (a) and across (b), and the half-size of its yard. */
   halfA: number;
   halfB: number;
+  yard: number;
   /** The camp's axes in the world: u toward the gate, v across. */
   ux: number;
   uz: number;
@@ -219,7 +250,7 @@ interface Rect {
  * Lays out a compound on its site. Its guards are staffed afterwards, from the layout and
  * the spatial grid (staffing.ts), so the camp comes back with none.
  */
-export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatures, colliders: ColliderSet, gen: GenTuning, spec: CampSpec): Camp {
+export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatures, colliders: ColliderSet, gen: GenTuning, spec: CampSpec, crux: CruxKind = 'walk'): Camp {
   const C = gen.compound;
   const site: Site = features.site;
   const padH = site.height;
@@ -249,15 +280,24 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
 
   // --- The plot: the size of the fence, and which side the breach is on. --------------
   const prng = rng.fork('plot');
-  const HA = prng.between(C.fenceHalf);
-  const HB = prng.between(C.fenceHalf);
+  const plan = choosePlan(rng.fork('plan'), gen, features.kind);
+  const [rangeA, rangeB] = plan.plot === 'long' ? [C.plotLong, C.plotNarrow] : plan.plot === 'wide' ? [C.plotNarrow, C.plotLong] : plan.plot === 'tight' ? [C.plotTight, C.plotTight] : [C.fenceHalf, C.fenceHalf];
+  const HA = prng.between(rangeA);
+  const HB = prng.between(rangeB);
+  // A plot too shallow for the usual yard gets a smaller one, and keeps its parcels.
+  const Y = Math.min(HA, HB) < C.fenceHalf[0]! ? C.yardTight : C.yard;
   const outward: Record<Side, Point2> = { front: along(1, 0), back: along(-1, 0), left: along(0, -1), right: along(0, 1) };
   // The breach faces the ridge it faces most squarely: its gully is the way down toward it.
+  // A wall counts for less, and only with a notch in it to come down by.
+  const wallBias = rng.fork('breach-wall').range(-0.6, 0.1);
   let breach: Side = 'back';
   let bestFacing = -Infinity;
   for (const side of ['back', 'left', 'right'] as const) {
     let facing = -1;
-    for (const rd of features.ridges ?? []) facing = Math.max(facing, outward[side].x * rd.bx + outward[side].z * rd.bz);
+    for (const rd of features.ridges ?? []) {
+      if (rd.wall && rd.gullies.length === 0) continue;
+      facing = Math.max(facing, outward[side].x * rd.bx + outward[side].z * rd.bz + (rd.wall ? wallBias : 0));
+    }
     facing += prng.range(0, 0.15); // near ties go either way
     if (facing > bestFacing) {
       bestFacing = facing;
@@ -274,13 +314,41 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     { kind: 'breach', side: breach, ...openingAt(breach, breachOffset), width: C.breachWidth },
   ];
 
-  // --- The perimeter: chain link blocks movement, not sight or bullets. ---------------
-  const fenceRun = (a0: number, b0: number, a1: number, b1: number) => {
+  // --- The perimeter: chain link blocks movement, not sight or bullets. A wall blocks
+  // everything: which sides have one is the plan's, a screen putting them where the ridges are. -
+  const solid = new Set<Side>();
+  if (plan.perimeter === 'fort') for (const s of ['front', 'back', 'left', 'right'] as const) solid.add(s);
+  else if (plan.perimeter === 'screen') {
+    let square: Side = 'back';
+    let most = -Infinity;
+    for (const s of ['front', 'back', 'left', 'right'] as const) {
+      for (const rd of features.ridges ?? []) {
+        if (rd.wall) continue;
+        const facing = outward[s].x * rd.bx + outward[s].z * rd.bz;
+        if (facing >= C.wallFacing) solid.add(s);
+        if (facing > most) {
+          most = facing;
+          square = s;
+        }
+      }
+    }
+    if (solid.size === 0) solid.add(square);
+  }
+  const fenceRun = (a0: number, b0: number, a1: number, b1: number, wall: boolean) => {
     const len = Math.abs(a1 - a0) + Math.abs(b1 - b0);
     if (len < 0.5) return;
     const pieces = Math.max(1, Math.ceil(len / 8));
     const ids: number[] = [];
     const alongA = Math.abs(a1 - a0) > 0;
+    if (wall) {
+      const t = 3 * C.wallThickness;
+      for (let k = 0; k < pieces; k++) {
+        const f = (k + 0.5) / pieces;
+        ids.push(box(a0 + (a1 - a0) * f, b0 + (b1 - b0) * f, alongA ? len / pieces : t, alongA ? t : len / pieces, C.wallHeight, Blocks.All, Surface.Rock));
+      }
+      add('block', ids);
+      return;
+    }
     for (let k = 0; k < pieces; k++) {
       const t = (k + 0.5) / pieces;
       ids.push(box(a0 + (a1 - a0) * t, b0 + (b1 - b0) * t, alongA ? len / pieces : 0.2, alongA ? 0.2 : len / pieces, C.fenceHeight, Blocks.Move, Surface.Metal));
@@ -298,11 +366,12 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     const gaps = openings.filter((o) => o.side === s).map((o) => (s === 'front' || s === 'back' ? [o.b - o.width / 2, o.b + o.width / 2] : [o.a - o.width / 2, o.a + o.width / 2])).sort((x, y) => x[0]! - y[0]!); // unique: openings never overlap
     const half = sideHalf(s);
     let from = -half;
+    const wall = solid.has(s);
     const run = (p: number, q: number) => {
-      if (s === 'front') fenceRun(HA, p, HA, q);
-      else if (s === 'back') fenceRun(-HA, p, -HA, q);
-      else if (s === 'left') fenceRun(p, -HB, q, -HB);
-      else fenceRun(p, HB, q, HB);
+      if (s === 'front') fenceRun(HA, p, HA, q, wall);
+      else if (s === 'back') fenceRun(-HA, p, -HA, q, wall);
+      else if (s === 'left') fenceRun(p, -HB, q, -HB, wall);
+      else fenceRun(p, HB, q, HB, wall);
     };
     for (const [g0, g1] of gaps) {
       run(from, g0!);
@@ -370,7 +439,6 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
 
   // --- The parcels: seven slots around the yard. ---------------------------------------
   const L = C.lane;
-  const Y = C.yard;
   const roadB0 = gateB - C.road / 2;
   const roadB1 = gateB + C.road / 2;
   const backW = (2 * (HB - L - 1) - 4) / 3;
@@ -394,9 +462,12 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     return pick;
   };
   const breachSlots = slots.map((s) => s.slot).filter((s) => touches(s, breach) && !s.startsWith('front'));
+  // Where the target lives: at the breach when the crux wants him reachable (the old skeleton),
+  // deep in the camp, away from it, when he's to be buried behind the camp itself.
+  const deepSlots = slots.map((s) => s.slot).filter((s) => !touches(s, breach));
   const farSide: Side = breach === 'left' ? 'right' : breach === 'right' ? 'left' : mrng.chance(0.5) ? 'left' : 'right';
   const assignment: Partial<Record<ModuleName, SlotName>> = {};
-  assignment.hq = take(breachSlots);
+  assignment.hq = take(buried(crux) ? deepSlots : breachSlots);
   assignment.shed = take(breachSlots.length > 1 ? breachSlots : slots.map((s) => s.slot).filter((s) => s.startsWith('back') || s.startsWith('mid')));
   assignment['motor-pool'] = take(['front-left', 'front-right']);
   assignment.radio = take(slots.map((s) => s.slot).filter((s) => touches(s, farSide)));
@@ -493,8 +564,35 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   const hqRng = rng.fork('hq');
   const hqFit = fit(slotOf(hq), C.hq[0]!, C.hq[1]!, hqRng);
   const backFace = faceToward(outward[breach].x * u.x + outward[breach].z * u.z, outward[breach].x * v.x + outward[breach].z * v.z);
-  const hqIndex = building('hq', hqFit.a, hqFit.b, hqFit.lenA, hqFit.lenB, C.hq[2]!, Surface.Wood, [inwardFace(hqFit.a, hqFit.b), backFace], hqRng);
+  // Where the crux is the way in, a second door gives the way in somewhere to go. Where it
+  // isn't, his one door is held (staffing), so nobody just walks in. Deep in the camp, the
+  // wall toward the yard and the wall toward the breach are often the same one: the second
+  // door then goes in the side wall nearer the breach, so the two are different ways in.
+  const yardFace = inwardFace(hqFit.a, hqFit.b);
+  const sideFace: Face = yardFace === 'a+' || yardFace === 'a-' ? (openings[1]!.b >= hqFit.b ? 'b+' : 'b-') : openings[1]!.a >= hqFit.a ? 'a+' : 'a-';
+  const hqFaces: Face[] = !needsWayIn(crux) ? [yardFace] : [yardFace, buried(crux) && backFace === yardFace ? sideFace : backFace];
+  const hqIndex = building('hq', hqFit.a, hqFit.b, hqFit.lenA, hqFit.lenB, C.hq[2]!, Surface.Wood, hqFaces, hqRng);
   const hqB = buildings[hqIndex]!;
+  // A buried target's doors have screens: a short wall just inside each, so nobody gets a
+  // straight line to him through the door from the yard. To reach him you step inside. A
+  // screen stops short of the room's side walls, so there is always a way round it.
+  if (buried(crux)) {
+    const screens: number[] = [];
+    for (const di of hqB.doors) {
+      const d = doors[di]!;
+      const f = toFrame(d.x + d.nx * C.screenDepth, d.z + d.nz * C.screenDepth);
+      const alongA = Math.abs(d.ux * u.x + d.uz * u.z) > 0.5;
+      const mid = alongA ? hqFit.a : hqFit.b;
+      const half = (alongA ? hqFit.lenA : hqFit.lenB) / 2 - C.wallThickness - C.screenGap;
+      const reach = C.doorWidth / 2 + C.screenWing;
+      const from = Math.max((alongA ? f.x : f.z) - reach, mid - half);
+      const to = Math.min((alongA ? f.x : f.z) + reach, mid + half);
+      if (to - from < C.doorWidth) continue;
+      const centre = (from + to) / 2;
+      screens.push(alongA ? box(centre, f.z, to - from, C.wallThickness, C.hq[2]!, Blocks.All, Surface.Wood) : box(f.x, centre, C.wallThickness, to - from, C.hq[2]!, Blocks.All, Surface.Wood));
+    }
+    add('block', screens);
+  }
 
   // The barracks, the mess and the storage shed.
   for (const [module, size, surface, doorsWanted] of [
@@ -606,8 +704,9 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   };
 
   const crng = rng.fork('cover');
+  const packed = plan.fill === 'packed';
   const placeCover = (a: number, b: number, crngLocal: Rng, low: boolean): boolean => {
-    const kind = low ? (crngLocal.chance(0.5) ? 'sandbags' : 'crate') : crngLocal.pick(['container', 'container', 'crate', 'sandbags'] as const);
+    const kind = low ? (crngLocal.chance(0.5) ? 'sandbags' : 'crate') : crngLocal.pick(packed ? (['container', 'container', 'container', 'crate'] as const) : (['container', 'container', 'crate', 'sandbags'] as const));
     const turn = crngLocal.chance(0.5);
     const [lenA, lenB] = kind === 'container' ? (turn ? [6.06, 2.44] : [2.44, 6.06]) : kind === 'sandbags' ? (turn ? [4, 0.8] : [0.8, 4]) : [1.2, 1.2];
     const r: Rect = { a0: a - lenA / 2 - 1.2, a1: a + lenA / 2 + 1.2, b0: b - lenB / 2 - 1.2, b1: b + lenB / 2 + 1.2 };
@@ -641,8 +740,10 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     if (placeCover(inA.x + da * t - (db / len) * sideStep, inA.z + db * t + (da / len) * sideStep, crng, true)) k++;
   }
   // Clusters round the yard and in the spare parcels.
-  const cover = crng.int(C.cover[0]!, C.cover[1]!);
-  for (let k = 0, tries = 0; k < cover && tries < 200; tries++) {
+  const coverRange = packed ? C.coverPacked : C.cover;
+  const cover = crng.int(coverRange[0]!, coverRange[1]!);
+  const coverTries = packed ? 600 : 200;
+  for (let k = 0, tries = 0; k < cover && tries < coverTries; tries++) {
     const spare = parcels.filter((p) => p.module === 'cover');
     const p = spare.length > 0 && crng.chance(0.5) ? crng.pick(spare) : null;
     const a = p ? p.a + crng.range(-0.4, 0.4) * p.lenA : crng.range(-HA + L + 2, HA - L - 2);
@@ -655,8 +756,10 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
 
   const layout: CampLayout = {
     archetype: spec.archetype,
+    plan,
     halfA: HA,
     halfB: HB,
+    yard: Y,
     ux: u.x,
     uz: u.z,
     vx: v.x,
@@ -670,7 +773,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   };
   const generator = devices.findIndex((d) => d.kind === 'generator');
   for (const d of devices) d.feed = d.kind === 'generator' ? -1 : generator;
-  return { site, structures, guards: [], fenceHalf: Math.max(HA, HB), layout, doors, vehicles, ladders, devices };
+  return { site, structures, guards: [], fenceHalf: Math.max(HA, HB), layout, doors, vehicles, ladders, devices, crux };
 }
 
 /**

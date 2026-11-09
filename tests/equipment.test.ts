@@ -11,6 +11,7 @@ import { usePrompt } from '../src/sim/game/use';
 import { clearOfBodies } from '../src/sim/body';
 import { truckRoute } from '../src/sim/game/camp';
 import { vehicleDrive } from '../src/sim/game/escape';
+import { plainTuning } from '../src/lab/experiments/variety';
 import { campMission, generateWorld, type DeviceSpec } from '../src/sim/generation';
 import { yawFromDirection } from '../src/sim/kernel/core/math';
 import { neutralInput, type TickInput } from '../src/sim/kernel/input';
@@ -32,7 +33,9 @@ import { testGuard, testWorld, tuningCopy } from './fixtures';
 
 let world: World;
 beforeAll(() => {
-  world = generateWorld(campMission('LEB-2534'), T);
+  // The plain compound: the tests below place the player by devices and doors and let guards
+  // walk their routines, so what they stand on is pinned to the camp they were written on.
+  world = generateWorld(campMission('LEB-2534'), plainTuning(T));
 });
 
 /** A live camp with the player standing `reach` metres from a point, facing it, somewhere clear. */
@@ -364,7 +367,12 @@ describe('reinforcements (E8)', () => {
 });
 
 describe('doors (E7, A9)', () => {
-  const doorCamp = () => world.camp.doors![0]!;
+  // A door no guard's route goes through, so nobody opens it again while the test leans on it.
+  const doorCamp = () => {
+    const doors = world.camp.doors!;
+    const quiet = doors.find((d) => !world.camp.guards.some((g) => (g.route ?? [{ x: g.x, z: g.z }]).some((p) => Math.hypot(p.x - d.x, p.z - d.z) < 2.5)));
+    return quiet ?? doors[0]!;
+  };
 
   it('shuts at a press of use, with a sound, and then stops a body and a bullet', () => {
     const d = doorCamp();
@@ -373,7 +381,7 @@ describe('doors (E7, A9)', () => {
     sim.step(neutralInput(toDoor));
     const player = sim.index.of('player')[0]!;
     expect(usePrompt(player, sim.index, sim.world, T, sim.solids)).toBe('shut');
-    const door = sim.index.of('door').find((x) => x.door.index === 0)!;
+    const door = sim.index.of('door').find((x) => x.door.index === world.camp.doors!.indexOf(d))!;
     expect(door.door.open).toBe(true);
     const events = sim.step({ ...neutralInput(toDoor), commands: [{ kind: 'use' }] }).map((e) => ({ ...e }));
     expect(door.door.open).toBe(false);

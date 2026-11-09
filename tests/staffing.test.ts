@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
+import { plainTuning } from '../src/lab/experiments/variety';
 import { campMission, generateWorld, GUARD_ROLES } from '../src/sim/generation';
 import { minimumCut } from '../src/sim/generation/chokepoints';
 import { routinePose, type RoutinePose } from '../src/sim/generation/routine';
@@ -120,7 +121,11 @@ describe('a generated camp\'s guards', () => {
   });
 
   it('post sentries off the way in that the skeleton laid down', () => {
-    for (const w of worlds) {
+    // Asked of a camp whose crux is the way in along that skeleton: the old promise's. A
+    // camp with another crux has no way in to keep; an inside camp's is the walked one.
+    const plain = plainTuning(T);
+    for (const seed of ['TAL-4471', 'KOR-1188']) {
+      const w = generateWorld(campMission(seed), plain);
       const corridor = w.camp.layout!.skeleton.corridor;
       for (const g of w.camp.guards.filter((h) => h.role === 'sentry')) {
         let nearest = Infinity;
@@ -128,7 +133,7 @@ describe('a generated camp\'s guards', () => {
         expect(nearest, `${w.seed}: sentry ${g.id}`).toBeGreaterThan(5);
       }
     }
-  });
+  }, 120_000);
 
   it('keep to their routines through the motor, through doorways and round buildings', () => {
     const w = worlds[1]!;

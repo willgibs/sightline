@@ -123,12 +123,14 @@ describe('a camp that fights back', () => {
   }, 180_000);
 
   it('gives reinforcements a place of their own, not a shared post', () => {
-    // This camp's first patrol stands at one point, where a squad once ended up in a heap.
-    const { sim, watch } = attackRun('LUV-5077', 'sniper', T);
-    expect(watch.counts()['pile-up']).toBe(0);
-    const reserves = sim.guards.filter((g) => g.guard.reserve);
-    expect(reserves.length).toBeGreaterThan(0);
-    for (const g of reserves) expect(g.guard.reserve!.x === reserves[0]!.guard.reserve!.x && g !== reserves[0]).toBe(false);
+    // A squad once ended up in a heap at a post that was a single point. These camps call one in.
+    for (const seed of ['LEB-2534', 'REV-0010']) {
+      const { sim, watch } = attackRun(seed, 'sniper', T);
+      expect(watch.counts()['pile-up']).toBe(0);
+      const reserves = sim.guards.filter((g) => g.guard.reserve);
+      expect(reserves.length).toBeGreaterThan(0);
+      for (const g of reserves) expect(g.guard.reserve!.x === reserves[0]!.guard.reserve!.x && g !== reserves[0]).toBe(false);
+    }
   }, 120_000);
 
   it('hides a man from every listed perch toward the threat, with the real rays', () => {

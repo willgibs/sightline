@@ -1,6 +1,6 @@
 # Sightline · Game Design & Build Plan
 
-> **This is a copy.** The design doc lives at [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), which only the owner's account can open, and the live doc wins wherever the two differ. This is its revision 38, exported on Nov 7, 2026, for sessions that can't open it, such as a Claude Code session without the Claude Docs connector. The live doc's four diagrams are written out here as text. Don't edit this copy to change the design: change the live doc, or propose the change to the owner, then export it again over this file.
+> **This is a copy.** The design doc lives at [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), which only the owner's account can open, and the live doc wins wherever the two differ. This is its revision 40, kept in step with it on Nov 9, 2026, for sessions that can't open it, such as a Claude Code session without the Claude Docs connector. The live doc's four diagrams are written out here as text. Don't edit this copy to change the design: change the live doc, or propose the change to the owner, then export it again over this file.
 
 Nov 7, 2026 · @Will Gibson
 
@@ -337,14 +337,11 @@ A camp mixes all three, and patrol timing makes the lines appear and disappear o
 
 Every camp must pass all of these:
 
-- **Three or more viable approaches:**
-  - long range: at least two perches that see half the guards and the objective;
-  - infiltration: a path to the objective with exposure under the threshold;
-  - systems: a reachable sabotage target (generator, radio or alarm) that materially changes the camp.
+- **A way through the camp's own problem:** each seed picks a decisive problem first, and the camp is built around it. Inside: the target stays deep indoors, out of every perch's view, and a way in to him exists. Flush: he stays indoors until the camp is shaken, then runs, and something can stop him. Escort: he walks in the open, mostly when another guard has him too, and a perch can have him long enough to shoot. Nothing else is promised on every seed. Finding what this camp allows is the reconnaissance.
 - **No unsolvable cluster:** each has a timing window or a way to split it.
 - **No single-perch win:** no one perch sees most of the guards, or the target for long, so a long-range plan has to relocate, split clusters or time its shots.
 - **An interceptable escape:** the target's escape route crosses a perch's sightline or passes a sabotage point.
-- **Two or more exfil routes.**
+- **Two or more exfil routes where the way in is the camp's problem.**
 - **Budgets hold:** at most 16 active guards, within the frame-time budget.
 
 #### Seeds
@@ -646,6 +643,7 @@ Calls 1–3 shape the core and have working defaults; the rest are deliberately 
 
 | Date | Decision | Outcome |
 | --- | --- | --- |
+| Nov 8, 2026 | No promised approach | Owner: a target anyone can shoot from any ridge makes every mission one shot from success and forces the same easy map. The guarantee that perches see the target goes. Each seed is built around a decisive problem, and validation promises only a way through it |
 | Nov 7, 2026 | Foundation for many games | Owner: one foundation for many games and features, with each lane aiming past the best known solution and proving it on its own bench. A narrow kernel, lanes behind contracts, a bench per lane |
 | Nov 7, 2026 | Sight, hearing and light | Owner's calls: stance and light become range caps, with a short-range periphery; one law of sound, with cues rather than biases; the player's light is the light at the ground beneath them |
 | Nov 7, 2026 | Phase 1 plan | Owner's calls: the labs run in two parallel waves after a short pass of shared seams; the owner runs the blind trials; an agent reviews lab D's camps and the owner checks three; the core archetype is a compound |

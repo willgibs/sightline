@@ -371,6 +371,8 @@ So the job of step 2 is that the camp comes after him, in a way he can see comin
 1. Lab F joins Phase 1, and *Labs pass* requires it. Within-mission means and posture move forward from Phase 3. Doctrine across an operation stays in Phase 3.
 2. Firing gives you away a little: dust and flash that lift the stance cap for a moment, less with a suppressor.
 3. A mission ends when you get out, not when the target falls.
+4. Each seed is generated from a decisive problem, replacing the guarantee that a perch can see the target (`docs/decisions.md`, *The world pillar*). The Nov 8 call that chose the camp's reactions over the generator stands for how a camp fights, and this one answers what it's defending.
+5. Step 2 waits for the owner's sitting on step 1 (Nov 9).
 
 **Still open.** Work proceeds on the recommendation unless the owner says otherwise.
 
@@ -382,7 +384,6 @@ So the job of step 2 is that the camp comes after him, in a way he can see comin
 | 7 | When you're shot at, what happens to you? | A near miss knocks the rifle off its rest and raises your heart rate. No screen effects |
 | 9 | Tower men can't leave their towers. Do they stay and fight from behind a parapet? | Yes |
 | 10 | Should a camp that expects attack keep its target out of the open, so the ridge shot isn't there for free? | Yes, by preparedness level |
-| 11 | Should each seed be generated from a decisive problem, replacing today's guarantee that a perch can see the target? Research says the sameness across seeds is structural (`docs/research/notes/foundations/world_variety.md`). It reopens part of the Nov 8 call, which chose the camp's reactions over the generator | Measure first (an agent is on it), then decide |
 | 8 | Hidden traits, such as the odd fanatic who doesn't break, stop players solving morale but cut against "predict the camp" | None to begin with: training is visible |
 
 ## 11. Beyond the camp

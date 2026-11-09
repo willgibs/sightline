@@ -1,4 +1,4 @@
-import { Blocks, type ColliderSet } from '../kernel/world/colliders';
+import { Blocks, type ColliderSet, type RayHit } from '../kernel/world/colliders';
 import { Cell, cellIndex, type GridLayer } from '../kernel/world/grid';
 import type { Heightfield } from '../kernel/world/heightfield';
 import type { Camp } from './camp';
@@ -262,6 +262,67 @@ export function centreOf(R: Raster, k: number): { x: number; y: number; z: numbe
   const j = (k - i) / R.na;
   const p = worldOf(R, i + 0.5, j + 0.5);
   return { x: p.x, y: R.ground[k]!, z: p.z };
+}
+
+/**
+ * Like lineOfSight, but a thin wall can't be slipped past at a corner of the cells: it
+ * samples more finely and, where a step changes both cell indices, tests the two cells it
+ * cut across. Sampling alone misses a row of one-cell-thick wall when the line crosses
+ * near where two cell corners meet, and a search over many cells and moments will find
+ * exactly those lines (a way in that "shoots" him through a wall). For the close shot,
+ * where it decides who can be reached.
+ */
+export function lineOfSightStrict(R: Raster, ex: number, ey: number, ez: number, tx: number, ty: number, tz: number): boolean {
+  const e = frameOf(R, ex, ez);
+  const t = frameOf(R, tx, tz);
+  const da = t.a - e.a;
+  const db = t.b - e.b;
+  const dist = Math.sqrt(da * da + db * db);
+  if (dist < 0.6) return true;
+  const step = R.cell * 0.25;
+  const n = Math.ceil(dist / step);
+  const k0 = Math.ceil(0.3 / step);
+  const blocked = (i: number, j: number, y: number): boolean => {
+    if (i < 0 || j < 0 || i >= R.na || j >= R.nb) return false;
+    const k = j * R.na + i;
+    return y < R.top[k]! || (y >= R.lo[k]! && y <= R.hi[k]!);
+  };
+  let pi = -1;
+  let pj = -1;
+  for (let s = k0; s <= n - k0; s++) {
+    const f = s / n;
+    const i = Math.floor((e.a + da * f - R.a0) / R.cell);
+    const j = Math.floor((e.b + db * f - R.b0) / R.cell);
+    const y = ey + (ty - ey) * f;
+    if (blocked(i, j, y)) return false;
+    if (pi >= 0 && i !== pi && j !== pj && (blocked(pi, j, y) || blocked(i, pj, y))) return false;
+    pi = i;
+    pj = j;
+  }
+  return true;
+}
+
+const clearShotHit: RayHit = { dist: Infinity, id: -1 };
+
+/**
+ * Whether a close shot between two points is really open: the strict line through the
+ * raster, then the colliders' own raycast, so a way in can't end by shooting through a wall
+ * the raster smeared. The first and last 0.3 m are the shooter's and the target's own.
+ */
+export function clearShot(R: Raster, colliders: ColliderSet, ax: number, ay: number, az: number, bx: number, by: number, bz: number): boolean {
+  if (!lineOfSightStrict(R, ax, ay, az, bx, by, bz)) return false;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const dz = bz - az;
+  const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (d < 0.7) return true;
+  const ux = dx / d;
+  const uy = dy / d;
+  const uz = dz / d;
+  clearShotHit.id = -1;
+  clearShotHit.dist = Infinity;
+  colliders.raycast(ax + ux * 0.3, ay + uy * 0.3, az + uz * 0.3, ux, uy, uz, d - 0.6, Blocks.Sight, clearShotHit);
+  return clearShotHit.id < 0;
 }
 
 /**

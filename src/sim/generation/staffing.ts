@@ -7,11 +7,12 @@ import { GridSearch } from '../kernel/world/search';
 import type { Camp, GuardRole, GuardSpawn } from './camp';
 import type { CampSpec } from './campSpec';
 import { minimumCut } from './chokepoints';
+import { buried, needsWayIn } from './crux';
 import type { DoorSpec } from './compound';
 import { segmentDistance, type Point2 } from './paths';
 import { naturalPeriod, nearestWalkable, patrolRoutine, pickScan, postRoutine, walkPath, type ScanKind, type Stop } from './patrols';
 import { dropDuty, seesDrop, trackOf, type GuardTrack } from './field';
-import { cellOf, centreOf, lineOfSight, type Raster } from './raster';
+import { cellOf, centreOf, lineOfSight, lineOfSightStrict, type Raster } from './raster';
 import { overviewPerches, perchSeesDeck, type PerchViews } from './perches';
 import { contactRate, reachOf, sightRate } from './sight';
 import { routinePose, type Routine, type RoutinePose } from './routine';
@@ -32,7 +33,8 @@ import { routinePose, type Routine, type RoutinePose } from './routine';
  * - **Marksmen** hold the tower decks; the **radio operator** his room; the **officer**
  *   walks between the target's building and the barracks; **workers** go about their
  *   chores between the generator, the stores and the motor pool; the **target** spends the
- *   cycle in his building but for one walk out, his window.
+ *   cycle in his building, and on an escort's camp (crux.ts) makes one walk out, with
+ *   another guard's eye on him.
  *
  * Every routine is fitted to one cycle of the camp (patrols.ts), so the camp's rhythm
  * repeats exactly and its windows can be learned. Each guard draws from his own fork.
@@ -54,7 +56,10 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
     return b && b.doors[k] !== undefined ? camp.doors![b.doors[k]!]! : null;
   };
   const step = (d: DoorSpec, k: number): Point2 => ({ x: d.x - d.nx * k, z: d.z - d.nz * k });
-  const corridor = L.skeleton.corridor;
+  // The way in is kept open only on a camp whose crux needs one; elsewhere it's what the
+  // player has to find, and guards stand where they like.
+  const crux = camp.crux ?? 'walk';
+  let corridor: readonly Point2[] = needsWayIn(crux) ? L.skeleton.corridor : [];
   /** How far a point is from the skeleton's way in: posts keep off it. */
   const offCorridor = (p: Point2): number => {
     let best = Infinity;
@@ -116,6 +121,15 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
     return { stops: pts.map((p, k) => ({ x: p!.x, z: p!.z, scan: scans?.[k] ?? pickScan(srng), look: looks[k]!, dwell: dwell() })), legs };
   };
 
+  // Where the way in matters and the target's building stands away from the breach, the
+  // straight line of the skeleton runs through other buildings: the guards are kept off the
+  // way a body can actually walk, from just inside the breach to his door.
+  if (needsWayIn(crux) && buried(crux)) {
+    const [entry, inside, door] = [L.skeleton.corridor[2]!, L.skeleton.corridor[3]!, L.skeleton.corridor[4]!];
+    const walked = walkPath(layer, search, inside, door);
+    if (walked) corridor = [...L.skeleton.corridor.slice(0, 2), entry, ...walked, L.skeleton.corridor[5]!];
+  }
+
   // The target: in his building, with one walk out to the mess (or the motor pool) and back.
   const hq = L.buildings.find((b) => b.module === 'hq')!;
   const hqDoor = camp.doors![hq.doors[0]!]!;
@@ -141,7 +155,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
 
   // Patrol loops on the lanes: the perimeter, the yard, and the alleys around each side.
   const lane = gen.compound.lane / 2;
-  const y = gen.compound.yard;
+  const y = L.yard;
   const HA = L.halfA;
   const HB = L.halfB;
   const loops: Array<{ name: string; pts: Point2[] }> = [
@@ -161,6 +175,19 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
   // Sentry posts: inside the gate, then the narrowest passages between the camp's zones.
   const gate = L.openings.find((o) => o.kind === 'gate')!;
   const sentryPosts: Array<{ at: Point2; look: number }> = [{ at: at(gate.a - 4, gate.b + gate.width / 2 + 1.5), look: lookAt(at(gate.a - 4, gate.b), at(gate.a + 10, gate.b)) }];
+  // Where the crux isn't the way in, his doors are held first: whoever means to reach him
+  // has a man to deal with on each, so getting in isn't the cheap answer it would otherwise
+  // be. On an escort's camp the target walks out of that door, so the man stands at its
+  // shoulder, clear of the way out, and watches him go.
+  if (!needsWayIn(crux)) {
+    const aside = crux === 'escort' ? (rng.fork('door-shoulder').chance(0.5) ? gen.crux.doorShoulder : -gen.crux.doorShoulder) : 0;
+    for (const k of [...hq.doors].reverse()) {
+      const d = camp.doors![k]!;
+      const front = step(d, gen.crux.doorPost);
+      const post = { x: front.x + d.ux * aside, z: front.z + d.uz * aside };
+      sentryPosts.unshift({ at: post, look: lookAt(post, { x: post.x - d.nx * 4, z: post.z - d.nz * 4 }) });
+    }
+  }
   const zones = [at(0, 0), at(-HA + lane, 0), at(0, -HB + lane), at(0, HB - lane), at(HA - lane - 2, gate.b)];
   for (let i = 0; i < zones.length; i++) {
     for (let j = i + 1; j < zones.length; j++) {
@@ -266,10 +293,11 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
   }
 
   /**
-   * The target's routine, against the perches (validation: no perch has him in view more
-   * than `maxTarget` of the cycle, and two have him for `targetSeconds`): his spot indoors is
-   * the one in his building the fewest perches see, and his walk out the first errand that
-   * fits. Failing that, the errand any perch sees least; failing that, he stays in.
+   * The target's routine, against the perches: no perch may have him in view more than
+   * `maxTarget` of the cycle, and his crux says what else (crux.ts). His spot indoors is the
+   * one in his building the fewest perches see. A buried target stays there. On an escort's
+   * camp he walks out, on a walk a perch can have him on; failing that, on the errand any
+   * perch sees least; failing that, he stays in.
    */
   function chooseTargetRoutine(): void {
     const plan = plans.find((p) => p.role === 'target');
@@ -277,10 +305,28 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
     const V = gen.validation;
     const overviews = overviewPerches(raster, perches.views, L.halfA, L.halfB, gen);
     const fork = rng.fork('target-routine');
-    // Where indoors: the walkable cell of his building fewest perches see at chest height.
+    // Where indoors: the walkable cell of his building fewest perches see at chest height. A
+    // buried target also stands out of line of his door, so that nobody can get him through
+    // it from the yard: to reach him you have to step inside.
+    const doorsOf = hq.doors.map((i) => camp.doors![i]!);
+    const seenThroughDoor = (m: { x: number; y: number; z: number }): number => {
+      const chest = m.y + gen.sight.chest;
+      let seen = 0;
+      for (const d of doorsOf) {
+        for (const out of gen.crux.doorLineOut) {
+          for (const side of gen.crux.doorLineSide) {
+            const px = d.x - d.nx * out + d.ux * side;
+            const pz = d.z - d.nz * out + d.uz * side;
+            if (lineOfSightStrict(raster, px, hf.heightAt(px, pz) + gen.sight.crouchHead, pz, m.x, chest, m.z)) seen++;
+          }
+        }
+      }
+      return seen;
+    };
     const inside: Point2 = (() => {
       let best: Point2 = { x: hq.x, z: hq.z };
       let bestCount = Infinity;
+      let bestDoor = Infinity;
       let bestD = Infinity;
       const halfL = hq.length / 2 - gen.compound.wallThickness - 0.5;
       const halfD = hq.depth / 2 - gen.compound.wallThickness - 0.5;
@@ -295,10 +341,13 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
         const chest = m.y + gen.sight.chest;
         let count = 0;
         for (const v of perches.views) if (chest >= v[c]!) count++;
+        // Everywhere but the old walk: a man at rest in line with an open door is a free shot, buried or not.
+        const door = crux !== 'walk' ? seenThroughDoor(m) : 0;
         const d = dx * dx + dz * dz;
-        if (count < bestCount || (count === bestCount && d < bestD)) {
+        if (count < bestCount || (count === bestCount && (door < bestDoor || (door === bestDoor && d < bestD)))) {
           best = { x: m.x, z: m.z };
           bestCount = count;
+          bestDoor = door;
           bestD = d;
         }
       }
@@ -306,6 +355,16 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
     })();
     const scan = { scanAmp: R.headScanDeg * DEG * 0.4, scanPeriod: scanEvery, scanPhase: 0 };
     const lookIn = lookAt(inside, across);
+    // A buried target stays indoors, at the spot the perches can't reach.
+    if (buried(crux)) {
+      plan.stops = undefined;
+      plan.legs = undefined;
+      plan.loop = undefined;
+      plan.perCycle = undefined;
+      plan.options = undefined;
+      plan.post = { at: inside, look: lookIn, scan: 'glance' };
+      return;
+    }
     // His walk out: to one of the other buildings; failing those, a few steps out of his own door.
     const hqDoors = hq.doors.map((i) => camp.doors![i]!);
     const nearby: Point2[] = hqDoors.flatMap((d) => [step(d, 8), step(d, 5)]);
@@ -323,11 +382,13 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
       }
     }
     const errands = [...fork.shuffle([doorOf('mess'), doorOf('barracks'), doorOf('storage')].filter((d): d is DoorSpec => d !== null).map((d) => step(d, 2.5))), ...fork.shuffle(nearby)];
-    type Option = { stops?: Stop[]; legs?: Point2[][]; max: number; two: boolean };
+    // An escort's walk must be one a perch can have him on; which of them is picked later,
+    // once every guard is placed, for how often another guard has him too (rechooseTargetWalk).
+    type Option = { stops?: Stop[]; legs?: Point2[][]; max: number; two: boolean; seenBy: number };
     const options: Option[] = [];
     for (const e of errands) {
-      // Enough to choose from when he's placed: each route is a grid search, so stop there.
-      if (options.filter((o) => o.max <= V.maxTarget - S.targetMargin && o.two).length >= S.targetOptions) break;
+      // Enough to choose from when he's placed: each route is a grid search, so stop there. An escort's walk needs them all compared.
+      if (crux === 'walk' && options.filter((o) => o.max <= V.maxTarget - S.targetMargin && o.two).length >= S.targetOptions) break;
       const r = route([inside, e], [lookIn, lookAt(e, inside)], ['glance', 'glance']);
       if (!r) continue;
       r.stops[0]!.weight = 1;
@@ -336,10 +397,11 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
       if (naturalPeriod(r.legs, r.stops, R) > cycle) continue;
       const t = trackOf(patrolRoutine(r.legs, r.stops, R, cycle, 0, scan), null, raster, gen, witnessSamples, gen.analysis.dt);
       const shares = perchShares(t);
-      // Two of the camp's overviews (validation's long range) must have him long enough.
-      options.push({ stops: r.stops, legs: r.legs, max: Math.max(...shares), two: shares.filter((x, i) => overviews[i] && x * cycle >= V.targetSeconds).length >= V.longRangePerches });
+      // A walk's use to the plan: for a 'walk' crux, two overviews must have him long enough; for an escort, one perch.
+      const seenBy = shares.filter((x) => x * cycle >= V.targetSeconds).length;
+      options.push({ stops: r.stops, legs: r.legs, max: Math.max(...shares), two: crux === 'walk' ? shares.filter((x, i) => overviews[i] && x * cycle >= V.targetSeconds).length >= V.longRangePerches : seenBy >= 1, seenBy });
     }
-    // The walks within the limit, those that two perches see first; they're tried in that
+    // The walks within the limit, those a perch can use first; they're tried in that
     // order when he's placed, since a post at his door can rule one out.
     const within = options.filter((o) => o.max <= V.maxTarget - S.targetMargin);
     const ordered = [...within.filter((o) => o.two), ...within.filter((o) => !o.two)];
@@ -622,6 +684,9 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
       }
     };
     for (let g = 0; g < n; g++) setEdges(g);
+    // This is an estimate from every few samples, so a camp built around a crux, which has
+    // fewer men in the open to go wrong with, keeps a margin over the rule.
+    const needed = V.watchedDuty + (crux === 'walk' ? 0 : S.witnessMargin);
     const breaking = (): number => {
       let bad = 0;
       for (let p = 0; p < perches.views.length; p++) {
@@ -642,7 +707,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
               of++;
               if (edge[u]![v]![k] && seenAt[p]![v]![k] && !seenAt[p]![u]![k]) count++;
             }
-            if (count / of >= V.watchedDuty) watched = true;
+            if (count / of >= needed) watched = true;
           }
           if (watched) break;
         }
@@ -655,7 +720,8 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
     const walkers = placed.map((q, i) => ({ q, i })).filter(({ q }) => q.routine.offset !== undefined && q.plan.role !== 'target');
     for (let tries = 0; tries < S.witnessTries && bad > 0; tries++) {
       const { q, i } = walkers[tries % walkers.length] ?? { q: null, i: -1 };
-      if (!q) return;
+      // No walkers to shift: the turns below are for exactly these camps.
+      if (!q) break;
       const before = { routine: q.routine, xz: q.xz, sight: q.sight };
       const routine = { ...q.routine, offset: (q.routine.offset! + (q.routine.period * (1 + (tries % 7))) / 8) % q.routine.period };
       const xz = track(routine);
@@ -675,24 +741,84 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
         setEdges(i);
       }
     }
+    // A camp built around a crux has fewer men in the open to shift, so if that wasn't enough
+    // a man on the ground is turned to have somebody else in his eye, as long as that keeps
+    // him off the way in (a fixed number of tries).
+    if (crux === 'walk') return;
+    const posted = placed.map((q, i) => ({ q, i })).filter(({ q }) => q.plan.post !== undefined && q.plan.post.elevated === undefined && q.plan.role !== 'target');
+    for (let tries = 0; tries < S.witnessTries && bad > 0 && posted.length > 0; tries++) {
+      const { q, i } = posted[tries % posted.length]!;
+      const turn = S.witnessTurns[Math.floor(tries / posted.length) % S.witnessTurns.length]!;
+      const post = q.plan.post!;
+      const before = { routine: q.routine, sight: q.sight };
+      const routine = postRoutine(postAt(q.routine), post.look + turn * DEG, post.scan, R, cycle, scanOf(q.routine));
+      const sight = sightOf(routine, null, q.plan.role);
+      if (corridorWatch(sight) > S.corridorWatch) continue;
+      q.routine = routine;
+      q.sight = sight;
+      setEdges(i);
+      const now = breaking();
+      if (now < bad) bad = now;
+      else {
+        q.routine = before.routine;
+        q.sight = before.sight;
+        setEdges(i);
+      }
+    }
   }
 
   /**
-   * With every guard placed, the perches that see half the camp are known: the target's
-   * walk out is changed, if another of his walks fits, so that two of them have him long
-   * enough (validation's long range).
+   * With every guard placed, the target's walk out is chosen again. On an escort's camp it's
+   * the walk a perch can use where another guard has him most often (the crux). On the old
+   * promise ('walk'), it's one that two of the perches that see half the camp have him on.
    */
   function rechooseTargetWalk(): void {
     const target = placed.find((q) => q.plan.role === 'target');
-    if (!target?.plan.options || target.plan.options.length < 2) return;
+    if (!target?.plan.options || target.plan.options.length < (crux === 'escort' ? 1 : 2)) return;
     const V = gen.validation;
     const seen = placed.filter((q) => q !== target).map((q) => perchShares(q.sight).map((x) => x * cycle >= V.seenSeconds - 1e-9));
     const half = Math.ceil(placed.length / 2);
     const wide = perches.views.map((_, p) => seen.filter((row) => row[p]).length + 1 >= half);
     const score = (t: GuardTrack): number => perchShares(t).filter((x, p) => wide[p] && x * cycle >= V.targetSeconds).length;
-    if (score(target.sight) >= V.longRangePerches) return;
     const r = target.routine;
     const scan = scanOf(r);
+    // An escort: of the walks a perch can use, the one where a perch has him most often with
+    // another guard's eye on him. Nobody is posted to do it; the walk is chosen.
+    if (crux === 'escort') {
+      const inAnyView = (t: GuardTrack, k: number): boolean => {
+        const c = cellOf(raster, t.x[k]!, t.z[k]!);
+        return c >= 0 && perches.views.some((v) => t.chest[k]! >= v[c]!);
+      };
+      const witnessed = (t: GuardTrack): number => {
+        let seen = 0;
+        let watched = 0;
+        for (let k = 0; k < witnessSamples; k += S.estimateStep) {
+          if (!inAnyView(t, k)) continue;
+          seen++;
+          if (placed.some((q) => q !== target && seesDrop(raster, q.sight, t, k, gen))) watched++;
+        }
+        return seen > 0 ? watched / seen : 0;
+      };
+      let top: { routine: Routine; xz: Float64Array; sight: GuardTrack; option: (typeof target.plan.options)[number]; share: number } | null = null;
+      for (const o of target.plan.options) {
+        const routine = patrolRoutine(o.legs, o.stops, R, r.period, r.offset!, scan);
+        const xz = track(routine);
+        if (placed.some((q) => q !== target && q.xz && clashes(q.xz, xz))) continue;
+        const sight = sightOf(routine, null, 'target');
+        const shares = perchShares(sight);
+        if (shares.filter((x) => x * cycle >= V.targetSeconds).length < 1 || Math.max(...shares) > V.maxTarget - S.targetMargin) continue;
+        const share = witnessed(sight);
+        if (!top || share > top.share + 1e-9) top = { routine, xz, sight, option: o, share };
+      }
+      if (top) {
+        target.routine = top.routine;
+        target.xz = top.xz;
+        target.sight = top.sight;
+        target.plan = { ...target.plan, stops: top.option.stops, legs: top.option.legs };
+      }
+      return;
+    }
+    if (score(target.sight) >= V.longRangePerches) return;
     for (const o of target.plan.options) {
       const routine = patrolRoutine(o.legs, o.stops, R, r.period, r.offset!, scan);
       const xz = track(routine);

@@ -1,7 +1,7 @@
 import type { World } from '../kernel/world/world';
 import { defaultTuning } from '../../config/tuning';
 import { InvariantWatch, bodyHeight, bodyShape, createBody, eyeOf, mantleAt, stepMotor, type Cylinder, type MotorContext } from '../body';
-import { analyzeCamp, buildWorld, campMission, generateWorld, infiltrate, spaceTimeSearch } from '../generation';
+import { analyzeCamp, buildWorld, campMission, cruxOf, generateWorld, infiltrate, spaceTimeSearch } from '../generation';
 import type { LayerName } from '../lanes';
 import { LAYERS } from '../lanes';
 import { Hasher } from '../kernel/core/hash';
@@ -538,7 +538,7 @@ function brainMetrics(): Record<string, number> {
   }
   m['reactions (in the scripted scenarios)'] = reactions;
   m['reactions unexplained'] = unexplained;
-  // One overlook, from both sides (E12): a perfect shooter who stays on the best overview, at a person's pace, and one timed shot at the target.
+  // One overlook, from both sides (E12): a perfect shooter who stays on the best overview, at a person's pace, and one timed shot at the target (on the camps that offer one).
   let down = 0;
   let there = 0;
   let cleared = 0;
@@ -558,6 +558,14 @@ function brainMetrics(): Record<string, number> {
     down += start.size - left;
     if (commanderOf(sim)?.camp.objective?.status === 'escaped') away++;
     else if (left === 0) cleared++;
+  }
+  // A timed shot needs a target a perch can have, which is an escort's camp (generation/crux.ts): the first few of those in a series of its own.
+  const TIMED_SEEDS: string[] = [];
+  for (let k = 0; TIMED_SEEDS.length < OVERLOOK_SEEDS.length && k < 100; k++) {
+    const seed = `BNT-${String(k).padStart(4, '0')}`;
+    if (cruxOf(seed, T.gen) === 'escort') TIMED_SEEDS.push(seed);
+  }
+  for (const seed of TIMED_SEEDS) {
     const shot = overlook(`seed=${seed}&plan=timed`);
     const run = startScene(shot, T);
     const d = shot.driver!();
@@ -569,7 +577,7 @@ function brainMetrics(): Record<string, number> {
   m[`overlook: guards down from one perch, of ${there}`] = down;
   m[`overlook: camps cleared (of ${OVERLOOK_SEEDS.length})`] = cleared;
   m[`overlook: the target got away (of ${OVERLOOK_SEEDS.length})`] = away;
-  m[`timed shot: target down (of ${OVERLOOK_SEEDS.length})`] = timed;
+  m[`timed shot on an escort's camp: target down (of ${TIMED_SEEDS.length})`] = timed;
   return m;
 }
 

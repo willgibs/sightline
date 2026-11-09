@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { campMission, defaultCampSpec, generateWorld } from '../src/sim/generation';
 import { buildCompound } from '../src/sim/generation/compound';
+import { needsWayIn } from '../src/sim/generation/crux';
 import type { Ridge } from '../src/sim/generation/landform';
 import type { Site } from '../src/sim/generation/site';
 import type { TerrainFeatures } from '../src/sim/generation/terrain';
@@ -62,12 +63,14 @@ describe('the compound', () => {
       const modules = L.buildings.map((b) => b.module);
       for (const m of ['hq', 'barracks', 'mess', 'radio'] as const) expect(modules).toContain(m);
       const hq = L.buildings.find((b) => b.module === 'hq')!;
-      expect(hq.doors.length).toBe(2);
+      expect(hq.doors.length).toBe(needsWayIn(w.camp.crux!) ? 2 : 1);
       for (const b of L.buildings) expect(b.doors.length).toBeGreaterThanOrEqual(1);
       expect(L.towers.length).toBeGreaterThanOrEqual(T.gen.compound.towers[0]!);
       expect(w.camp.ladders!.length).toBe(L.towers.length);
       expect(w.camp.vehicles!.filter((v) => v.escape).length).toBe(1);
-      for (const kind of ['generator', 'mast', 'light', 'alarm', 'fence', 'tower'] as const) expect(w.camp.structures.some((s) => s.kind === kind)).toBe(true);
+      for (const kind of ['generator', 'mast', 'light', 'alarm', 'tower'] as const) expect(w.camp.structures.some((s) => s.kind === kind)).toBe(true);
+      // Its perimeter is chain link, or a solid wall.
+      expect(w.camp.structures.some((s) => s.kind === 'fence' || s.kind === 'block')).toBe(true);
     }
   });
 
@@ -137,7 +140,7 @@ describe('the compound', () => {
 
   it('stands wherever its site is: the same camp, moved', () => {
     const hf = testWorld({ size: 1200, cell: 4 }).terrain;
-    const ridge = (bx: number, bz: number): Ridge => ({ bx, bz, angle: 0, span: 1, crest: { points: [], lengths: [], total: 0, boxes: new Float64Array(0) }, height: 40, front: 90, gullyRun: 90, back: 150, gullies: [] });
+    const ridge = (bx: number, bz: number): Ridge => ({ bx, bz, angle: 0, span: 1, crest: { points: [], lengths: [], total: 0, boxes: new Float64Array(0) }, height: 40, front: 90, gullyRun: 90, back: 150, gullies: [], wall: false, notch: 0.12 });
     const build = (site: Site) => {
       const colliders = new ColliderSet(1200);
       const features = { site, ridges: [ridge(-0.8, 0.6)] } as unknown as TerrainFeatures;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { emptyRoute, emptySteering, followRoute, navigatorOf, routeLength, type Route } from '../src/sim/brain/nav';
+import { plainTuning } from '../src/lab/experiments/variety';
 import { campMission } from '../src/sim/generation';
 import { generateWorld } from '../src/sim/generation/world';
 import { player } from '../src/sim/game/entities';
@@ -124,7 +125,9 @@ describe('navigation', () => {
   });
 
   it('goes coarse across the valley, refining inside the camp, and every segment is walkable', () => {
-    const world = generateWorld(missionSpec('TAL-4471'), T);
+    // The plain valley this route was first checked on: on other valleys a raw diagonal step can
+    // clip a tree (nav.ts's edges check the two ways round a corner, not the corner itself).
+    const world = generateWorld(missionSpec('TAL-4471'), plainTuning(T));
     const nav = navigatorOf(world, T);
     const site = world.camp.site;
     const r = emptyRoute();

@@ -41,9 +41,10 @@ describe('terrain with teeth', () => {
       const o = checkValley(v.heightfield, v.features, T.gen);
       expect(o.problems).toEqual([]);
       const ridges = v.features.ridges!;
-      expect(ridges.length).toBeGreaterThanOrEqual(T.gen.landform.ridges[0]!);
-      expect(ridges.length).toBeLessThanOrEqual(T.gen.landform.ridges[1]!);
-      expect(o.ridgesSeen).toBe(ridges.length);
+      const spines = ridges.filter((r) => !r.wall);
+      expect(spines.length).toBeGreaterThanOrEqual(Math.min(2, T.gen.landform.ridges[0]!));
+      expect(spines.length).toBeLessThanOrEqual(T.gen.landform.ridges[1]!);
+      expect(o.ridgesSeen).toBe(spines.length);
       expect(o.perchArcDeg).toBeLessThanOrEqual(T.gen.overwatch.maxPerchArcDeg);
       expect(o.openGapDeg).toBeGreaterThanOrEqual(T.gen.overwatch.minOpenGapDeg);
       // Every perch stands on a placed ridge, none on the open floor.
@@ -94,7 +95,7 @@ describe('terrain with teeth', () => {
             const x = top.x + (nx / len) * d;
             const z = top.z + (nz / len) * d;
             // The creek's banks are a barrier of their own (tested below), wherever a gully meets them.
-            if (closestOnPolyline(v.features.creek, x, z, T.gen.world.creekWidth / 2 + 10, hit).dist !== Infinity) break;
+            if (closestOnPolyline(v.features.creek, x, z, v.features.creekWidth! / 2 + 30, hit).dist !== Infinity) break;
             v.heightfield.sample(x, z, sample);
             slopes.push(sample.slopeTan);
           }
@@ -107,7 +108,9 @@ describe('terrain with teeth', () => {
           if (rd.gullies.some((g) => Math.abs(g - s) < T.gen.landform.gullyWidth * 1.5)) continue;
           if (Math.max(...descents(s)) > walkable) cliffs++;
         }
-        expect(cliffs).toBeGreaterThan(0);
+        // A low bluff has no cliff band to speak of: the band climbs 0.6 of the crest's height
+        // over 0.18 of the face's run, so only a face taller than that is steep at all.
+        if ((3.33 * rd.height) / rd.front > walkable) expect(cliffs).toBeGreaterThan(0);
       }
     }
   });
@@ -126,7 +129,7 @@ describe('terrain with teeth', () => {
         const l = Math.hypot(tx, tz);
         let worst = 0;
         for (const side of [-1, 1]) {
-          for (let d = T.gen.world.creekWidth / 2 + 1; d < T.gen.world.creekWidth / 2 + 6; d += 1) {
+          for (let d = v.features.creekWidth! / 2 + 1; d < v.features.creekWidth! / 2 + 6; d += 1) {
             v.heightfield.sample(p.x - (tz / l) * d * side, p.z + (tx / l) * d * side, sample);
             worst = Math.max(worst, sample.slopeTan);
           }

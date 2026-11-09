@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
+import { plainTuning } from '../src/lab/experiments/variety';
 import { analyzeCamp, buildRaster, campMission, campPlans, generateWorld, planOn, sameSignature, sharedFields, type AnalysisParts, type CampAnalysis, type Plan } from '../src/sim/generation';
 import { sectorOf } from '../src/sim/generation/plans';
 import type { World } from '../src/sim/kernel/world/world';
@@ -10,7 +11,9 @@ import type { World } from '../src/sim/kernel/world/world';
  * best plan works on that camp.
  */
 
-const G = T.gen;
+// The bots know the way in, the long range and the systems, not a flush, so they're asked of a camp the old promise built.
+const plain = plainTuning(T);
+const G = plain.gen;
 let world: World;
 let analysis: CampAnalysis;
 let parts: AnalysisParts;
@@ -18,7 +21,7 @@ let plans: Plan[];
 let best: Plan;
 
 beforeAll(() => {
-  world = generateWorld(campMission('BNC-0101'), T);
+  world = generateWorld(campMission('BNC-0101'), plain);
   const R = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, G.analysis.cell, G.analysis.margin);
   ({ analysis, parts } = analyzeCamp(world.camp, world.terrain, world.colliders, world.grid, G, R));
   ({ plans, best } = campPlans(world.camp, analysis, parts, G));
