@@ -38,10 +38,18 @@ export class OverlookShooter implements Driver<Simulation> {
   private readonly marksman = new MarksmanDriver(this.steps);
   private readonly shape = emptyShape();
   private readonly hit = emptyHit();
-  private next_ = 3;
+  private next_: number;
 
-  /** `pace`: seconds between his shots. A person needs several to range, hold and press; the bolt alone allows about 1.5. */
-  constructor(private readonly pace: number) {}
+  /**
+   * `pace`: seconds between his shots. A person needs several to range, hold and press; the bolt alone allows about 1.5.
+   * `firstAt`: when he may first fire, seconds into the run.
+   */
+  constructor(
+    private readonly pace: number,
+    firstAt = 3,
+  ) {
+    this.next_ = firstAt;
+  }
 
   next(sim: Simulation, out: InputFrame): InputFrame {
     const now = sim.tick / sim.tuning.sim.tickHz;

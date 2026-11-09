@@ -43,6 +43,8 @@ export interface Experiment {
   camps: number;
   arms: readonly Arm[];
   measures: readonly Measure[];
+  /** The measure that says which arm did best on a camp, for a tournament between arms: the report counts each arm's best camps, and by how far. */
+  score?: string;
   /** One camp, one arm: each measure's value. */
   run(seed: string, arm: Arm, tuning: Tuning): Record<string, number>;
 }
@@ -126,6 +128,37 @@ function cell(m: MeasureReport): string {
   return `${number(m.value.value)} ±${number((m.value.high - m.value.low) / 2)}`;
 }
 
+/** Who does best on each camp, by an experiment's score, and how far ahead of the next arm: the design's "dominance". */
+export interface Tournament {
+  key: string;
+  /** Each arm: the camps it's alone at the top of. */
+  best: Array<{ arm: string; camps: number }>;
+  /** Camps where the top is shared. */
+  tied: number;
+  /** The mean gap between the best arm and the next, over the camps. */
+  margin: number;
+}
+
+export function tournament(exp: Experiment, results: Results, rolls = 1): Tournament | null {
+  const key = exp.score;
+  if (!key) return null;
+  const scores = exp.arms.map((arm) => groupsOf(results.get(arm.name)!, rolls).map((g) => mean(g.map((r) => r[key] ?? NaN)).value));
+  const camps = scores[0]!.length;
+  const best = exp.arms.map((arm) => ({ arm: arm.name, camps: 0 }));
+  let tied = 0;
+  let margin = 0;
+  for (let c = 0; c < camps; c++) {
+    const here = scores.map((s) => s[c]!);
+    const sorted = [...here].sort((a, b) => b - a);
+    const top = sorted[0]!;
+    margin += top - (sorted[1] ?? top);
+    const leaders = here.flatMap((v, k) => (v === top ? [k] : []));
+    if (leaders.length === 1) best[leaders[0]!]!.camps++;
+    else tied++;
+  }
+  return { key, best, tied, margin: camps > 0 ? margin / camps : NaN };
+}
+
 /** How much of a measure is the camp's, with the spread of each. */
 function splitCell(m: MeasureReport): string {
   const s = m.split;
@@ -139,11 +172,16 @@ function table(rows: ReadonlyArray<readonly string[]>): string[] {
 }
 
 /** The whole report, as plain text: a table, each change that's more than the camps' own variation, and with several rolls of the dice, what's the camp and what's the dice. */
-export function formatReport(exp: Experiment, reports: readonly ArmReport[], count: number, rolls = 1): string {
+export function formatReport(exp: Experiment, reports: readonly ArmReport[], count: number, rolls = 1, best: Tournament | null = null): string {
   const headers = ['', ...exp.measures.map((m) => m.label)];
   const out = [`${exp.name}: ${exp.about}`, `${count} camps${rolls > 1 ? `, ${rolls} rolls of the dice on each` : ''}, series ${exp.series}.`, '', ...table([headers, ...reports.map((r) => [r.arm, ...r.measures.map(cell)])]), ''];
   const clear = reports.flatMap((r) => r.measures.filter((m) => m.clear).map((m) => `  ${r.arm}: ${m.label} ${m.change!.value >= 0 ? '+' : ''}${m.kind === 'rate' ? `${(m.change!.value * 100).toFixed(0)} points` : number(m.change!.value)}`));
   out.push(clear.length ? 'Clearly different from the first arm, seed by seed:' : 'Nothing is clearly different from the first arm.', ...clear, '');
+  if (best) {
+    out.push(`Best on each camp, by ${best.key}:`);
+    for (const b of best.best) out.push(`  ${b.arm}: ${b.camps} of ${count}`);
+    out.push(`  tied at the top: ${best.tied} of ${count}`, `  the best ahead of the next by ${number(best.margin)} on average`, '');
+  }
   if (rolls > 1) {
     out.push("The camp or the dice? The camp's share of the spread between runs (the rest is luck), with the standard deviation between camps · between rolls on one camp:", '');
     out.push(...table([headers, ...reports.map((r) => [r.arm, ...r.measures.map(splitCell)])]), '');

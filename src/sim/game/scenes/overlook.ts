@@ -103,9 +103,9 @@ export function overlook(params?: string): Scene {
       base.setup!(sim);
       // What E12 measures is whether the target falls or gets away, so the run is over when he does.
       delete commanderOf(sim)!.camp.objective!.getOut;
-      const at = p.plan === 'clear' ? bestOverview(world!) : plan;
+      const at = p.plan === 'clear' ? bestOverview(sim.world) : plan;
       if (!at) return;
-      const site = world!.camp.site;
+      const site = sim.world.camp.site;
       placePlayer(sim, at.x, at.z, site.x - at.x, site.z - at.z);
     },
     driver: (): Driver<Simulation> => {

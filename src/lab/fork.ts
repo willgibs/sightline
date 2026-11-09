@@ -59,6 +59,18 @@ export function movePlayer(x: number, z: number): Intervention {
   return { name: `move the player to (${x.toFixed(0)}, ${z.toFixed(0)})`, apply: (sim) => placeBody(sim, x, z) };
 }
 
+/** Moves the player where `where` says, read from the run at the fork. Fails if it has nowhere to say. */
+export function teleportTo(name: string, where: (sim: Simulation) => { x: number; z: number } | null): Intervention {
+  return {
+    name,
+    apply(sim) {
+      const at = where(sim);
+      if (!at) throw new Error(`No firing point for '${name}' at tick ${sim.tick}`);
+      placeBody(sim, at.x, at.z);
+    },
+  };
+}
+
 /** Moves the player `metres` square across the line of fire (+ to the shooter's right, as he faces the camp), to the nearest open ground there. */
 export function moveAcross(metres: number): Intervention {
   return {

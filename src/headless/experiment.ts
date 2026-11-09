@@ -15,7 +15,7 @@ import { fork, type ChildProcess } from 'node:child_process';
 import { availableParallelism } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { defaultTuning } from '../config/tuning';
-import { formatReport, report, seedsOf, withDice, type RunResult } from '../lab/experiment';
+import { formatReport, report, seedsOf, tournament, withDice, type RunResult } from '../lab/experiment';
 import { EXPERIMENTS } from '../lab/experiments';
 import { parseArgs } from './args';
 
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   await share(jobs, size, results);
   // Back to arms, each in the order of the seeds and their rolls, whichever process finished what first.
   const byArm = new Map(exp.arms.map((arm, a) => [arm.name, jobs.filter((j) => j.arm === a).map((j) => results[j.id]!)]));
-  console.log(`\n${formatReport(exp, report(exp, byArm, rolls), count, rolls)}`);
+  console.log(`\n${formatReport(exp, report(exp, byArm, rolls), count, rolls, tournament(exp, byArm, rolls))}`);
   console.log(`${jobs.length} runs on ${size} processes, in ${((performance.now() - started) / 1000).toFixed(0)} s.\n`);
 }
 
