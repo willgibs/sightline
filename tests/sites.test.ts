@@ -185,7 +185,8 @@ describe('the crux a camp is built around', () => {
   const worlds = new Map<string, ReturnType<typeof generateWorld>>();
   beforeAll(() => {
     for (const crux of ['inside', 'flush', 'escort'] as const) for (const seed of SEEDS_) worlds.set(`${crux}${seed}`, generateWorld(campMission(seed), forced(crux)));
-  }, 180_000);
+    // Nine camps, three of them flush camps at their slowest: more than three minutes on a loaded Windows runner.
+  }, 420_000);
   const each = (crux: string): ReadonlyArray<ReturnType<typeof generateWorld>> => SEEDS_.map((s) => worlds.get(`${crux}${s}`)!);
 
   it('is picked from a stream of its own, and every kind comes up', () => {
