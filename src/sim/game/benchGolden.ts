@@ -179,7 +179,18 @@ export const BENCH_GOLDEN: PinnedBench = {
       "overlook: the target got away (of 3)": 1,
       "timed shot: target down (of 3)": 3
     },
-    "runs": {}
+    "runs": {
+      "camp-fight": {
+        "work": {
+          "motor": { "rays": 0, "nodes": 0, "bodies": 9208 },
+          "bullets": { "rays": 66, "nodes": 0, "bodies": 0 },
+          "perception-hearing": { "rays": 71, "nodes": 30562, "bodies": 0 },
+          "perception-spotting": { "rays": 16461, "nodes": 0, "bodies": 0 },
+          "perception-awareness": { "rays": 0, "nodes": 85189, "bodies": 0 },
+          "guard-brains": { "rays": 0, "nodes": 63260, "bodies": 0 }
+        }
+      }
+    }
   },
   "ballistics": {
     "metrics": {

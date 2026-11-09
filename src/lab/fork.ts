@@ -447,8 +447,9 @@ function compare(base: Play, branch: Play, d: Divergence): void {
   if (!d.guard) {
     const other = new Map(b.guards.map((g) => [g.id, g]));
     for (const g of a.guards) {
+      // One the branch has lost is its own news: an event says who dropped, and the state already showed one taken away.
       const h = other.get(g.id);
-      if (!h || h.body.x !== g.body.x || h.body.z !== g.body.z || h.body.yaw !== g.body.yaw || h.guard.headYaw !== g.guard.headYaw) {
+      if (h && (h.body.x !== g.body.x || h.body.z !== g.body.z || h.body.yaw !== g.body.yaw || h.guard.headYaw !== g.guard.headYaw)) {
         d.guard = { tick: b.tick, id: g.id, role: roleOf(a, g.guard.spawn) };
         break;
       }

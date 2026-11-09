@@ -138,7 +138,7 @@ export function ladder(params?: string): Scene {
       },
       driver: () => new PlanDriver(p.plan),
       // Long enough to walk out from anywhere. The perfect shooter never leaves, so he stops when he's had his chance.
-      seconds: p.plan === 'static' ? 300 : p.plan === 'careless' ? 240 : 1200,
+      seconds: p.plan === 'static' ? 300 : 1200,
       expect: [
         {
           name: 'the run stays a run: the whole camp is awake, and the player is where the plan put him',

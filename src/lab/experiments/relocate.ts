@@ -55,11 +55,6 @@ export function firingPointAbout(sim: Simulation, metres: number): { x: number; 
 /** Lies where he is and does nothing. */
 const LIES_STILL: Driver<Simulation> = { next: (sim, out) => Object.assign(out, neutralInput(sim.player.yaw, sim.player.pitch)) };
 
-/** Stays put, shooting or not. */
-function afterwards(firing: boolean, firstAt: number): Driver<Simulation> {
-  return firing ? new OverlookShooter(PACE, firstAt) : LIES_STILL;
-}
-
 /** Carries the shooter on foot to a firing point, and then does what he'd do there. */
 class WalkThere implements Driver<Simulation> {
   private walk: WalkTo | null = null;
@@ -92,10 +87,11 @@ class WalkThere implements Driver<Simulation> {
   }
 }
 
-function change(move: Move, firing: boolean, firstAt: number): Intervention {
+function change(move: Move, firing: boolean): Intervention {
   if (move.how === 'on foot') return { name: `walked ${move.metres} m`, apply: () => {}, driver: () => new WalkThere(move.metres, firing) };
   const base = move.how === 'stay' ? noChange() : teleportTo(`moved ${move.metres} m`, (sim) => firingPointAbout(sim, move.metres));
-  return { ...base, driver: () => afterwards(firing, firstAt) };
+  // Keeping up the shooting needs no new driver: he's the same shooter, wherever he is.
+  return firing ? base : { ...base, driver: () => LIES_STILL };
 }
 
 function experiment(name: string, about: string, firing: boolean): Experiment {
@@ -129,7 +125,7 @@ function experiment(name: string, about: string, firing: boolean): Experiment {
       let target = '';
       let moved = 0;
       try {
-        const o = playBranch(run, at, change(arm as Move, firing, (at + PACE * tuning.sim.tickHz) / tuning.sim.tickHz), (sim) => {
+        const o = playBranch(run, at, change(arm as Move, firing), (sim) => {
           if (sim.tick === at) from = { x: sim.player.x, z: sim.player.z };
           if (sim.tick >= at && from) moved = Math.max(moved, Math.sqrt((sim.player.x - from.x) * (sim.player.x - from.x) + (sim.player.z - from.z) * (sim.player.z - from.z)));
           target = commanderOf(sim)?.camp.objective?.status ?? '';

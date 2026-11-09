@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { firstTick, forkRun, formatFork, moveAcross, movePlayer, noChange, parseIntervention, patched, patchNumber, playBranch, recordingRun, removeGuard, sceneRun, switchOff } from '../src/lab/fork';
+import { firstTick, forkRun, formatFork, moveAcross, movePlayer, noChange, parseIntervention, patched, patchNumber, playBranch, recordingRun, removeGuard, sceneRun, switchOff, type RunSource } from '../src/lab/fork';
 import { commanderOf } from '../src/sim/game/comms';
 import { overlook } from '../src/sim/game/scenes/overlook';
 import { takeAway } from '../src/sim/game/switches';
@@ -12,7 +12,9 @@ import { runScene, startScene, type Scene } from '../src/sim/kernel/scene';
 
 const params = 'seed=LEB-2534&plan=clear&pace=5';
 const scene = (): Scene<Simulation> => overlook(params) as Scene<Simulation>;
-const run = (seconds = 15) => sceneRun(scene(), T, { seconds });
+/** One run to fork, played again for every branch: a world takes longer to build than these take to play. */
+let fifteen: RunSource | null = null;
+const run = (seconds = 15): RunSource => (seconds === 15 ? (fifteen ??= sceneRun(scene(), T, { seconds })) : sceneRun(scene(), T, { seconds }));
 const shotAt = (sim: Simulation, events: readonly { type: string; source: number }[]): boolean => events.some((e) => e.type === 'shot' && e.source === sim.playerId);
 
 describe('a fork', () => {
