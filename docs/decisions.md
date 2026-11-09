@@ -19,6 +19,19 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 **What it cost.** On a fresh held-out series 90 of 100 camps are valid at the first attempt, none invalid (`npm run seeds -- --count 100 --from lab-crowns-exit`). The series the world pillar measured fell from 93 to 82, also with none invalid: the bar is being met only just. Nearly all the difference is the two rules about what one perch may see, `perch witnessed` (8) and `perch coverage` (5). A perch that crowns have narrowed sees a few men, and those two rules were written for perches that see most of a camp; a rebuild fixes those seeds, at about 3 s each. Whether those rules should change is left open until the camp types settle what a perch is for.
 
 **What review changed.** An independent review checked the walk and the chords against brute force and found no bug in the law. It found these at the edges, all fixed: perches read the map too coarsely (the figure above was 93.6%); an eye inside a crown, as above; a round stopped short of a man still counted as a near miss, which was already true of walls; the tools that drop something where you point landed it in the branches; the debug shot line ran on past the crown; and the canopy cell had no bound, so a corrupt recording could size an allocation.
+## 2026-11-09 · What the first sitting showed: the simulator was misreading its own shooter
+
+The owner's first sitting of the compound simulator: "kill shots from hundreds of meters away, through tree cover. Zero line of sight, near perfect accuracy."
+
+**What was really happening.** The script's shooter was on a ridge 200 to 290 m from the camp, and its shots went over the treetops. The panel measured everything from the idle player, parked 736 m away at the corner of the map, so it read as a 736 m shot through forest, and F3 put the camera back there. A tool that says the wrong thing costs a sitting.
+
+**Changed.**
+- The panel measures from the real shooter, the last muzzle, and says where that is. The label `shooter` marks it in the debug view, and 7 looks along the last shot from there.
+- In the compound scene, leaving the debug view stays over the camp: its player is only parked.
+- The scripted sniper is a person: it shoots only at someone in a clear line, at the chest, with 0.8 mrad of error, every 8 s, and otherwise holds fire. It used to fire at the middle of the camp when it could see nobody.
+- The flaw detector holds a man only to what his camp could know. Of the 19 "in the line" flags against the fair sniper, none was exposed from where his camp believed the shots came from. He'd gone to cover from the wrong ridge, or had no idea. That's the honest uncertainty the owner asked for, not a defect. In-the-line per run: sniper 0, suppressed 2.0, relocating 0.9.
+
+**Still true, and next:** tree crowns stop nothing on generated maps (11% of perch-to-post lines the simulation calls clear pass through crowns too thick to see through). The law to build: if you can't see through it, you can't shoot through it.
 
 ## 2026-11-08 · The world pillar: the target is buried, and camps are built around a crux
 
