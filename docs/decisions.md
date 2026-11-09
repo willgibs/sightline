@@ -2,6 +2,18 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · The steep-ground promise, measured where it's kept
+
+**What was happening.** Long bot runs stopped on "gained N m on ground too steep to stand on" about one time in five (5 of 24 runs of 12 minutes, on fresh valleys), and nobody knew why. In all five the motor had done nothing wrong. The body had slid off a steep triangle, across it or down it, onto a walkable one that rose the way it was going, and every millimetre was gained on the walkable one. The watch charged the whole tick's rise to where the tick began. It started with the valleys' scarps and gorges, which put steep and walkable triangles side by side far more often.
+
+**The watch now measures the gain where it happens** (`Heightfield.gainOnSteep`): along the line the body moved, triangle by triangle, counting what the terrain rises on the triangles too steep to stand on. It holds a body on the terrain at both ends of a tick to the two things the motor keeps exactly:
+- it never ends a tick on steep ground higher than it began it, wherever it began (the old check never looked at a body that began on walkable ground);
+- it gains nothing on the steep triangle it began the tick on.
+
+**A known inexactness, reported and left.** The motor judges a move by where it ends, so on its way to ground it can stand on, a body can cross a corner of a steep triangle uphill: up to 58 mm in a tick over 34 hours of bot play, never faster than a walkable grade over the move, and nothing it can climb by. The watch reports the most it sees (`seamGain`, and on the body lane's bench) and holds it to no limit. Making it exact means cutting a move at the first steep triangle that rises and sliding along that triangle's contour. That moves every pinned run near steep ground, for something no player can see, so it's written down in the motor's header and left until there's a reason.
+
+**What it did.** No behaviour changed: this is the instrument. The five valleys that failed hold, and so does every one found since.
+
 ## 2026-11-09 · What you can't see through, you can't shoot through
 
 **Why.** The owner's first sitting found kill shots "through tree cover". Those shots had really gone over the treetops, but the worry was right: on a generated map a tree's crown stopped nothing. Of the lines from perches to posts that the simulation called clear, 11% passed through more crown than anyone could see through, and a bullet went through at no cost. "The fact that it can happen invites lots of problems."

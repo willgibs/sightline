@@ -19,6 +19,24 @@ import { bodyShape } from './shape';
  *
  * The audit that hardened the controller showed an older check passing two deliberately
  * broken controllers, so the tolerances are tight (0.1 mm).
+ *
+ * Height gained on steep ground is measured where it is gained: along the line the body
+ * moved over this tick, triangle by triangle, counting only what the terrain rises on the
+ * triangles too steep to stand on (Heightfield.gainOnSteep). The check used to charge the
+ * whole tick's rise to where the tick began. A body that slides off a steep face and
+ * carries on up walkable ground in the same tick has gained nothing on the face, and that
+ * case stopped about one long bot run in five once the valleys got scarps and gorges, with
+ * the motor doing nothing wrong. What a body on the terrain at both ends of a tick is held to:
+ * - it never ends a tick on steep ground higher than it began it, wherever it began. Steep
+ *   ground is a barrier from walkable ground too, which the old check never looked at;
+ * - it gains no height on the steep ground it began the tick on, wherever it ends: no part
+ *   of its own speed goes uphill there (motor.ts, driveGround).
+ * `seamGain` is reported and held to no limit: the most the terrain rose on steep triangles
+ * under one tick's move with neither promise broken. That is a corner of a steep triangle
+ * clipped on the way to walkable ground, or the far side of a notch ridden up after sliding
+ * down into it and ending no higher. The motor judges a move by where it ends (motor.ts,
+ * terrainBlocks), so it allows these: a few centimetres in a tick, never more than a
+ * walkable grade over the move, and nothing a body can climb by.
  */
 
 export interface InvariantReport {
@@ -30,6 +48,8 @@ export interface InvariantReport {
   worstOverlap: number;
   worstRise: number;
   steepGain: number;
+  /** The most gained in one tick on a sliver of steep ground crossed from walkable ground: reported, not a broken promise (see above). */
+  seamGain: number;
   /** The most a lean grew in one tick, m. */
   worstLeanStep: number;
   /** Lying poses whose head, torso and legs were checked, part by part. */
@@ -46,6 +66,8 @@ export const STEEP_TOLERANCE = 0.005;
 
 interface Before {
   y: number;
+  /** On the ground, on the terrain itself: where its height is the terrain's. */
+  onTerrain: boolean;
   onSteep: boolean;
   lean: number;
   x: number;
@@ -57,9 +79,10 @@ interface Before {
 }
 
 export class InvariantWatch {
-  readonly report: InvariantReport = { ticks: 0, checks: 0, below: 0, inside: 0, worstOverlap: 0, worstRise: 0, steepGain: 0, worstLeanStep: 0, partChecks: 0, nan: 0, first: null };
+  readonly report: InvariantReport = { ticks: 0, checks: 0, below: 0, inside: 0, worstOverlap: 0, worstRise: 0, steepGain: 0, seamGain: 0, worstLeanStep: 0, partChecks: 0, nan: 0, first: null };
   private readonly before = new Map<EntityId, Before>();
   private readonly sample = makeTerrainSample();
+  private readonly piece = { first: 0 };
   private readonly push = { x: 0, z: 0 };
   private readonly ids: number[] = [];
   private readonly shape = emptyShape();
@@ -78,7 +101,8 @@ export class InvariantWatch {
       world.terrain.sample(b.x, b.z, this.sample);
       const tanMax = dtanDeg(tuning.bodies[e.kind].maxSlopeDeg);
       const lying = b.lying > 0;
-      this.before.set(e.id, { y: b.y, onSteep: b.motor === 'ground' && b.standingOn < 0 && this.sample.slopeTan > tanMax, lean: b.lean, x: b.x, z: b.z, head: lying ? b.y + b.riseHead : NaN, pelvis: lying ? b.y + b.risePelvis : NaN, feet: lying ? b.y + b.riseFeet : NaN });
+      const onTerrain = b.motor === 'ground' && b.standingOn < 0;
+      this.before.set(e.id, { y: b.y, onTerrain, onSteep: onTerrain && this.sample.slopeTan > tanMax, lean: b.lean, x: b.x, z: b.z, head: lying ? b.y + b.riseHead : NaN, pelvis: lying ? b.y + b.risePelvis : NaN, feet: lying ? b.y + b.riseFeet : NaN });
     }
   }
 
@@ -121,9 +145,21 @@ export class InvariantWatch {
     if (rise > spec.stepHeight + 1e-9) broke(`rose ${rise.toFixed(4)} m in a tick`);
     // On a ladder, its own rate, up or down (a fall begins only by letting go).
     if (b.motor === 'ladder' && b.ladder!.t >= spec.ladder.reachTime && Math.abs(rise) > spec.ladder.downRate * this.sim.dt + 1e-9) broke(`moved ${rise.toFixed(4)} m on a ladder in a tick`);
-    if (was.onSteep && b.standingOn < 0) {
+    if (was.onTerrain && b.motor === 'ground' && b.standingOn < 0) {
+      // On the terrain at both ends of the tick: what it climbed on steep triangles on the way.
+      const tanMax = dtanDeg(spec.maxSlopeDeg);
+      const gain = world.terrain.gainOnSteep(was.x, was.z, b.x, b.z, tanMax, this.piece);
+      const endsSteep = world.terrain.sample(b.x, b.z, this.sample).slopeTan > tanMax;
+      // What it climbed on steep ground: the whole tick's rise if it ends there, and otherwise
+      // whatever it gained on the triangle it began on.
+      const climbed = endsSteep ? Math.max(rise, this.piece.first) : this.piece.first;
+      r.steepGain = Math.max(r.steepGain, climbed);
+      if (climbed >= STEEP_TOLERANCE) broke(endsSteep && rise >= STEEP_TOLERANCE ? `ended ${rise.toFixed(4)} m higher, on ground too steep to stand on` : `gained ${climbed.toFixed(4)} m on ground too steep to stand on`);
+      else r.seamGain = Math.max(r.seamGain, gain);
+    } else if (was.onSteep && b.standingOn < 0) {
+      // It left steep ground some other way (into the air, onto a path of its own): it may not have gone up doing so.
       r.steepGain = Math.max(r.steepGain, rise);
-      if (rise >= STEEP_TOLERANCE) broke(`gained ${rise.toFixed(4)} m on ground too steep to stand on`);
+      if (rise >= STEEP_TOLERANCE) broke(`rose ${rise.toFixed(4)} m off ground too steep to stand on`);
     }
     const height = bodyHeight(b, spec);
     // Standing, the body is its circle; lying down, the chain below takes its place.
