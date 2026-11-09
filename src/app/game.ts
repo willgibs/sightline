@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Tuning } from '../config/tuning';
 import { FixedStepClock } from '../sim/kernel/core/clock';
-import { headingDegrees, lerp, moveTowards } from '../sim/kernel/core/math';
+import { headingDegrees, lerp, moveTowards, yawFromDirection } from '../sim/kernel/core/math';
 import { headBob } from '../sim/body';
 import type { ReportCode } from '../sim/kernel/events';
 import { BARKS, beliefRadius, explainChain, groundLight, lightName, movementVisibility, stanceVisibility } from '../sim/perception';
@@ -948,7 +948,7 @@ export class Game {
     this.instruments.draw(this.instrumentState(view, scoped, optic === Optic.Binoculars && rifle ? eased : 0, rifle));
     // A click from now on is about this frame: the line of sight the player steered, before any sway.
     this.input.latch.frameShown(this.sim.tick, this.clock.alpha, pose.yaw, pose.pitch);
-    this.hud.updateCompass(view.yaw);
+    this.hud.updateCompass(view.yaw, this.wayOutHeading());
     this.hud.setPrompt(this.detached || this.replay ? null : this.curr.use ? `${this.input.map.describe('use')} · ${USE_LINES[this.curr.use]}${this.curr.useProgress > 0 ? ` ${Math.round(this.curr.useProgress * 100)}%` : ''}` : this.curr.climb ? `${this.input.map.describe('climb')} · ${this.curr.climb === 'ladder' ? 'climb' : 'mantle'}` : null);
     this.cues.draw(this.curr, view, this.time);
     this.hud.setRange(this.debug ? this.aimText : null);
@@ -1008,7 +1008,7 @@ export class Game {
     this.curr = this.sim.snapshot(swap);
     for (const e of events) {
       if (e.type === 'outcome') this.decided = true;
-      if (e.type === 'objective') this.hud.toast('Target down. Get out: reach the edge of the valley.');
+      if (e.type === 'objective') this.hud.toast('Target down. Get out: follow the road out of the valley.');
       else if (e.type === 'ranged') this.ranged = { range: e.range, at: performance.now() / 1000 };
       else if (e.type === 'shot' && e.speed > 0 && e.source === this.sim.playerId) {
         const fire = this.sim.lastInput.commands.find((c) => c.kind === 'fire');
@@ -1356,6 +1356,14 @@ export class Game {
     if (id === this.sim.playerId) return 'you';
     const g = this.sim.guards.find((x) => x.id === id);
     return g ? `${this.world.camp.guards[g.guard.spawn]?.role ?? 'guard'} ${id}` : `entity ${id}`;
+  }
+
+  /** The heading of the way out, once the target is down and there's somewhere to go; null otherwise. */
+  private wayOutHeading(): number | null {
+    if (!this.sim) return null;
+    const o = commanderOf(this.sim)?.camp.objective;
+    if (!o?.getOut || o.status !== 'done') return null;
+    return headingDegrees(yawFromDirection(o.getOut.x - this.sim.player.x, o.getOut.z - this.sim.player.z));
   }
 
   /** The rifle and the vitals in the debug panel (sim/ballistics, sim/body/vitals.ts). */

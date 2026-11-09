@@ -86,7 +86,7 @@ describe('engine switches', () => {
     const scene = { ...(liveCamp('seed=LEB-2534&off=power,truck') as Scene<Simulation>), expect: [] };
     const run = runScene(scene, T, { seconds: 2 });
     expect(run.sim.index.of('generator').every((g) => !g.generator.running)).toBe(true);
-    expect(run.sim.index.of('vehicle').find((v) => v.vehicle.escape)!.vehicle.disabled).toBe(true);
+    expect(commanderOf(run.sim)!.camp.devices.escape).toBeNull();
     expect(resimulate(run.recording, { scene }).ok).toBe(true);
   }, 120_000);
 
@@ -95,6 +95,15 @@ describe('engine switches', () => {
     const off = sceneSystems(liveCamp('seed=LEB-2534&off=commander') as Scene<Simulation>).map((s) => s.name);
     expect(off).toEqual(on);
   });
+
+  it('make a part absent: left alone, a camp without its radio or alarm boxes stays calm', () => {
+    const run = runScene({ ...(liveCamp('seed=LEB-2534&off=radio,alarm') as Scene<Simulation>), expect: [] }, T, { seconds: 200 });
+    const c = commanderOf(run.sim)!;
+    expect(c.camp.level).toBe('calm');
+    expect(c.camp.netWorking).toBe(false);
+    expect(c.camp.devices.alarms).toHaveLength(0);
+    expect(run.sim.index.of('radio')).toHaveLength(0);
+  }, 120_000);
 
   it('stop the reinforcements being called at all', () => {
     const sim = startScene(liveCamp('seed=LEB-2534&off=reinforce') as Scene<Simulation>, T);

@@ -71,10 +71,11 @@ export const switchOff: Experiment = {
     { name: 'commander', off: 'commander' },
     { name: 'radio', off: 'radio' },
     { name: 'commander, radio', off: 'commander,radio' },
+    { name: 'alarm boxes', off: 'alarm' },
     { name: 'reinforcements', off: 'reinforce' },
     { name: "target's truck", off: 'truck' },
-    { name: 'generator', off: 'power' },
-    { name: 'generator, truck', off: 'power,truck' },
+    { name: 'generator cut', off: 'power' },
+    { name: 'alarm boxes, truck', off: 'alarm,truck' },
   ],
   measures: [
     { key: 'down', label: 'guards down', kind: 'mean' },

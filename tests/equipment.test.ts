@@ -409,11 +409,14 @@ describe('doors (E7, A9)', () => {
 });
 
 describe('getting out (the owner\'s call, Nov 8)', () => {
-  /** A live camp whose target falls at the first tick, and the player `from` metres inside the edge of the valley. */
-  function afterTheKill(from: number, kill = true): { sim: Simulation; events: SimEvent[]; run: (seconds: number, moveZ?: number) => void } {
+  /** A live camp whose target falls at the first tick, and the player `from` metres from the way out. */
+  function afterTheKill(from: number, kill = true): { sim: Simulation; events: SimEvent[]; run: (seconds: number) => void } {
     const base = liveCamp('seed=LEB-2534') as Scene<Simulation>;
-    const half = world.playHalf;
-    // The rules go by the death event, whatever caused it.
+    const road = truckRoute(world, T)!;
+    const exit = road[0]!;
+    // Up the road from the way out, so there's ground to stand on, facing it.
+    const ux = (road[1]!.x - exit.x) / Math.hypot(road[1]!.x - exit.x, road[1]!.z - exit.z);
+    const uz = (road[1]!.z - exit.z) / Math.hypot(road[1]!.x - exit.x, road[1]!.z - exit.z);
     const killer: System = {
       name: 'test-kill',
       phase: 'world',
@@ -428,36 +431,37 @@ describe('getting out (the owner\'s call, Nov 8)', () => {
         ctx.emit({ type: 'death', source: ctx.state.entities[0]!.id, victim, remains: 0, post: 0, part: 'head', x: 0, y: 0, z: 0 });
       },
     };
-    const scene: Scene<Simulation> = { ...base, world: () => world, systems: [...(base.systems ?? []), killer], setup: (s) => (base.setup!(s), placePlayer(s, half - from, 0, 1, 0)) };
+    const scene: Scene<Simulation> = { ...base, world: () => world, systems: [...(base.systems ?? []), killer], setup: (s) => (base.setup!(s), placePlayer(s, exit.x + ux * from, exit.z + uz * from, -ux, -uz)) };
     const sim = startScene(scene, T);
     const events: SimEvent[] = [];
+    const yaw = yawFromDirection(-ux, -uz);
     return {
       sim,
       events,
-      run: (seconds, moveZ = 0) => {
-        const input = { ...neutralInput(yawFromDirection(1, 0)), moveZ };
+      run: (seconds) => {
+        const input = { ...neutralInput(yaw), moveZ: 1 };
         for (let i = 0; i < seconds * 30 && sim.state.outcome.status === 'playing'; i++) events.push(...sim.step(input).map((e) => ({ ...e })));
       },
     };
   }
 
   it('the target falling is not the end: it says to get out, and the run goes on', () => {
-    const { sim, events, run } = afterTheKill(60);
+    const { sim, events, run } = afterTheKill(200);
     run(2);
     expect(events.some((e) => e.type === 'objective' && e.stage === 'get-out')).toBe(true);
     expect(commanderOf(sim)!.camp.objective!.status).toBe('done');
     expect(sim.state.outcome.status).toBe('playing');
   }, 60_000);
 
-  it('reaching the edge of the valley with the target down ends the mission', () => {
-    const { sim, run } = afterTheKill(T.brain.getOut.margin + 4);
-    run(6, 1);
+  it('reaching the way out with the target down ends the mission', () => {
+    const { sim, run } = afterTheKill(T.brain.getOut.radius + 6);
+    run(6);
     expect(sim.state.outcome).toMatchObject({ status: 'succeeded', reason: 'the target is down, and you got out' });
   }, 60_000);
 
   it('reaching it with the target alive ends nothing', () => {
-    const { sim, run } = afterTheKill(T.brain.getOut.margin + 4, false);
-    run(6, 1);
+    const { sim, run } = afterTheKill(T.brain.getOut.radius + 6, false);
+    run(6);
     expect(sim.state.outcome.status).toBe('playing');
   }, 60_000);
 });

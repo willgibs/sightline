@@ -7,12 +7,15 @@ import type { Simulation } from './sim';
  * to measure and to feel what each part adds. A scene takes them as a parameter, so a
  * recording names them and re-simulates them.
  *
- * A switch never takes a system out: the others are ordered against it, and leaving it in
- * place doing nothing keeps every other system's order and random draws (rule 3). What
- * differs between two runs is then the switched part's doing, and nothing else.
+ * A switch makes a part absent, as if the camp had never had it: nobody finds a dead set or
+ * a stopped generator, because there's nothing to find. (`power` is the one exception, and
+ * says so.) It never takes a system out, because the others are ordered against it: it
+ * leaves it in place doing nothing. Random streams belong to entities (rule 3), so no
+ * guard's numbers shift because another part is off, though a guard who then behaves
+ * differently draws differently, as he should.
  */
 
-export const CAMP_SWITCHES = ['commander', 'radio', 'power', 'truck', 'reinforce'] as const;
+export const CAMP_SWITCHES = ['commander', 'radio', 'alarm', 'truck', 'reinforce', 'power'] as const;
 
 export type CampSwitch = (typeof CAMP_SWITCHES)[number];
 
@@ -31,14 +34,25 @@ export function switchedOff(scene: Scene<Simulation>, off: readonly CampSwitch[]
   const has = (s: CampSwitch): boolean => off.includes(s);
   return {
     ...scene,
-    systems: (scene.systems ?? []).map((s) => (has('commander') && s.name === 'camp-commander' ? { ...s, run() {} } : s)),
+    systems: (scene.systems ?? []).map((s) => ((has('commander') && s.name === 'camp-commander') || (has('radio') && s.name === 'camp-checkins') ? { ...s, run() {} } : s)),
     setup: (sim) => {
       setup?.(sim);
-      if (has('power')) for (const g of sim.index.of('generator')) g.generator.running = false;
-      if (has('radio')) for (const r of sim.index.of('radio')) r.radio.working = false;
-      if (has('truck')) for (const v of sim.index.of('vehicle')) if (v.vehicle.escape) v.vehicle.disabled = true;
+      const camp = commanderOf(sim)!.camp;
+      // No set, no net, no check-ins. The commander's the one who calls reinforcements, so `commander` takes them too.
+      if (has('radio')) {
+        for (const r of [...sim.index.of('radio')]) sim.despawn(r.id);
+        camp.netWorking = false;
+      }
+      if (has('alarm')) {
+        for (const a of [...sim.index.of('alarm')]) sim.despawn(a.id);
+        camp.devices.alarms.length = 0;
+      }
+      // Nothing to run for: the vehicle stays parked, and the target stays where he is.
+      if (has('truck')) camp.devices.escape = null;
       // Already called, as far as the commander knows: it never calls them again.
-      if (has('reinforce')) commanderOf(sim)!.camp.reinforceCalled = 0;
+      if (has('reinforce')) camp.reinforceCalled = 0;
+      // Not an absence: the generator is cut before the run starts, as sabotage would, and whoever passes it notices.
+      if (has('power')) for (const g of sim.index.of('generator')) g.generator.running = false;
     },
   };
 }

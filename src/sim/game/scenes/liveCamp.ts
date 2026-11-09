@@ -3,6 +3,7 @@ import { giveBrains } from '../brains';
 import { campRules } from '../combat';
 import { campCheckins, campCommander, campDevices, commanderOf, commsVoice, giveCampDevices, giveCommander } from '../comms';
 import { player } from '../entities';
+import { truckRoute } from '../camp';
 import { vehicleDrive } from '../escape';
 import { arm } from '../shooting';
 import { parseSwitches, switchedOff, type CampSwitch } from '../switches';
@@ -65,8 +66,9 @@ export function liveCamp(params?: string): Scene {
       giveBrains(sim);
       giveCommander(sim);
       giveCampDevices(sim);
-      // Here, as in the missions to come, the job isn't done until you're out.
-      commanderOf(sim)!.camp.objective!.getOut = true;
+      // Here, as in the missions to come, the job isn't done until you're out: at the end of the road.
+      const road = truckRoute(sim.world, sim.tuning);
+      if (road) commanderOf(sim)!.camp.objective!.getOut = { x: road[0]!.x, z: road[0]!.z };
       const you = player(sim.index);
       arm(you, sim.tuning);
       you.health = { hits: 0 };

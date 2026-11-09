@@ -82,8 +82,10 @@ export function hurtPlayer(ctx: TickContext, p: PlayerEntity, part: BodyPart, sh
  * The lab's rules: the player who takes enough hits dies; the objective is done if the
  * target falls, lost if he gets away. Where getting out counts (the objective's `getOut`,
  * the owner's call on Nov 8), the target falling is only half of it: you've won when you
- * then reach the edge of the valley alive. That's the way out lab D validates, so every
- * camp has two.
+ * then reach that place alive. It's the end of the road, a five-minute walk from the
+ * perches that can see the target (`npm run experiment -- way-out`), where the nearest edge
+ * of the valley is a stroll that nothing the camp does could interrupt, and it's the way
+ * the reinforcements come in.
  */
 export const campRules: System = {
   name: 'camp-rules',
@@ -118,7 +120,7 @@ export const campRules: System = {
       }
     } else if (obj.status === 'escaped') {
       decide(ctx, 'failed', 'the target got away', p.id);
-    } else if (obj.status === 'done' && obj.getOut && Math.max(Math.abs(p.body.x), Math.abs(p.body.z)) >= ctx.world.playHalf - ctx.tuning.brain.getOut.margin) {
+    } else if (obj.status === 'done' && obj.getOut && (p.body.x - obj.getOut.x) * (p.body.x - obj.getOut.x) + (p.body.z - obj.getOut.z) * (p.body.z - obj.getOut.z) <= ctx.tuning.brain.getOut.radius * ctx.tuning.brain.getOut.radius) {
       decide(ctx, 'succeeded', 'the target is down, and you got out', p.id);
     }
   },

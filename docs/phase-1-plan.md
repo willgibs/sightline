@@ -1,6 +1,6 @@
 # Phase 1 · Core labs: the plan
 
-Phase 1 builds five labs. Each lab is an isolated wireframe scene, built to its exit test before anything is integrated. The phase ends at the gate **Labs pass**, when every lab meets its exit test. Phase 2 then joins the labs into one core mission.
+Phase 1 builds six labs (the sixth, F, added on Nov 8). Each lab is an isolated wireframe scene, built to its exit test before anything is integrated. The phase ends at the gate **Labs pass**, when every lab meets its exit test. Phase 2 then joins the labs into one core mission.
 
 This is the working plan. Its checkboxes are kept current as work lands, and what a lab learns goes into its section, so nothing depends on anyone's memory.
 
@@ -9,7 +9,7 @@ This is the working plan. Its checkboxes are kept current as work lands, and wha
 - `docs/phase-1-handoff.md`: what is already in place.
 - `docs/foundation-shape.md`: the shape every lab builds into. A narrow kernel, lanes whose contracts are enforced by tests, and a bench for every lane.
 - `docs/research/`: the seeds each lab starts from.
-- `docs/camp-engine.md`: a proposal (Nov 8) for how a camp fights back, as engines, and for testing engines in playable sandboxes. Nothing in it is built, and its calls are the owner's.
+- `docs/camp-engine.md`: Lab F's design: how a camp fights back, as engines, and sandboxes as development instruments for proving them.
 - `docs/lab-opportunities.md`: where each lab tests less than the best idea on hand, ranked, with sources.
 
 This plan covers how the labs run, what each one defines for the others, and how each exit test is measured.
@@ -260,6 +260,18 @@ The statistics behind these protocols are in `docs/research/foundations.md`. A p
   - Each mark is checked in the replay.
   - The target is zero marks over at least 40 reactions, which bounds unexplained reactions below about 7%.
 
+### F · A camp worth taking down
+
+The design is `docs/camp-engine.md`, section 8. Scored with a shooter limited to what a person can do, over held-out camps and every preparedness level, on guards who aren't on a tower.
+
+- **The ladder holds its order.** Shoot once and leave doesn't win on camps that expect attack. Perfect and static loses or can't finish on 90% of them. The patient planner wins most.
+- **No plan is best on more than half the camps.** Today one plan is best on 29 of 30.
+- **The gallery closes, and opens again.** Under 20% of standing guards in a clear line 15 s after a shot, on camps that expect attack, and men back out with a job within about a minute.
+- **Staying is dangerous, and moving pays:** a shooter who stays is under effective fire within a time we set, and moving along dead ground buys back a measured amount.
+- **Cuts degrade the camp and force a visible fallback.** No single cut wins by itself.
+- **Every response explains itself** back to something sensed, and no-omniscience holds after contact.
+- **A person can play it.** The owner plays each step and can say "I got outplayed", not "I was cheated".
+
 ## The owner's time
 
 - **Each lab ends** with:
@@ -276,6 +288,7 @@ The statistics behind these protocols are in `docs/research/foundations.md`. A p
   | C | Two of about 12 minutes, with a few minutes on feel |
   | D | One of about 10 minutes |
   | E | One of 10–15 minutes |
+  | F | A short one at the end of every step, about 15 minutes, with three questions |
   | Gate | The report, and one last look |
 
 - **The foundation pass's open check** folds into the first sitting. It runs on the owner's Mac and covers:
@@ -967,6 +980,33 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
     | A 26–30 m move at ±5° and 300 m ends outside 2 sigma | at least half the time | 50.5% moving across the line of fire; 29.5% in any direction |
     | Re-found within 60 s, of 16 | honest at least 80% of omniscient, and ahead of the rest | honest 15, unpaced 16; staleness 13, plain 13, random 2, omniscient 16 |
     | Reactions unexplained | 0 | 0 of 62 |
+
+### F · The camp fights back
+
+Added on Nov 8, the owner's call. *Labs pass* requires it. Design and reasoning: `docs/camp-engine.md`. Research: `docs/research/notes/labs/camp_defense.md`.
+
+**The seed, and the target:**
+- **Seed:** the first-contact drill in LAMBS Danger, confidence in Days Gone, the suppression ladder and reference points in Combat Mission, the countermeasures in FM 3-06.11, the order of events at Wanat.
+- **Where it falls short:** games reach for numbers and scripts; the camp is either helpless against a sniper or it cheats.
+- **Beyond it:** every capability is a chain of simulated things you can see and cut; the camp knows its own ground as data computed with it; the same honesty as lab E.
+- **Bench:** the gauges and experiments in `src/lab`, over paired camps.
+
+**Every step ends with something the owner can play.** A step isn't finished on bot numbers alone.
+
+- [ ] F0 · The bench.
+  - [x] `npm run experiment`: the same camps, several ways, compared seed by seed. `friction`, `gallery`, `switch-off`, `dead-ground` and `way-out` reproduce the numbers behind the design.
+  - [x] Engine switches (`off=` in a camp scene's parameters), as true absences.
+  - [x] Gauges, and the lab panel (`&lab`).
+  - [x] A mission ends when you get out (the owner's call): on the live camp, at the end of the road, marked on the compass once the target is down.
+  - [x] Trial briefs name only the action (see the exit tests).
+  - [ ] Fork a run: re-simulation plus one intervention.
+  - [ ] Re-roll the dice on one camp: a salt in the tuning.
+  - [ ] A shooter limited to what a person can do, through a view of what a player could see; "shoot once and leave" on the ladder.
+  - [ ] A cap on route-finding per tick (the worst tick today is 56 ms), and a camp fight pinned on the bench.
+- [ ] F1 · The first fight. A signal you can hear at range, men who leave the line and come back, tower men who fire back, near misses that knock you off your rest, the flash. Fifteen minutes in the owner's hands: what did the camp do, why did you move, what would you do next?
+- [ ] F2 · The camp hunts. Stance for guards, Picture and Command, sections that sweep, routes that reach the ridges, cut-offs on the road, fallbacks.
+- [ ] F3 · The camp has means. The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels.
+- [ ] F4 · If play asks for it. Mortar, smoke, hardening, Memory, decoys, and the rest of the sandboxes.
 
 ### Gate · Labs pass
 

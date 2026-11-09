@@ -22,9 +22,9 @@ The foundation pass that followed is done.
 
   The plan's rules for landing on `main` apply to every branch.
 - Keep the plan's checkboxes current as work lands, as the foundation plan was kept.
-- Proposed on Nov 8, waiting on the owner's calls: `docs/camp-engine.md`, how a camp fights back, as engines, and engines tested in playable sandboxes. `docs/lab-opportunities.md` lists where each lab tests less than the best idea on hand.
+- **Lab F, the camp fights back** (the owner's call, Nov 8), is the sixth lab, and *Labs pass* requires it. `docs/camp-engine.md` is its design: how a camp fights back, as engines, and sandboxes as development instruments for proving them. Every step has to be human-playable, not only good on paper. `docs/lab-opportunities.md` lists where each lab tests less than the best idea on hand.
 
-**Phase 1:** five labs, each an isolated wireframe scene built to its exit test.
+**Phase 1:** six labs, each an isolated wireframe scene built to its exit test.
 
 | Lab | Builds | Exit test |
 | --- | --- | --- |
@@ -33,6 +33,7 @@ The foundation pass that followed is done.
 | C | Movement and body | Players predict their own noise and visibility |
 | D | Camp generator | 90 of 100 seeds pass validation on the first try |
 | E | Camp brain | Escalation can be caused, contained and interrupted |
+| F | The camp fights back | A camp worth taking down: staying put loses, planning wins, and a person can play it |
 
 Art stays out until the core passes Concept proven (end of Phase 2). Feel is in scope: camera motion, sound timing and readability.
 
@@ -69,6 +70,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 - `npm run bench`: every lane's bench: its pinned runs, the work each system does in them (rays, grid nodes, bodies) and its quality metrics, against their pinned values. `-- --write` pins what moved on purpose.
 - `npm run explain` (or `-- --base <ref>`): for every pinned run that moved since `origin/main`, the first divergent tick, the state paths that differ there, and each lane's work and metrics before and after. CI prints it for every pull request and push. `npm run trace -- --run <name>` is the per-tick trace it compares.
 - `npm run playtest`: every session in `playtests/` (the dev build saves each run there as it goes), re-simulated, checked and summarized with its telemetry. `-- <file|dir>` for others.
+- `npm run experiment` (or `-- <name>`, `--camps N`, `--jobs N`): the lab bench (`src/lab`): the same camps run several ways and compared seed by seed, with intervals. The numbers behind a decision should be one command away, so an experiment that informs a call goes here, not in a throwaway script.
 - `npm run scene` (or `-- <name>`, `-- --list`): every scene in `src/sim/game/scenes` headless, by its own driver, checking its expectations and re-simulating its recording. `?scene=<name>` plays one in the browser. A regression test that needs more than one tick belongs in a scene.
 - `npm run sim -- --replay <file>`: re-simulate a recording saved in the browser; it says where a run diverged, or why it can't re-simulate in this build.
 - `npm run trials -- <seed>`: a sitting of trial mode (A12), trial by trial, with its key; `--shots` draws every freeze frame into `shots/trials/<seed>/` with what the simulation recorded there, for the agents' pre-screen. `npm run playtest` scores sittings from their recordings or saved files.
@@ -85,6 +87,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
   - **Trial mode** (`?trials=<seed>`, A12; `&lab=movement` for the movement lab's, C8; `&fresh` forgets a sitting kept in this browser): `trial()` (where the sitting stands), `answer(yes)`, `onScreen(x, y, z)` (where a world point is drawn).
 - To drive the hooks from a script, use `openGame()` in `src/headless/browser.ts`. It starts its own server and browser and evaluates expressions with the hooks in scope.
 - `?replay=playtests/<name>.slrec` watches a kept session in the dev build.
+- `&lab` in the address of a camp scene shows the lab panel: what the camp is doing to you, and engine switches (`off=` in the scene's parameters). It shows the truth, so a blind sitting leaves it off.
 - Look at the result. Render the honest and debug views and judge them, rather than trusting that code which compiles also reads well. A headless browser draws at a few frames a second, so judge feel and frame rate on a real machine.
 
 ## Workflow
