@@ -1,6 +1,34 @@
 # Compound types: different kinds of place, and what a second storey asks of the engine
 
-The design, Nov 9, 2026, for the owner's call of the same day ("compound types are the next thing the generator learns, on their own branch, alongside the camp work", with two-storey buildings to come with them). It is on the owner's desk as a decision (the *Compound types* ask). **Step 1 (section 6) has landed; Step 2 follows the owner's answer or the desk's default.**
+The design, Nov 9, 2026, for the owner's call of the same day ("compound types are the next thing the generator learns, on their own branch, alongside the camp work", with two-storey buildings to come with them). It is on the owner's desk as a decision (the *Compound types* ask). **The work is paused: the next section says how far it got.**
+
+## Where this stands (paused, Nov 9)
+
+The owner paused this on Nov 9 until an advisor working on its own branch reports, because that work may rebuild the foundation, the generator included. Nothing here has landed on `main`, no pull request is open, and the decision on the desk is unanswered. Everything is pushed, on two branches. Both are unfinished in the ways listed below.
+
+**Step 1, the types on one storey: built and measured, not landed (branch `compound-types`, `GEN_VERSION` 8).**
+
+- **Built:** the four types as records in `gen.compound.types` (yard, keep, depot, farm) and the four plot shapes in `generation/plots.ts` (yard, bailey, spine, steading). A seed picks its type from its own root stream, weighted by crux × ground. `staffing.ts` walks the loops and zones the shape gives it. The variety experiments have a `yard only` arm and a `type` column. `docs/decisions.md` has the full entry.
+- **Measured** on the merged generator before the last merge of `main`: 93 of 100 valid at the first attempt on the held-out series `compound-types-exit-2`, 7 repaired, none invalid (lab D's bar is 90). Variety against yard-only is in the entry in `docs/decisions.md`. With only `yard` weighted, the generator draws exactly what it did before there were types (`tests/types.test.ts`). The keep, depot and farm were looked at in `npm run look` and read as themselves.
+- **Merged with `main` through #28 and #29.** After that merge the typecheck passed, `tests/escape.test.ts` and `tests/invariants.test.ts` passed, the self-test matched every pin, and the golden recording and bench were rewritten.
+- **`npm run check` has not passed yet, so this is not ready to land.** The last full run was on the commit before that merge and was stopped before it finished, so the rest of the suite is unknown. It had shown three failures. The crowns test was real (it assumed `LEB-2534` is a plain yard) and is fixed. `tests/detmath.test.ts` ("is never reached…") and `tests/systems.test.ts` ("…in the scene ladder") ran past their time limits with the machine at load 47. Their messages were never seen, so those two are unconfirmed. `main` has since given the detmath test more time.
+- **One late change is untested in full.** Main's new `yardRoute` (#29) found no way out of the yard for the escape vehicle on 3 of 40 camps here, 2 of them among 10 depots: the route started from the open cell nearest the vehicle, and that can be a pocket of a few cells between it and a fence. It now retries from the nearest cell the gate can be reached from, and 0 of 40 are boxed in. The self-test wasn't re-run after this, so a pinned run could have moved. `tests/escape.test.ts` gained two depot seeds and now checks the first leg from the vehicle, and that extended test hasn't been run. A check that no route crosses anything solid on 60 fresh seeds was stopped before it finished.
+- **Not done:** the owner's sitting. The seeds picked, each valid at the first attempt, one per type: keep `KAB-8430` (spur, *inside*), depot `HUK-0975` (hollow, *escort*), farm `FUF-9143` (hollow, *flush*). It needs the branch deployed.
+
+**Step 2, levels and two storeys: drafted, not finished (branch `compound-storeys`, `GEN_VERSION` 9).** It branches from Step 1 at the commit before the merge of #28 and #29.
+
+- **Built:** storeys and stairs in the grid (`kernel/world/grid.ts`). One `GridSearch` over a stacked index space, with one-storey searches unchanged. Routes that cross stairs and know a goal's height (`brain/nav.ts`, `brain.ts`). Hearing across floors (`floorLossDb`). Upper-floor cells and a second slab in the raster, field, perches and the certified way in. Floors, real stairs, windows and upstairs posts in the generator. Storeys in the debug grid. `tests/storeys.test.ts` covers the upper floor, the target upstairs, routes up and down, a body climbing the flight by the motor alone, and sound by the stairs and through the floor. Its six tests passed on the last run, before the last small commit.
+- **Measured only roughly:** with the *inside* crux forced, valid at the first attempt on keep 7 of 8, farm 8 of 8, depot 7 of 8.
+- **Not done:** merging Step 1's latest state, the pins at `GEN_VERSION` 9, a held-out series of 100, the variety experiments, pictures of the finished build, `npm run fuzz` over two-storey camps, and `npm run check`. A guard going upstairs because it heard something has its parts tested (the route, the climb) but hasn't been shown in a run.
+
+**What comes next, if this resumes as it is.** Run `npm run check` and the self-test on a quiet machine, merge `main`, and land Step 1. Put the sitting on the desk. Then bring Step 1 into `compound-storeys`, re-pin, measure it as section 7 says, and land Step 2.
+
+**What's worth keeping if the generator is rebuilt.**
+
+- A place is data: a tuning record says what it suits (crux × ground), its shape, its plan weights and what stands in it, so a new type on an old shape needs no code.
+- The type is drawn from the seed's own stream, so re-rolling a valley keeps it, and an "old world, exactly" test made the whole change safe to do.
+- What the new places broke, each a trap for any generator: a keep's centre is inside a building, so a search starting at the site's centre finds nothing (`campWalkStart`). A vehicle parked across a door strands whoever is behind it (`vehicleDoorGap`). A patrol loop's corner can stand on a building. A vehicle by a fence needs a route that starts on the right side of it.
+- Levels as a stacked index space with stairs as links let navigation, hearing and the certified way in share one search. The motor, sight and bullets needed nothing new.
 
 ## 1. The gap
 
