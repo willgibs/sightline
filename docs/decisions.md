@@ -2,6 +2,28 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · A shot's sounds are data, and the quiet kill is measured
+
+**Why.** One suppressed kill from a ridge had nearly the whole camp searching within 5 s. The design doc's ladder asks searching of "a close shot"; the code raised a guard to searching for any sound of a shot heard at all, at any clarity: the report, the crack, the strike (which carries 650 m, so that you hear your hit) and the bolt.
+
+**Changed, with nothing moving.** What each of a shot's four sounds raises a listener to is now data (`perception.awareness.shots`): a faint level, a clear level and the clarity that counts as clear, read like any other sound. The defaults are the old behaviour exactly (0.8 at any clarity), so no fingerprint moves; the golden recording is rewritten because the tuning grew. One law still says what a guard hears; this says what he can tell from it. The compound simulator's shot also takes a subsonic load's quieter report, as the rifle's own always did.
+
+**Measured** (`npm run experiment -- quiet-kill`, 24 camps): the same guard taken through the head, silently, by a suppressed round from the best overview, by a loud one, and by a suppressed subsonic round from 90 m, each under the old reading and a graded one (a crack is a shot within about 40 m of the bullet's path and a snap beyond; a strike is a thud that makes a man look).
+
+| | Of the rest, searching at +5 s | At +20 s | Siren within 150 s | Target gone |
+| --- | --- | --- | --- | --- |
+| Silent | 38% | 60% | 2 of 24 | 2 of 24 |
+| Suppressed, any shot is a shot | 99% | 91% | 10 of 24 | 10 of 24 |
+| Suppressed, by how clearly | 95% | 89% | 10 of 24 | 10 of 24 |
+| Loud, any shot is a shot | 99% | 91% | 10 of 24 | 10 of 24 |
+| Loud, by how clearly | 95% | 91% | 9 of 24 | 9 of 24 |
+| Subsonic at 90 m, any shot is a shot | 98% | 87% | 8 of 23 | 8 of 23 |
+| Subsonic at 90 m, by how clearly | 85% | 84% | 7 of 23 | 7 of 23 |
+| Suppressed, by how clearly, and a whistle only turns heads | 84% | 84% | 9 of 24 | 9 of 24 |
+| Subsonic at 90 m, by how clearly, and a whistle only turns heads | 67% | 75% | 7 of 23 | 7 of 23 |
+
+**What it says.** Grading what a guard hears barely moves the camp: 99% to 95%, and 98% to 85% for the quietest rifle shot there is. So the law of sound isn't what makes a camp all-or-nothing. What does is how news spreads once one man has it: he shouts, the radio carries it, and in a camp that fights someone blows a whistle that carries 600 m and raises everyone who hears it to searching. Making that whistle a call to look up, and no more, takes the quietest shot to 67%. Even a silent kill, with no whistle blown at all, has 60% of the camp searching 20 s later. Where the siren sounds, it sounds a median 7 s after the man falls, and the target is gone a median 25 s after he fell. The defaults stay as they were: the graded reading is a taste call, and by itself it doesn't buy a quiet kill. `docs/foundation-review.md` says what would.
+
 ## 2026-11-09 · The foot of a low ledge is no way up it
 
 **What the new watch found.** Measured where it's gained (the entry below), one run in about fifty still broke the promise, and this one was real: a body sliding down the last of a near-vertical face was carried 1.2 m sideways and 0.43 m up onto the ledge above it in one tick (ROK-8470, tick 286). Terrain rising more than a step inside a body's rim backs it off "downhill", by the ground at the rim point. Where a scarp is narrower than the body, that ground is the top of the ledge, not its face, and if the top falls away from its edge, downhill pointed onto it. Anything under a step high could be mounted that way.

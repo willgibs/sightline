@@ -57,6 +57,11 @@ const BOUNDS: ReadonlyArray<readonly [path: string, min: number, max: number, in
   ['gen.props.treeCover', 0, 1],
   ['gen.props.canopyCell', 1, 64],
   ['gen.walkableSlopeDeg', 1, 89],
+  // What a shot's sounds are read against: clear has to be past the edge of hearing, or the ramp divides by nothing.
+  ['perception.awareness.shots.report.clearAt', 1.01, 10000],
+  ['perception.awareness.shots.crack.clearAt', 1.01, 10000],
+  ['perception.awareness.shots.impact.clearAt', 1.01, 10000],
+  ['perception.awareness.shots.bolt.clearAt', 1.01, 10000],
   // Budgets that size searches inside a tick (rule 18), so a hostile recording can't hang a guard's brain.
   ['brain.nav.siteExpansions', 1, 500000, true],
   ['brain.nav.mapExpansions', 1, 500000, true],

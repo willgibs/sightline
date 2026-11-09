@@ -72,13 +72,24 @@ export function stateAt(level: number, A: Tuning['perception']['awareness']): Aw
   return 'unaware';
 }
 
-/** The level a heard sound raises a guard to: faint at the edge of hearing, clear at clarity 4; a voice only its line's. */
+/**
+ * The level a heard sound raises a guard to: faint at the edge of hearing, clear at clarity 4;
+ * a voice only its line's. A shot is read the same way, by which of its sounds reached him
+ * (the report, the crack, the strike, the bolt), each with its own levels and its own idea of
+ * clear. One law says what he hears (kernel/sound.ts); this says what he can tell from it.
+ */
 export function soundLevel(p: PendingSound, tuning: Tuning): number {
   const A = tuning.perception.awareness;
-  if (p.kind === 'shot') return A.shot;
   if (p.kind === 'voice') return p.voice;
-  const t = (p.clarity - 1) / 3;
-  return A.sound.faint + (A.sound.clear - A.sound.faint) * (t <= 0 ? 0 : t >= 1 ? 1 : t);
+  if (p.kind === 'shot') {
+    const S = p.sound === 'crack' ? A.shots.crack : p.sound === 'impact' ? A.shots.impact : p.sound === 'bolt' ? A.shots.bolt : A.shots.report;
+    return ramp(S.faint, S.clear, (p.clarity - 1) / (S.clearAt - 1));
+  }
+  return ramp(A.sound.faint, A.sound.clear, (p.clarity - 1) / 3);
+}
+
+function ramp(faint: number, clear: number, t: number): number {
+  return faint + (clear - faint) * (t <= 0 ? 0 : t >= 1 ? 1 : t);
 }
 
 /** Seconds a state's fall waits for, with its spread: `u` is a draw in [0, 1) from his own stream. */
