@@ -2,6 +2,18 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · The way-in search, a fifth quicker, bit for bit
+
+**Why.** Generation spends about two fifths of its time in the search that certifies a way in (`generation/infiltrate.ts`): 41% over five camps profiled, more than anything else.
+
+**Changed, with no answer moving.** Two things inside the search, neither of which changes which state it expands next:
+- **Beaten labels leave their lists.** A label another has beaten used to stay in its cell's list and be walked past on every later push and pop. It's now taken out when it's beaten and skipped when the heap reaches it. Beating carries over (if one label beats a second and the second beat a third, the first beats the third), so anything a removed label would have turned away is turned away by the one that removed it: the lists are true Pareto fronts, and the search expands exactly the states it did, in the same order.
+- **The heap holds label numbers** and reads its keys from the pool, where it held six numbers a label in a plain array. No two open labels share all five keys, so the order they come off in is the order of the keys, whatever the heap's shape. Neighbours come from a table built once.
+
+**Measured.** By sampling profile over the same five camps (four whose search runs out its budget, one repaired nine times), with the exposure field as the reference that shouldn't move (5,420 ms before, 5,423 ms after): the search 14.2 s to 11.5 s, 19% less, and a world 8% less. Every world's fingerprint is the same for 24 seeds, and a fingerprint covers each search's count of states expanded, so the order is the same and not only the answers. `tests/world.test.ts` pins one of them.
+
+**What's left is the larger part, and it isn't this file's.** On a camp whose target has to be flushed out, the search runs its whole budget of 400,000 states and reports that it doesn't know, for a way in that camp's rules never ask for. Skipping it changes what a world's report holds, so it needs a new `GEN_VERSION` and belongs with the generator's next change. `docs/foundation-review.md`, Generation.
+
 ## 2026-11-09 · A shot's sounds are data, and the quiet kill is measured
 
 **Why.** One suppressed kill from a ridge had nearly the whole camp searching within 5 s. The design doc's ladder asks searching of "a close shot"; the code raised a guard to searching for any sound of a shot heard at all, at any clarity: the report, the crack, the strike (which carries 650 m, so that you hear your hit) and the bolt.
