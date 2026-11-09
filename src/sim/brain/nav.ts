@@ -5,7 +5,7 @@ import { Cell, cellIndex, type GridLayer } from '../kernel/world/grid';
 import { sightLine, type QueryView } from '../kernel/world/query';
 import { Solids } from '../kernel/world/solids';
 import { COST_PER_METRE, GridSearch, type MoveCost, type SearchOptions } from '../kernel/world/search';
-import type { World } from '../kernel/world/world';
+import type { Ground } from './mind';
 
 /**
  * Navigation (E1): where a guard walks, on the one grid search (kernel/world/search.ts).
@@ -79,12 +79,13 @@ export class Navigator {
   private readonly view: QueryView;
 
   constructor(
-    private readonly world: World,
+    private readonly world: Ground,
     private tuning: Tuning,
   ) {
     this.site = new GridSearch(world.grid.site);
     this.map = new GridSearch(world.grid.map);
-    this.view = { world, solids: new Solids(world.colliders), bodies: [] };
+    // The kernel's queries read the terrain and the tree crowns of a world and nothing more, which is ground.
+    this.view = { world: world as QueryView['world'], solids: new Solids(world.colliders), bodies: [] };
   }
 
   setTuning(tuning: Tuning): void {
@@ -449,10 +450,10 @@ function cellZ(L: GridLayer, c: number): number {
   return L.z0 + (Math.floor(c / L.nx) + 0.5) * L.cell;
 }
 
-const worlds = new WeakMap<World, Navigator>();
+const worlds = new WeakMap<Ground, Navigator>();
 
 /** The world's navigator, made once: its scratch is rewritten by every search, and nothing is kept between them. */
-export function navigatorOf(world: World, tuning: Tuning): Navigator {
+export function navigatorOf(world: Ground, tuning: Tuning): Navigator {
   let n = worlds.get(world);
   if (!n) worlds.set(world, (n = new Navigator(world, tuning)));
   n.setTuning(tuning);

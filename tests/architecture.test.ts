@@ -113,6 +113,18 @@ describe('architecture', () => {
     expect(offenders).toEqual([]);
   });
 
+  it("hands a mind no more of the world than its camp's own ground", () => {
+    // A brain decides from its mind (rule 13), and the mind's world is typed as the ground a
+    // defender knows (brain/mind.ts, Ground): not where anyone came into the valley, and not
+    // what the generator worked out about how the camp can be taken. Only mind.ts names the
+    // whole world, to say which parts of it those are.
+    const offenders = files(join(sim, 'brain'))
+      .filter((f) => !f.endsWith(`${sep}mind.ts`))
+      .filter((f) => /kernel\/world\/world'/.test(readFileSync(f, 'utf8')) || /\bWorld\b/.test(code(f)))
+      .map((f) => relative(root, f));
+    expect(offenders).toEqual([]);
+  });
+
   it('keeps no mutable module-level state in the simulation', () => {
     // State that outlives a tick belongs in the simulation's state, where it is hashed and
     // saved. Module-level scratch buffers are fine as consts that are fully rewritten on use.

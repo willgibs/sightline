@@ -2,6 +2,12 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · A mind is handed its camp's ground, and no more of the world
+
+**Why.** Rule 13 says a brain decides from its mind alone. The mind held the whole static world, which is more than a defender knows: it carries where the player came into the valley, the mission it was built for, and everything the generator worked out about how the camp can be taken (its certified ways in, who it found unwatched). No brain read any of that. Nothing stopped one, and the test that catches omniscience moves the player, not the world, so it wouldn't have caught it.
+
+**Changed, by type alone.** A mind's world is a `Ground` (`brain/mind.ts`): the terrain, what's solid, the grid, the camp's layout and posts, and the range card as places only. A world is one of these, so nothing is copied and nothing runs differently. The brain lane names no wider type, and `tests/architecture.test.ts` holds it to that.
+
 ## 2026-11-09 · An experiment builds each camp once
 
 **Why.** An experiment runs the same camps several ways, and every run built its camp again: seconds of generation for a fraction of a second of play. `quiet-kill` has ten arms, so it built each camp ten times.
