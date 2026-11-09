@@ -12,9 +12,9 @@
  * field of the world; dsin and dcos reduce exactly from 10⁶ up (lab D, D1). 5: every
  * valley is lab D's, with a generated compound; Phase 0's test camp retires (D9). 6: six
  * kinds of site, plans for the compound, kinds of day for the target, and perches a body
- * can walk to.
+ * can walk to. 7: compound types: a keep, a depot and a farm (docs/compound-types.md).
  */
-export const GEN_VERSION = 6;
+export const GEN_VERSION = 7;
 
 /**
  * How the simulation behaves for given inputs. 3: events carry ids, times, entity sources
