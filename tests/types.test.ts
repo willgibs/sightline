@@ -140,7 +140,8 @@ describe('each kind of place', () => {
     const L = w.camp.layout!;
     expect(L.plan.perimeter).toBe('fields');
     expect(w.camp.structures.some((s) => s.kind === 'fence')).toBe(false);
-    expect(L.towers.length).toBe(1);
+    // The silo, and a window of the house's upper floor.
+    expect(L.towers.map((t) => t.corner).sort()).toEqual(['silo', 'window']);
     const C = T.gen.compound;
     const low = w.camp.structures.filter((s) => s.kind === 'block' && s.colliders.every((id) => { const c = w.colliders.list[id]!; return c.y1 - c.y0 < C.fieldWall + 0.3; }));
     expect(low.length).toBeGreaterThanOrEqual(4);
