@@ -15,6 +15,11 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 **Input.** A tap of the scope button now leaves the scope up, so a trackpad can scope and then click to fire; holding it still peeks. Runs kept in the browser can be deleted one at a time or all together.
 
 **What this didn't fix.** On 19 of 24 camps the target is gone a median of 29 s after the first shot (fastest 21 s), which is the owner's larger point: it leaves one long shot or an ambush on the road, and neither takes the base. It's on their desk as a decision.
+## 2026-11-09 · What the long bot runs found in the motor
+
+The weekly run on main, and the same runs on the tree crown branch, broke a body's promise in about one run in five: "gained N m on ground too steep to stand on" (rule 10). Most of it was real: a body on steep ground could step up across a triangle seam onto a higher, gentler one, by up to 45 mm, because only the destination's slope was asked about. The motor now also refuses a rise when the body starts on steep ground. The rest wasn't a broken promise at all: a mantle from steep ground rises as a mantle should, and the check now applies to bodies that stay on the ground. Six of the seven failing valleys pass an hour of play.
+
+**Still open:** one failing run (RAK-4743, the fuzzing bot) ends with a torso 1.3 mm inside a rock as a body starts to lie down beside it on a slope. It's in the lying-down chain and is small and rare, but it is a broken promise, and the weekly run will keep saying so until it's fixed.
 
 ## 2026-11-09 · What you can't see through, you can't shoot through
 
