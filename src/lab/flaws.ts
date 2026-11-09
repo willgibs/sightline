@@ -85,7 +85,8 @@ export class FlawWatch {
         const dz = lastShot.from.z - g.body.z;
         const heard = sim.tuning.brain.roles[spawn.role].fight > 0 && dx * dx + dz * dz <= F.suppress.range * F.suppress.range;
         if (heard && since >= 8 && since < 9 && (this.fired.get(g.id) ?? -1) < lastShot.tick) this.add(sim, 'silent-tower', g.id, `a shot within his range ${since.toFixed(0)} s ago, and no answer`, `tower${g.id}${lastShot.tick}`);
-      } else if (spawn?.role !== 'target' && since < 20 && !BUSY.has(b.act) && speed < 0.3) {
+      } else if (spawn?.role !== 'target' && since < 20 && !BUSY.has(b.act) && speed < 0.3 && g.body.stance !== 'prone') {
+        // Not a man flat on the ground with nothing to get behind: he has done what he can.
         const y = g.body.y + g.body.eyeHeight;
         if (sightLine(view, lastShot.from.x, lastShot.from.y, lastShot.from.z, g.body.x, y, g.body.z, Blocks.Bullet)) {
           const s = (this.lined.get(g.id) ?? 0) + dt;

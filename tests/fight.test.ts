@@ -86,6 +86,23 @@ describe('a camp that fights back', () => {
     expect(Math.hypot(belief.x - from.x, belief.z - from.z)).toBeLessThan(3);
   }, 60_000);
 
+  it('gets men down at the spots that hide them, and up again when the stand-to ends', () => {
+    const { sim, events } = oneShot(T.brain.fight.drill.standTo.max + 25);
+    const down = events.filter((e) => e.type === 'stance' && (e.to === 'crouch' || e.to === 'prone'));
+    expect(down.length).toBeGreaterThan(0);
+    expect(events.some((e) => e.type === 'stance' && e.to === 'stand')).toBe(true);
+    for (const g of sim.guards) if (g.brain && !g.brain.down) expect(g.body.stance).toBe('stand');
+  }, 120_000);
+
+  it('gives reinforcements a place of their own, not a shared post', () => {
+    // This camp's first patrol stands at one point, where a squad once ended up in a heap.
+    const { sim, watch } = attackRun('LUV-5077', 'sniper', T);
+    expect(watch.counts()['pile-up']).toBe(0);
+    const reserves = sim.guards.filter((g) => g.guard.reserve);
+    expect(reserves.length).toBeGreaterThan(0);
+    for (const g of reserves) expect(g.guard.reserve!.x === reserves[0]!.guard.reserve!.x && g !== reserves[0]).toBe(false);
+  }, 120_000);
+
   it('hides a man from every listed perch toward the threat, with the real rays', () => {
     const p = bestOverview(world);
     const nav = navigatorOf(world, T);
@@ -96,7 +113,7 @@ describe('a camp that fights back', () => {
       if (!spot) continue;
       found++;
       const e = eye(world, p);
-      expect(nav.seesPoint(e.x, e.y, e.z, spot.x, world.terrain.heightAt(spot.x, spot.z) + T.bodies.guard.eyeHeight.stand, spot.z)).toBe(false);
+      expect(nav.seesPoint(e.x, e.y, e.z, spot.x, world.terrain.heightAt(spot.x, spot.z) + T.bodies.guard.eyeHeight[spot.stance], spot.z)).toBe(false);
     }
     expect(found).toBeGreaterThan(0);
   }, 60_000);

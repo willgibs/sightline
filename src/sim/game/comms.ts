@@ -2,6 +2,7 @@ import { REPORT_KINDS, alertRung, createBrain, createCamp, digest, fuseShots, ma
 import type { DebugDraw } from '../kernel/debugDraw';
 import type { SimEvent } from '../kernel/events';
 import { createBody } from '../body';
+import { yawFromDirection } from '../kernel/core/math';
 import { air } from '../kernel/env';
 import { Faction, type EntityBase } from '../kernel/state';
 import type { ScheduleHandler, System, TickContext } from '../kernel/systems';
@@ -247,14 +248,14 @@ export function squadArrives(ctx: TickContext, c: CommanderEntity, x: number, z:
       const body = createBody(ctx.world, ctx.solids, ctx.tuning.bodies.guard, px, pz, faceX, faceZ);
       const senses = createSenses(false);
       const brain = createBrain();
-      return { id, kind: 'guard', faction: Faction.Camp, body, guard: { spawn: post >= 0 ? post : 0, headYaw: 0, order: standStill() }, senses, brain };
+      return { id, kind: 'guard', faction: Faction.Camp, body, guard: { spawn: post >= 0 ? post : 0, headYaw: 0, order: standStill(), reserve: { x: px, z: pz, yaw: yawFromDirection(faceX, faceZ) } }, senses, brain };
     });
   }
   const event = ctx.emit({ type: 'reinforce', source: c.id, cause, count: T.count, x, z });
   // They hunt: the camp's latest belief, by radio, as an order to go and search there.
   for (const g of ctx.index.of('guard')) {
     if (!g.brain || g.guard.order.tick !== 0 || g.brain.act !== 'routine' || c.camp.roster.some((m) => m.id === g.id)) continue;
-    c.camp.roster.push({ id: g.id, post: g.guard.spawn, x: g.body.x, z: g.body.z, tick: ctx.tick, status: 'ok' });
+    c.camp.roster.push({ id: g.id, post: g.guard.spawn, x: g.body.x, z: g.body.z, tick: ctx.tick, status: 'ok', ...(g.guard.reserve ? { reserve: { x: g.guard.reserve.x, z: g.guard.reserve.z } } : {}) });
     const target = c.camp.search ?? (c.camp.shots.estimate ? { x: c.camp.shots.estimate.x, z: c.camp.shots.estimate.z } : { x: site.x, z: site.z });
     g.brain.task = { id: c.camp.nextTask++, kind: 'search', x: target.x, z: target.z, issued: ctx.tick, cause: event };
   }

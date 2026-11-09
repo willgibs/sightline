@@ -91,6 +91,9 @@ export interface BrainState {
   radio: Report | null;
   /** In a camp that fights (Lab F): how long he stays down after the last shot, until when, and whether he has blown his whistle or is about to. */
   standHold?: number;
+  /** How low he has to get where he's going, and whether he's got there and got down. */
+  coverStance?: 'crouch' | 'prone';
+  down?: 'crouch' | 'prone';
   standTo?: number;
   blown?: true;
   whistle?: boolean;
@@ -256,6 +259,8 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
   b.until = -1;
   b.fireAt = -1;
   b.covered = false;
+  delete b.coverStance;
+  delete b.down;
   b.useUntil = -1;
   b.calling = null;
   b.route.points.length = 0;
@@ -960,7 +965,11 @@ function performCover(m: GuardMind, out: Order): void {
         return;
       }
       m.nav.searches.left--;
-      spot = groundSpot(m.world, m.tuning, m.self.x, m.self.z, threat.x, threat.z);
+      const found = groundSpot(m.world, m.tuning, m.self.x, m.self.z, threat.x, threat.z, !from);
+      if (found) {
+        spot = found;
+        b.coverStance = found.stance;
+      }
       const D = m.tuning.brain.fight.drill;
       b.standHold = D.standTo.min + (D.standTo.max - D.standTo.min) * m.draw();
       if (!b.blown) {
@@ -968,7 +977,11 @@ function performCover(m: GuardMind, out: Order): void {
         b.whistle = true;
       }
     }
-    spot ??= findCover(m, threat.x, threat.z);
+    if (!spot) {
+      spot = findCover(m, threat.x, threat.z);
+      // Something solid breaks the line at chest height, so he crouches behind it. With nothing at all, he gets down where he is.
+      if (m.fights) b.coverStance = spot.x === m.self.x && spot.z === m.self.z ? 'prone' : 'crouch';
+    }
     b.covered = true;
     b.coverX = spot.x;
     b.coverZ = spot.z;
@@ -976,6 +989,7 @@ function performCover(m: GuardMind, out: Order): void {
   }
   const w = walk(m, out, b.coverX, b.coverZ, m.tuning.brain.paces.run, 'sprint', b.x, b.z);
   if (w === 'arrived' || w === 'stuck') {
+    if (b.coverStance) b.down = b.coverStance;
     stand(m, out, false);
     if (m.fights) {
       // Down until it's been quiet a while, then back out: hiding doesn't win a fight.
@@ -1132,6 +1146,9 @@ function writeOrder(m: GuardMind, out: Order, wishX: number, wishZ: number, gait
   out.yaw = yaw;
   out.pitch = 0;
   out.headYaw = turnTowards(m.head, head, A.headRate * dt);
+  // Absent standing, so a state that has never known a guard to get down doesn't change shape.
+  if (m.brain?.down) out.stance = m.brain.down;
+  else delete out.stance;
 }
 
 function clamp(v: number, limit: number): number {

@@ -566,9 +566,14 @@ export const defaultTuning = {
       drill: {
         within: 4, // seconds a shot stays news enough to get out of the line for
         listen: 1.2, // seconds he waits for the report after a crack or a strike, before going on what he has
-        maxRun: 16, // metres of path a man will run to get out of the line
-        cells: 500, // cells one search for a spot may look at (rule 18)
+        maxRun: 40, // metres of path a man will run to get out of the line
+        cells: 14000, // cells one search for a spot may walk (rule 18)
+        rays: 900, // rays one search for a spot may cast (rule 18)
+        spacing: 1.5, // metres between the spots he considers near him: twice that past nearRun, four times past twice nearRun, because neighbouring spots see the same things and rays are what cost
+        nearRun: 10,
+        preferUpright: 8, // metres farther he'll go to crouch behind something than to lie flat in a fold of the ground: from there he can fight
         bearingDeg: 20, // listed perches this close to the believed bearing are the ones to hide from
+        wideDeg: 60, // the same with only a crack or a strike to go on
         standTo: { min: 45, max: 60 }, // seconds after the last shot before men come back out
       },
       whistle: { radius: 600, every: 6 }, // metres it carries, and the seconds between blasts: it's how a person on a ridge knows the camp has reacted

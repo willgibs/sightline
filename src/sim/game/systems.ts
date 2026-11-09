@@ -1,4 +1,4 @@
-import { eyeOf, intentFor, motorSystem, poseAt, type PoseSample } from '../body';
+import { eyeOf, intentFor, motorSystem, poseAt, requestStance, type PoseSample } from '../body';
 import { carryOut, type NavAllowance } from '../brain';
 import { dcos, dsin } from '../kernel/core/detmath';
 import { Faction } from '../kernel/state';
@@ -139,15 +139,20 @@ const playerIntentSystem: System = {
   },
 };
 
-/** Every guard carries out his current order: what his body intends this tick, and where he turns his head. */
+/** Every guard carries out his current order: what his body intends this tick, where he turns his head, and whether he gets down or up. */
 const guardOrders: System = {
   name: 'guard-orders',
   phase: 'intent',
-  reads: ['guard.guard.order'],
-  writes: ['guard.guard.headYaw', '@intents.guard'],
-  emits: [],
+  after: ['player-intent'],
+  reads: ['guard.guard.order', 'guard.body'],
+  writes: ['guard.guard.headYaw', '@intents.guard', 'guard.body'],
+  emits: ['stance'],
   run(ctx) {
-    for (const g of ctx.index.of('guard')) g.guard.headYaw = carryOut(g.guard.order, ctx.tick, intentFor(ctx, g.id));
+    for (const g of ctx.index.of('guard')) {
+      g.guard.headYaw = carryOut(g.guard.order, ctx.tick, intentFor(ctx, g.id));
+      const want = g.guard.order.stance ?? 'stand';
+      if (g.body.stance !== want && !g.body.proneTransition) requestStance(g.body, want, ctx.tuning.bodies.guard, { world: ctx.world, solids: ctx.solids, source: g.id, emit: ctx.emit });
+    }
   },
 };
 
