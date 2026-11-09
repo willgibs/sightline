@@ -277,7 +277,7 @@ function rangefind(ctx: TickContext, p: PlayerEntity, c: Extract<Command, { kind
   raycast(ctx.query(), eye.x, eye.y, eye.z, sight.x, sight.y, sight.z, max, Blocks.Sight, hit, p.id);
   const t = (ctx.tick - 1 - c.lag) / ctx.tuning.sim.tickHz;
   if (hit.what === 'none') ctx.emit({ type: 'ranged', source: p.id, t, range: -1, x: 0, y: 0, z: 0, what: 'none' });
-  else ctx.emit({ type: 'ranged', source: p.id, t, range: Math.round(hit.dist), x: hit.x, y: hit.y, z: hit.z, what: hit.what });
+  else ctx.emit({ type: 'ranged', source: p.id, t, range: Math.round(hit.dist), x: hit.x, y: hit.y, z: hit.z, what: hit.what === 'crown' ? 'collider' : hit.what });
 }
 
 /**

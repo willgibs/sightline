@@ -1,7 +1,9 @@
+import type { GenTuning } from '../../config/tuning';
 import { Blocks, type ColliderSet, type RayHit } from '../kernel/world/colliders';
 import { Cell, cellIndex, type GridLayer, type Storey } from '../kernel/world/grid';
 import type { Heightfield } from '../kernel/world/heightfield';
 import type { Camp } from './camp';
+import { canopyOf, type Canopy, type Tree } from './props';
 
 /**
  * The analysis raster (D7): the camp as lab D's analyses see it, one grid shared by all of
@@ -41,6 +43,8 @@ export interface Raster {
   a0: number;
   b0: number;
   cell: number;
+  /** The tree crowns over the whole map: what a perch's view has to clear on the way here. */
+  canopy: Canopy;
   na: number;
   nb: number;
   ground: Float32Array;
@@ -69,10 +73,11 @@ export const MOVE_DIRS: ReadonlyArray<readonly [number, number]> = [
 ];
 
 /**
- * Builds the raster over the camp and `margin` metres around its fence. `levels` is the
- * spatial grid's upper floors and stairs: on a camp with some, the raster gets their cells too.
+ * Builds the raster over the camp and the analysis margin around its fence. `levels` is the
+ * spatial grid's upper floors: on a camp with some, the raster gets their cells too.
  */
-export function buildRaster(camp: Camp, hf: Heightfield, colliders: ColliderSet, layer: GridLayer, cell: number, margin: number, levels: { storeys: readonly Storey[] } = { storeys: [] }): Raster {
+export function buildRaster(camp: Camp, hf: Heightfield, colliders: ColliderSet, layer: GridLayer, gen: GenTuning, trees: readonly Tree[], levels: { storeys: readonly Storey[] } = { storeys: [] }): Raster {
+  const { cell, margin } = gen.analysis;
   const L = camp.layout!;
   const site = camp.site;
   const halfA = L.halfA + margin;
@@ -93,6 +98,7 @@ export function buildRaster(camp: Camp, hf: Heightfield, colliders: ColliderSet,
     a0: -halfA,
     b0: -halfB,
     cell,
+    canopy: canopyOf(trees, hf.size, gen),
     na,
     nb,
     ground: new Float32Array(n),

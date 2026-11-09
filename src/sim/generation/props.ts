@@ -3,6 +3,7 @@ import { dtanDeg } from '../kernel/core/detmath';
 import { smoothstep } from '../kernel/core/math';
 import type { Rng } from '../kernel/core/rng';
 import { Blocks, type ColliderSet } from '../kernel/world/colliders';
+import type { FoliageVolume } from '../kernel/world/foliage';
 import { makeTerrainSample, type Heightfield } from '../kernel/world/heightfield';
 import { Surface } from '../kernel/world/surfaces';
 import { Noise2D } from './noise';
@@ -18,8 +19,10 @@ import type { TerrainFeatures } from './terrain';
  * the seed, its kind and its cell: its `cell` is its id, stable whatever happens to the
  * cells around it.
  *
- * Trunks block everything. Rocks block everything, and low ones can be stepped onto.
- * Bushes block sight only, so they hide a prone player without stopping anyone.
+ * Trunks block everything. A tree's crown dims a line through it, and a line through
+ * enough of them is stopped, sight and bullets alike (kernel/world/foliage.ts). Rocks block
+ * everything, and low ones can be stepped onto. Bushes block sight only, so they hide a
+ * prone player without stopping anyone.
  */
 
 export interface Tree {
@@ -66,6 +69,68 @@ export interface Props {
   trees: Tree[];
   rocks: Rock[];
   bushes: Bush[];
+}
+
+/** Each tree's crown as foliage, where it's drawn and just inside what's drawn (render/worldMeshes.ts, canopyMatrix). */
+export function treeCrowns(trees: readonly Tree[], gen: GenTuning): FoliageVolume[] {
+  const { crownDensity: density, crownInset: inset } = gen.props;
+  return trees.map((t) => ({ kind: 'cone' as const, x: t.x, z: t.z, y0: t.y + t.trunkH, y1: t.y + t.trunkH + t.canopyH, r: t.canopyR * inset, density }));
+}
+
+/** The crowns as a height map, for searches that can't afford a real line for every cell (perches.ts). */
+export interface Canopy {
+  x0: number;
+  z0: number;
+  cell: number;
+  nx: number;
+  /** Row-major (z, then x): how high the crowns stop a line there; −Infinity with none. */
+  top: Float32Array;
+}
+
+/**
+ * A map of how high the crowns over each cell stop a line: the highest the crown's surface
+ * comes anywhere in the cell, but not its thin tip, which a line gets through. It stands in
+ * for the crown from the ground up, so a search that uses it never counts on seeing under the branches.
+ */
+export function canopyOf(trees: readonly Tree[], size: number, gen: GenTuning): Canopy {
+  const cell = gen.props.canopyCell;
+  const nx = Math.ceil(size / cell);
+  const x0 = -size / 2;
+  const z0 = -size / 2;
+  const top = new Float32Array(nx * nx).fill(-Infinity);
+  const chord = gen.props.crownStop / gen.props.crownDensity;
+  for (const t of trees) {
+    const r = t.canopyR * gen.props.crownInset;
+    const y1 = t.y + t.trunkH + t.canopyH;
+    const tip = y1 - t.canopyH * Math.min(1, chord / (2 * r));
+    const i0 = Math.max(0, Math.floor((t.x - r - x0) / cell));
+    const i1 = Math.min(nx - 1, Math.floor((t.x + r - x0) / cell));
+    const j0 = Math.max(0, Math.floor((t.z - r - z0) / cell));
+    const j1 = Math.min(nx - 1, Math.floor((t.z + r - z0) / cell));
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        // The nearest the cell comes to the tree: a crown is narrow beside a cell, and steep.
+        const cx = x0 + i * cell;
+        const cz = z0 + j * cell;
+        const dx = Math.max(cx, Math.min(cx + cell, t.x)) - t.x;
+        const dz = Math.max(cz, Math.min(cz + cell, t.z)) - t.z;
+        const rho = Math.sqrt(dx * dx + dz * dz);
+        if (rho >= r) continue;
+        const surface = y1 - (t.canopyH * rho) / r;
+        const h = surface < tip ? surface : tip;
+        const c = j * nx + i;
+        if (h > top[c]!) top[c] = h;
+      }
+    }
+  }
+  return { x0, z0, cell, nx, top };
+}
+
+/** How high the crowns stop a line at (x, z): −Infinity where there are none. */
+export function canopyTop(c: Canopy, x: number, z: number): number {
+  const i = Math.floor((x - c.x0) / c.cell);
+  const j = Math.floor((z - c.z0) / c.cell);
+  return i < 0 || j < 0 || i >= c.nx || j >= c.nx ? -Infinity : c.top[j * c.nx + i]!;
 }
 
 export function scatterProps(

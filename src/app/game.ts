@@ -18,7 +18,7 @@ import type { UsePrompt } from '../sim/game/use';
 import type { SimEvent } from '../sim/kernel/events';
 import { normalizeSeed } from '../sim/kernel/core/seed';
 import { Blocks, type Collider } from '../sim/kernel/world/colliders';
-import { emptyHit, raycast } from '../sim/kernel/world/query';
+import { emptyHit, raycast, IGNORE_CROWNS } from '../sim/kernel/world/query';
 import { entityOfCollider } from '../sim/kernel/world/solids';
 import { Surface, surfaceName } from '../sim/kernel/world/surfaces';
 import { GameRenderer, type CameraPose } from '../render/renderer';
@@ -30,7 +30,7 @@ import { InputController } from './input';
 import { Overlay } from './overlay';
 import { GameSound } from './sound';
 import { BrowserStore, DevInbox, PlaytestCapture, type StoredRun } from './playtest';
-import { DROP_KEYS, LabPanel } from './labPanel';
+import { DROP_KEYS, LabPanel, SHOOTER_VIEW_KEY } from './labPanel';
 import { CampGauges } from '../lab/gauges';
 import { commanderOf } from '../sim/game/comms';
 import { stimulus, type StimulusName } from '../sim/game/drops';
@@ -90,6 +90,8 @@ export interface GameOptions {
 const TIME_SCALES = [0.25, 0.5, 1, 2, 4, 8];
 /** Ticks between updates of the lab panel: a ray per guard each time. */
 const LAB_PANEL_EVERY = 15;
+/** Degrees across the view from the shooter's eye: about what a scope shows. */
+const SHOOTER_VIEW_FOV = 14;
 /** Seconds of unsaved play after which closing the tab asks first (in the deployed game). */
 const UNSAVED_WARNING_SECONDS = 60;
 
@@ -175,6 +177,8 @@ export class Game {
   private gauges: CampGauges | null = null;
   /** The mouse has let go of the view, for clicking the panels, with the world still running (toggleMouse). */
   private mouseFree = false;
+  /** Where the camera was before looking along the last shot (toggleShooterView). */
+  private shooterView: { x: number; y: number; z: number; yaw: number; pitch: number } | null = null;
   private labPanel: LabPanel | null = null;
   /** The attack script a compound simulator is running, if any. */
   private attack: Driver<Simulation> | null = null;
@@ -617,9 +621,9 @@ export class Game {
     this.sim = this.scene ? startScene(this.scene, this.tuning, this.world) : new Simulation(this.world, this.tuning);
     if (this.scene && commanderOf(this.sim) && (this.opts.lab || this.scene.name === 'compound')) {
       this.gauges = new CampGauges(this.sim);
-      this.labPanel ??= new LabPanel(this.hud.dock, this.scene.params ?? '', this.scene.name === 'compound' ? (what) => this.dropWherePointing(what) : null);
+      this.labPanel ??= new LabPanel(this.hud.dock, this.scene.params ?? '', this.scene.name === 'compound' ? (what) => this.dropWherePointing(what) : null, this.scene.name === 'compound' ? () => this.toggleShooterView() : null);
       this.hud.setLab(true);
-      if (this.scene.name === 'compound') this.hud.setExtraKeys(DROP_KEYS.map(([code, , text]) => [code.slice(5), text]));
+      if (this.scene.name === 'compound') this.hud.setExtraKeys([...DROP_KEYS.map(([code, , text]) => [code.slice(5), text] as const), [SHOOTER_VIEW_KEY.slice(5), "shooter's view"]]);
       this.devKeys();
     }
     const recorder = new Recorder(this.sim, BUILD);
@@ -852,7 +856,8 @@ export class Game {
     this.renderer.setDebug(on);
     this.hud.setDebug(on);
     if (!on) {
-      if (this.detached) this.setDetached(false);
+      // The compound simulator's player is only parked somewhere: there's nobody's eyes to go back to.
+      if (this.detached && this.scene?.name !== 'compound') this.setDetached(false);
       this.timeScaleIndex = 2;
     }
     this.hud.toast(on ? 'Debug view · everything the simulation knows' : 'Honest view · only what the game will show');
@@ -1265,7 +1270,7 @@ export class Game {
     this.fly.z += (fz * ax.z + rz * ax.x) * speed;
     const ground = this.world.terrain.heightAt(this.fly.x, this.fly.z) + 0.3;
     if (this.fly.y < ground) this.fly.y = ground;
-    return { x: this.fly.x, y: this.fly.y, z: this.fly.z, yaw, pitch, roll: 0, fov };
+    return { x: this.fly.x, y: this.fly.y, z: this.fly.z, yaw, pitch, roll: 0, fov: this.shooterView ? SHOOTER_VIEW_FOV : fov };
   }
 
   /** What systems drew in their last tick: lines in the world, labels in the HUD. */
@@ -1294,6 +1299,12 @@ export class Game {
       }
       this.drawnLabels.push({ x: at.x, y: at.y, text: s.text, color: palette.debug.tones[s.tone], detail: s.detail });
     }
+    // The compound simulator's shots come from wherever the script is, and the panel can only say so in numbers.
+    const shot = this.scene?.name === 'compound' ? this.gauges?.lastShot : null;
+    if (shot) {
+      const at = this.renderer.project(shot.x, shot.y + 1.2, shot.z, w, h);
+      if (at) this.drawnLabels.push({ x: at.x, y: at.y, text: 'shooter', color: palette.debug.tones.bad });
+    }
     if (closest >= 0) this.drawnLabels[closest]!.text = this.drawnLabels[closest]!.detail!;
     this.hud.setLabels(this.drawnLabels);
   }
@@ -1320,7 +1331,9 @@ export class Game {
             ? entityOfCollider(hit.id) >= 0
               ? `solid ${entityOfCollider(hit.id)}`
               : colliderLabel(this.sim.solids.get(hit.id))
-            : 'terrain';
+            : hit.what === 'crown'
+              ? 'tree crown'
+              : 'terrain';
       this.aim = (this.aim ?? new THREE.Vector3()).set(hit.x, hit.y, hit.z);
       this.aimText = `${t < 10 ? t.toFixed(1) : Math.round(t)} m · ${what}`;
     } else {
@@ -1464,6 +1477,29 @@ export class Game {
     this.input.pitch = -0.55;
   }
 
+  /** The compound simulator: look along the last shot from where it was fired, close up, to judge the line for yourself. The same key again comes back. */
+  private toggleShooterView(): void {
+    if (this.shooterView) {
+      const v = this.shooterView;
+      this.fly.set(v.x, v.y, v.z);
+      this.input.yaw = v.yaw;
+      this.input.pitch = v.pitch;
+      this.shooterView = null;
+      return;
+    }
+    const s = this.gauges?.lastShot;
+    if (!s) {
+      this.hud.toast('No shot yet');
+      return;
+    }
+    if (!this.detached) this.setDetached(true);
+    this.shooterView = { x: this.fly.x, y: this.fly.y, z: this.fly.z, yaw: this.input.yaw, pitch: this.input.pitch };
+    this.fly.set(s.x, s.y, s.z);
+    this.input.yaw = yawFromDirection(s.dx, s.dz);
+    this.input.pitch = Math.asin(Math.max(-1, Math.min(1, s.dy)));
+    this.hud.toast("From the shooter's eye, along the last shot · press 7 to come back");
+  }
+
   /** The compound simulator: something happens where you're pointing, the free mouse or the crosshair, and a shot comes from the camera itself. */
   private dropWherePointing(what: StimulusName): void {
     if (!this.sim) return;
@@ -1471,7 +1507,7 @@ export class Game {
     const yaw = this.input.yaw;
     const pitch = this.input.pitch;
     const d = this.mouseFree ? this.renderer.rayThrough(this.input.mouseX, this.input.mouseY, window.innerWidth, window.innerHeight) : { x: -Math.sin(yaw) * Math.cos(pitch), y: Math.sin(pitch), z: -Math.cos(yaw) * Math.cos(pitch) };
-    const hit = raycast({ world: this.world, solids: this.sim.solids, bodies: this.sim.queryBodies() }, this.fly.x, this.fly.y, this.fly.z, d.x, d.y, d.z, 2000, Blocks.All, emptyHit());
+    const hit = raycast({ world: this.world, solids: this.sim.solids, bodies: this.sim.queryBodies() }, this.fly.x, this.fly.y, this.fly.z, d.x, d.y, d.z, 2000, Blocks.All, emptyHit(), -1, IGNORE_CROWNS);
     if (hit.what === 'none') {
       this.hud.toast('Nothing there to drop it on');
       return;

@@ -1,7 +1,7 @@
 import type { Tuning } from '../../config/tuning';
 import type { EntityBase, EntityId } from '../kernel/state';
 import { Blocks } from '../kernel/world/colliders';
-import { emptyHit, raycast, type QueryView } from '../kernel/world/query';
+import { emptyHit, IGNORE_CROWNS, raycast, type QueryView } from '../kernel/world/query';
 import type { Surface } from '../kernel/world/surfaces';
 
 /**
@@ -90,7 +90,8 @@ export function flyThrown(s: ThrownState, until: number, dt: number, view: Query
     const dy = b.y - a.y;
     const dz = b.z - a.z;
     const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (len > 1e-9) raycast(view, a.x, a.y, a.z, dx / len, dy / len, dz / len, len, Blocks.Move | Blocks.Bullet, hit, s.thrower);
+    // Crowns stop lines, not things: a thrown stone falls through the branches and carries on.
+    if (len > 1e-9) raycast(view, a.x, a.y, a.z, dx / len, dy / len, dz / len, len, Blocks.Move | Blocks.Bullet, hit, s.thrower, IGNORE_CROWNS);
     if (len <= 1e-9 || hit.what === 'none') {
       s.swept = t1;
       if (t1 - s.t > R.maxFlight) s.rest = true;

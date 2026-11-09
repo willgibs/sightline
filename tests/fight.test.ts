@@ -1,9 +1,14 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { attackRun } from '../src/lab/experiments/flaws';
+import { yardOnly } from '../src/lab/experiments/variety';
 import { compound } from '../src/sim/game/scenes/compound';
 import { bestOverview } from '../src/sim/game/scenes/overlook';
-import type { AttackDriver } from '../src/sim/game/attacks';
+import { ATTACKS, type AttackDriver } from '../src/sim/game/attacks';
+import { CampGauges } from '../src/lab/gauges';
+import { Rng } from '../src/sim/kernel/core/rng';
+import { Blocks } from '../src/sim/kernel/world/colliders';
+import { sightLine } from '../src/sim/kernel/world/query';
 import { compoundDrops, STIMULI, stimulus } from '../src/sim/game/drops';
 import { giveBrains } from '../src/sim/game/brains';
 import { guardFire } from '../src/sim/game/combat';
@@ -121,7 +126,8 @@ describe('a camp that fights back', () => {
   it('gives reinforcements a place of their own, not a shared post', () => {
     // A squad once ended up in a heap at a post that was a single point. These camps call one in.
     for (const seed of ['LEB-2534', 'REV-0010']) {
-      const { sim, watch } = attackRun(seed, 'sniper', T);
+      // Plain yards, as these two camps were when the numbers were set: the reinforcements are what's measured.
+      const { sim, watch } = attackRun(seed, 'sniper', yardOnly(T));
       expect(watch.counts()['pile-up']).toBe(0);
       const reserves = sim.guards.filter((g) => g.guard.reserve);
       expect(reserves.length).toBeGreaterThan(0);
@@ -196,6 +202,23 @@ describe('a near miss', () => {
   it('does nothing when it goes wide', () => {
     expect(fireAtPlayer(20).events.some((e) => e.type === 'passed')).toBe(false);
   }, 60_000);
+
+  it('does nothing when something stopped the round short of him', () => {
+    const saved = [world.crowns, world.crownStop] as const;
+    const you = { x: T.gen.world.size, z: T.gen.world.size };
+    try {
+      // A thick crown between the guard and the player: the round ends there.
+      const probe = fireAtPlayer(1.5);
+      you.x = probe.sim.index.of('player')[0]!.body.x;
+      you.z = probe.sim.index.of('player')[0]!.body.z;
+      world.crowns = [{ kind: 'cyl', x: you.x + 15, z: you.z, y0: -500, y1: 500, r: 4, density: T.gen.props.crownDensity }];
+      world.crownStop = T.gen.props.crownStop;
+      expect(fireAtPlayer(1.5).events.some((e) => e.type === 'passed')).toBe(false);
+    } finally {
+      world.crowns = saved[0];
+      world.crownStop = saved[1];
+    }
+  }, 60_000);
 });
 
 describe('the compound simulator', () => {
@@ -205,6 +228,47 @@ describe('the compound simulator', () => {
     expect(commanderOf(run.sim)!.camp.level).not.toBe('calm');
     expect(resimulate(run.recording, { scene: { ...scene, world: () => world } }).ok).toBe(true);
   }, 120_000);
+
+  it('reads the fight from where the shots really come from, not the parked player', () => {
+    const scene = compound('seed=LEB-2534&attack=one-shot') as Scene<Simulation>;
+    const sim = startScene(scene, T);
+    const driver = scene.driver!() as AttackDriver;
+    const raw = scene.game.still(sim);
+    const gauges = new CampGauges(sim);
+    expect(gauges.read(sim).shooter).toBeNull();
+    for (let i = 0; i < 20 * 30; i++) gauges.observe(sim, sim.step(driver.next(sim, raw)));
+    const from = driver.truth.find((t) => t.what === 'shot')!.from;
+    const r = gauges.read(sim);
+    expect(r.shotsFired).toBe(1);
+    expect(r.shooter!.x).toBeCloseTo(from.x, 3);
+    expect(r.shooter!.z).toBeCloseTo(from.z, 3);
+    let nearest = Infinity;
+    for (const g of sim.guards) nearest = Math.min(nearest, Math.sqrt((g.body.x - from.x) ** 2 + (g.body.z - from.z) ** 2));
+    expect(r.nearest).toBeCloseTo(nearest, 3);
+    // The camp is hundreds of metres from where the player is parked: measuring from him is the bug this replaced.
+    expect(Math.sqrt((sim.player.x - from.x) ** 2 + (sim.player.z - from.z) ** 2)).toBeGreaterThan(nearest + 100);
+  }, 60_000);
+
+  it('only ever shoots at someone it can see, and holds fire when it can see nobody', () => {
+    const scene = compound('seed=LEB-2534&attack=sniper') as Scene<Simulation>;
+    const sim = startScene(scene, T);
+    const driver = scene.driver!() as AttackDriver;
+    const raw = scene.game.still(sim);
+    const view = { world: sim.world, solids: sim.solids, bodies: [] };
+    let seen = 0;
+    for (let i = 0; i < 80 * 30; i++) {
+      const input = driver.next(sim, raw);
+      for (; seen < driver.truth.length; seen++) {
+        const t = driver.truth[seen]!;
+        const aimed = sim.guards.some((g) => sightLine(view, t.from.x, t.from.y, t.from.z, g.body.x, g.body.y + g.body.eyeHeight * 0.75, g.body.z, Blocks.Bullet));
+        expect(aimed).toBe(true);
+      }
+      sim.step(input);
+    }
+    expect(seen).toBeGreaterThan(0);
+    const nobody = Object.create(sim, { guards: { value: [] } }) as Simulation;
+    expect(ATTACKS['one-shot']![0]!.make(nobody, new Rng('test', 'attack'))).toBeNull();
+  }, 60_000);
 
   it('keeps every kind of stimulus recordable', () => {
     const scene = { ...(compound('seed=LEB-2534') as Scene<Simulation>), world: () => world, seconds: 3 };

@@ -1,12 +1,13 @@
 import type { Tuning } from '../../config/tuning';
 import type { BodySpec, BodyState } from '../body';
-import { datan2, dcos, dsin } from '../kernel/core/detmath';
+import { datan2, dcos, dexp, dsin } from '../kernel/core/detmath';
 import type { EnvSpec } from '../kernel/env';
 import type { EntityId } from '../kernel/state';
 import { Blocks } from '../kernel/world/colliders';
-import { emptyHit, raycast, type QueryBody, type QueryView } from '../kernel/world/query';
+import { emptyHit, IGNORE_CROWNS, raycast, type QueryBody, type QueryView } from '../kernel/world/query';
 import type { BodyShape } from '../kernel/world/shape';
 import { foliageOf } from './foliage';
+import { crownsOf } from '../kernel/world/foliage';
 import { groundLight } from './light';
 import { movementVisibility, stanceVisibility } from './visibility';
 
@@ -252,6 +253,8 @@ export function exposure(at: QueryView, env: EnvSpec, t: number, tuning: Tuning,
   others.length = 0;
   for (const b of at.bodies) if (b.id !== target.id) others.push(b);
   const foliage = foliageOf(at.world);
+  const crowns = crownsOf(at.world);
+  const crownStop = at.world.crownStop ?? Infinity;
   const W = weights;
   W[0] = S.parts.head;
   W[1] = S.parts.chest;
@@ -271,10 +274,13 @@ export function exposure(at: QueryView, env: EnvSpec, t: number, tuning: Tuning,
       const ux = rx / len;
       const uy = ry / len;
       const uz = rz / len;
-      raycast(view, eye.x, eye.y, eye.z, ux, uy, uz, len, Blocks.Sight, hit, eye.id);
+      // The crowns from the two ends, so this is the same whichever end is the eye.
+      raycast(view, eye.x, eye.y, eye.z, ux, uy, uz, len, Blocks.Sight, hit, eye.id, IGNORE_CROWNS);
       r.clear = hit.dist >= len - 1e-6;
+      const crown = r.clear ? crowns.opticalDepth(eye.x, eye.y, eye.z, r.x, r.y, r.z, true) : 0;
+      if (crown >= crownStop) r.clear = false;
       if (r.clear) {
-        r.through = foliage.transmittance(eye.x, eye.y, eye.z, r.x, r.y, r.z);
+        r.through = foliage.transmittance(eye.x, eye.y, eye.z, r.x, r.y, r.z) * (crown === 0 ? 1 : dexp(-crown));
         r.sky = skyBehind(r, ux, uy, uz, foliage, S);
       }
     }

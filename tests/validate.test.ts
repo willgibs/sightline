@@ -30,7 +30,7 @@ beforeAll(() => {
     }
   }
   expect(world, 'a seed that passes at its first attempt').toBeDefined();
-  const R = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, G.analysis.cell, G.analysis.margin);
+  const R = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, G, world.props.trees);
   ({ analysis, parts } = analyzeCamp(world.camp, world.terrain, world.colliders, world.grid, G, R));
 }, 180_000);
 

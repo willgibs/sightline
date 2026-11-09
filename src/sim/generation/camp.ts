@@ -64,6 +64,8 @@ export interface GuardSpawn {
   scanScale: number;
   /** What he does all mission, as a pure function of time (routine.ts). */
   routine: Routine;
+  /** He holds the target's door, which is the point of the camp's crux: a repair may turn him, but not walk him away. */
+  holdsDoor?: true;
 }
 
 export interface Camp {

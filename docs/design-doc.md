@@ -1,6 +1,6 @@
 # Sightline · Game Design & Build Plan
 
-> **This is a copy.** The design doc lives at [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), which only the owner's account can open, and the live doc wins wherever the two differ. This is its revision 40, kept in step with it on Nov 9, 2026, for sessions that can't open it, such as a Claude Code session without the Claude Docs connector. The live doc's four diagrams are written out here as text. Don't edit this copy to change the design: change the live doc, or propose the change to the owner, then export it again over this file.
+> **This is a copy.** The design doc lives at [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), which only the owner's account can open, and the live doc wins wherever the two differ. This is its revision 41, kept in step with it on Nov 9, 2026, for sessions that can't open it, such as a Claude Code session without the Claude Docs connector. The live doc's four diagrams are written out here as text. Don't edit this copy to change the design: change the live doc, or propose the change to the owner, then export it again over this file.
 
 Nov 7, 2026 · @Will Gibson
 
@@ -643,6 +643,7 @@ Calls 1–3 shape the core and have working defaults; the rest are deliberately 
 
 | Date | Decision | Outcome |
 | --- | --- | --- |
+| Nov 9, 2026 | What you can't see through, you can't shoot through | Owner, after the first sitting: a kill through tree cover from hundreds of metres is unfair, and "the fact that it can happen invites lots of problems." A tree's crown stops sight and bullets once a line has been through about a metre of it, by one law. A thin tip or rim only dims the line, and the crown round your own eye doesn't count |
 | Nov 8, 2026 | No promised approach | Owner: a target anyone can shoot from any ridge makes every mission one shot from success and forces the same easy map. The guarantee that perches see the target goes. Each seed is built around a decisive problem, and validation promises only a way through it |
 | Nov 7, 2026 | Foundation for many games | Owner: one foundation for many games and features, with each lane aiming past the best known solution and proving it on its own bench. A narrow kernel, lanes behind contracts, a bench per lane |
 | Nov 7, 2026 | Sight, hearing and light | Owner's calls: stance and light become range caps, with a short-range periphery; one law of sound, with cues rather than biases; the player's light is the light at the ground beneath them |
