@@ -1,6 +1,6 @@
 # Compound types: different kinds of place, and what a second storey asks of the engine
 
-The design, Nov 9, 2026, for the owner's call of the same day ("compound types are the next thing the generator learns, on their own branch, alongside the camp work", with two-storey buildings to come with them). It is on the owner's desk as a decision (the *Compound types* ask), and nothing past Step 1 below is built until that is answered or the desk's default stands.
+The design, Nov 9, 2026, for the owner's call of the same day ("compound types are the next thing the generator learns, on their own branch, alongside the camp work", with two-storey buildings to come with them). It is on the owner's desk as a decision (the *Compound types* ask). **Step 1 (section 6) has landed; Step 2 follows the owner's answer or the desk's default.**
 
 ## 1. The gap
 
@@ -113,11 +113,11 @@ The honest list. Today the game is two-and-a-half-dimensional in several places,
 
 ## 6. The order, and what each step proves
 
-**Step 1 · The types, on one storey** (one pull request, `GEN_VERSION` 8 once `tree-crowns` has landed its 7). `generation/plots.ts`: the four shapes. `compound.ts`: types and shapes in place of the one topology; `staffing.ts`: the loops and zones it walks come from the shape, not from hard-coded rectangles. Variety experiments gain a `type` column and an arm with the types switched off.
+**Step 1 · The types, on one storey** (one pull request; `GEN_VERSION` 7). `generation/plots.ts`: the four shapes. `compound.ts`: types and shapes in place of the one topology; `staffing.ts`: the loops and zones it walks come from the shape, not from hard-coded rectangles. Variety experiments gain a `type` column and an arm with the types switched off.
 
 Done when: every seed generates one of the four, chosen to suit its crux and ground; lab D's bar holds on a new held-out series (90 of 100 valid at the first attempt, `npm run seeds -- --count 100 --from compound-types-exit`); the variety experiments show the gain; each type reads as itself in `npm run look` and the debug view; `npm run check` passes.
 
-**Step 2 · The levels, and two storeys** (a second pull request, `GEN_VERSION` 9). Levels in the grid and the search; navigation, hearing, the raster and the search over extra cells; floors, stairs and windows in the generator; upstairs posts in staffing; a goal's height in the brain. The motor's invariant run and `npm run fuzz` go over two-storey camps.
+**Step 2 · The levels, and two storeys** (a second pull request, the next free `GEN_VERSION`). Levels in the grid and the search; navigation, hearing, the raster and the search over extra cells; floors, stairs and windows in the generator; upstairs posts in staffing; a goal's height in the brain. The motor's invariant run and `npm run fuzz` go over two-storey camps.
 
 Done when: the second storey is reached by real stairs, by the player and by guards who have heard something up there; the way in is certified to a clear shot at the target upstairs; sound goes up the stairs and through the floor, tested; every pin that doesn't stand on a two-storey camp is unmoved; a person can play it.
 

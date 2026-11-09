@@ -2,6 +2,39 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · Compound types: a keep on a hilltop, a depot along a road, a farm and its outbuildings
+
+**The owner's call** (on the desk, Nov 9): compound types are the next thing the generator learns, on their own branch, alongside the camp work, and two-storey buildings come with them. `docs/compound-types.md` is the design, with the honest list of what a second storey asks of each system. This lands its first step: the types, on one storey. The second storey is its own pull request, after the owner's answer on the desk. `GEN_VERSION` 7.
+
+**What a type is.** A record in `gen.compound.types` (`generation/plots.ts`): how well it suits each crux and each kind of ground, its plan, the size of its plot, its modules, and a `shape`, one function per plot family. A shape produces parcels, corners, lanes, lights and door-facing, and everything downstream (modules, fixtures, cover, staffing, validation) reads those and never asks which type it is. A new type on an old shape is data alone. A seed's type comes from a root stream of its own (`compoundTypeOf`), weighted by crux × ground, so a valley re-rolled or a camp rebuilt keeps it. With every other type weighted to nothing the generator draws exactly what it did: `tests/types.test.ts` pins a yard-only TAL-4471 to the fingerprint it had before there were types, and the yard-only arm of the experiments is that generator.
+
+**Four shapes.** A *yard* (as first built). A *bailey* (the yard's ring with a keep in the middle, its door toward the gate, walled all round, on high ground if it can be). A *spine* (a long plot with the road running through it, gate to gate, sheds down both banks with their doors on the road). A *steading* (no fence: a farmhouse, barn and byre round a small farmyard, huts beyond, field walls in runs with gaps, a silo). The fence, the towers, patrol loops, gates, the breach and lights all come from the shape; `yard` keeps today's numbers.
+
+**Measured** (100 held-out seeds, series `lab-world-variety`, as Lab D's survey was; `npm run experiment -- variety-compound`, `variety-families`, `variety-types`; the arm "yard only" is the generator before this change):
+
+| | yard only | as built |
+| --- | --- | --- |
+| Type (yard / keep / depot / farm) | 100 / 0 / 0 / 0 | 19 / 25 / 27 / 29 |
+| Plot (yard / long / wide / tight) | 37 / 15 / 26 / 22 | 12 / 28 / 31 / 29 |
+| Perimeter (chain / screen / fort / fields) | 47 / 38 / 15 / 0 | 19 / 24 / 28 / 29 |
+| Openings in the perimeter, 3 or more | 0 | 27 |
+| Nearest opening 25 m or nearer his building | 22 | 16 |
+| Best family of plan (shot / flush / take apart / way in) | 7 / 37 / 9 / 47 | 7 / 39 / 12 / 42 |
+
+The mix of plans is level with yard-only overall; what the types change is which plan each kind of place calls for, which is the point: `variety-types` has a keep answered only by a flush (12) or a way in (13) with no ridge shot at all, a depot the only place a shot from a perch is the best plan (5 of the 7 where any is) alongside take-apart (6) and flush (10), and a farm with a flush (12) and a way in (11). A yard has shots 2, flush 5, way in 12. No family dominates a type by construction, and a keep isn't solved the way a depot is. Layout descriptors alone would have called the yard-only camps varied (Beukman's trap), so the plan families are the claim.
+
+**Lab D's bar.** 98 of 100 valid at the first attempt on a new held-out series (`npm run seeds -- --count 100 --from compound-types-exit`), 2 repaired, none invalid; a mean of 3.0 s to generate. A keep's escort crux is weighted to nothing: walled in the middle of a walled plot, no perch ever has him long enough for that crux to be a crux, and validation says so.
+
+**What the pictures say** (`npm run look`, fly camera and honest view from the best perch): the keep is a walled plot on a hill with its towers and a tall building in the middle; the depot a long strip with sheds down a road and a gate each end; the farm has no fence, and field walls show as low broken lines round a court of three buildings.
+
+**A bug the keep found.** Three searches walk from the site's centre on the coarse map layer (`findPerches`, spawn, `counter-perch`); a keep's centre is inside the keep, whose map cells are a sealed pocket, so nothing could reach any perch and a keep came out with no perches at all. `campWalkStart` starts those walks just inside the gate wherever a building stands on the centre.
+
+**Reported, not fixed:** on a yard or any camp the escape vehicle can be parked across a door (his `escapeRun` search checks ground and corridor, not doors); on farms that dropped a worker's chore route in 1 of 5 seeds, so farms, keeps and depots keep it off doors (`vehicleDoorGap`, 3 m), and the yard keeps its zero so its old camps stay identical.
+
+**Tests.** `tests/types.test.ts`: the pick is by weight and from its own stream; a yard-only camp matches the old generator's fingerprint; each type is what it says (a keep with him in the middle behind a wall, a depot with a road gate to gate and every shed's door on it, a farm with low field walls and a court). `tests/compound.test.ts` and `sites.test.ts` follow the moved tuning. Routes off the camp and the variety tests stand on the plain yard or say which type they want, since the seed list now holds other types.
+
+**What moved.** `GEN_VERSION` 7, `GOLDEN_TAL_4471` (TAL-4471 is a farm now), and the pinned runs standing on generated camps (`TAL-4471 wander`, `MUD-9031 wander`, `TAL-4471 chaos`, `camp-systems`, `camp-fight`); none of the movement, perception, shooting or kernel runs. The bench pins and the golden recording are rewritten.
+
 ## 2026-11-09 · What the first sitting showed: the simulator was misreading its own shooter
 
 The owner's first sitting of the compound simulator: "kill shots from hundreds of meters away, through tree cover. Zero line of sight, near perfect accuracy."
