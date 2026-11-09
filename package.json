@@ -29,6 +29,7 @@
     "bisect": "tsx src/headless/bisect.ts",
     "scene": "tsx src/headless/scene.ts",
     "experiment": "tsx src/headless/experiment.ts",
+    "whatif": "tsx src/headless/whatif.ts",
     "fuzz": "tsx src/headless/fuzz.ts",
     "playtest": "tsx src/headless/playtest.ts",
     "look": "tsx src/headless/look.ts",
