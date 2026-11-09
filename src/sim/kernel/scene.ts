@@ -112,7 +112,8 @@ export interface SceneRun<S extends Simulation = Simulation> {
 /** Runs a scene headless with its driver, recording it and checking its expectations. A profiler times each system. */
 export function runScene<S extends Simulation>(scene: Scene<S>, tuning: Tuning, opts: { build?: string; seconds?: number; world?: World; profiler?: Profiler } = {}): SceneRun<S> {
   const sim = startScene(scene, tuning, opts.world);
-  sim.profiler = opts.profiler ?? null;
+  // A scene's setup may have installed one of its own (a test watching what systems write).
+  if (opts.profiler) sim.profiler = opts.profiler;
   const recorder = new Recorder(sim, opts.build ?? '');
   const driver = scene.driver?.();
   const input = scene.game.still(sim);

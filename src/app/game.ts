@@ -14,6 +14,7 @@ import type { World } from '../sim/kernel/world/world';
 import { neutralInput } from '../sim/kernel/input';
 import { Recorder, Recording } from '../sim/kernel/record/recording';
 import { Simulation, type Snapshot } from '../sim/game/sim';
+import type { UsePrompt } from '../sim/game/use';
 import type { SimEvent } from '../sim/kernel/events';
 import { normalizeSeed } from '../sim/kernel/core/seed';
 import { Blocks, type Collider } from '../sim/kernel/world/colliders';
@@ -107,6 +108,18 @@ const CALL_LINES: Readonly<Record<ReportCode, string>> = {
   missing: "Post isn't answering.",
   clear: 'Clear here.',
   claim: "I'll take a look.",
+  outage: "Something's dead over here.",
+};
+
+/** What the use key would do, in words (sim/game/use.ts). */
+const USE_LINES: Readonly<Record<Exclude<UsePrompt, ''>, string>> = {
+  carry: 'carry',
+  drop: 'put down',
+  open: 'open',
+  shut: 'shut',
+  generator: 'hold: cut the generator',
+  radio: 'hold: cut the radio',
+  vehicle: 'hold: disable the vehicle',
 };
 
 export class Game {
@@ -903,6 +916,7 @@ export class Game {
     const view = this.detached || this.bench || !rifle ? pose : this.swayed(pose, rifle);
     // The listener is the camera: your eyes, or the fly camera wherever it is.
     this.sound.setPaused(this.paused);
+    this.sound.setHumming(this.curr.humming);
     this.sound.frame(dt, view);
 
     if (this.debug) {
@@ -921,7 +935,7 @@ export class Game {
     // A click from now on is about this frame: the line of sight the player steered, before any sway.
     this.input.latch.frameShown(this.sim.tick, this.clock.alpha, pose.yaw, pose.pitch);
     this.hud.updateCompass(view.yaw);
-    this.hud.setPrompt(this.detached || this.replay ? null : this.curr.use ? `${this.input.map.describe('use')} · ${this.curr.use === 'drop' ? 'put down' : 'carry'}` : this.curr.climb ? `${this.input.map.describe('climb')} · ${this.curr.climb === 'ladder' ? 'climb' : 'mantle'}` : null);
+    this.hud.setPrompt(this.detached || this.replay ? null : this.curr.use ? `${this.input.map.describe('use')} · ${USE_LINES[this.curr.use]}${this.curr.useProgress > 0 ? ` ${Math.round(this.curr.useProgress * 100)}%` : ''}` : this.curr.climb ? `${this.input.map.describe('climb')} · ${this.curr.climb === 'ladder' ? 'climb' : 'mantle'}` : null);
     this.cues.draw(this.curr, view, this.time);
     this.hud.setRange(this.debug ? this.aimText : null);
 

@@ -87,7 +87,9 @@ export class Acoustics {
   private start = -1;
   private offset = 0;
   /** Each steady source and the costs of its flood, by cell. */
-  private steady: Array<{ s: SoundSource; costs: Map<number, number>; start: number; offset: number }> | null = null;
+  private steady: Array<{ s: SoundSource; costs: Map<number, number>; start: number; offset: number; hum: boolean }> | null = null;
+  /** Whether the camp's generators are running: set from the state before each use, so a stopped one stops masking (E7). */
+  humming = true;
 
   constructor(
     readonly world: World,
@@ -154,6 +156,12 @@ export class Acoustics {
   /** What a listener at (x, y, z) hears of steady source `i` (in ambientSources' order), unmasked: for the speakers. */
   hearSteady(i: number, x: number, y: number, z: number, out: Heard): Heard {
     const a = this.steadySources()[i]!;
+    if (a.hum && !this.humming) {
+      out.level = 0;
+      out.route = 'none';
+      out.clarity = 0;
+      return out;
+    }
     this.listen(a.s, a.start, a.offset, (cell) => a.costs.get(cell) ?? -1, x, y, z, out);
     out.threshold = 1;
     out.clarity = out.level;
@@ -168,6 +176,7 @@ export class Acoustics {
     const steady = this.steadySources();
     let power = 0;
     for (const a of steady) {
+      if (a.hum && !this.humming) continue;
       this.listen(a.s, a.start, a.offset, (cell) => a.costs.get(cell) ?? -1, x, y, z, scratch);
       power += scratch.level * scratch.level;
     }
@@ -342,7 +351,7 @@ export class Acoustics {
           }
         }
       }
-      this.steady.push({ s, costs, start, offset });
+      this.steady.push({ s, costs, start, offset, hum: a.kind === 'hum' });
     }
     return this.steady;
   }

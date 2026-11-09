@@ -41,6 +41,8 @@ export function describe(e: SimEvent): string {
     case 'heard':
       return `heard ${e.kind === 'voice' ? 'a voice' : e.kind === 'shot' ? 'a shot' : 'a sound'}, ${e.clarity.toFixed(1)}× over his threshold, from about (${m(e.x)}, ${m(e.z)}) ± ${m(e.radius)} m`;
     case 'spotted':
+      if (e.what === 'outage') return `saw equipment stopped, ${m(e.distance)} m away`;
+      if (e.what === 'door') return `saw a door not as it was left, ${m(e.distance)} m away`;
       return e.what === 'body' ? `saw a body, ${m(e.distance)} m away` : `saw a flash from a lens, ${m(e.distance)} m away`;
     case 'alert':
       return `${e.from} → ${e.to}: ${e.reason}`;
@@ -80,6 +82,10 @@ export function describe(e: SimEvent): string {
       return `the player was hit in the ${e.part} (${e.hits})`;
     case 'alarm':
       return `alarm box ${e.box}: ${e.stage}`;
+    case 'sabotage':
+      return `the ${e.what} was sabotaged`;
+    case 'door':
+      return `a door was ${e.open ? 'opened' : 'shut'}`;
     case 'siren':
       return `the siren, heard to ${m(e.radius)} m`;
     case 'reinforce':

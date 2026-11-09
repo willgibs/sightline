@@ -68,6 +68,11 @@ export class GameSound {
   }
 
   /** A new valley or scene: its steady sources and its air. */
+  /** Whether the camp's generators are running (a snapshot's `humming`). */
+  setHumming(on: boolean): void {
+    this.ears.setHumming(on);
+  }
+
   setWorld(world: World): void {
     this.world = world;
     this.ears.setWorld(world, this.tuning);

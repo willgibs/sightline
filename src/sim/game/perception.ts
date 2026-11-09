@@ -196,6 +196,7 @@ export function deliverSound(ctx: TickContext, e: Extract<SimEvent, SoundFields>
     if (dx * dx + dz * dz > e.radius * e.radius) continue;
     if (!acoustics) {
       acoustics = acousticsOf(ctx.world, T);
+      acoustics.humming = ctx.index.of('generator').every((x) => x.generator.running);
       acoustics.spread(e, ctx.work);
     }
     acoustics.hear(ear.x, ear.y, ear.z, heard);
@@ -292,19 +293,39 @@ const fallen = { x: 0, y: 0, z: 0, yaw: 0, eyeHeight: 0, speed: 0 } as unknown a
  * pointed his way with the sun behind it, if he is looking that way (ballistics/glint.ts).
  * What he does about them is the ladder's ('perception-awareness').
  */
+/** What's out of place in the camp, for anyone who looks at it: equipment that has stopped, and a door not as it was left (E7). */
+function outOfPlace(ctx: TickContext): Array<{ id: number; what: 'outage' | 'door'; x: number; y: number; z: number }> {
+  const camp = ctx.world.camp;
+  const out: Array<{ id: number; what: 'outage' | 'door'; x: number; y: number; z: number }> = [];
+  for (const e of ctx.index.of('generator')) {
+    const d = camp.devices?.[e.generator.device];
+    if (d && !e.generator.running) out.push({ id: e.id, what: 'outage', x: d.x, y: d.y, z: d.z });
+  }
+  for (const e of ctx.index.of('radio')) {
+    const d = camp.devices?.[e.radio.device];
+    if (d && !e.radio.working) out.push({ id: e.id, what: 'outage', x: d.x, y: d.y, z: d.z });
+  }
+  for (const e of ctx.index.of('door')) {
+    const d = camp.doors?.[e.door.index];
+    if (d && e.door.open !== d.open) out.push({ id: e.id, what: 'door', x: d.x, y: d.y + 1, z: d.z });
+  }
+  return out;
+}
+
 export const perceptionSpotting: System = {
   name: 'perception-spotting',
   phase: 'perception',
   after: ['perception-hearing'],
-  reads: ['*.body', 'remains.remains', 'player.rifle', 'input', 'guard.guard', 'guard.senses', 'solid.solid'],
-  writes: ['guard.senses.bodies', 'guard.senses.spotted', 'guard.senses.flashed'],
+  reads: ['*.body', 'remains.remains', 'player.rifle', 'input', 'guard.guard', 'guard.senses', 'solid.solid', 'generator.generator', 'radio.radio', 'door.door'],
+  writes: ['guard.senses.bodies', 'guard.senses.spotted', 'guard.senses.flashed', 'guard.senses.noticed'],
   emits: ['spotted'],
   run(ctx) {
     const T = ctx.tuning;
     const S = T.perception.sight;
     const remains = ctx.index.of('remains');
     const armed = ctx.index.of('player')[0];
-    if (remains.length === 0 && !armed?.rifle) return;
+    const amiss = outOfPlace(ctx);
+    if (remains.length === 0 && !armed?.rifle && amiss.length === 0) return;
     const t = ctx.tick / T.sim.tickHz;
     const env = ctx.world.spec.env;
     const spec = T.bodies.guard;
@@ -338,6 +359,17 @@ export const perceptionSpotting: System = {
         const death = ctx.events.find((e) => e.type === 'death' && e.remains === r.id);
         const cause = ctx.emit({ type: 'spotted', source: g.id, cause: death?.id ?? 0, what: 'body', x: chest.x, y: chest.y, z: chest.z, distance: seen.distance });
         s.spotted.push({ what: 'body', cause, x: chest.x, y: chest.y, z: chest.z, radius: 0.5, strength: 1 });
+      }
+      for (const o of amiss) {
+        if (s.noticed?.includes(o.id)) continue;
+        const dx = o.x - eye.x;
+        const dy = o.y - eye.y;
+        const dz = o.z - eye.z;
+        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (d > S.notice.range || !inGaze(eye, o.x, o.y, o.z, S.core.halfDeg) || !lineOpen(view, eye, o.x, o.y, o.z, S.notice.stop, S.notice.through)) continue;
+        (s.noticed ??= []).push(o.id);
+        const cause = ctx.emit({ type: 'spotted', source: g.id, what: o.what, x: o.x, y: o.y, z: o.z, distance: d });
+        s.spotted.push({ what: o.what, cause, x: o.x, y: o.y, z: o.z, radius: 1, strength: 1 });
       }
       if (!armed?.rifle) continue;
       // The flash: where the player's lens is, toward this guard's eye.
@@ -446,10 +478,10 @@ export const perceptionAwareness: System = {
       }
       // What he has just caught sight of: a body, a flash.
       for (const sp of s.spotted) {
-        const keep = sp.what === 'body' ? T.perception.awareness.keepBody : T.perception.hearing.keep;
+        const keep = sp.what === 'body' || sp.what === 'outage' ? T.perception.awareness.keepBody : T.perception.hearing.keep;
         const p: Percept = { kind: sp.what, x: sp.x, y: sp.y, z: sp.z, radius: sp.radius, strength: sp.strength, tick, expires: tick + Math.round(keep * hz), cause: sp.cause };
         s.percepts.push(p);
-        stimulate(a, { kind: sp.what, level: sp.what === 'body' ? T.perception.awareness.body : T.perception.awareness.glint, x: sp.x, y: sp.y, z: sp.z, cause: sp.cause, reason: sp.what }, tick, T, draw);
+        stimulate(a, { kind: sp.what, level: T.perception.awareness[sp.what], x: sp.x, y: sp.y, z: sp.z, cause: sp.cause, reason: sp.what }, tick, T, draw);
       }
       s.spotted.length = 0;
       prunePercepts(s.percepts, tick);

@@ -1,5 +1,8 @@
+import type { Tuning } from '../../config/tuning';
 import { dcos, dsin, dtanDeg } from '../kernel/core/detmath';
-import type { BodySpec, BodyState } from './body';
+import type { Entity } from '../kernel/state';
+import { overlapsBody, type Collider } from '../kernel/world/colliders';
+import { bodyHeight, hasBody, type BodySpec, type BodyState } from './body';
 
 /**
  * The prone body's real shape, for collision: a chain of circles along its axis, from
@@ -133,4 +136,28 @@ export function footprint(b: Lying, spec: BodySpec, out: FootCircle[], axis: num
   }
   out.length = chain.length;
   return out;
+}
+
+/** A hair more than touching: a body pressed up against the space isn't in it. */
+const CLEARANCE = 0.02;
+const circles: FootCircle[] = [];
+
+/**
+ * True if a solid placed as `c` would be clear of every body: what anything that moves or
+ * places a solid asks first (kernel/world/solids.ts). A lying body counts along its whole
+ * chain: the motor keeps every circle out of solids, so nothing may put a solid on one.
+ */
+export function clearOfBodies(c: Collider, entities: readonly Entity[], bodies: Tuning['bodies']): boolean {
+  for (const e of entities) {
+    if (!hasBody(e)) continue;
+    const spec = bodies[e.kind];
+    const b = e.body;
+    const height = bodyHeight(b, spec);
+    const foot = footprint(b, spec, circles);
+    for (let k = 0; k < foot.length; k++) {
+      const C = foot[k]!;
+      if (overlapsBody(c, b.x + C.x, b.y - C.allow, b.z + C.z, C.r + CLEARANCE, height + C.allow)) return false;
+    }
+  }
+  return true;
 }

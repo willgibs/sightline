@@ -5,6 +5,7 @@ import { campBrain } from './campBrain';
 import { CAMP_SCENARIOS, campScenario } from './campScenario';
 import { campSystems } from './campSystems';
 import { liveCamp } from './liveCamp';
+import { OVERLOOK_TABLE, overlook } from './overlook';
 import { movementCourse } from './movementCourse';
 import { movementLab } from './movementLab';
 import { perceptionCrowd, perceptionLab } from './perceptionLab';
@@ -34,6 +35,7 @@ export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   'spawn-tick': spawnTick,
   'camp-systems': campSystems,
   'live-camp': liveCamp,
+  overlook,
   'shooting-range': shootingRange,
 };
 
@@ -52,4 +54,5 @@ export const SCENARIOS: Readonly<Record<string, readonly string[]>> = {
   noise: NOISE_TABLE,
   sight: SIGHT_TABLE,
   'camp-scenario': CAMP_SCENARIOS,
+  overlook: OVERLOOK_TABLE,
 };

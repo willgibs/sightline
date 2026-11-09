@@ -18,10 +18,15 @@ import { SCENES } from '../src/sim/game/scenes';
 import { generateWorld } from '../src/sim/generation';
 import { missionSpec } from '../src/sim/kernel/mission';
 import { kernelAloneScene } from '../src/sim/kernel/alone';
-import { runScene } from '../src/sim/kernel/scene';
+import { runScene, type Scene } from '../src/sim/kernel/scene';
+import { boardingPoint } from '../src/sim/game/camp';
+import { commanderOf } from '../src/sim/game/comms';
+import type { GuardEntity } from '../src/sim/game/entities';
+import { liveCamp } from '../src/sim/game/scenes/liveCamp';
 import { Blocks } from '../src/sim/kernel/world/colliders';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testWorld, tuningCopy } from './fixtures';
+import { shooterScene } from './live';
 
 const noop = (): void => {};
 /** A system's access when it touches nothing. */
@@ -302,6 +307,16 @@ describe('declared data access', () => {
       return out;
     }
     if (Array.isArray(a) && Array.isArray(b)) {
+      // Entities are matched by id: a despawn shifts the rest along, and mustn't hide what else changed.
+      if (path.length === 1 && path[0] === 'entities') {
+        const now = new Map((b as Array<{ id: number }>).map((e, j) => [e.id, j]));
+        if (a.length !== b.length || (a as Array<{ id: number }>).some((e) => !now.has(e.id))) out.push(path);
+        for (const e of a as Array<{ id: number }>) {
+          const j = now.get(e.id);
+          if (j !== undefined) changes(e, b[j], [...path, j], out);
+        }
+        return out;
+      }
       if (a.length !== b.length) out.push(path);
       else a.forEach((x, i) => changes(x, b[i], [...path, i], out));
       return out;
@@ -321,7 +336,8 @@ describe('declared data access', () => {
     const p = path.split('.');
     if (w.length > p.length) return false;
     const isKind = (r: string): boolean => !['schedule', 'outcome', 'rng', 'entities', 'input', 'nextEventId', 'tick'].includes(r);
-    if (w[0] === 'entities') return isKind(p[0]!) || p[0] === 'entities';
+    // Spawning and despawning, not every field of every entity: a new entity shows up as itself, with no field named.
+    if (w[0] === 'entities') return p[0] === 'entities' || p.length === 1;
     if (w[0] !== p[0] && !(w[0] === '*' && isKind(p[0]!))) return false;
     return w.every((x, i) => i === 0 || x === p[i]);
   }
@@ -342,7 +358,45 @@ describe('declared data access', () => {
     };
   }
 
-  it('lets every system write only what it declares, in valleys and in every scene', () => {
+  it('lets every system write only what it declares, with the camp brain under fire', () => {
+    const found = new Set<string>();
+    const base = shooterScene('LEB-2534', 24, 2, 2);
+    const scene = { ...base, setup: (sim: Simulation) => (base.setup!(sim), watchWrites(sim, found)) };
+    runScene(scene, defaultTuning);
+    expect([...found]).toEqual([]);
+  }, 180_000);
+
+  it('lets every system write only what it declares, when the target boards or finds his vehicle dead', () => {
+    for (const disabled of [false, true]) {
+      const found = new Set<string>();
+      const base = liveCamp('seed=LEB-2534') as Scene<Simulation>;
+      const scene: Scene<Simulation> = {
+        ...base,
+        seconds: 6,
+        expect: [],
+        setup: (sim) => {
+          base.setup!(sim);
+          const c = commanderOf(sim)!;
+          const spec = sim.world.camp.vehicles!.find((x) => x.escape)!;
+          sim.index.of('vehicle').find((v) => v.vehicle.escape)!.vehicle.disabled = disabled;
+          const at = boardingPoint(sim.world, spec, defaultTuning);
+          const target = sim.index.get(c.camp.objective!.target) as GuardEntity;
+          target.body.x = at.x;
+          target.body.z = at.z;
+          target.body.y = sim.world.terrain.heightAt(at.x, at.z);
+          target.brain!.sirenAt = 0;
+          c.camp.level = 'lockdown';
+          watchWrites(sim, found);
+        },
+      };
+      const run = runScene(scene, defaultTuning);
+      const status = commanderOf(run.sim as Simulation)!.camp.objective!.status;
+      expect(status).toBe(disabled ? 'open' : 'escaping');
+      expect([...found]).toEqual([]);
+    }
+  }, 180_000);
+
+  it('lets every system write only what it declares, in valleys', () => {
     const found = new Set<string>();
     const world = generateWorld(missionSpec('TAL-4471'), defaultTuning);
     for (const bot of [new ChaosBot('TAL-4471'), new WanderBot('TAL-4471')]) {
@@ -351,17 +405,22 @@ describe('declared data access', () => {
       const raw = neutralInput();
       for (let i = 0; i < 900; i++) sim.step({ ...bot.next(sim, raw), commands: i % 100 === 50 ? [{ kind: 'fire', lag: 0.5, yaw: 0, pitch: 0 }] : [] });
     }
-    // Cloning the state around every system is slow, so long scenes run shortened, without their expectations.
-    const scenes = [...Object.values(SCENES).map((make) => make()), kernelAloneScene()];
-    for (const scene of scenes) {
-      const long = (scene.seconds ?? 10) > 20;
-      const run = runScene(
-        { ...scene, ...(long ? { expect: [] } : {}), setup: (sim) => (scene.setup?.(sim as never), watchWrites(sim, found)) } as typeof scene,
-        defaultTuning,
-        long ? { seconds: 20 } : {},
-      );
-      expect(run.failures).toEqual([]);
-    }
     expect([...found]).toEqual([]);
-  }, 240_000); // every scene, with a full-tree diff around every system: Windows' runner took 68 s
+  }, 120_000);
+
+  // One test per scene: cloning the state around every system is slow, and one time limit over all of them stopped fitting on Windows' runner.
+  const scenes: Array<[string, () => Scene]> = [...(Object.entries(SCENES) as Array<[string, () => Scene]>), ['kernel-alone', () => kernelAloneScene()]];
+  it.each(scenes)('lets every system write only what it declares, in the scene %s', (_name, make) => {
+    const found = new Set<string>();
+    const scene = make();
+    // Long scenes run shortened, without their expectations.
+    const long = (scene.seconds ?? 10) > 20;
+    const run = runScene(
+      { ...scene, ...(long ? { expect: [] } : {}), setup: (sim) => (scene.setup?.(sim as never), watchWrites(sim, found)) } as typeof scene,
+      defaultTuning,
+      long ? { seconds: 20 } : {},
+    );
+    expect(run.failures).toEqual([]);
+    expect([...found]).toEqual([]);
+  }, 180_000);
 });

@@ -9,6 +9,8 @@ This is the working plan. Its checkboxes are kept current as work lands, and wha
 - `docs/phase-1-handoff.md`: what is already in place.
 - `docs/foundation-shape.md`: the shape every lab builds into. A narrow kernel, lanes whose contracts are enforced by tests, and a bench for every lane.
 - `docs/research/`: the seeds each lab starts from.
+- `docs/camp-engine.md`: a proposal (Nov 8) for how a camp fights back, as engines, and for testing engines in playable sandboxes. Nothing in it is built, and its calls are the owner's.
+- `docs/lab-opportunities.md`: where each lab tests less than the best idea on hand, ranked, with sources.
 
 This plan covers how the labs run, what each one defines for the others, and how each exit test is measured.
 
@@ -288,7 +290,7 @@ The statistics behind these protocols are in `docs/research/foundations.md`. A p
   | Any time | A, first sitting | `?trials=OWNER-A1` | 12 min |
   | Any time | C, first sitting, and feel (C9) | `?trials=OWNER-C1&lab=movement`, then `?scene=movement-lab`, with `&hz=blind` | 15 min |
   | A few days later | A and C, second sittings | `?trials=OWNER-A2` and `?trials=OWNER-C2&lab=movement` | 25 min |
-  | Once E13, E7, E8 and E12 are on `main` | E, and D's three camps | E13's scene | 25 min |
+  | Once E7 and E8 are on `main` | E, and D's three camps | `?scene=live-camp&params=seed=LEB-2534`, then `KUV-9210` and `HUM-0755` | 25 min |
 
   What each sitting asks is in its lab's section. Lab A's questions wait until after its first sitting.
 
@@ -443,12 +445,12 @@ Playable at `?scene=perception-lab`. Design doc: Enemy perception; Individual aw
   - The bark vocabulary, started now (Alien: Isolation's took most of its cycle). Barks run from specific to generic.
   - The detection indicator at the screen edge.
   - Then the fairness checks.
-- [ ] A9 · The other stimuli, each wired in when its source is on `main` (`docs/decisions.md`, A9):
+- [x] A9 · The other stimuli, each wired in when its source is on `main` (`docs/decisions.md`, A9):
   - [x] bodies and a comrade dropping (B4);
   - [x] impacts (B4), and the crack from the bullet's path;
   - [x] thrown objects (B9);
   - [x] lens glint (B6);
-  - [ ] open doors (D4). Lab D's doors are on `main`, but they all stand open and nothing changes them yet, so this goes in with the use key (E7).
+  - [x] doors (D4, E7): a door shut or opened is a sound, and a door not as it was left is something a guard notices. Lab D's doors all start open, so the cue is a door someone has shut.
 - [x] A10 · Sandbox mode: noise drops, and the time-scale hook.
 - [x] A11 · The budget: 16 guards perceiving within the frame budget, measured by work counts as well as `npm run sim -- --profile`, in Chromium, Firefox and WebKit. Fast paths come only if it needs them: a still body skips the motor, and a distant guard skips perception.
 - [x] A12 · Trial mode, with the protocol in Exit tests, and the agents' pre-screen.
@@ -825,7 +827,7 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
 - [ ] Exit test, the bench numbers, a note, a playable link.
   - **Where it stands (Nov 8), waiting on the owner:**
     - **Two questions, for the camps' sitting:**
-      1. Should camps steer players away from the ridge shot at the target? The default proposed is to keep all three approaches but vary how contested that shot is, so that in some camps every clean moment is watched or brief. The alternative is to leave it to lab E's reactions and accept the signature test as too strict for now. The camp's reaction can only make escaping harder once the target is dead, so the shot is measured with the camp answering (E13, E12) before the owner is asked.
+      1. **Answered Nov 8: contest it, through how a camp fights rather than through the generator (`docs/camp-engine.md`).** Should camps steer players away from the ridge shot at the target? The default proposed was to keep all three approaches but vary how contested that shot is, so that in some camps every clean moment is watched or brief. The alternative is to leave it to lab E's reactions and accept the signature test as too strict for now. Measured with the camp answering (E12, above): one timed shot takes the target in 28 of 30, and the camp then doesn't get near the shooter, so lab E's reactions alone won't change it.
       2. Are sightline hard cores bigger than the intended 4 all right? 22 of 100 camps have one, the largest 7, because tower marksmen now see properly. They make camps harder rather than broken.
     - **The held-out series passes:** 97 of 100 at the first camp attempt, 3 repaired or rebuilt, none invalid (`lab-d-exit-3`).
     - **The bots prove diversity:** 36 distinct best-plan signatures over those 100, and 8 of 10 on the review set, whose plans are clearly worse elsewhere in 77 of 90 cases.
@@ -908,11 +910,12 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - Searches end on time since the last percept and the search map's spread, never on the player's true position. Cycles run near 30–45 s, and the camp settles one level up.
   - The no-omniscience probe covers the commander, with a planted peek it catches.
 - [x] E6 · Radio check-ins, as scheduled events (`game/comms.ts`). The operator calls each post every few minutes. A dead post doesn't answer, the camp goes uneasy, and someone walks over.
-- [ ] E7 · Alarms.
+- [x] E7 · Alarms.
   - Done (`game/comms.ts`, `brain/brain.ts`, stand-in boxes until D's devices land): after the reaction window, a guard runs 4–8 s to an alarm box, a journey through the motor; lockdown is set only by the box changing state; dropping him or cutting the power interrupts it.
   - The core's sabotage, by default: hold the use key at arm's length to switch off the generator or cut the radio. Whoever passes or needs it notices the outage. The sabotage kit is Phase 3's.
   - At lockdown, the target runs for the vehicle when he hears the siren (`flee`); reaching it loses the mission, and dropping him first wins it. The drive away needs bodies to ride moving solids (with C).
-- [ ] E8 · Counter-sniper and reinforcements. Done so far: triangulation from real shot and crack percepts, with a calibrated ellipse (`brain/triangulate.ts`), marksmen sweeping the estimate and following newer fixes, a visible reaction inside 2 s, guards under fire taking cover, reinforcements at lockdown (a squad on foot until D's trucks land). Still to come: marksmen moving to overlooking posts (D's perches).
+  - **Built on generated camps** (`game/sabotage.ts`, `game/escape.ts`, `game/doors.ts`). Holding use at arm's length stops the generator, breaks the radio at its set or mast, or disables the target's vehicle. Nobody is told: a guard who looks at stopped equipment takes notice, the operator finds a dead set at the next call, and a runner finds a dead box. A stopped generator stops humming and masking. His truck drives out through the gate, swerving round anyone in the road, and the mission is lost only when it's gone; a sabotaged one strands him beside it, still to be got. Bodies still don't ride moving solids: he is gone from the camp once he's in the cab.
+- [x] E8 · Counter-sniper and reinforcements. Triangulation from real shot and crack percepts, with a calibrated ellipse (`brain/triangulate.ts`), marksmen sweeping the estimate and following newer fixes, a visible reaction inside 2 s, guards under fire taking cover, and reinforcements at lockdown, by truck up the camp's road on a generated camp. Marksmen stay on their towers: measured over 16 camps, a tower already overlooks 98% of the perches and every camp's best overview, so leaving one (which needs ladder links in navigation) waits until a sitting shows it's missed (`docs/decisions.md`, The camp's equipment).
   - **Honest triangulation:**
     - every guard who heard the report or the crack forms a bearing, with error from his own stream;
     - reports reach the commander by voice or radio;
@@ -933,11 +936,14 @@ Playable at `?scene=camp-brain`. Design doc: Enemy awareness and the camp brain;
   - The player's health is two or three hits (`tuning.brain.combat`), and the player can die (`game/combat.ts`, `campRules`).
   - Phase 2 only joins labs, so this is built here.
 - [x] E11 · Sandbox body drops: L in the debug view drops a body where the player looks (lab A's A9/A10 sandbox); the camp finds it as it would any body (`tests/commander.test.ts`).
-- [ ] E12 · The scenarios and the baselines (see Exit tests). Done so far: the scenario family `camp-scenario` (suspicion, search, alarm, escape), the search-cycle and calibration benches, the relocation metric, and the honest brain against Xu and Verbrugge's baselines (`game/baselines.ts`, pinned in the bench). "One overlook doesn't clear the camp" waits for lab D's validated camps, and for E13. Two leftovers: every report of the same body adds its own cover order, so seven guards are told to take cover where three should be; and the seed search isn't on the bench yet (the other four baselines are).
+- [ ] E12 · The scenarios and the baselines (see Exit tests). Done: the scenario family `camp-scenario` (suspicion, search, alarm, escape), the search-cycle and calibration benches, the relocation metric, the honest brain against Xu and Verbrugge's baselines (`game/baselines.ts`, pinned in the bench), and "one overlook" from both sides (`?scene=overlook&params=seed=<seed>%26plan=clear`, or `plan=timed`, pinned in the bench). Still open: the seed search isn't on the bench yet, every report of the same body adds its own cover order, and "one overlook doesn't clear the camp" doesn't hold on every camp.
+  - **One overlook, measured on 30 fresh camps (Nov 8):** a perfect shooter on the best overview, one shot every 5 s, the target last, drops 8.7 of 9.6 guards on average. In 22 of 30 the alarm goes up and the target gets away, so the mission is lost. In 2 of 30 he clears the camp outright. A shot as fast as the bolt allows: 8.2 of 9.6 down, 10 of 30 lost, 1 of 30 cleared. **It stops the mission, but it doesn't stop the killing:** whether that meets the owner's "shouldn't be so easy as to take everyone out" is the owner's call at the camps' sitting. Getting guards under cover at the first shot was tried and made it worse (`docs/decisions.md`, One overlook).
+  - **One timed shot, the other side:** a shooter on a certified perch waits for the target's head to be in a clear line with nobody watching, a median 138 s in, and wins 28 of 30, with the camp awake. That is the ridge-shot question in numbers: the camp can't answer a shot it can't see coming, and the lab's mission ends with the target. Phase 2's exfil is what makes getting away part of it.
+  - **After that shot, with the shooter staying put for two minutes more (28 kills):** the alarm went up in 20 (median 8 s after the kill), and nobody saw him or hit him in any of them. The nearest any guard came was a median 223 m, and the camp's estimate of the perch was a median 83 m off. **The camp's reaction doesn't yet make getting away any harder.**
 - [x] E13 · The camp brain on generated camps (added Nov 8). So far it had run only on E2's handmade camp: a generated camp's guards perceive (A13), but they had no brain, commander, radio or rules, and the player no rifle. A scene puts all of those on any validated camp, using that camp's own devices, so that E7, E8 and E12 can finish there and the owner can play it. It stays a scene: the default valley's behaviour doesn't move until Phase 2.
   - **Built:** `?scene=live-camp&params=seed=<seed>` (`scenes/liveCamp.ts`). The commander's record of the alarm boxes and the radio is kept from lab D's entities (`campDevices`), and raising a box raises the entity. On the three spot-check camps, a marksman firing from the best overview draws a reaction inside 2 s, the alarm goes up at one of the camp's own boxes, and the target gets away; every reaction reads back to something sensed (`tests/liveCamp.test.ts`).
 - [ ] Exit test, the bench numbers, a note, a playable link.
-  - **Not ready for the owner's sitting yet:** E13, E7, E8 and E12 come first, so that the sitting is on a generated camp. `?scene=camp-brain` plays now on the handmade camp, for an early look that doesn't count.
+  - **Ready for the owner's sitting:** `?scene=live-camp&params=seed=<seed>` puts the whole brain on a generated camp, with the rifle. `?scene=camp-brain` plays now on the handmade camp, for an early look that doesn't count.
   - **What to try** (F3 opens the debug view, which lists each guard's act and the camp's state; M marks a reaction you can't explain):
     - Walk toward the gate. The sentry looks up, walks over or calls it in. Move off, and watch him go back when he finds nothing.
     - Make a noise near the gate, or press K in the debug view to drop one: one guard goes, and the others look that way but stay put.

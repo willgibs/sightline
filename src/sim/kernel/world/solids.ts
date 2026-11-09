@@ -14,8 +14,9 @@ import { footprintExtent, rayCollider, type Collider, type ColliderSet, type Ray
  * run, so a body standing on a crate knows what it stands on across ticks and restores.
  *
  * Rules for whatever moves a solid:
- * - Never move it into a body (check with `overlapsBody` first, and wait or stop): the
- *   motor's invariant that no body ends a tick inside anything solid depends on it.
+ * - Never move it into a body (check every part of it first, and wait or stop: the body
+ *   lane's `clearOfBodies`, since a lying body is a chain of circles): the motor's
+ *   invariant that no body ends a tick inside anything solid depends on it.
  * - Bodies don't ride what they stand on yet: a solid moving under a body slides out
  *   from under it.
  * - The spatial grid (grid.ts) is built from the world's colliders only; a door that

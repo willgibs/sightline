@@ -2,6 +2,49 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · The camp needs hands
+
+**The owner's call on the ridge shot:** contest it, and contest it through how a camp fights. A compound expecting attack has counter-snipers, and a camp under fire takes up defensive positions, returns fire, inspects where the shot came from and calls for support. Asked to assess that "through a lens of engines", we wrote `docs/camp-engine.md`. It's a proposal: nothing in it is built, and its calls are the owner's.
+
+**What was tried first and shelved:** a generator rule that posts one more guard to watch the target's walk. 23 of 100 camps got one, and the longest unwatched moment on the walk fell only from a median 7.2 s to 5.0 s, because most candidates broke the limits on clusters. A guard posted on one walk contests one plan. It wasn't kept.
+
+**What the measurement adds** (30 camps, series `lab-e-overlook`, a perfect shooter staying on the best perch): the camp fired no rounds at him in any run, no guard ever detected him, the nearest came a median 272 m, and 30 s after his first shot its estimate of his position was a median 62 m off. 4.8 guards stood in a clear line from the perch at the first kill, and 4.8 did 20 s later. The camp knows where he is and has no way to act on it.
+
+**The scripts behind these numbers weren't kept.** That's a gap: a number an owner's call rests on should be one command away. The experiment runner in the proposal's first slice closes it.
+
+## 2026-11-08 · One overlook, from both sides (E12)
+
+**Decision:** the scenario `overlook` runs on any generated camp with the whole brain awake. `plan=clear` is a perfect shooter on the best overview who never moves and takes everyone he can see, the target last, one shot every 5 s by default (a person's pace; `pace=1.5` is as fast as the bolt allows). `plan=timed` is a shooter on a certified perch who waits for a clear line to the target's head while nobody is watching him, and fires, up to three times. The bench pins both on three camps. Scene expectations hold only what must be true on every camp.
+
+**What it found** (30 fresh camps, series `lab-e-overlook`):
+
+| | Guards down | Target got away | Cleared outright | Undecided or target down |
+| --- | --- | --- | --- | --- |
+| One perch, a shot every 5 s | 8.7 of 9.6 | 22 of 30 | 2 of 30 | 6 |
+| One perch, as fast as the bolt | 8.2 of 9.6 | 10 of 30 | 1 of 30 | 19 |
+
+The timed shot takes the target in 28 of 30, a median 138 s in. In the other two the shots were taken and didn't drop him. Left on his perch for two more minutes, in those 28: the alarm went up in 20, a median 8 s after the kill; nobody saw him or hit him; the nearest any guard came was a median 223 m; and the camp's estimate of the perch was a median 83 m off. That is what the owner's ridge-shot call rests on.
+
+**What was tried and taken back:** ordering the whole camp to cover from the believed perch, having guards duck at the first shot they hear, and making cover hide the head, not the chest. Each made it worse. Guards ran across open ground to reach cover, and those who would have run for the alarm didn't, so the target stopped getting away. Cover within 12 m rarely hides a guard from a ridge in any case. Tuning this blind was the wrong tool, so the brain is as lab E left it and the question goes to the owner with the numbers.
+
+**Why it's open:** the plan asks for "on every validated camp"; 2 of 30 isn't every, and the mission-losing alarm depends on who is left to raise it. The target's escape, not the guards' survival, is what stops a shooter on a ridge.
+
+**What moved:** the brain's bench gains the four numbers. Nothing else pinned.
+
+## 2026-11-08 · The camp's equipment (E7, E8, A9's doors)
+
+**Decision:**
+- **Sabotage is held, not pressed.** The use key has a held bit now (in the held byte, so older recordings still read). Holding it at arm's length stops the generator, breaks the radio at its set or its mast, or disables the target's vehicle. It's a step of the use system rather than a system of its own, because every other system in 'commands' already orders itself against 'use'.
+- **Nobody is told.** A guard who looks at stopped equipment notices it, once. The operator finds a dead set at his next call. A runner finds a dead box. With the generator down the radio is down too, so a guard who notices can only say so aloud; the operator's report reaches the camp because the set is what's dead.
+- **The hum stops with the generator:** in what masks a guard's hearing, and in the speakers.
+- **The target's truck drives out,** and the mission is lost only when it's gone. It swerves round anyone in the road, and after 4 s held up it goes through, because a truck that a sentry can stop forever is a mission that can't be lost. Sabotaged, it strands him beside it and the mission stays open.
+- **Doors** open and shut at a press and are heard. A guard who walks up to a shut door opens it, so no route needs to know. They all start open, so the cue is a door someone has shut.
+- **Reinforcements come by truck** up the camp's road, timed to reach the gate at the delay, and get down behind it. A handmade camp has no road laid out, so its squad still arrives on foot.
+
+**Marksmen stay on their towers, for now.** The plan had them moving to overlooking posts. Measured over 16 camps, a tower already overlooks 495 of 503 perches (98%) and every camp's best overview, so the move would matter for very few perches. It needs ladder links in navigation and a marksman who is no longer tied to his post, so it waits until a sitting shows it's missed.
+
+**What moved:** nothing pinned. New state is absent until used, so runs that don't use it hash as before. The tuning grew, so the golden recording is rewritten.
+
 ## 2026-11-08 · The camp brain on generated camps (E13)
 
 **Decision:** a scene, `live-camp`, puts lab E's whole brain on any generated camp, with the rifle. It is a scene rather than a change to the valley's systems, so the default valley's behaviour doesn't move until Phase 2 joins the labs. Lab D's entities hold the one answer about whether a box has power or the radio works; `campDevices` keeps the commander's copy of it, and raising a box raises its entity. A handmade scene's camp, with no such entities, keeps the list its scene gave it, so the scripted scenarios and benches are untouched.

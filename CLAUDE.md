@@ -12,7 +12,7 @@ The foundation pass that followed is done.
 
 **Now: Phase 1, planned on Nov 7 in `docs/phase-1-plan.md`.**
 - Wave 0, the shared seams, is on `main` (W0.2–W0.8, Nov 7): the kernel, the lanes and the game (`docs/foundation-shape.md`), brains that decide after perceiving, spawning and queries inside a tick, grid search, code ranges and roles, mechanical landing, and determinism checks at the edges. `docs/decisions.md` (Wave 0) has the reasoning.
-- All five labs reached `main` on Nov 8, each from its own session, branch and pull request. What's left is in the plan's open checkboxes (A9's doors, C9, D9, E7, E8, E12, and E13, the camp brain on generated camps) and the exit tests, which wait on the owner's sittings (the plan's *The owner's time* says which, when and where).
+- All five labs reached `main` on Nov 8, each from its own session, branch and pull request. What's left is in the plan's open checkboxes (C9 and E12) and the exit tests, which wait on the owner's sittings (the plan's *The owner's time* says which, when and where).
 - A lab session starts from:
   - this file;
   - `docs/phase-1-handoff.md`: what each lab starts from, and the gotchas;
@@ -22,6 +22,7 @@ The foundation pass that followed is done.
 
   The plan's rules for landing on `main` apply to every branch.
 - Keep the plan's checkboxes current as work lands, as the foundation plan was kept.
+- Proposed on Nov 8, waiting on the owner's calls: `docs/camp-engine.md`, how a camp fights back, as engines, and engines tested in playable sandboxes. `docs/lab-opportunities.md` lists where each lab tests less than the best idea on hand.
 
 **Phase 1:** five labs, each an isolated wireframe scene built to its exit test.
 

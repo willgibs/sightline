@@ -191,7 +191,7 @@ tests/                 Vitest
 | `npm run sim -- --minutes 10` | Headless run: a bot plays a valley at about 2,000× real time, records it, re-simulates the recording and checks it matches bit for bit. |
 | `npm run sim -- --replay file.slrec` | Re-simulates a recording saved from the browser, and says where a run diverged. |
 | `npm run scene` | Every scene headless, by its own driver, checking its expectations. |
-| `npm run seeds -- --count 100` | Generates many valleys and reports validation, timing, overwatch and access. |
+| `npm run seeds -- --count 100` | Generates many camps and reports how many pass validation first time, what repair did, and how long they took. |
 | `npm run fuzz -- --seeds 20 --minutes 60` | Bots play fresh valleys while every body's promises are checked every tick; `--synctest` also saves, restores and re-steps every 30 ticks. |
 | `npm run playtest` | Re-simulates and summarizes the runs kept in `playtests/`. |
 | `npm run selftest` | The golden values, in this JavaScript engine. |

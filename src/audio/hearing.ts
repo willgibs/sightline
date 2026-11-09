@@ -58,6 +58,11 @@ export class Ears {
     this.acoustics?.setSolids(solids);
   }
 
+  /** Whether the camp's generators are running, from the snapshot: a stopped one stops humming. */
+  setHumming(on: boolean): void {
+    if (this.acoustics) this.acoustics.humming = on;
+  }
+
   /** How a sound reaches a listener, by the guards' law. */
   readonly route: RouteFn = (x, y, z, radius, lx, ly, lz, out) => {
     const a = this.acoustics;

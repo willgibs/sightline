@@ -15,6 +15,7 @@ import { think } from './guards';
 import { playerIntent } from './player';
 import { PERCEPTION } from './perception';
 import { SHOOTING_SYSTEMS } from './shooting';
+import { guardDoors } from './doors';
 import { carriedSystem, useSystem } from './use';
 
 /**
@@ -161,7 +162,7 @@ const guardBrains: System = {
   name: 'guard-brains',
   phase: 'decide',
   reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.senses', 'guard.brain'],
-  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'commander.camp.devices', 'commander.camp.level', 'commander.camp.since', 'commander.camp.objective', 'alarm.alarm.raised', 'objective.objective.status', 'schedule', 'entities', 'bullet.bullet'],
+  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'commander.camp.devices', 'commander.camp.level', 'commander.camp.since', 'commander.camp.objective', 'commander.camp.inbox', 'alarm.alarm.raised', 'objective.objective.status', 'vehicle.vehicle.driving', 'schedule', 'entities', 'bullet.bullet'],
   emits: ['act', 'call', 'shot', 'report', 'alarm', 'siren', 'level'],
   run(ctx) {
     const nav = navAllowance(ctx);
@@ -198,7 +199,7 @@ function navAllowance(ctx: TickContext): NavAllowance {
 /** What the schedule's handlers touch beyond the schedule (kernel/systems.ts, scheduleSystem). */
 const SCHEDULED_ACCESS = {
   reads: ['commander.camp', 'guard', 'solid.solid'],
-  writes: ['commander.camp', 'guard.brain.told', 'guard.brain.task', 'guard.brain.thinkAt', 'guard.senses.awareness', 'guard.senses.belief', 'rng.awareness', 'entities', 'guard.body'],
+  writes: ['commander.camp', 'guard.brain', 'guard.senses.awareness', 'guard.senses.belief', 'rng.awareness', 'entities', 'guard.body', 'vehicle.vehicle'],
   emits: ['radio', 'checkin', 'reinforce'],
 } as const satisfies Access;
 
@@ -219,5 +220,6 @@ export const SYSTEMS: readonly System[] = [
   // Perception (lab A, in the valley since A13): after everything has moved, before anyone decides.
   ...PERCEPTION,
   guardBrains,
+  guardDoors,
   objectiveStatus,
 ];

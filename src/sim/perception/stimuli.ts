@@ -15,7 +15,7 @@ import type { PendingSound } from './senses';
  *   draws a guard to look, not to search (B9);
  * - a body seen, a comrade dropping and a flash from a lens come in by sight through
  *   'perception-spotting' (game/perception.ts), at their own levels (B4, B6);
- * - an open door is lab D's, when it's on `main` (D4).
+ * - a door shut or opened is a sound, and a door not as it was left comes in by sight (E7).
  */
 export const HEARD_AS: Readonly<Partial<Record<EventType, PendingSound['kind']>>> = {
   footstep: 'sound',
@@ -29,4 +29,5 @@ export const HEARD_AS: Readonly<Partial<Record<EventType, PendingSound['kind']>>
   report: 'shot',
   impact: 'shot',
   bolt: 'shot',
+  door: 'sound',
 };

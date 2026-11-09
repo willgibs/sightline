@@ -42,6 +42,11 @@ export class MarksmanDriver {
 
   constructor(private readonly steps: readonly Step[]) {}
 
+  /** Every step so far has been taken: a driver that adds steps as it goes can add another. */
+  get idle(): boolean {
+    return this.done >= this.steps.length;
+  }
+
   next(sim: Simulation, out: InputFrame): InputFrame {
     const hz = sim.tuning.sim.tickHz;
     const now = sim.tick / hz;

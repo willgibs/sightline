@@ -65,7 +65,7 @@ export interface CampDevices {
 
 export interface CampState {
   /** The mission's objective (E7): the target's entity id and whether he's still to be got, a stand-in until lab D's. */
-  objective: { target: number; status: 'open' | 'done' | 'escaped' } | null;
+  objective: { target: number; status: 'open' | 'done' | 'escaping' | 'escaped' } | null;
   /** The camp's devices (E7): where they are and whether they work. On a generated camp, kept current from lab D's entities (`game/comms.ts`, campDevices). */
   devices: CampDevices;
   /** A shooter the camp has triangulated (E8): the bearings it fuses, and its estimate. */
@@ -104,7 +104,7 @@ export interface CampState {
   /** When it last planned. */
   planned: number;
   /** Radio check-ins (E6): when the next call goes out, and the one waiting for an answer. */
-  checkins: { next: number; cursor: number; pending: { post: number; guard: number; seq: number; answered: boolean } | null; seq: number };
+  checkins: { next: number; cursor: number; pending: { post: number; guard: number; seq: number; answered: boolean } | null; seq: number; deadReported?: boolean };
 }
 
 export function createCamp(campX: number, campZ: number, tuning: Tuning): CampState {

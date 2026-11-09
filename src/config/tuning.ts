@@ -427,6 +427,7 @@ export const defaultTuning = {
       // looking that way (his core cone, or a marksman's far one), through foliage letting
       // through at least `through`, with nothing solid in the way.
       glint: { min: 0.5, range: 600, through: 0.15 },
+      notice: { range: 30, stop: 1.2, through: 0.15 }, // equipment stopped or a door out of place: how far, how near the line may end, and how much foliage it sees through
       skylineReach: 1500, // a line on past the body that hits nothing this far ends in open sky
       skylineRampDeg: 0.5, // it counts as sky from this far below level to this far above, ramping
       groundLift: 0.05, // light is taken this far above the ground beneath the body (owner)
@@ -473,6 +474,8 @@ export const defaultTuning = {
       cry: 0.8, // a comrade's cry heard: searching
       body: 0.8, // a body seen: searching (design doc: the strongest stimulus)
       glint: 0.55, // a flash from a lens: suspicious
+      outage: 0.55, // equipment stopped, that was running: suspicious
+      door: 0.3, // a door not as it was left: curious
       keepBody: 120, // seconds a body stays in his mind (a sound or a shot: hearing.keep)
       floor: 0.15, // after a search he never settles below this (design doc: a raised baseline)
       sharp: 1.25, // and his eyes are this much quicker
@@ -541,10 +544,27 @@ export const defaultTuning = {
       use: 0.7, // seconds to throw the switch, standing at it
       role: { sentry: 0.6, patrol: 0.5, marksman: 0, 'radio-operator': 0.3, officer: 0.5, worker: 1, target: 0 },
       sirenRadius: 1200,
-      flee: { pace: 4.6, arrive: 1.2, boardGap: 0.8 }, // the target's run for the vehicle at lockdown (m/s, how close counts as aboard)
+      flee: { pace: 4.6, arrive: 1.2, boardGap: 0.8, drive: 9, swerve: 4, swerveBy: [0, 0.5, -0.5, 1, -1, 2, -2], giveWay: 4 }, // the target's run for the vehicle at lockdown (m/s, how close counts as aboard, the gap beside it to get in; then its speed on the way out, how far off the road it goes round someone, sideways per metre forward in the order it tries them, and the seconds before it barges through)
       retry: 10, // seconds before he'll try the alarm again, after a run that came to nothing
       claimWithin: 3, // metres from the box for someone's shout to count as claiming it
       sirenHeight: 3, // metres above the box's foot that the horn sounds from
+    },
+    // Doors (E7, A9): they stand open until someone shuts one.
+    doors: {
+      reach: 1.8, // metres from the body to the doorway, for a press of use
+      underfoot: 0.5, // metres inside which he needn't be facing it
+      reachHeight: 1.2, // metres of height between the body and the doorway
+      facingCos: 0.5,
+      guardReach: 1.1, // metres at which a walking guard opens a shut door
+      radius: 14, // metres a door is heard at
+    },
+    // Sabotage (E7): held at arm's length, with nothing but your hands.
+    sabotage: {
+      reach: 1.6, // metres from the body to the thing
+      underfoot: 0.5, // metres inside which he needn't be facing it
+      reachHeight: 1.2, // metres between the thing and waist height
+      facingCos: 0.5, // cosine of how far off to the side it can be
+      seconds: { generator: 2.5, radio: 2, vehicle: 4 },
     },
     // Reinforcements (E8): called at lockdown, arriving after a delay as a squad that hunts.
     reinforce: {
@@ -552,6 +572,7 @@ export const defaultTuning = {
       count: 3, // guards in the squad
       spread: 3.5, // metres between them when they arrive
       edgeMargin: 14, // metres inside the map's edge where they arrive, up the camp's road
+      truck: { length: 6.2, width: 2.3, height: 2.9, every: 25, stopShort: 14, dropBehind: 1.5, holdOff: 1 }, // their truck (metres): its size, a waypoint this often along the road, where it stops short of the gate, how far behind it the squad gets down; and the seconds it holds off if someone is standing where it would appear
     },
     // Counter-sniper (E8): triangulating shots from bearings (triangulate.ts) and hunting the shooter.
     sniper: {
@@ -621,8 +642,8 @@ export const defaultTuning = {
       keep: 25, // seconds a guard remembers what he's been told
       maxTold: 8, // reports a guard's memory holds
       reportEvery: 20, // seconds between his calls about the same thing
-      level: { contact: 0.8, heard: 0.32, shot: 0.8, body: 0.82, missing: 0.4, clear: 0, claim: 0 }, // what a report raises him to
-      radius: { contact: 4, heard: 18, shot: 22, body: 6, missing: 8, clear: 12, claim: 8 }, // metres of uncertainty each kind adds to the speaker's
+      level: { contact: 0.8, heard: 0.32, shot: 0.8, body: 0.82, missing: 0.4, clear: 0, claim: 0, outage: 0.32 }, // what a report raises him to
+      radius: { contact: 4, heard: 18, shot: 22, body: 6, missing: 8, clear: 12, claim: 8, outage: 6 }, // metres of uncertainty each kind adds to the speaker's
       clearRadius: 18, // metres a searcher's "clear" report wipes from the map
       // Claims (Blacklist): "I've got it": one guard goes, those who hear him don't all pile in.
       claimWithin: 14, // metres between a claim's spot and his own for it to count
