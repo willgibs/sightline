@@ -2,6 +2,16 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · The camp needs hands
+
+**The owner's call on the ridge shot:** contest it, and contest it through how a camp fights. A compound expecting attack has counter-snipers, and a camp under fire takes up defensive positions, returns fire, inspects where the shot came from and calls for support. Asked to assess that "through a lens of engines", we wrote `docs/camp-engine.md`. It's a proposal: nothing in it is built, and its calls are the owner's.
+
+**What was tried first and shelved:** a generator rule that posts one more guard to watch the target's walk. 23 of 100 camps got one, and the longest unwatched moment on the walk fell only from a median 7.2 s to 5.0 s, because most candidates broke the limits on clusters. A guard posted on one walk contests one plan. It wasn't kept.
+
+**What the measurement adds** (30 camps, series `lab-e-overlook`, a perfect shooter staying on the best perch): the camp fired no rounds at him in any run, no guard ever detected him, the nearest came a median 272 m, and 30 s after his first shot its estimate of his position was a median 62 m off. 4.8 guards stood in a clear line from the perch at the first kill, and 4.8 did 20 s later. The camp knows where he is and has no way to act on it.
+
+**The scripts behind these numbers weren't kept.** That's a gap: a number an owner's call rests on should be one command away. The experiment runner in the proposal's first slice closes it.
+
 ## 2026-11-08 · One overlook, from both sides (E12)
 
 **Decision:** the scenario `overlook` runs on any generated camp with the whole brain awake. `plan=clear` is a perfect shooter on the best overview who never moves and takes everyone he can see, the target last, one shot every 5 s by default (a person's pace; `pace=1.5` is as fast as the bolt allows). `plan=timed` is a shooter on a certified perch who waits for a clear line to the target's head while nobody is watching him, and fires, up to three times. The bench pins both on three camps. Scene expectations hold only what must be true on every camp.

@@ -26,6 +26,7 @@ Gathered on Nov 7, 2026, while planning Phase 1. Fourteen researchers covered tw
   - `stats.py`: the exit-test statistics.
 
   They are reference calculations, not part of the build.
+- **`notes/labs/camp_defense.md`** (added Nov 8): how a defended position answers an attacker, from field manuals, after-action studies and shipped games. Behind `docs/camp-engine.md`.
 
 ## How far to trust it
 

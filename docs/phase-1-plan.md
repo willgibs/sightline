@@ -9,6 +9,8 @@ This is the working plan. Its checkboxes are kept current as work lands, and wha
 - `docs/phase-1-handoff.md`: what is already in place.
 - `docs/foundation-shape.md`: the shape every lab builds into. A narrow kernel, lanes whose contracts are enforced by tests, and a bench for every lane.
 - `docs/research/`: the seeds each lab starts from.
+- `docs/camp-engine.md`: a proposal (Nov 8) for how a camp fights back, as engines, and for testing engines in playable sandboxes. Nothing in it is built, and its calls are the owner's.
+- `docs/lab-opportunities.md`: where each lab tests less than the best idea on hand, ranked, with sources.
 
 This plan covers how the labs run, what each one defines for the others, and how each exit test is measured.
 
@@ -825,7 +827,7 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
 - [ ] Exit test, the bench numbers, a note, a playable link.
   - **Where it stands (Nov 8), waiting on the owner:**
     - **Two questions, for the camps' sitting:**
-      1. Should camps steer players away from the ridge shot at the target? The default proposed is to keep all three approaches but vary how contested that shot is, so that in some camps every clean moment is watched or brief. The alternative is to leave it to lab E's reactions and accept the signature test as too strict for now. Measured with the camp answering (E12, above): one timed shot takes the target in 28 of 30, and the camp then doesn't get near the shooter, so lab E's reactions alone won't change it.
+      1. **Answered Nov 8: contest it, through how a camp fights rather than through the generator (`docs/camp-engine.md`).** Should camps steer players away from the ridge shot at the target? The default proposed was to keep all three approaches but vary how contested that shot is, so that in some camps every clean moment is watched or brief. The alternative is to leave it to lab E's reactions and accept the signature test as too strict for now. Measured with the camp answering (E12, above): one timed shot takes the target in 28 of 30, and the camp then doesn't get near the shooter, so lab E's reactions alone won't change it.
       2. Are sightline hard cores bigger than the intended 4 all right? 22 of 100 camps have one, the largest 7, because tower marksmen now see properly. They make camps harder rather than broken.
     - **The held-out series passes:** 97 of 100 at the first camp attempt, 3 repaired or rebuilt, none invalid (`lab-d-exit-3`).
     - **The bots prove diversity:** 36 distinct best-plan signatures over those 100, and 8 of 10 on the review set, whose plans are clearly worse elsewhere in 77 of 90 cases.

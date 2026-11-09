@@ -22,6 +22,7 @@ The foundation pass that followed is done.
 
   The plan's rules for landing on `main` apply to every branch.
 - Keep the plan's checkboxes current as work lands, as the foundation plan was kept.
+- Proposed on Nov 8, waiting on the owner's calls: `docs/camp-engine.md`, how a camp fights back, as engines, and engines tested in playable sandboxes. `docs/lab-opportunities.md` lists where each lab tests less than the best idea on hand.
 
 **Phase 1:** five labs, each an isolated wireframe scene built to its exit test.
 
