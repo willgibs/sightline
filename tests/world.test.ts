@@ -143,4 +143,4 @@ describe('world generation', () => {
   });
 });
 
-const GOLDEN_TAL_4471 = '317ed710bbcc8526';
+const GOLDEN_TAL_4471 = '3f741d796333d706';

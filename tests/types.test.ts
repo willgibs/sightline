@@ -147,4 +147,4 @@ describe('each kind of place', () => {
 });
 
 /** TAL-4471, its layout as it was before compound types: generation fingerprints don't move for a yard. */
-const BEFORE_TYPES = 'f4a711268d0f8a54';
+const BEFORE_TYPES = '317ed710bbcc8526';

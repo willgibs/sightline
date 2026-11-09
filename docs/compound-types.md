@@ -113,7 +113,7 @@ The honest list. Today the game is two-and-a-half-dimensional in several places,
 
 ## 6. The order, and what each step proves
 
-**Step 1 · The types, on one storey** (one pull request; `GEN_VERSION` 7). `generation/plots.ts`: the four shapes. `compound.ts`: types and shapes in place of the one topology; `staffing.ts`: the loops and zones it walks come from the shape, not from hard-coded rectangles. Variety experiments gain a `type` column and an arm with the types switched off.
+**Step 1 · The types, on one storey** (one pull request; `GEN_VERSION` 8). `generation/plots.ts`: the four shapes. `compound.ts`: types and shapes in place of the one topology; `staffing.ts`: the loops and zones it walks come from the shape, not from hard-coded rectangles. Variety experiments gain a `type` column and an arm with the types switched off.
 
 Done when: every seed generates one of the four, chosen to suit its crux and ground; lab D's bar holds on a new held-out series (90 of 100 valid at the first attempt, `npm run seeds -- --count 100 --from compound-types-exit`); the variety experiments show the gain; each type reads as itself in `npm run look` and the debug view; `npm run check` passes.
 
