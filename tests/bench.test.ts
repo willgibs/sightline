@@ -3,7 +3,7 @@ import { LAYERS, type LayerName } from '../src/sim/lanes';
 import { benchReport } from '../src/sim/game/benches';
 import { BENCH_GOLDEN } from '../src/sim/game/benchGolden';
 import { GOLDEN } from '../src/sim/game/golden';
-import { PINNED_RUNS } from '../src/sim/game/runs';
+import { PINNED_RUNS, pinnedRun } from '../src/sim/game/runs';
 
 /**
  * Every lane's bench (src/sim/game/benches.ts) holds its pinned numbers: the work each
@@ -31,6 +31,24 @@ describe('the lanes’ benches', () => {
     }
     expect(moved, 'npm run bench -- --write pins numbers that moved on purpose').toEqual([]);
   });
+
+  it('pin a camp fight for the brain lane, and it is a fight: shots, a body, the camp awake', () => {
+    expect(live.brain.runs['camp-fight']).toBeDefined();
+    const r = pinnedRun('camp-fight').start();
+    let shots = 0;
+    let deaths = 0;
+    let woke = false;
+    while (!r.over) {
+      for (const e of r.step()) {
+        if (e.type === 'shot') shots++;
+        else if (e.type === 'death') deaths++;
+        else if (e.type === 'level' && e.to !== 'calm') woke = true;
+      }
+    }
+    expect(shots).toBeGreaterThan(2);
+    expect(deaths).toBeGreaterThan(0);
+    expect(woke).toBe(true);
+  }, 30_000);
 
   it('count the work they pin: the motor resolves every body every tick', () => {
     const valley = live.game.runs['TAL-4471 wander']!;

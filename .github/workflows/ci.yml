@@ -149,6 +149,26 @@ jobs:
           name: synctest-failures
           path: synctest-failures/
 
+  # The plans against the camp (src/lab/experiments/ladder.ts): who wins, on fresh dice,
+  # with the numbers in the run's summary. A pull request only plays its canary (the
+  # ladder scene), because a full ladder takes twenty minutes on a CI machine.
+  ladder:
+    name: The bot ladder
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - shell: bash
+        run: |
+          npm run experiment -- ladder --dice 3 | tee ladder.log
+          { echo '```'; cat ladder.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
   same-everywhere:
     name: Same hash on every platform
     needs: [check, platforms]

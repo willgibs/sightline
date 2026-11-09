@@ -6,6 +6,7 @@ import { compound } from './compound';
 import { CAMP_SCENARIOS, campScenario } from './campScenario';
 import { campSystems } from './campSystems';
 import { liveCamp } from './liveCamp';
+import { ladder } from './ladder';
 import { OVERLOOK_TABLE, overlook } from './overlook';
 import { movementCourse } from './movementCourse';
 import { movementLab } from './movementLab';
@@ -38,6 +39,7 @@ export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   'camp-systems': campSystems,
   'live-camp': liveCamp,
   overlook,
+  ladder,
   'shooting-range': shootingRange,
 };
 

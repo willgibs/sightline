@@ -199,6 +199,8 @@ tests/                 Vitest
 | `npm run bench` | Every lane's bench: pinned runs, the work each system does, quality metrics. |
 | `npm run explain` | For every pinned run that moved since `origin/main`: where it first diverged, and what changed. |
 | `npm run trace -- --run <name>` | The per-tick trace of one pinned run, which `explain` compares. |
+| `npm run experiment -- <name>` | The lab bench: the same camps run several ways and compared seed by seed; `--dice N` runs each camp with other luck and says how much of a number is the camp. |
+| `npm run whatif` | A run forked at a tick with one thing changed: where it first differs, and how each branch comes out. |
 | `npm run land -- <number>` | Merges a pull request, only if it is up to date with `main` and green. |
 | `npm run bisect -- --recording <file>` | Where this build and the one that made a recording part ways: tick, system, state paths. |
 | `npm run build` | Production build into `dist/`. |

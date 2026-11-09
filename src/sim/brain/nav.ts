@@ -128,6 +128,12 @@ export class Navigator {
     return this.finish(ax, az, bx, bz, out);
   }
 
+  /** Builds what routes need, ahead of the first tick: the fields are the one slow thing here. */
+  prepare(): void {
+    this.rimField();
+    this.exitField();
+  }
+
   /**
    * A route with one end inside the site: out by the fine field to the site's edge, by the
    * coarse field between the rim and the far end, and joined by a search round the camp.

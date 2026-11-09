@@ -223,6 +223,16 @@ describe('architecture', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('keeps a person-limited bot behind the player view', () => {
+    // Bots that make design calls decide from what a person could know (game/bots/playerView.ts).
+    // person.ts may reach the view, the kernel's math and the input it writes, and nothing that holds the state.
+    const f = join(sim, 'game/bots/person.ts');
+    const allowed = /^(\.\/playerView|\.\.\/\.\.\/kernel\/core\/(detmath|math|rng)|\.\.\/\.\.\/kernel\/input|\.\.\/\.\.\/body)$/;
+    const offenders = specifiers(f).filter((spec) => !allowed.test(spec));
+    expect(offenders).toEqual([]);
+    expect(readFileSync(f, 'utf8')).toMatch(/import type \{[^}]*Stance[^}]*\} from '\.\.\/\.\.\/body'/);
+  });
+
   it('sorts only in total orders, with ties broken by an id or an index', () => {
     // Array.prototype.sort is stable, so equal elements keep their input order, but a
     // comparator that isn't a consistent total order lets engines order the same input

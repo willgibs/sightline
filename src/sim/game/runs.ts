@@ -93,6 +93,8 @@ export const PINNED_RUNS: readonly PinnedRun[] = [
   scene('spawn-tick', 'kernel', SCENES['spawn-tick']!),
   scene('camp-systems', 'generation', SCENES['camp-systems']!),
   scene('kernel-alone', 'kernel', kernelAloneScene),
+  // A camp fight, kept short because every machine that runs the self-test plays it: the shooter's first shots, the camp's answer, the target's run.
+  scene('camp-fight', 'brain', () => ({ ...SCENES.overlook!('seed=LEB-2534&plan=clear&pace=5'), seconds: 45 })),
 ];
 
 export function pinnedRun(name: string): PinnedRun {

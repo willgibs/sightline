@@ -17,6 +17,7 @@ export const defaultTuning = {
     tickHz: 30, // fixed simulation rate (design doc · Platform and architecture)
     recordHz: 10, // state samples per second in recordings
     gravity: 9.81, // m/s², for everything that falls: bodies now, bullets and throws later
+    dice: 0, // which roll of the dice a run gets: forks every entity's random streams, the same camp with other luck (Lab F). 0 is the game's own
   },
 
   // Everything generation reads, and nothing else: changing any of it rebuilds the valley.

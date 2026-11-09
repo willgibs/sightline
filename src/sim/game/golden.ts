@@ -33,7 +33,8 @@ export const GOLDEN = {
    * budget); the shooting range, a marksman's shots from the click to the body on the
    * ground; spawn timing,
    * bodies spawned inside a tick; the kernel alone, a run with every lane switched off;
-   * camp systems, a generated camp with its generator cut and its target taken (lab D).
+   * camp systems, a generated camp with its generator cut and its target taken (lab D);
+   * a camp fight, the first 45 s of a shooter on an overlook with the whole brain awake (lab F).
    */
   scenes: {
     'movement-course': { behaviour: '0f2551d99837a6bc', state: '549efd1a98bc727c' },
@@ -43,6 +44,7 @@ export const GOLDEN = {
     'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '30be7b87da76f7de' },
     'kernel-alone': { behaviour: '0698e581024f5b35', state: '045b6f0f6879675a' },
     'camp-systems': { behaviour: 'e5c646c959574b12', state: 'dfb432c39d4c6d80' },
+    'camp-fight': { behaviour: '6e123adf77d6a266', state: '658ad1868d429a33' },
   },
 } as const;
 
