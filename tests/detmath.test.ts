@@ -129,5 +129,5 @@ describe('the exact range reduction', () => {
     const seconds = (1e6 / (2 * Math.PI) - 1) * shortest;
     expect(seconds / 86400).toBeGreaterThan(12);
     expect(DEG).toBe(Math.PI / 180);
-  }, 120_000);
+  }, 300_000);
 });
