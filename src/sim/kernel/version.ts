@@ -30,5 +30,6 @@ export const GEN_VERSION = 8;
  * longer search; a route with one end in the camp is found through fields (Lab F).
  * 11: a siren is heard through walls, so a man deep indoors still hears it.
  * 12: a tree's crown stops sight and bullets once a line has been through enough of it.
+ * 13: the escape vehicle drives round the yard and down the road, and is away only at the end of it.
  */
-export const SIM_VERSION = 12;
+export const SIM_VERSION = 13;

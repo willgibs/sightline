@@ -35,6 +35,25 @@ The mix of plans is level with yard-only overall; what the types change is which
 
 **What moved.** `GEN_VERSION` 8, `GOLDEN_TAL_4471` (TAL-4471 is a farm now), and the pinned runs standing on generated camps (`TAL-4471 wander`, `MUD-9031 wander`, `TAL-4471 chaos`, `camp-systems`, `camp-fight`); none of the movement, perception, shooting or kernel runs. The bench pins and the golden recording are rewritten.
 
+## 2026-11-09 · The owner's first fight: what it found
+
+**The escape really was broken.** The owner's reading: the box "seems to run into a building, get stuck, the target gets in, marked as escaped." On LEB-2534, the camp they played, that's exactly it. The vehicle's way out was a straight line to the gate, and on 21 of 24 camps that line went through something solid. It was held up 12 m along, and four seconds later the camp counted it as away, because giving up in the road ended the same way as reaching the end of it.
+
+**Changed.** The vehicle finds a way across the yard on the site grid with room for its width (`yardRoute`), then follows the road itself, and is away only at the end of it. A vehicle with no way out of the yard counts as disabled, and that's 1 camp in 40.
+
+**The target can be found.** The debug view marks him TARGET, and TARGET aboard once he's in the vehicle.
+
+**The camp's return fire can be read.** The simulated shooter is a stand-in, so it stays small: a figure where the shots come from, and the panel measures each of the camp's rounds along the path it really flew against that spot (`fired back`: how many, the closest, how many would have struck). It can't be hurt. Being hunted is for a person to feel, from a perch (the owner, Nov 9: use whichever method really answers the question).
+
+**Input.** A tap of the scope button now leaves the scope up, so a trackpad can scope and then click to fire; holding it still peeks. Runs kept in the browser can be deleted one at a time or all together.
+
+**What this didn't fix.** On 19 of 24 camps the target is gone a median of 29 s after the first shot (fastest 21 s), which is the owner's larger point: it leaves one long shot or an ambush on the road, and neither takes the base. It's on their desk as a decision.
+## 2026-11-09 · What the long bot runs found in the motor
+
+The weekly run on main, and the same runs on the tree crown branch, broke a body's promise in about one run in five: "gained N m on ground too steep to stand on" (rule 10). Most of it was real: a body on steep ground could step up across a triangle seam onto a higher, gentler one, by up to 45 mm, because only the destination's slope was asked about. The motor now also refuses a rise when the body starts on steep ground. The rest wasn't a broken promise at all: a mantle from steep ground rises as a mantle should, and the check now applies to bodies that stay on the ground. Six of the seven failing valleys pass an hour of play.
+
+**Still open:** one failing run (RAK-4743, the fuzzing bot) ends with a torso 1.3 mm inside a rock as a body starts to lie down beside it on a slope. It's in the lying-down chain and is small and rare, but it is a broken promise, and the weekly run will keep saying so until it's fixed.
+
 ## 2026-11-09 · What you can't see through, you can't shoot through
 
 **Why.** The owner's first sitting found kill shots "through tree cover". Those shots had really gone over the treetops, but the worry was right: on a generated map a tree's crown stopped nothing. Of the lines from perches to posts that the simulation called clear, 11% passed through more crown than anyone could see through, and a bullet went through at no cost. "The fact that it can happen invites lots of problems."

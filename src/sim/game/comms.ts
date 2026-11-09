@@ -8,7 +8,7 @@ import { Faction, type EntityBase } from '../kernel/state';
 import type { ScheduleHandler, System, TickContext } from '../kernel/systems';
 import { Surface } from '../kernel/world/surfaces';
 import { believe, createSenses, stimulate, type Percept } from '../perception';
-import { boardingPoint, escapeRoute, routeSeconds, spawnTruck, truckRoute } from './camp';
+import { boardingPoint, escapeRoute, yardRoute, routeSeconds, spawnTruck, truckRoute } from './camp';
 import type { GuardEntity } from './entities';
 import { deliverSound } from './perception';
 import type { Simulation } from './sim';
@@ -276,7 +276,10 @@ export function targetEscapes(ctx: TickContext, g: GuardEntity): void {
   const c = commanderOf(ctx);
   if (!c?.camp.objective || c.camp.objective.target !== g.id) return;
   const vehicle = ctx.index.of('vehicle').find((v) => v.vehicle.escape);
-  if (vehicle?.vehicle.disabled) {
+  // A vehicle that can't get out of the yard is as much use as one that won't start.
+  const spec = vehicle ? ctx.world.camp.vehicles?.[vehicle.vehicle.index] : undefined;
+  const yard = vehicle && !vehicle.vehicle.disabled && !g.brain!.stranded ? (spec && ctx.world.camp.layout ? yardRoute(ctx.world, ctx.tuning, spec, ctx.work) : []) : null;
+  if (vehicle && !yard) {
     if (!g.brain!.stranded) {
       g.brain!.stranded = true;
       reportOutage(ctx, c, g, vehicle.solid.x, g.body.y, vehicle.solid.z);
@@ -286,7 +289,7 @@ export function targetEscapes(ctx: TickContext, g: GuardEntity): void {
   const status = vehicle ? 'escaping' : 'escaped';
   c.camp.objective.status = status;
   for (const o of ctx.index.of('objective')) if (o.objective.target === g.id) o.objective.status = status;
-  if (vehicle) vehicle.vehicle.driving = { route: [{ x: vehicle.solid.x, z: vehicle.solid.z }, ...escapeRoute(ctx.world)], leg: 1, waited: 0, then: 'escape', cause: 0 };
+  if (vehicle) vehicle.vehicle.driving = { route: [{ x: vehicle.solid.x, z: vehicle.solid.z }, ...yard!, ...escapeRoute(ctx.world, ctx.tuning)], leg: 1, waited: 0, then: 'escape', cause: 0 };
   ctx.despawn(g.id);
 }
 

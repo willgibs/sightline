@@ -714,7 +714,7 @@ export const defaultTuning = {
       use: 0.7, // seconds to throw the switch, standing at it
       role: { sentry: 0.6, patrol: 0.5, marksman: 0, 'radio-operator': 0.3, officer: 0.5, worker: 1, target: 0 },
       sirenRadius: 1200,
-      flee: { pace: 4.6, arrive: 1.2, boardGap: 0.8, drive: 9, swerve: 4, swerveBy: [0, 0.5, -0.5, 1, -1, 2, -2], giveWay: 4 }, // the target's run for the vehicle at lockdown (m/s, how close counts as aboard, the gap beside it to get in; then its speed on the way out, how far off the road it goes round someone, sideways per metre forward in the order it tries them, and the seconds before it barges through)
+      flee: { pace: 4.6, arrive: 1.2, boardGap: 0.8, drive: 9, swerve: 4, swerveBy: [0, 0.5, -0.5, 1, -1, 2, -2], giveWay: 4, clearance: 0.2, routeReach: 8, routeExpansions: 200000, driveOut: 80 }, // the target's run for the vehicle at lockdown (m/s, how close counts as aboard, the gap beside it to get in; then its speed on the way out, how far off the road it goes round someone, sideways per metre forward in the order it tries them, and the seconds before it barges through)
       retry: 10, // seconds before he'll try the alarm again, after a run that came to nothing
       claimWithin: 3, // metres from the box for someone's shout to count as claiming it
       sirenHeight: 3, // metres above the box's foot that the horn sounds from
