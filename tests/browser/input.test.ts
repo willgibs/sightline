@@ -32,8 +32,11 @@ describe('the scope on a trackpad', () => {
   });
 });
 
+/** WebKit under test runs a private profile, where IndexedDB can't hold a Blob at all. */
+const webkit = /AppleWebKit/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+
 describe('the runs kept in this browser', () => {
-  it('can be deleted, one at a time', async () => {
+  it.skipIf(webkit)('can be deleted, one at a time', async () => {
     const store = new BrowserStore();
     const report = (savedAt: string) => ({ savedAt, world: { seed: 'S', scene: null }, run: { ticks: 1, tickHz: 30 } }) as unknown as TelemetryReport;
     await store.save('delete-a', new Blob(['a']), report('2026-11-09T00:00:01.000Z'));
