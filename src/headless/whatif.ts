@@ -15,6 +15,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { defaultTuning } from '../config/tuning';
+import { withDice } from '../lab/experiment';
 import { firstTick, forkRun, formatFork, noChange, parseIntervention, recordingRun, sceneRun, type Intervention, type RunSource } from '../lab/fork';
 import { SCENES, sceneOf } from '../sim/game/scenes';
 import type { Simulation } from '../sim/game/sim';
@@ -49,7 +50,7 @@ function source(): { run: RunSource; hz: number } {
   if (!name) usage('Name a scene or a recording.');
   const make = SCENES[name];
   if (!make) usage(`No scene called '${name}'.`);
-  const tuning = defaultTuning;
+  const tuning = withDice(defaultTuning, Number(args.get('dice') ?? 0));
   const seconds = args.get('seconds');
   return { run: sceneRun(make(args.get('params')), tuning, seconds ? { seconds: Number(seconds) } : {}), hz: tuning.sim.tickHz };
 }

@@ -42,6 +42,7 @@ const BOUNDS: ReadonlyArray<readonly [path: string, min: number, max: number, in
   ['view.fogDensity', 0, 0.1],
   ['sim.tickHz', 10, 240, true],
   ['sim.recordHz', 1, 240, true],
+  ['sim.dice', 0, 1000000, true],
   ['gen.world.size', 64, 4096],
   ['gen.world.cellSize', 0.5, 20],
   ['gen.world.playMargin', 0, 1000],
