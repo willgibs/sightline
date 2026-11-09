@@ -1011,7 +1011,7 @@ Added on Nov 8, the owner's call. *Labs pass* requires it. Design and reasoning:
   - [x] The compound simulator (`?scene=compound`): the camp with no player, and stimuli dropped anywhere. Attack scripts, and flaw detectors (`npm run flaws`, `npm run experiment -- flaws`).
   - [x] Men get out of the line from up to 40 m away and get down when they arrive, crouched or flat by what hides them. Standing in the line fell from 5.5 to 0.9 men per run against a sniper.
   - [x] Reinforcements have a place of their own, so a squad no longer stands in a heap.
-  - [ ] Drive the rest of the flaws down. What's left is mostly men caught by a shot they couldn't place.
+  - [ ] Drive the rest of the flaws down: about one man a run in the line, mostly caught by a shot he couldn't place. Nobody stuck, no pile-ups, no silent camps.
   - [ ] The owner's sitting.
 - [ ] F2 · The camp hunts. Picture and Command, sections that sweep, cut-offs on the road, fallbacks.
   - [x] Stance for guards.

@@ -8,7 +8,7 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 **Guards can change stance.** It looks first for a spot that hides a man crouched, because he can fight from there. A fold of ground that only hides him lying flat is taken when it's at least 8 m nearer. With nothing at all, he gets down where he stands. Orders carry an optional stance, the snapshot carries what his shape needs, and he's drawn where his shape is in any stance (rule 14, `tests/guardMeshes.test.ts`).
 
-**What moved** (`npm run experiment -- flaws`, 8 camps): in the line, against a sniper, 5.5 to 0.9 men per run; a suppressed sniper 9.4 to 1.8; relocating 5.1 to 1.0; sabotage 4.3 to 0.9. It costs no more to run. A man flat in the open is no longer counted: he's done what he can.
+**What moved** (`npm run experiment -- flaws`, 8 camps): in the line, against a sniper, 5.5 to 0.9 men per run; a suppressed sniper 9.4 to 1.8; relocating 5.1 to 1.0; sabotage 4.3 to 0.9. It costs no more to run. Three things a detector shouldn't have counted are gone: a man flat in the open has done what he can, a man looking around where he was sent isn't stuck, and a man under a roof can really miss a distant report. What's left, about one man a run, is mostly men caught by a shot they couldn't place.
 
 **Reinforcements have a place of their own.** They used to borrow the first patrol's post, and one camp's first patrol stands at a single point, so a squad of three ended up in a heap with him (pile-up 3.0 per run). Each now goes back to where he got down from the truck. A phase along the patrol's loop didn't help: a post with no route has no loop.
 

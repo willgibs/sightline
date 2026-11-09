@@ -3,6 +3,7 @@ import type { Attacked } from '../sim/game/attacks';
 import type { Simulation } from '../sim/game/sim';
 import type { SimEvent } from '../sim/kernel/events';
 import { Blocks } from '../sim/kernel/world/colliders';
+import { Cell, cellIndex } from '../sim/kernel/world/grid';
 import { sightLine } from '../sim/kernel/world/query';
 
 /**
@@ -71,7 +72,7 @@ export class FlawWatch {
       if (!b) continue;
       const spawn = sim.world.camp.guards[g.guard.spawn];
       const speed = Math.sqrt(g.body.vx * g.body.vx + g.body.vz * g.body.vz);
-      if (WALKING.has(b.act) && b.routeOk && b.route.points.length > 0 && !b.covered && speed < 0.05) {
+      if (WALKING.has(b.act) && b.routeOk && b.route.points.length > 0 && !b.covered && b.linger < 0 && speed < 0.05) {
         const s = (this.still.get(g.id) ?? 0) + dt;
         this.still.set(g.id, s);
         if (s >= 4) this.add(sim, 'stuck', g.id, `${b.act}, not moving for ${s.toFixed(0)} s`, `stuck${g.id}${Math.floor(sim.tick / (15 * hz))}`);
@@ -79,7 +80,10 @@ export class FlawWatch {
       if (b.act === 'cover' && lastAny && (sim.tick - lastAny.tick) / hz > F.drill.standTo.max + 15) this.add(sim, 'hiding-on', g.id, `still in cover ${((sim.tick - lastAny.tick) / hz).toFixed(0)} s after the last thing happened`, `hide${g.id}`);
       if (!lastShot) continue;
       const since = (sim.tick - lastShot.tick) / hz;
-      if (lastShot.what === 'shot' && since >= 5 && since < 6 && g.senses?.awareness.state === 'unaware' && (this.seenSince.get(g.id) ?? sim.tick) <= lastShot.tick) this.add(sim, 'deaf', g.id, `still unaware ${since.toFixed(0)} s after an unsuppressed shot`, `deaf${g.id}${lastShot.tick}`);
+      // Under a roof, a distant report can really be too faint: only a man outdoors is deaf.
+      const cell = cellIndex(sim.world.grid.site, g.body.x, g.body.z);
+      const indoors = cell >= 0 && (sim.world.grid.site.flags[cell]! & Cell.Roofed) !== 0;
+      if (!indoors && lastShot.what === 'shot' && since >= 5 && since < 6 && g.senses?.awareness.state === 'unaware' && (this.seenSince.get(g.id) ?? sim.tick) <= lastShot.tick) this.add(sim, 'deaf', g.id, `still unaware ${since.toFixed(0)} s after an unsuppressed shot`, `deaf${g.id}${lastShot.tick}`);
       if (spawn?.elevated) {
         const dx = lastShot.from.x - g.body.x;
         const dz = lastShot.from.z - g.body.z;
