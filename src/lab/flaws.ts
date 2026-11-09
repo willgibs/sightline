@@ -15,8 +15,12 @@ import { sightLine } from '../sim/kernel/world/query';
  * moment can be replayed in the browser.
  *
  * An instrument: it reads and doesn't write. It does know the truth, because judging a
- * reaction takes knowing what really happened; none of it reaches a guard.
+ * reaction takes knowing what really happened; none of it reaches a guard. It holds a man
+ * only to what his camp could know: taking cover from the wrong ridge is a mistake he's
+ * allowed to make.
  */
+
+type LineView = Parameters<typeof sightLine>[0];
 
 export const FLAW_KINDS = ['deaf', 'in-the-line', 'stuck', 'hiding-on', 'silent-tower', 'pile-up', 'friendly-fire', 'chatter'] as const;
 export type FlawKind = (typeof FLAW_KINDS)[number];
@@ -97,7 +101,7 @@ export class FlawWatch {
         if (sightLine(view, lastShot.from.x, lastShot.from.y, lastShot.from.z, g.body.x, y, g.body.z, Blocks.Bullet)) {
           const s = (this.lined.get(g.id) ?? 0) + dt;
           this.lined.set(g.id, s);
-          if (s > 6 && this.couldHaveMoved(sim, g.id, g.body.stance, g.body.x, g.body.z, lastShot)) this.add(sim, 'in-the-line', g.id, `standing in the shooter's clear line for ${s.toFixed(0)} s (${b.act})`, `line${g.id}${lastShot.tick}`);
+          if (s > 6 && this.openToWhatTheyBelieve(sim, view, g.body.x, g.body.y + g.body.eyeHeight, g.body.z) && this.couldHaveMoved(sim, g.id, g.body.stance, g.body.x, g.body.z, lastShot)) this.add(sim, 'in-the-line', g.id, `standing in the shooter's clear line for ${s.toFixed(0)} s (${b.act})`, `line${g.id}${lastShot.tick}`);
         }
       } else if (since >= 20) this.lined.delete(g.id);
       let near = 0;
@@ -108,6 +112,17 @@ export class FlawWatch {
         if (s > 4) this.add(sim, 'pile-up', g.id, `${near + 1} men within 2.5 m for ${s.toFixed(0)} s (${b.act})`, `pile${g.id}${Math.floor(sim.tick / (15 * hz))}`);
       } else this.pile.delete(g.id);
     }
+  }
+
+  /**
+   * Whether a man is also in the open from where his camp believes the shots come from. Hidden
+   * from that, or with no idea at all, he's done what he can with what he knows: to call it a
+   * flaw would ask him to know where the shooter really is.
+   */
+  private openToWhatTheyBelieve(sim: Simulation, view: LineView, x: number, y: number, z: number): boolean {
+    const est = commanderOf(sim)?.camp.shots.estimate;
+    if (!est) return false;
+    return sightLine(view, est.x, sim.world.terrain.heightAt(est.x, est.z) + sim.tuning.bodies.player.eyeHeight.prone, est.z, x, y, z, Blocks.Bullet);
   }
 
   /** A man flat on the ground with truly nothing to get behind, from the real shooter's bearing, has done what he can. */

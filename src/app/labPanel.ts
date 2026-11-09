@@ -38,11 +38,14 @@ export const DROP_KEYS: ReadonlyArray<readonly [string, StimulusName, string]> =
   ['Digit6', 'sabotage', 'cut equipment'],
 ];
 
+/** The compound simulator's look along the last shot, from where it was fired. */
+export const SHOOTER_VIEW_KEY = 'Digit7';
+
 export class LabPanel {
   private lines = '';
   private brief = '';
 
-  constructor(private readonly dock: DevDock, params: string, drop: ((what: StimulusName) => void) | null = null) {
+  constructor(private readonly dock: DevDock, params: string, drop: ((what: StimulusName) => void) | null = null, look: (() => void) | null = null) {
     dock.add({ id: 'lab-camp', title: 'Gauges', side: 'right', open: true, text: () => this.lines, summary: () => this.brief });
     const box = document.createElement('div');
     box.className = 'lab-switches';
@@ -67,6 +70,7 @@ export class LabPanel {
       window.addEventListener('keydown', (e) => {
         const key = DROP_KEYS.find(([code]) => code === e.code);
         if (key) drop(key[1]);
+        else if (e.code === SHOOTER_VIEW_KEY) look?.();
       });
     }
   }
@@ -77,10 +81,11 @@ export class LabPanel {
       `first shot  ${seconds(r.sinceFirstShot)}`,
       `shots       ${r.shotsFired}`,
       `down        ${r.guardsDown}  standing ${r.guardsStanding}`,
-      `in line     ${r.inLine}`,
-      `at you      ${r.roundsAtYou}  near ${r.nearMisses}`,
-      `seen you    ${r.detected ? 'yes' : 'no'}`,
+      `shooter at  ${r.shooter ? `${r.shooter.x.toFixed(0)}, ${r.shooter.z.toFixed(0)}` : 'none yet'}`,
       `nearest     ${metres(r.nearest)}`,
+      `in line     ${r.inLine}`,
+      `fired back  ${r.roundsAtYou}  near ${r.nearMisses}`,
+      `spotted     ${r.detected ? 'yes' : 'no'}`,
       `their guess ${Number.isNaN(r.estimateOff) ? 'none' : `${metres(r.estimateOff)} off`}`,
       `camp        ${r.level}${r.siren ? ', siren' : ''}`,
       `target      ${r.targetStatus}`,

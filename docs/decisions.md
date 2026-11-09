@@ -2,6 +2,20 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · What the first sitting showed: the simulator was misreading its own shooter
+
+The owner's first sitting of the compound simulator: "kill shots from hundreds of meters away, through tree cover. Zero line of sight, near perfect accuracy."
+
+**What was really happening.** The script's shooter was on a ridge 200 to 290 m from the camp, and its shots went over the treetops. The panel measured everything from the idle player, parked 736 m away at the corner of the map, so it read as a 736 m shot through forest, and F3 put the camera back there. A tool that says the wrong thing costs a sitting.
+
+**Changed.**
+- The panel measures from the real shooter, the last muzzle, and says where that is. The label `shooter` marks it in the debug view, and 7 looks along the last shot from there.
+- In the compound scene, leaving the debug view stays over the camp: its player is only parked.
+- The scripted sniper is a person: it shoots only at someone in a clear line, at the chest, with 0.8 mrad of error, every 8 s, and otherwise holds fire. It used to fire at the middle of the camp when it could see nobody.
+- The flaw detector holds a man only to what his camp could know. Of the 19 "in the line" flags against the fair sniper, none was exposed from where his camp believed the shots came from. He'd gone to cover from the wrong ridge, or had no idea. That's the honest uncertainty the owner asked for, not a defect. In-the-line per run: sniper 0, suppressed 2.0, relocating 0.9.
+
+**Still true, and next:** tree crowns stop nothing on generated maps (11% of perch-to-post lines the simulation calls clear pass through crowns too thick to see through). The law to build: if you can't see through it, you can't shoot through it.
+
 ## 2026-11-08 · Getting out of the line, getting down, and routes off the camp
 
 **The flaw detectors found it.** Standing in the shooter's line was the largest flaw. Most of it wasn't men misled by a suppressed shot, as we'd written: it was men on the fence, whose nearest cover was 14 to 35 m away, with a search that gave up at about 11 m. They stood in the open for a minute. The search now walks up to 40 m, looks at fewer spots the farther it goes, and counts rays as well as cells (rule 18).
