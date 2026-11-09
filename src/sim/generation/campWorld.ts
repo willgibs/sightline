@@ -7,6 +7,7 @@ import { buildGrid, type SpatialGrid } from '../kernel/world/grid';
 import type { World } from '../kernel/world/world';
 import type { TerrainReport } from './analysis';
 import type { Camp } from './camp';
+import { cruxOf } from './crux';
 import { campSpecProblems, type CampSpec } from './campSpec';
 import { perchViews } from './perches';
 import { buildRaster } from './raster';
@@ -70,7 +71,7 @@ export function generateCampWorld(spec: MissionSpec, tuning: Tuning, clock?: () 
     report.problems.push(...repaired.validation.rules.filter((r) => !r.ok).map((r) => `${r.rule}: ${r.detail}`));
   }
   const playHalf = terrain.heightfield.size / 2 - G.world.playMargin;
-  const spawn = chooseSpawn(spec.insertion, terrain.heightfield, terrain.features, colliders, report, playHalf, camp.site);
+  const spawn = chooseSpawn(spec.insertion, terrain.heightfield, terrain.features, colliders, report, playHalf, camp.site, grid.map);
   return {
     grid,
     spec,
@@ -102,7 +103,7 @@ interface BuiltCamp {
 function buildCamp(seed: string, attempt: number, terrain: TerrainResult, G: Tuning['gen'], spec: CampSpec): BuiltCamp {
   const fork = (label: string): Rng => new Rng(seed, attempt === 0 ? label : `${label}#${attempt}`);
   const colliders = new ColliderSet(G.world.size);
-  const camp = buildCompound(fork('camp'), terrain.heightfield, terrain.features, colliders, G, spec);
+  const camp = buildCompound(fork('camp'), terrain.heightfield, terrain.features, colliders, G, spec, cruxOf(seed, G));
   const props = scatterProps(fork('props'), terrain.heightfield, terrain.features, colliders, G);
   colliders.build();
   // The fine grid covers the ground the analysis looks at: the camp and its margin.
@@ -110,12 +111,12 @@ function buildCamp(seed: string, attempt: number, terrain: TerrainResult, G: Tun
   // Staffing searches the grid (its chokepoints, its patrols' paths) and sees through the
   // analysis raster (who would see whom drop), so it shapes the camp's clusters as it goes.
   let raster = buildRaster(camp, terrain.heightfield, colliders, grid.site, G.analysis.cell, G.analysis.margin);
-  let views = perchViews(raster, terrain.heightfield, camp.site, G);
+  let views = perchViews(raster, terrain.heightfield, camp.site, G, grid.map);
   placeFixtures(camp, colliders, terrain.heightfield, raster, views, G, fork('fixtures'));
   colliders.build();
   blockVehicles(camp, grid, G);
   raster = buildRaster(camp, terrain.heightfield, colliders, grid.site, G.analysis.cell, G.analysis.margin);
-  views = perchViews(raster, terrain.heightfield, camp.site, G);
+  views = perchViews(raster, terrain.heightfield, camp.site, G, grid.map);
   staffCamp(camp, terrain.heightfield, grid, raster, views, G, spec, fork('staff'), fork('routines'));
   const repaired = validateAndRepair(camp, terrain.heightfield, colliders, grid, raster, G, fork('repair'));
   return { attempt, camp, colliders, props, grid, repaired };

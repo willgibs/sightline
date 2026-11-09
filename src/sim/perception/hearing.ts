@@ -36,6 +36,9 @@ import type { World } from '../kernel/world/world';
  * flood; beyond, by the straight line alone, which in the open is the same answer.
  */
 
+/** More walls than any line in a camp crosses. */
+const THROUGH_ANYTHING = 32;
+
 /** A sound as hearing takes it: where, how far it carries unmasked, and which kind. */
 export interface SoundSource {
   x: number;
@@ -43,6 +46,8 @@ export interface SoundSource {
   z: number;
   /** Metres an unmasked listener hears it along an open route (kernel/events.ts, SoundFields). */
   radius: number;
+  /** What a wall takes off this sound, if not the usual, with no limit on how many it goes through: a siren. */
+  wallLossDb?: number;
 }
 
 /** What one listener hears of a sound. */
@@ -206,10 +211,11 @@ export class Acoustics {
     out.route = 'none';
     out.length = 0;
     // Through: walls and ground cost decibels.
-    const walls = this.wallsOnLine(s.x, sy, s.z, x, y, z, H.maxWalls + 1);
+    const most = s.wallLossDb === undefined ? H.maxWalls : THROUGH_ANYTHING;
+    const walls = this.wallsOnLine(s.x, sy, s.z, x, y, z, most + 1);
     out.walls = walls;
-    if (walls <= H.maxWalls) {
-      let loss = walls * H.wallLossDb;
+    if (walls <= most) {
+      let loss = walls * (s.wallLossDb ?? H.wallLossDb);
       if (straight > 1e-6 && this.world.terrain.raycast(s.x, sy, s.z, dx / straight, dy / straight, dz / straight, straight) < straight - 0.05) loss += H.terrainLossDb;
       const level = audibility(s.radius, straight) * (loss > 0 ? dpow(10, -loss / 20) : 1);
       if (level > 0) {

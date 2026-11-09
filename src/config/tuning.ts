@@ -77,6 +77,62 @@ export const defaultTuning = {
       creekBank: 2.2, // creek banks between fords: too steep to climb (rise per metre)
       fordBank: 0.45, // and at a ford
       fords: [2, 3], // crossings besides the road's
+      // The kinds of ground a camp can stand on (landform.ts), and how often each comes up
+      // (relative weights). A hollow is the valley above; every other kind is its own ground.
+      sites: { hollow: 3, spur: 2, bend: 2, scarp: 2, gorge: 1, col: 1 },
+      // How the road reaches the gate where there's an open side to come in by: straight in, or
+      // swinging round from a long way off the gate's axis.
+      roads: { straight: 1, dogleg: 1 },
+      doglegDeg: [40, 75], // the swing from the gate's axis, degrees
+      // A camp on a spur: the ground falls away round the pad, except along the neck that joins
+      // it to the high ground behind. Long, flat shots across the valley; dead ground to the fence.
+      spur: {
+        drop: [22, 38], // from the pad down to the valley floor
+        fall: [85, 120], // the run of that fall, from the pad's edge
+        neck: [36, 56], // half-width of the level ground running back from the pad
+        neckBlend: 40, // the neck's shoulders
+        ridgeDistance: [300, 440],
+        ridgeRise: [14, 32], // a crest above the pad, so above the floor by this and the drop
+        ridgeSpanDeg: [60, 95],
+        passBy: [30, 90], // the creek's closest approach, beyond the fall
+      },
+      // A camp in a river's bend: the water loops round its back, and comes near no gate.
+      bend: {
+        loop: [50, 78], // the river's distance beyond the pad's edge
+        width: [12, 20], // of its bed
+        openingDeg: [95, 125], // the river's legs leave at this bearing either side of the road
+        ridgeDistance: [250, 350],
+        ridgeHeight: [16, 30],
+        fords: [2, 4],
+      },
+      // A camp under a cliff (scarp), or between two (gorge): a wall nobody can stand on, broken
+      // at most by a notch you can climb to.
+      wall: {
+        distance: [155, 190], // from the camp's centre to the crest
+        height: [44, 72],
+        front: [38, 52], // run of its camp face
+        back: [34, 48], // and of its far face
+        notchDepth: 0.55, // how much of the crest a notch takes
+        notches: [0, 1],
+        arcShare: 0.9, // how much of the open side a scarp's wall takes
+      },
+      gorge: {
+        wallHalfDeg: [34, 46], // half the arc of each wall
+        ridgeDistance: [340, 500], // the far rises up and down its axis
+        ridgeHeight: [24, 44],
+        ridgeSpanDeg: [34, 50],
+        offAxisDeg: [18, 30], // the front rise stands this far off the road
+        passBy: [108, 122], // the creek along its floor
+      },
+      // A camp on a col: high shoulders close on either side, the ground falling away ahead and behind.
+      col: {
+        shoulderDistance: [195, 255],
+        shoulderHeight: [38, 62],
+        shoulderSpanDeg: [50, 62],
+        fall: [10, 22], // how far the ground falls ahead of and behind the camp
+        run: [140, 240], // over this distance from its pad
+        passBy: [180, 250], // the creek, across the fall ahead
+      },
     },
 
     // What D3 checks a valley for (sim/generation/overwatch.ts): overwatch from the placed
@@ -96,6 +152,19 @@ export const defaultTuning = {
     // the road in) and parcels around a central yard, each filled from a handmade module.
     // Sizes are metres: buildings are [length, depth, wall height].
     compound: {
+      // The camp's plan, each part a relative weight from a stream of its own: the shape of its
+      // plot, what its perimeter is made of, how full its yard is. `yard`, `chain` and `open` are
+      // the compound as first built.
+      plots: { yard: 3, long: 2, wide: 2, tight: 2 },
+      perimeters: { chain: 3, screen: 2, fort: 1 },
+      fills: { open: 3, packed: 2 },
+      plotLong: [58, 66], // half-size along a long plot's length
+      plotNarrow: [30, 36], // and across it
+      plotTight: [36, 42], // half-sizes of a tight plot
+      yardTight: 10, // the yard of a plot too shallow for the usual one
+      wallHeight: 3.2, // a solid perimeter: higher than a man, and it stops a bullet
+      wallFacing: 0.6, // a screen is walled on the sides this squarely facing a ridge
+      coverPacked: [18, 30], // clusters of containers and crates in a packed yard
       fenceHalf: [44, 52], // half-sizes of the perimeter, along the gate axis and across it
       fenceHeight: 2.2,
       gateWidth: 8,
@@ -116,6 +185,9 @@ export const defaultTuning = {
       radio: [6, 5, 2.8], // the radio room; its antenna, on its most hidden wall
       mast: 2, // the antenna's height: a whip well below the roof line (radio room 2.8 m), so the building hides it
       fixtureDoorGap: 2, // metres a wall fixture keeps from a door
+      screenDepth: 1.6, // a buried target's door has a short wall this far inside it: no straight line through the door
+      screenWing: 1.2, // how far that wall runs past the doorway either side
+      screenGap: 1.6, // clear floor kept between the end of that wall and the room's side wall: there's always a way round
       escapeRun: [6, 22], // metres from the target's door to his vehicle, tried at this range
       escapeClearance: 3, // metres his vehicle keeps off the skeleton's way in
       overviewShare: 0.15, // a perch that sees this much of the camp's ground counts as an overview, which fixtures hide from first
@@ -146,10 +218,24 @@ export const defaultTuning = {
       targetFan: [6, 10, 14], // metres out from his door that the target's walks are tried, in a fan
       coverageMargin: 0.02, // posts are moved while a perch comes this near validation's limit on guard time
       coverageRounds: 6, // posts so moved, at most (rule 18)
-      witnessTries: 12, // walkers' phases tried to give every perch someone it can't see watching (rule 18)
+      witnessTries: 12, // walkers' phases tried to give every perch someone it can't see watching, and as many turns of posts (rule 18)
+      witnessTurns: [45, -45, 90, -90, 135, -135], // degrees a post is tried turned for that
+      witnessMargin: 0.02, // the estimate of who's watched keeps this over validation's duty, on a camp built around a crux
       clusterMax: [2, 3], // the largest sightline cluster, from the easiest camp to the hardest: all but one
       coreMax: [3, 5], // and the hard core's
       corridorWatch: 0.2, // the most of the cycle one guard may watch the skeleton's way in
+    },
+
+    // The crux: the decisive problem each camp is built around (sim/generation/crux.ts), picked for
+    // the seed before anything else, relative weights. `walk` is the old promise (a target who walks
+    // out in front of the perches) and is weighted to nothing: an arm of the variety experiments only.
+    crux: {
+      kinds: { walk: 0, inside: 4, flush: 3, escort: 3 },
+      buriedSeconds: 2, // on inside and flush camps, no perch has him in view longer than this a cycle
+      doorPost: 1.4, // metres out from a door of his building that a door's sentry stands, where the crux isn't the way in: close enough that nobody crosses the threshold outside his contact zone
+      doorShoulder: 1.3, // on an escort's camp that sentry stands this far to the side, clear of the target's way out of the door
+      doorLineOut: [3, 6, 9, 12], // a buried target's spot is out of line of his door: eyes this far out in front of it are tried
+      doorLineSide: [-2, 0, 2], // and this far to either side
     },
 
     // Lab D's own sight model (D7; sim/generation/sight.ts). Generation reads only gen, so its
@@ -179,8 +265,8 @@ export const defaultTuning = {
     // procedural camps · Validation rules), the plan's no-single-perch rule and its companions.
     validation: {
       seenSeconds: 15, // a perch sees a guard if he's in its view this long a cycle: the plan's minimum time in view
-      longRangePerches: 2, // perches that must each see half the guards and the target
-      targetSeconds: 10, // ...the target for at least this long a cycle
+      longRangePerches: 2, // perches that see half the guards and hold the target, for a 'walk' crux: the old promise
+      targetSeconds: 10, // long enough a cycle for a perch to count as having the target
       maxCoverage: 0.6, // no perch sees more than this share of guard time
       maxTarget: 0.25, // nor the target for more than this share of the cycle
       watchedDuty: 0.03, // a guard counts as watched if another would see him drop for this share of the cycle
@@ -446,6 +532,7 @@ export const defaultTuning = {
       // arrives by the straight line only (A11: a shout's whole flood cost a frame).
       floodReach: 25,
       wallLossDb: 12, // the straight route loses this much per wall it passes through (as Rainbow Six Siege's does)
+      sirenWallLossDb: 3, // a siren's a good deal lower and louder than anything else in the camp, and walls barely touch it: it's meant to be heard indoors
       terrainLossDb: 15, // and this much where the ground is in the way
       maxWalls: 4, // through more walls than this, the straight route is silent
       maskDb: 17, // a steady sound hides anything more than this far below it (psychoacoustics: 15–20 dB)

@@ -131,11 +131,11 @@ describe('world generation', () => {
     for (const p of [...tal.props.trees, ...tal.props.bushes, ...tal.props.rocks]) {
       expect(Math.hypot(p.x, p.z)).toBeGreaterThan(W.padRadius);
       expect(closestOnPolyline(tal.features.road, p.x, p.z, W.roadWidth / 2, hit).dist).toBe(Infinity);
-      expect(closestOnPolyline(tal.features.creek, p.x, p.z, W.creekWidth / 2, hit).dist).toBe(Infinity);
+      expect(closestOnPolyline(tal.features.creek, p.x, p.z, (tal.features.creekWidth ?? W.creekWidth) / 2, hit).dist).toBe(Infinity);
     }
     expect(tal.props.trees.length).toBeGreaterThan(2000);
     expect(tal.props.bushes.length).toBeGreaterThan(500);
   });
 });
 
-const GOLDEN_TAL_4471 = '6493586d720c2b68';
+const GOLDEN_TAL_4471 = 'f4a711268d0f8a54';

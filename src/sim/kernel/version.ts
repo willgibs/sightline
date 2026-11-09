@@ -10,9 +10,11 @@
  * camp. 3: walls and buildings block sound (Blocks.Sound), and the fingerprint covers every
  * collider. 4: scatter depends only on seed, label and cell; the fingerprint covers every
  * field of the world; dsin and dcos reduce exactly from 10⁶ up (lab D, D1). 5: every
- * valley is lab D's, with a generated compound; Phase 0's test camp retires (D9).
+ * valley is lab D's, with a generated compound; Phase 0's test camp retires (D9). 6: six
+ * kinds of site, plans for the compound, kinds of day for the target, and perches a body
+ * can walk to.
  */
-export const GEN_VERSION = 5;
+export const GEN_VERSION = 6;
 
 /**
  * How the simulation behaves for given inputs. 3: events carry ids, times, entity sources
@@ -25,5 +27,6 @@ export const GEN_VERSION = 5;
  * 9: the valley's guards perceive (A13: lab A's sight, hearing and awareness join its
  * systems). 10: men in a camp that fights get down at the spots that hide them, from a
  * longer search; a route with one end in the camp is found through fields (Lab F).
+ * 11: a siren is heard through walls, so a man deep indoors still hears it.
  */
-export const SIM_VERSION = 10;
+export const SIM_VERSION = 11;

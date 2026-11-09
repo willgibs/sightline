@@ -62,6 +62,8 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 
 ## Checking work
 
+**Test what's settled, measure what's still moving** (the owner, Nov 9): free iteration where the ideas are still changing, thorough tests as things solidify, so problems don't compound or snowball. Foundations (the kernel, the motor, determinism, the lanes' contracts) get full tests and pins. Behaviour still being found (a camp's reactions, tuning, a sandbox) gets invariants and experiments, and its exact outcomes are pinned once a person has played the step and it has settled.
+
 - `npm run check`: typecheck plus all tests. Must pass before you hand anything back.
 - `npm run test:browser`: tests that need a real browser (Web Audio, WebGL, each browser's JavaScript engine), run in Chromium through Playwright. On a new machine, install the browser once with `npx playwright install chromium`. CI also runs them in Firefox and WebKit (`BROWSERS=chromium,firefox,webkit`), and the self-test under Bun, on every push. After changing a footstep voice, recalibrate: `VITE_CALIBRATE=1 npm run test:browser -- calibrate`.
 - `npm run sim -- --minutes 10`: bot run, recording and bit-exact re-simulation, with timing. Add `--profile` for the time each system takes.
@@ -103,6 +105,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 - Land a pull request with `npm run land -- <number>`: it merges only a branch that is up to date with `main` and green (`docs/phase-1-plan.md`, Landing on `main`). A branch takes `main` by merging it, never by rebasing.
 - Sessions land their own pull requests and handle branching and versioning without asking the owner (the owner's word, Nov 8). Push with an explicit destination, `git push origin HEAD:<branch>`; the hand-over's Gotchas say why.
 - A report for the owner lands in this repository (the plan, or `docs/`), or goes out as an artifact. A session's notes folder doesn't outlast the session: the night's review point was lost that way on Nov 8 and rebuilt from a transcript.
+- **The owner's desk** is [Sightline Desk](https://claude.ai/artifact/RB4pjU2qNsYE3zCuBYYb7f), which only the owner's account can open; the plan's *The owner's time* is the public record of the sittings. It holds what's waiting on the owner (sittings to play, decisions), every ask and where it stands, what's being worked on, and the owner's notes to us. At the start of a session, read its `notes`, `decisions` and `sittings` with `ArtifactData` and act on anything new. When something lands or changes, update it in the same session: a new ask or sitting goes on it, an answered decision closes with its outcome, a note gets a reply. Anything that needs the owner goes on the desk as well as in chat, so it can't get buried.
 - Research is a seed, not a ceiling. A lane starts from the strongest prior art in `docs/research/`, says where it falls short, builds past it, and proves the gain on its bench.
 - The foundation is meant to carry many games. Keep the kernel narrow, keep lanes behind their contracts, and generalize at the third use (`docs/foundation-shape.md`).
 

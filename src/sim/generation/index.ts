@@ -9,7 +9,8 @@ export { generateWorld, simTuningKey, siteBounds, worldFingerprint, worldTuningK
 export { buildWorld, handmadeMission, type HandmadeSpec } from './handmade';
 export { siteAt, type Site } from './site';
 export { ARCHETYPES, campMission, campSpecProblems, defaultCampSpec, type CampArchetype, type CampSpec } from './campSpec';
-export type { Ford, Ridge } from './landform';
+export { SITE_KINDS, siteKindOf, type Ford, type Ridge, type SiteKind } from './landform';
+export { CRUX_KINDS, cruxOf, type CruxKind } from './crux';
 export type { Overwatch } from './overwatch';
 export type { BuildingSpec, CampLayout, DeviceKind, DeviceSpec, DoorSpec, LadderSpec, ModuleName, ObjectiveSpec, Opening, Parcel, Side, Skeleton, SlotName, VehicleSpec } from './compound';
 export { GUARD_ROLES, type Camp, type GuardRole, type GuardSpawn, type Structure, type StructureKind } from './camp';
@@ -23,6 +24,6 @@ export { surveyWorld, type Survey, type SurveyAnalysis, type SurveyGuard, type S
 export { analyzeCamp, type CampAnalysis, type PathReport, type PerchReport } from './campAnalysis';
 export { infiltrate, spaceTimeSearch } from './infiltrate';
 export { buildRaster } from './raster';
-export { campPlans, planOn, sameSignature, SECTORS, sharedFields, writtenShots, type Approach, type Plan, type PlanSignature, type WrittenShots } from './plans';
+export { campPlans, carefulWayIn, planOn, sameSignature, SECTORS, sharedFields, writtenShots, type Approach, type Plan, type PlanSignature, type WrittenShots } from './plans';
 export type { AnalysisParts } from './campAnalysis';
 export type { Cluster } from './clusters';

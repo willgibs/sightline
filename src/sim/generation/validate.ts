@@ -6,6 +6,7 @@ import { cellIndex } from '../kernel/world/grid';
 import { GridSearch } from '../kernel/world/search';
 import type { Camp } from './camp';
 import type { AnalysisParts, CampAnalysis } from './campAnalysis';
+import { cruxExcess, needsWayIn } from './crux';
 
 /**
  * Validation (D8): the design doc's rules for a camp (Maps and procedural camps · Validation
@@ -18,7 +19,7 @@ import type { AnalysisParts, CampAnalysis } from './campAnalysis';
  * judged by whether it brings a camp closer (repair.ts).
  */
 export type RuleName =
-  | 'long range'
+  | 'crux'
   | 'infiltration'
   | 'systems'
   | 'clusters'
@@ -32,7 +33,7 @@ export type RuleName =
   | 'guards';
 
 export const RULES: readonly RuleName[] = [
-  'long range',
+  'crux',
   'infiltration',
   'systems',
   'clusters',
@@ -68,7 +69,6 @@ export interface Validation {
 export function validateCamp(camp: Camp, a: CampAnalysis, parts: AnalysisParts, hf: Heightfield, grid: SpatialGrid, gen: GenTuning): Validation {
   const V = gen.validation;
   const n = camp.guards.length;
-  const target = camp.objective?.target ?? -1;
   const seenShare = V.seenSeconds / a.cycle;
   const sees = a.perches.map((p) => p.guards.map((s) => s >= seenShare - 1e-9));
   const out: RuleResult[] = [];
@@ -77,16 +77,19 @@ export function validateCamp(camp: Camp, a: CampAnalysis, parts: AnalysisParts, 
     out.push({ rule: name, ok, excess: ok ? 0 : excess, detail: ok ? '' : detail, perches: ok ? [] : perches });
   };
 
-  // Long range: perches that see half the guards and the target.
+  // The crux: what this camp is built around, and that a way to succeed at it exists. No other
+  // way is promised: `infiltration`, `systems` and the ways out are asked only of the cruxes
+  // that depend on them.
+  const crux = camp.crux ?? 'walk';
+  const wayIn = needsWayIn(crux);
   {
-    const half = Math.ceil(n / 2);
-    const good = a.perches.filter((p, i) => sees[i]!.filter(Boolean).length >= half && target >= 0 && p.target * a.cycle >= V.targetSeconds - 1e-9).length;
-    rule('long range', V.longRangePerches - good, `${good} perch(es) see half the guards and the target; ${V.longRangePerches} needed`);
+    const { excess, detail } = cruxExcess(camp, a, gen);
+    rule('crux', excess, detail);
   }
-  rule('infiltration', a.infiltration.found ? 0 : 1, a.infiltration.exhausted ? 'no way in within the search budget' : 'no way in');
+  rule('infiltration', !wayIn || a.infiltration.found ? 0 : 1, a.infiltration.exhausted ? 'no way in within the search budget' : 'no way in');
   {
     const feeds = (camp.devices ?? []).filter((d) => d.kind === 'alarm' || d.kind === 'radio').length;
-    rule('systems', (a.sabotage.found ? 0 : 1) + (feeds > 0 ? 0 : 1), !a.sabotage.found ? 'no unseen way to the generator' : 'the generator powers no alarm and no radio');
+    rule('systems', !wayIn || (a.sabotage.found && feeds > 0) ? 0 : (a.sabotage.found ? 0 : 1) + (feeds > 0 ? 0 : 1), !a.sabotage.found ? 'no unseen way to the generator' : 'the generator powers no alarm and no radio');
   }
   {
     const unsolved = a.clusters.filter((c) => c.certified === 'unsolved');
@@ -163,7 +166,8 @@ export function validateCamp(camp: Camp, a: CampAnalysis, parts: AnalysisParts, 
     const excess = (others > 0 || a.vehicle.found ? 0 : 1) + (fromBest >= V.interceptSeconds ? fromBest - V.interceptSeconds + 1e-6 : 0);
     rule('escape', excess, others === 0 && !a.vehicle.found ? 'nothing but the best overview can stop the target on his run' : `the best overview has the target on his run for ${fromBest.toFixed(1)} s`, best >= 0 && fromBest >= V.interceptSeconds ? [best] : []);
   }
-  rule('two ways out', (a.exfil.found ? 0 : 1) + (a.exfil2.found ? 0 : 1), !a.exfil.found ? 'no way out' : 'only one way out');
+  // The ways out are found from the end of the way in, so only a camp whose crux is the way in is asked for them.
+  rule('two ways out', !wayIn ? 0 : (a.exfil.found ? 0 : 1) + (a.exfil2.found ? 0 : 1), !a.exfil.found ? 'no way out' : 'only one way out');
   rule('guards', Math.max(0, n - gen.staffing.cap), `${n} guards, more than ${gen.staffing.cap}`);
 
   const failed = out.filter((r) => !r.ok).map((r) => r.rule);

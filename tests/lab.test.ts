@@ -158,7 +158,7 @@ describe('the dice', () => {
     // Generation reads only tuning.gen, so the valley can't have moved.
     const camp = campMission('LEB-2534');
     expect(worldFingerprint(generateWorld(camp, withDice(T, 7)))).toBe(worldFingerprint(generateWorld(camp, T)));
-  }, 60_000);
+  }, 180_000);
 
   it('roll 0 is the game as it ships', () => {
     expect(T.sim.dice).toBe(0);

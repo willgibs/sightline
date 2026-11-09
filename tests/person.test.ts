@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { tournament, type Experiment, type RunResult } from '../src/lab/experiment';
+import { plainTuning } from '../src/lab/experiments/variety';
 import { Careless, HASTY, PERSON, ShootOnceAndLeave, WalkTo } from '../src/sim/game/bots/person';
 import { LiveView, ViewDriver, type Angles, type PlayerView, type Point3, type SeenMan, type You } from '../src/sim/game/bots/playerView';
 import { commanderOf, giveCommander } from '../src/sim/game/comms';
@@ -193,8 +194,9 @@ describe('the ladder', () => {
     // Nobody can shoot back, and the target has nowhere to run, so this is about the walk.
     const quiet = tuningCopy();
     for (const role of Object.keys(quiet.brain.combat.range) as Array<keyof typeof quiet.brain.combat.range>) quiet.brain.combat.range[role] = 0;
+    // On a camp the old promise built: this plan shoots the target from a perch, and most camps don't offer one now.
     const sc = ladder('seed=HOF-3956&plan=leave&off=truck,alarm,fight') as Scene<Simulation>;
-    const sim = startScene(sc, quiet);
+    const sim = startScene(sc, plainTuning(quiet));
     const driver = sc.driver!();
     const raw = sc.game.still(sim);
     const ticks = sceneTicks(sc, quiet);

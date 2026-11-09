@@ -2,6 +2,74 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · The world pillar: the target is buried, and camps are built around a crux
+
+**Why.** The reviewers found the same best plan in 29 of 30 camps. The owner's ruling on what that plan rested on: "If the target can always be seen from every perch, that effectively makes every mission 1-shot from success from nearly every vantage point. That effectively forces the easiest map of all time across generations, where it likely has to fall into a low-building compound within a valley. Very bad rule that forces both generic map design, and no real challenge to reach a target. Much smarter to bury target behind the challenges inherent to the base takedown." So lab D's rule that every camp offers two perches on the target is gone. The design doc's validation rules ("three or more viable approaches") need the owner's edit to match.
+
+**Measured first** (`npm run experiment -- variety-ground`, `-perches`, `-views`, `-compound`, `-target`, `-families`, `-cruxes`; 100 held-out seeds, series `lab-world-variety`; the `plain` arm is the generator as it was, with every new weight at zero). Three things made a hundred seeds one picture, rotated, and the seed explorer and `npm run look` agreed. Plain, then as built:
+
+- **One kind of ground.** The pad in a hole or level with what's round it: 100 of 100 plain, 85 now, with 15 standing 8 m or more above it. A skyline under 4°: 94, then 70, with 9 at 8° or more (0 before). Ground falling away on half the bearings or more: 0, then 15. Dead ground the towers can't see over a tenth of the ring: 1, then 48. Six kinds of site now: hollow 25, spur 15, bend 23, scarp 20, gorge 8, col 9.
+- **Every perch had the same view, and the target in it.** The median perch saw 65% of the camp's ground or more in 99 camps, 22 now, and under 40% in 23 (none before). Four perches in five or more held the target for 10 s in 63 camps, 6 now. Fewer than one in four in 1 camp, 78 now.
+- **One compound, one road.** A square plot in all 100 (41 are now 1.6 long to 1 or more), the road within 15° of the gate's axis in all 100 (74 now), chain link everywhere (38 have a wall on the ridge sides, 15 all round; 38 have packed yards).
+
+**The rule was doing the work, and layout couldn't undo it.** With the new ground and plans but the old promise (the `layout only` arm of `variety-families`), the ridge shot is best on 35 of 100 camps against 32 plain, and possible on all 100. Taking the promise away is what moved it: best on 7, possible on 29. Holding to a shot whatever the camp costs a mean 0.32 of risk now against 0.10 plain.
+
+| Best family of plan (of 100) | shot | flush | take apart | way in | a shot at all |
+| --- | --- | --- | --- | --- | --- |
+| plain | 32 | 7 | 19 | 42 | 100 |
+| layout only | 35 | 16 | 18 | 31 | 100 |
+| as built | 7 | 39 | 12 | 42 | 29 |
+
+No family is over 50%. That bar was already met on this scoring by the plain generator (42%, a way in), so it isn't what changed: the shot's share, its cost and whether it exists at all are. Lab D's risks aren't calibrated, and the mix leans on how the way in is scored: with the path the analysis first found rather than a careful one, the shot is best on 46 plain camps and 9 as built, the same direction. By crux (`variety-cruxes`): inside, a way in on 37 of 44 and a flush on 7; flush, a flush on 27 of 27; escort, spread: take apart 12, shot 7, flush 5, way in 5 of 29. The longest unwatched view of him any perch gets was 10 s or more in 40 camps, and is now in none, in the analysis's model, which counts a door as solid.
+
+**Lab D's bar stays:** 93 of 100 valid at the first attempt on a new held-out series (`npm run seeds -- --count 100 --from lab-world-variety-exit`), 7 repaired or rebuilt, none invalid. Generation takes a little longer: a median of about 2.8 s for an inside camp and 3.7 s for a flush camp against 2.1 s plain, because on a flush camp the search for a way in to a man whose door is held usually runs out its budget.
+
+**What changed.**
+
+- **Cruxes** (`generation/crux.ts`). A seed picks its decisive problem first, from a root stream of its own (rule 3), and the camp is laid out to make it true. *Inside* (weight 4): he stays in his building, deep in the camp and away from the breach, out of every perch's view, and someone has to go in. *Flush* (3): he stays in too, his one door is held, and he has to be made to run and had on his run. *Escort* (3): he walks in the open, on the walk where another guard most often has him too. Validation's `crux` rule asks that a way to succeed at that problem exists, and nothing else.
+- **What a crux lays out.** Deep slots for a buried target. A short wall inside each of his doors (`screenDepth`), so that a straight line through the door from the yard doesn't reach him, always stopped short of the side walls (`screenGap`). His spot picked out of line of the doors as well as out of the perches' sight. Where the way in isn't the crux, his one door held by a sentry; on an escort's camp that sentry stands at the door's shoulder, clear of his way out. On an inside camp, two doors on two different walls, and guards kept off the way a body can actually walk from the breach to his door.
+- **The ground.** Six kinds of site (`generation/landform.ts`, each from its own stream). Walls nobody can stand on aren't perches, and a perch has to be ground a body can walk to (26 of 748 weren't).
+- **The compound.** A plan (`layout.plan`, its own stream): the plot's shape, its perimeter, how full its yard is. Roads that swing off the gate's axis.
+- **Close shots are checked against what stops bullets.** The raster let a line through a one-cell wall at a corner, so a search over many cells and moments found ways in that "shot" him through a wall. `clearShot` is a stricter raster line, then the colliders' own raycast.
+
+Every new choice has its own stream and weights in tuning, so with them at zero the generator draws what it did (the `plain` arm). `GEN_VERSION` 6.
+
+**The audit: what else forced generic maps or took the challenge away.** Changed, as clearly wrong:
+
+- The two-perch guarantee and everything staffing did to serve it (the walk chosen for two overviews, the target at the breach).
+- `infiltration`, `systems` and `two ways out` asked of every camp ("every approach must be possible on every seed"). They're asked now only where the crux needs the way in: on a flush or an escort camp a way in is what the player has to find, or do without.
+- Guards kept off the way in on every camp: only where the crux needs it.
+
+Left as they are, each the owner's call:
+
+| Guarantee | Recommendation |
+| --- | --- |
+| One compound topology: seven slots round a yard, one gate, one breach | Next, and the biggest: archetypes as data (a keep on a hilltop, a depot strung along a road, a farm and its outbuildings), picked by crux |
+| A breach in every fence, facing a ridge | Ask only of the cruxes that use it, once a player can cut a fence |
+| Low buildings: one storey, 3.2 m | Change with the archetypes: a two-storey building is the next way to bury him |
+| One-sided overwatch (perches over at most half the horizon, at least 120° open) | Keep for now: it's what leaves the road a way in. A ring of high ground belongs with the crux below |
+| The flat pad at the middle of the map | Keep: everything assumes a pad, and rule 15 leaves the door open to moving it |
+| One of each of the seven roles in every camp | Keep until lab F says what a camp's roster should be, then buy by crux |
+| `clusters`: every sightline cluster can be taken apart | Keep, and ask it only where a chain shot is the way (escort) when a camp type needs otherwise: 1 camp in 120 broke it |
+| `perch coverage`, `perch target`, `perch witnessed`, `counter-perch`, `alarms in fire`, `escape`, `guards` | Keep: they take a free ride away from a perch; they don't promise one |
+
+A fourth crux, **the rim is held** (guards on the high ground, so the perches have to be taken first), isn't built: guards outside the raster aren't analysed, and they need lab F's engines. A player isn't told a camp's crux: finding it out is the reconnaissance.
+
+**The research, weighed.** A survey of expressive range, plan-family regret and generating from a decisive problem (Smith and Whitehead 2010; Beukman et al. 2022; Balduzzi et al. 2019) was the seed. It said the sameness was structural and to pick each seed's problem first, and the measurements bear out both. It blamed the rule, and the rule asked for only two perches, but 27 of 32 had him: the open compound on flat ground did as much as the rule, and needed the new ground and plans. It kept the design doc's "every approach exists, what varies is the margin"; the owner's ruling goes further, and nothing is promised but a way through the crux. It went from a list of problems to validate; here the crux also lays out the camp, which is what makes a crux true on 93 of 100 seeds first time rather than a filter that throws most away.
+
+**What moved.** `GEN_VERSION` 6, `GOLDEN_TAL_4471`, and the pinned runs that stand on generated camps (`TAL-4471 wander`, `MUD-9031 wander`, `TAL-4471 chaos`, `camp-systems`, `camp-fight`); no other scene's fingerprint moved.
+
+- **Benches.** Lab D's six camps: 4 valid first time, 2 repaired (5 of those 6 happen to be flush camps), and a way in and out is found on 1 of them, since only an inside camp is promised one. One overlook from the best perch (E12): 22 of 31 guards down against 12 of 27, and the target got away on all three camps, which are flush camps where he runs when the shooting starts. No camp was cleared.
+- **E12's timed shot** needs a target a perch can have, so the bench runs it on three escort camps of its own and gets him on 2 of 3. The plan's *One timed shot* (28 of 30) was measured before the cruxes and says so now. On other camps that shooter has nothing to do; the `overlook` scene already leaves him idle.
+- **Tests.** `tests/validate.test.ts` and `tests/sites.test.ts` ask for what each crux promises. `tests/equipment.test.ts`, `nav.test.ts`, `plans.test.ts`, `person.test.ts` and the way-in check in `staffing.test.ts` run on the plain camps: what they test (doors, a route across the valley, the bots, the walk out after a perch shot, the skeleton's corridor) stood on what those camps promised. `tests/guards.test.ts` sums what's walked over its two camps, since a camp can have every man on a post. `tests/lab.test.ts`'s dice test stands on a flush camp, which takes longer to generate, so its time budget went up. `campAnalysis`, `landform`, `compound` and `world` follow the new kinds of site.
+
+**Known limits.** The plan bots know long range, a way in and the systems, not a flush: on a flush camp `campPlans` falls back to a plan that doesn't reach him, so `npm run plans` and D's signature test say less there. A flush camp's officer mostly stands, because the door sentry is in the way of his walk through it (4 of 24 walk; 33 of 35 on inside camps, 40 of 72 plain); guards walking overall are level with plain (2.8 a camp), but a few camps have one or none, TAL-4471 among them. The reviewers haven't been re-run, nobody has played these camps, and lab D's risks aren't calibrated.
+
+**What an independent review caught.** A flush target could be deaf to the siren: walls cost a siren what they cost a voice, and the deep room and the new screen put him behind three or four. On 24 forced flush camps one was deaf to every box and 10 of 62 boxes were silent, so he'd never run, which is the whole of that camp's problem. A siren is meant to be heard indoors: it now loses 3 dB a wall with no limit on how many, and none is silent. A player could start on a shelf with no walk to the camp (REV-0010, REV-0047, REV-0058): the spawn now asks. A man at rest in line with an open door was a free shot on an escort camp (2 of 23), because a perch's view counts a door as solid: the door-line choice now covers every crux but the old walk.
+
+**One thing left, with the numbers.** Certified ways in on inside camps are looser than the simulation supports. Replayed with real perception they're detected on 10 of 41 inside camps, against 4 of 54 before: the paths are about 2.5 times longer at the same 0.84 peak against a limit of 0.85. A careful person isn't a replay, so the sitting decides whether it needs a tighter limit.
+
+**Reported, not fixed (outside this work).** `brain/nav.ts`: a raw diagonal step can clip a tree (TAL-4471 as built, from −126.3, −96.3 to −128.8, −98.8), because its edges check the two ways round a corner and not the corner itself. `lineOfSight` in `raster.ts` still slips past a one-cell wall at a corner; staffing's estimates use it, and the close shot now doesn't.
 ## 2026-11-08 · Getting out of the line, getting down, and routes off the camp
 
 **The flaw detectors found it.** Standing in the shooter's line was the largest flaw. Most of it wasn't men misled by a suppressed shot, as we'd written: it was men on the fence, whose nearest cover was 14 to 35 m away, with a search that gave up at about 11 m. They stood in the open for a minute. The search now walks up to 40 m, looks at fewer spots the farther it goes, and counts rays as well as cells (rule 18).

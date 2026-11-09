@@ -91,7 +91,7 @@ export function scatterProps(
   const nearPath = (x: number, z: number, roadPad: number, creekPad: number): boolean => {
     closestOnPolyline(features.road, x, z, W.roadWidth / 2 + roadPad, hit);
     if (hit.dist !== Infinity) return true;
-    closestOnPolyline(features.creek, x, z, W.creekWidth / 2 + creekPad, hit);
+    closestOnPolyline(features.creek, x, z, (features.creekWidth ?? W.creekWidth) / 2 + creekPad, hit);
     return hit.dist !== Infinity;
   };
 

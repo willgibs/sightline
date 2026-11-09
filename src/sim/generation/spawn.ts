@@ -1,7 +1,9 @@
 import type { SpawnKind } from '../kernel/mission';
 import { dtanDeg } from '../kernel/core/detmath';
 import { Blocks, footprintContains, type ColliderSet } from '../kernel/world/colliders';
+import { cellIndex, type GridLayer } from '../kernel/world/grid';
 import { makeTerrainSample, type Heightfield } from '../kernel/world/heightfield';
+import { GridSearch } from '../kernel/world/search';
 import type { Perch } from './analysis';
 import type { Site } from './site';
 import type { TerrainFeatures } from './terrain';
@@ -29,12 +31,24 @@ export function chooseSpawn(
   report: { perches: Perch[] },
   playHalf: number,
   site: Site,
+  map: GridLayer,
 ): Spawn {
   const sample = makeTerrainSample();
+  // Not somewhere with no way down to the camp: a shelf in a gorge, the top of a scarp.
+  let walk: GridSearch | null = null;
+  const reachable = (x: number, z: number): boolean => {
+    if (!walk) {
+      walk = new GridSearch(map);
+      walk.flood([cellIndex(map, site.x, site.z)], { maxExpansions: map.nx * map.nz });
+    }
+    const c = cellIndex(map, x, z);
+    return c >= 0 && walk.cost[c]! >= 0;
+  };
   const maxTan = dtanDeg(28);
   const ids: number[] = [];
   const clear = (x: number, z: number): boolean => {
     if (Math.abs(x) > playHalf - 2 || Math.abs(z) > playHalf - 2) return false;
+    if (!reachable(x, z)) return false;
     hf.sample(x, z, sample);
     if (sample.slopeTan > maxTan) return false;
     colliders.query(x - 1.5, z - 1.5, x + 1.5, z + 1.5, ids);
@@ -63,11 +77,12 @@ export function chooseSpawn(
     return { faceX: -dx / l, faceZ: -dz / l };
   };
 
-  if (kind === 'overlook' && report.perches.length > 0) {
+  const perches = kind === 'overlook' ? report.perches.filter((p) => reachable(p.x, p.z)) : [];
+  if (perches.length > 0) {
     // Prefer a high perch at a classic engagement distance.
-    let best = report.perches[0]!;
+    let best = perches[0]!;
     let bestScore = -Infinity;
-    for (const p of report.perches) {
+    for (const p of perches) {
       const range = p.dist >= 200 && p.dist <= 400 ? 1 : 0.6;
       const score = p.heightAbovePad * range;
       if (score > bestScore) {

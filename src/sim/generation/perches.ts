@@ -1,6 +1,8 @@
 import type { GenTuning } from '../../config/tuning';
 import { circleDirections, datan2, dcos, dsin, dtanDeg } from '../kernel/core/detmath';
+import { cellIndex, type GridLayer } from '../kernel/world/grid';
 import { makeTerrainSample, type Heightfield } from '../kernel/world/heightfield';
+import { GridSearch } from '../kernel/world/search';
 import type { Site } from './site';
 import { frameOf, lineOfSight, type Raster } from './raster';
 
@@ -9,9 +11,10 @@ import { frameOf, lineOfSight, type Raster } from './raster';
  * list, so a rule like "no single perch wins" can be checked over every one of them.
  *
  * The list comes from a radial sweep from the camp's eye (as D3's checks do): every prone
- * shooter's eye 150–560 m out that clears the terrain's horizon and looks down into the
- * camp is a candidate, and candidates are thinned to one per `perchSpacing` metres, the
- * steepest view kept. Up to `perches` of them, the steepest first, wherever they are.
+ * shooter's eye 150–560 m out that clears the terrain's horizon, looks down into the camp,
+ * and can be walked to from it is a candidate, and candidates are thinned to one per
+ * `perchSpacing` metres, the steepest view kept. Up to `perches` of them, the steepest
+ * first, wherever they are.
  *
  * Each perch then gets a viewshed over the analysis raster: rays fanned from its eye across
  * the camp, marched over the terrain and into the raster, where everything that stops sight
@@ -29,14 +32,21 @@ export interface PerchSpot {
   heightAbovePad: number;
 }
 
-export function findPerches(hf: Heightfield, site: Site, gen: GenTuning): PerchSpot[] {
+export function findPerches(hf: Heightfield, site: Site, gen: GenTuning, map: GridLayer): PerchSpot[] {
   const O = gen.overwatch;
   const A = gen.analysis;
   const eyeY = site.height + 1.6;
   const minSlope = dtanDeg(O.perchAngleDeg);
-  // A body lies only where the motor will hold it.
+  // A body lies only where the motor will hold it, and where it can walk to: on a wall's
+  // crest there's a cell or two flat enough to lie on and no way up to them.
   const maxTan = dtanDeg(A.perchSlopeDeg);
   const under = makeTerrainSample();
+  const walk = new GridSearch(map);
+  walk.flood([cellIndex(map, site.x, site.z)], { maxExpansions: map.nx * map.nz });
+  const reachable = (x: number, z: number): boolean => {
+    const c = cellIndex(map, x, z);
+    return c >= 0 && walk.cost[c]! >= 0;
+  };
   const [near, far] = [O.perchRange[0]!, O.perchRange[1]!];
   const playHalf = hf.size / 2 - gen.world.playMargin;
   const rays = 720;
@@ -52,7 +62,7 @@ export function findPerches(hf: Heightfield, site: Site, gen: GenTuning): PerchS
       if (Math.abs(x) > playHalf || Math.abs(z) > playHalf) break;
       const ground = hf.heightAt(x, z);
       const toEye = (ground + gen.sight.proneEye - eyeY) / r;
-      if (r >= near && toEye >= horizon && toEye >= minSlope && hf.sample(x, z, under).slopeTan <= maxTan) {
+      if (r >= near && toEye >= horizon && toEye >= minSlope && hf.sample(x, z, under).slopeTan <= maxTan && reachable(x, z)) {
         const key = Math.floor(x / bucketSize) * 4096 + Math.floor(z / bucketSize);
         const spot = { x, y: ground, z, eye: ground + gen.sight.proneEye, dist: r, heightAbovePad: ground - site.height };
         const old = buckets.get(key);
@@ -145,8 +155,8 @@ export interface PerchViews {
   views: Float32Array[];
 }
 
-export function perchViews(R: Raster, hf: Heightfield, site: Site, gen: GenTuning): PerchViews {
-  const spots = findPerches(hf, site, gen);
+export function perchViews(R: Raster, hf: Heightfield, site: Site, gen: GenTuning, map: GridLayer): PerchViews {
+  const spots = findPerches(hf, site, gen, map);
   return { spots, views: spots.map((p) => perchViewshed(R, hf, p)) };
 }
 
