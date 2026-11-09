@@ -39,6 +39,7 @@ const NO_ALARMS: readonly { x: number; z: number }[] = [];
 export interface CampFacts {
   alarms: readonly { x: number; z: number }[];
   escape: Readonly<{ x: number; z: number }> | null;
+  fights?: boolean;
 }
 const NO_FACTS: CampFacts = { alarms: NO_ALARMS, escape: null };
 /** The awareness of a guard without senses: unaware, attending to nothing. */
@@ -69,19 +70,20 @@ export function guardMind(g: GuardEntity, world: World, tuning: Tuning, tick: nu
   out.nav = nav;
   out.alarms = facts.alarms;
   out.escape = facts.escape;
+  out.fights = facts.fights === true;
   return out;
 }
 
 /** A mind for guardMind to fill: every field is written on each use. */
 export function emptyMind(): Writable<GuardMind> {
   const unset = null as never;
-  return { id: 0, self: unset, head: 0, post: unset, world: unset, tuning: unset, tick: 0, time: 0, percepts: NO_PERCEPTS, awareness: UNAWARE, belief: null, brain: null, draw: noDraw, nav: noNav, alarms: NO_ALARMS, escape: null };
+  return { fights: false, id: 0, self: unset, head: 0, post: unset, world: unset, tuning: unset, tick: 0, time: 0, percepts: NO_PERCEPTS, awareness: UNAWARE, belief: null, brain: null, draw: noDraw, nav: noNav, alarms: NO_ALARMS, escape: null };
 }
 
 const noDraw = (): number => {
   throw new Error('This mind has no stream to draw from');
 };
-const noNav: NavAllowance = { work: undefined, searches: { left: 0 } };
+const noNav: NavAllowance = { work: undefined, searches: { left: 0 }, nodesAtStart: 0 };
 
 /** Scratch: the mind a guard's brain decides from, rewritten for each decision. */
 const mind = emptyMind();

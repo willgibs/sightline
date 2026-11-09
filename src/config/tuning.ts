@@ -474,6 +474,8 @@ export const defaultTuning = {
       cry: 0.8, // a comrade's cry heard: searching
       body: 0.8, // a body seen: searching (design doc: the strongest stimulus)
       glint: 0.55, // a flash from a lens: suspicious
+      muzzle: 0.8, // a muzzle flash, seen: searching
+      whistle: 0.8, // the camp's whistle: searching
       outage: 0.55, // equipment stopped, that was running: suspicious
       door: 0.3, // a door not as it was left: curious
       keepBody: 120, // seconds a body stays in his mind (a sound or a shot: hearing.keep)
@@ -508,6 +510,7 @@ export const defaultTuning = {
       siteExpansions: 40000, // site-layer cells one search may expand (rule 18)
       mapExpansions: 20000, // map-layer cells one search may expand (rule 18)
       searchesPerTick: 4, // routes searched in one tick, across every guard
+      nodesPerTick: 12000, // and once a tick's searches have expanded this many cells, the rest wait for the next (a search under way always finishes)
       snapRadius: 4, // metres: how far a blocked point looks for the nearest walkable cell
       pullAhead: 200, // cells a straight segment may skip in string-pulling
       sampleStep: 0.2, // metres between clearance samples along a pulled segment
@@ -557,6 +560,22 @@ export const defaultTuning = {
       facingCos: 0.5,
       guardReach: 1.1, // metres at which a walking guard opens a shut door
       radius: 14, // metres a door is heard at
+    },
+    // The first fight (Lab F, docs/camp-engine.md): how a camp that's ready for it answers a shot. Only camps with `fights` do this.
+    fight: {
+      drill: {
+        within: 4, // seconds a shot stays news enough to get out of the line for
+        listen: 1.2, // seconds he waits for the report after a crack or a strike, before going on what he has
+        maxRun: 16, // metres of path a man will run to get out of the line
+        cells: 500, // cells one search for a spot may look at (rule 18)
+        bearingDeg: 20, // listed perches this close to the believed bearing are the ones to hide from
+        standTo: { min: 45, max: 60 }, // seconds after the last shot before men come back out
+      },
+      whistle: { radius: 600, every: 6 }, // metres it carries, and the seconds between blasts: it's how a person on a ridge knows the camp has reacted
+      suppress: { range: 480, react: 2.5, every: 2.2, forget: 25 }, // tower men firing at where they believe he is: metres, seconds to the first round, between rounds, and how long a shot stays worth answering
+      spreadDeg: { marksman: 0.3, other: 1.1 }, // the error radius of a round fired by a camp that fights, degrees
+      nearMiss: { radius: 3, knock: 1.4 }, // metres from your head that a round counts as a near miss, and the seconds it knocks you off your rest
+      flash: { range: 520, suppressed: 140 }, // metres a muzzle flash can be seen at, by someone looking that way
     },
     getOut: { radius: 15 }, // metres from the way out at which you've got out (Lab F)
     // Sabotage (E7): held at arm's length, with nothing but your hands.

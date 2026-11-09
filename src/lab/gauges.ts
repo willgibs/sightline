@@ -46,6 +46,8 @@ export interface Readings {
   /** Guards in a clear line from the player now. */
   inLine: number;
   roundsAtYou: number;
+  /** Rounds that passed within a near miss of your head. */
+  nearMisses: number;
   /** Whether any guard has confirmed sight of the player. */
   detected: boolean;
   /** Metres to the nearest guard now. */
@@ -65,6 +67,7 @@ export class CampGauges {
   private firstShot = -1;
   private shotsFired = 0;
   private roundsAtYou = 0;
+  private nearMisses = 0;
   private detected = false;
   private siren = false;
   private nearestEver = Infinity;
@@ -84,6 +87,7 @@ export class CampGauges {
         } else this.roundsAtYou++;
       } else if (e.type === 'detected' && e.target === sim.playerId) this.detected = true;
       else if (e.type === 'siren') this.siren = true;
+      else if (e.type === 'passed') this.nearMisses++;
     }
     if (this.firstShot < 0) return;
     for (const g of sim.guards) this.nearestEver = Math.min(this.nearestEver, distance(g.body.x, g.body.z, sim.player.x, sim.player.z));
@@ -102,6 +106,7 @@ export class CampGauges {
       guardsStanding: sim.guards.length,
       inLine: inClearLine(sim),
       roundsAtYou: this.roundsAtYou,
+      nearMisses: this.nearMisses,
       detected: this.detected,
       nearest,
       nearestEver: this.nearestEver,

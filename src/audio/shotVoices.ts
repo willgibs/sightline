@@ -142,3 +142,29 @@ export function door(ctx: BaseAudioContext, out: AudioNode, noise: NoiseBuffers,
   end = Math.max(end, thump(ctx, voice, when + 0.01, 110, 0.12, 0.9));
   return Math.max(end, burst(ctx, voice, noise.white, rand, when + 0.012, 'lowpass', 500, 0.7, 0.003, 0.09, 0.6));
 }
+
+/** The camp's whistle: three hard blasts, a trilled high note, carrying across the valley. */
+export function whistle(ctx: BaseAudioContext, out: AudioNode, when: number, amp: number): number {
+  const voice = new GainNode(ctx, { gain: capped(amp) * 0.5 });
+  voice.connect(out);
+  const band = new BiquadFilterNode(ctx, { type: 'bandpass', frequency: 3100, Q: 6 });
+  band.connect(voice);
+  const osc = new OscillatorNode(ctx, { type: 'square', frequency: 3100 });
+  const trill = new OscillatorNode(ctx, { type: 'sine', frequency: 31 });
+  const depth = new GainNode(ctx, { gain: 90 });
+  trill.connect(depth).connect(osc.frequency);
+  const env = new GainNode(ctx, { gain: 0 });
+  osc.connect(env).connect(band);
+  const end = when + 1.05;
+  for (const [start, stop] of [[0, 0.3], [0.38, 0.68], [0.76, 1.05]] as const) {
+    env.gain.setValueAtTime(0, when + start);
+    env.gain.linearRampToValueAtTime(1, when + start + 0.015);
+    env.gain.setValueAtTime(1, when + stop - 0.02);
+    env.gain.linearRampToValueAtTime(0, when + stop);
+  }
+  osc.start(when);
+  trill.start(when);
+  osc.stop(end + 0.02);
+  trill.stop(end + 0.02);
+  return end + 0.02;
+}

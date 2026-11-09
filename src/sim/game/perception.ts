@@ -209,7 +209,7 @@ export function deliverSound(ctx: TickContext, e: Extract<SimEvent, SoundFields>
       return [r * dcos(a), r * dsin(a)] as const;
     });
     const arrives = Math.max(ctx.tick, Math.ceil((e.t + heard.length / air(ctx.world.spec.env).speedOfSound) * T.sim.tickHz - 1e-9));
-    const voice = e.type === 'bark' ? (BARKS[e.line]?.level ?? 0) : e.type === 'cry' ? T.perception.awareness.cry : 0;
+    const voice = e.type === 'bark' ? (BARKS[e.line]?.level ?? 0) : e.type === 'cry' ? T.perception.awareness.cry : e.type === 'whistle' ? T.perception.awareness.whistle : 0;
     s.heard.push({ arrives, cause: e.id, kind, sound: e.type, clarity: heard.clarity, voice, x: heard.fromX + ox, y: heard.fromY, z: heard.fromZ + oz, radius });
   }
 }
@@ -316,7 +316,7 @@ export const perceptionSpotting: System = {
   name: 'perception-spotting',
   phase: 'perception',
   after: ['perception-hearing'],
-  reads: ['*.body', 'remains.remains', 'player.rifle', 'input', 'guard.guard', 'guard.senses', 'solid.solid', 'generator.generator', 'radio.radio', 'door.door'],
+  reads: ['commander.camp.fights', '*.body', 'remains.remains', 'player.rifle', 'input', 'guard.guard', 'guard.senses', 'solid.solid', 'generator.generator', 'radio.radio', 'door.door'],
   writes: ['guard.senses.bodies', 'guard.senses.spotted', 'guard.senses.flashed', 'guard.senses.noticed'],
   emits: ['spotted'],
   run(ctx) {
@@ -324,8 +324,10 @@ export const perceptionSpotting: System = {
     const S = T.perception.sight;
     const remains = ctx.index.of('remains');
     const armed = ctx.index.of('player')[0];
+    const F = T.brain.fight.flash;
+    const flashes = ctx.index.of('commander')[0]?.camp.fights ? ctx.events.filter((e): e is Extract<SimEvent, { type: 'report' }> => e.type === 'report' && ctx.index.get(e.source)?.faction !== Faction.Camp) : [];
     const amiss = outOfPlace(ctx);
-    if (remains.length === 0 && !armed?.rifle && amiss.length === 0) return;
+    if (remains.length === 0 && !armed?.rifle && amiss.length === 0 && flashes.length === 0) return;
     const t = ctx.tick / T.sim.tickHz;
     const env = ctx.world.spec.env;
     const spec = T.bodies.guard;
@@ -370,6 +372,17 @@ export const perceptionSpotting: System = {
         (s.noticed ??= []).push(o.id);
         const cause = ctx.emit({ type: 'spotted', source: g.id, what: o.what, x: o.x, y: o.y, z: o.z, distance: d });
         s.spotted.push({ what: o.what, cause, x: o.x, y: o.y, z: o.z, radius: 1, strength: 1 });
+      }
+      // A muzzle flash (Lab F), in a camp that fights: for a moment, seen by whoever is looking that way, whoever fired it.
+      for (const fired of flashes) {
+        const dx = eye.x - fired.x;
+        const dy = eye.y - fired.y;
+        const dz = eye.z - fired.z;
+        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (d <= (fired.suppressed ? F.suppressed : F.range) && (inGaze(eye, fired.x, fired.y, fired.z, S.core.halfDeg) || (eye.far && inGaze(eye, fired.x, fired.y, fired.z, S.far.halfDeg))) && lineOpen(view, eye, fired.x, fired.y, fired.z, 0.4, S.glint.through)) {
+          const cause = ctx.emit({ type: 'spotted', source: g.id, cause: fired.id, what: 'muzzle', x: fired.x, y: fired.y, z: fired.z, distance: d });
+          s.spotted.push({ what: 'muzzle', cause, x: fired.x, y: fired.y, z: fired.z, radius: 1 + 0.01 * d, strength: 1 });
+        }
       }
       if (!armed?.rifle) continue;
       // The flash: where the player's lens is, toward this guard's eye.
@@ -481,6 +494,8 @@ export const perceptionAwareness: System = {
         const keep = sp.what === 'body' || sp.what === 'outage' ? T.perception.awareness.keepBody : T.perception.hearing.keep;
         const p: Percept = { kind: sp.what, x: sp.x, y: sp.y, z: sp.z, radius: sp.radius, strength: sp.strength, tick, expires: tick + Math.round(keep * hz), cause: sp.cause };
         s.percepts.push(p);
+        // A flash says exactly where.
+        if (sp.what === 'muzzle') believe(s, p, false, tick, T);
         stimulate(a, { kind: sp.what, level: T.perception.awareness[sp.what], x: sp.x, y: sp.y, z: sp.z, cause: sp.cause, reason: sp.what }, tick, T, draw);
       }
       s.spotted.length = 0;

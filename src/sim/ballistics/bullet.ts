@@ -25,6 +25,8 @@ export interface BulletState {
   flight: Flight;
   /** Mission time up to which its path has been swept. */
   swept: number;
+  /** It has already passed close by someone (Lab F): once is enough. */
+  passed?: true;
 }
 
 export interface BulletEntity extends EntityBase {

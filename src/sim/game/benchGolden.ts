@@ -174,7 +174,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       "re-found within 60 s (of 16): honest, unpaced": 16,
       "reactions (in the scripted scenarios)": 62,
       "reactions unexplained": 0,
-      "overlook: guards down from one perch, of 27": 22,
+      "overlook: guards down from one perch, of 27": 12,
       "overlook: camps cleared (of 3)": 0,
       "overlook: the target got away (of 3)": 1,
       "timed shot: target down (of 3)": 3

@@ -503,6 +503,18 @@ export function speak(ctx: TickContext, g: GuardEntity): void {
   const b = g.brain;
   if (!b) return;
   const C = ctx.tuning.brain.comms;
+  if (b.whistle) {
+    // The first man who gets moving blows it. It needs no power and no radio, and it carries.
+    b.whistle = false;
+    const camp = commanderOf(ctx)?.camp;
+    const W = ctx.tuning.brain.fight.whistle;
+    if (camp && (camp.whistled === undefined || ctx.tick - camp.whistled >= Math.round(W.every * ctx.tuning.sim.tickHz))) {
+      camp.whistled = ctx.tick;
+      const body = g.body;
+      ctx.emit({ type: 'whistle', source: g.id, x: body.x, y: body.y + body.eyeHeight - ctx.tuning.perception.hearing.lift, z: body.z, surface: Surface.Grass, loudness: W.radius / ctx.tuning.noise.radiusPerUnit, radius: W.radius });
+      deliverSound(ctx, ctx.events[ctx.events.length - 1] as Extract<SimEvent, { type: 'whistle' }>);
+    }
+  }
   if (b.say) {
     const { report, radius, radio } = b.say;
     b.say = null;
