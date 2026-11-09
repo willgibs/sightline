@@ -17,7 +17,7 @@ export type DebugShape =
   | { kind: 'line'; ax: number; ay: number; az: number; bx: number; by: number; bz: number; tone: DebugTone }
   | { kind: 'point'; x: number; y: number; z: number; size: number; tone: DebugTone }
   | { kind: 'circle'; x: number; y: number; z: number; r: number; tone: DebugTone }
-  | { kind: 'label'; x: number; y: number; z: number; text: string; tone: DebugTone };
+  | { kind: 'label'; x: number; y: number; z: number; text: string; tone: DebugTone; detail?: string };
 
 /** The drawing calls a system gets inside ctx.debug. */
 export interface DebugDraw {
@@ -25,7 +25,7 @@ export interface DebugDraw {
   point(x: number, y: number, z: number, size?: number, tone?: DebugTone): void;
   /** A horizontal circle. */
   circle(x: number, y: number, z: number, r: number, tone?: DebugTone): void;
-  label(x: number, y: number, z: number, text: string, tone?: DebugTone): void;
+  label(x: number, y: number, z: number, text: string, tone?: DebugTone, detail?: string): void;
 }
 
 /** Collects one tick's shapes. */
@@ -48,7 +48,8 @@ export class DebugCanvas implements DebugDraw {
     this.shapes.push({ kind: 'circle', x, y, z, r, tone });
   }
 
-  label(x: number, y: number, z: number, text: string, tone: DebugTone = 'info'): void {
-    this.shapes.push({ kind: 'label', x, y, z, text, tone });
+  /** A label over the world. `detail` is the fuller text, shown when you're looking right at it; `text` may then be '' to show nothing otherwise. */
+  label(x: number, y: number, z: number, text: string, tone: DebugTone = 'info', detail?: string): void {
+    this.shapes.push(detail === undefined ? { kind: 'label', x, y, z, text, tone } : { kind: 'label', x, y, z, text, tone, detail });
   }
 }

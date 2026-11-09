@@ -1,15 +1,16 @@
 import { CAMP_SWITCHES } from '../sim/game/switches';
 import type { Readings } from '../lab/gauges';
 import type { StimulusName } from '../sim/game/drops';
+import type { DevDock } from './devDock';
 
 /**
- * The lab panel (Lab F, docs/camp-engine.md): `&lab` in the address of a camp scene shows
- * what the camp is doing to you, in the same gauges the experiments read, and lets you
- * switch parts of it off. A development instrument, for someone testing an engine: it
+ * The lab panel (Lab F, docs/camp-engine.md): `&lab` in the address of a camp scene adds, to
+ * the dock, what the camp is doing to you, in the same gauges the experiments read, and
+ * switches for parts of it. A development instrument, for someone testing an engine: it
  * shows the truth, so a sitting that's meant to be blind leaves it off.
  *
- * A switch is a parameter of the scene, so changing one reloads the scene with it, and
- * the run's recording names it.
+ * A switch is a parameter of the scene, so changing one reloads the scene with it, and the
+ * run's recording names it.
  */
 
 const seconds = (s: number): string => (Number.isNaN(s) ? 'not yet' : `${s.toFixed(0)} s ago`);
@@ -28,35 +29,23 @@ export function offIn(params: string): string[] {
 }
 
 /** The compound simulator's keys: what happens where you're pointing. */
-const DROP_KEYS: ReadonlyArray<readonly [string, StimulusName, string]> = [
+export const DROP_KEYS: ReadonlyArray<readonly [string, StimulusName, string]> = [
   ['Digit1', 'noise', 'noise'],
   ['Digit2', 'body', 'body'],
-  ['Digit3', 'shot', 'shot, from here'],
-  ['Digit4', 'suppressed-shot', 'suppressed shot, from here'],
-  ['Digit5', 'kill', 'nearest guard drops'],
-  ['Digit6', 'sabotage', 'cut nearest equipment'],
+  ['Digit3', 'shot', 'shot'],
+  ['Digit4', 'suppressed-shot', 'quiet shot'],
+  ['Digit5', 'kill', 'guard drops'],
+  ['Digit6', 'sabotage', 'cut equipment'],
 ];
 
 export class LabPanel {
-  private readonly lines: HTMLElement;
+  private lines = '';
+  private brief = '';
 
-  constructor(parent: HTMLElement, params: string, drop: ((what: StimulusName) => void) | null = null) {
-    const root = document.createElement('div');
-    root.className = 'lab-panel';
-    root.innerHTML = `<div class="lab-title">Lab</div><pre class="lab-lines"></pre><div class="lab-switches"></div><div class="lab-note">Press Esc to reach the switches. Changing one restarts the run.</div>`;
-    parent.appendChild(root);
-    this.lines = root.querySelector('.lab-lines')!;
-    const box = root.querySelector('.lab-switches')!;
-    if (drop) {
-      const keys = document.createElement('div');
-      keys.className = 'lab-note';
-      keys.textContent = `WASD to fly, Space and Q up and down, Shift fast. ${DROP_KEYS.map(([code, , label]) => `${code.slice(5)} ${label}`).join(' · ')}`;
-      root.appendChild(keys);
-      window.addEventListener('keydown', (e) => {
-        const key = DROP_KEYS.find(([code]) => code === e.code);
-        if (key) drop(key[1]);
-      });
-    }
+  constructor(private readonly dock: DevDock, params: string, drop: ((what: StimulusName) => void) | null = null) {
+    dock.add({ id: 'lab-camp', title: 'Gauges', side: 'right', open: true, text: () => this.lines, summary: () => this.brief });
+    const box = document.createElement('div');
+    box.className = 'lab-switches';
     const off = new Set(offIn(params));
     for (const name of CAMP_SWITCHES) {
       const label = document.createElement('label');
@@ -73,20 +62,30 @@ export class LabPanel {
       label.append(input, name);
       box.appendChild(label);
     }
+    dock.add({ id: 'lab-switches', title: 'Switches', side: 'right', body: box, summary: () => (off.size === 0 ? 'all on' : `off: ${[...off].join(', ')}`) });
+    if (drop) {
+      window.addEventListener('keydown', (e) => {
+        const key = DROP_KEYS.find(([code]) => code === e.code);
+        if (key) drop(key[1]);
+      });
+    }
   }
 
   update(r: Readings): void {
-    this.lines.textContent = [
-      `first shot   ${seconds(r.sinceFirstShot)}`,
-      `shots fired  ${r.shotsFired}`,
-      `guards down  ${r.guardsDown}, standing ${r.guardsStanding}`,
-      `in your line ${r.inLine}`,
-      `rounds at you ${r.roundsAtYou}, near ${r.nearMisses}`,
-      `seen you     ${r.detected ? 'yes' : 'no'}`,
-      `nearest      ${metres(r.nearest)}`,
-      `their guess  ${Number.isNaN(r.estimateOff) ? 'none' : `${metres(r.estimateOff)} off`}`,
-      `camp         ${r.level}${r.siren ? ', siren' : ''}`,
-      `target       ${r.targetStatus}`,
+    this.brief = `${r.level}, ${r.guardsDown} down`;
+    this.lines = [
+      `first shot  ${seconds(r.sinceFirstShot)}`,
+      `shots       ${r.shotsFired}`,
+      `down        ${r.guardsDown}  standing ${r.guardsStanding}`,
+      `in line     ${r.inLine}`,
+      `at you      ${r.roundsAtYou}  near ${r.nearMisses}`,
+      `seen you    ${r.detected ? 'yes' : 'no'}`,
+      `nearest     ${metres(r.nearest)}`,
+      `their guess ${Number.isNaN(r.estimateOff) ? 'none' : `${metres(r.estimateOff)} off`}`,
+      `camp        ${r.level}${r.siren ? ', siren' : ''}`,
+      `target      ${r.targetStatus}`,
     ].join('\n');
+    // In the honest view nothing else brings the dock up to date.
+    this.dock.refresh();
   }
 }

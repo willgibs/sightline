@@ -39,6 +39,8 @@ export type Action =
   | 'overwatch'
   | 'grid'
   | 'flyCamera'
+  | 'dockHide'
+  | 'mouseFree'
   | 'slower'
   | 'faster'
   | 'restart'
@@ -57,9 +59,10 @@ export type Action =
 
 /**
  * Where an action means something: on foot (play), always (even paused), in the debug
- * view, with the fly camera, watching a replay (where the debug view's keys work too).
+ * view, with the fly camera, watching a replay (where the debug view's keys work too),
+ * and wherever the dev panels show (dev: the debug view, a replay, a lab panel).
  */
-export type Context = 'play' | 'always' | 'debug' | 'fly' | 'replay';
+export type Context = 'play' | 'always' | 'debug' | 'fly' | 'replay' | 'dev';
 
 export interface ActionSpec {
   context: Context;
@@ -100,6 +103,8 @@ export const DEFAULT_ACTIONS: Readonly<Record<Action, ActionSpec>> = {
   overwatch: { context: 'debug', kind: 'pressed', inputs: ['KeyO'], label: 'overwatch' },
   grid: { context: 'debug', kind: 'pressed', inputs: ['KeyU'], label: 'grid' },
   flyCamera: { context: 'debug', kind: 'pressed', inputs: ['KeyN'], label: 'fly camera' },
+  mouseFree: { context: 'dev', kind: 'pressed', inputs: ['Tab'], label: 'mouse' },
+  dockHide: { context: 'dev', kind: 'pressed', inputs: ['KeyI'], label: 'panels' },
   slower: { context: 'debug', kind: 'pressed', inputs: ['BracketLeft'], label: 'slower' },
   faster: { context: 'debug', kind: 'pressed', inputs: ['BracketRight'], label: 'faster' },
   restart: { context: 'debug', kind: 'pressed', inputs: ['KeyR'], label: 'restart run' },

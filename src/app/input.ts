@@ -50,6 +50,9 @@ export class InputController {
    * mouse is for the timeline).
    */
   freeKeys = false;
+  /** Where the mouse is on the page, in CSS pixels: for pointing at things while it isn't captured. */
+  mouseX = 0;
+  mouseY = 0;
   private readonly commands: Command[] = [];
   /** Inputs held down: key codes, and Mouse0 to Mouse4. */
   private readonly down = new Set<string>();
@@ -73,6 +76,8 @@ export class InputController {
     on(window, 'keyup', (e) => this.down.delete(e.code));
     on(window, 'blur', () => this.releaseAll());
     on(document, 'mousemove', (e) => {
+      this.mouseX = e.clientX;
+      this.mouseY = e.clientY;
       if (!this.locked) return;
       if (this.skipMove) {
         this.skipMove = false;

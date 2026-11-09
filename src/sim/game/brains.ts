@@ -21,7 +21,7 @@ export function drawBrain(draw: DebugDraw, ctx: TickContext, g: GuardEntity): vo
   const ground = (x: number, z: number): number => h(x, z) + 0.15;
   const a = g.senses?.awareness.state ?? 'unaware';
   const tone = a === 'combat' ? 'bad' : a === 'searching' ? 'warn' : a === 'unaware' ? 'muted' : 'info';
-  draw.label(body.x, body.y + body.eyeHeight + 0.95, body.z, `${b.act} · ${a}${b.linger >= 0 ? ' · looking around' : ''}`, tone);
+  draw.label(body.x, body.y + body.eyeHeight + 0.95, body.z, b.act, tone, `${b.act} · ${a}${b.linger >= 0 ? ' · looking around' : ''}`);
   // The route: from him through what's left of it.
   let px = body.x;
   let pz = body.z;
