@@ -10,6 +10,7 @@ import { pickWeighted } from '../src/sim/generation/weights';
 import type { TerrainResult } from '../src/sim/generation/terrain';
 import { Rng } from '../src/sim/kernel/core/rng';
 import { dtanDeg } from '../src/sim/kernel/core/detmath';
+import { acousticsOf, emptyHeard } from '../src/sim/perception';
 import { Cell, cellIndex } from '../src/sim/kernel/world/grid';
 import { GridSearch } from '../src/sim/kernel/world/search';
 import { makeTerrainSample } from '../src/sim/kernel/world/heightfield';
@@ -227,6 +228,31 @@ describe('the crux a camp is built around', () => {
       }
     }
   });
+
+  it('a flush target hears the siren from every box, however deep he stays', () => {
+    // Behind the deep room's walls and the screen inside his door, a siren that lost what a voice loses was silent, and he never ran.
+    for (const w of each('flush')) {
+      const him = w.camp.guards[w.camp.objective!.target]!;
+      const acoustics = acousticsOf(w, T);
+      const y = w.terrain.heightAt(him.x, him.z) + T.bodies.guard.eyeHeight.stand;
+      const boxes = (w.camp.devices ?? []).filter((d) => d.kind === 'alarm');
+      expect(boxes.length).toBeGreaterThan(0);
+      for (const b of boxes) {
+        const heard = emptyHeard();
+        acoustics.spread({ x: b.x, y: w.terrain.heightAt(b.x, b.z) + T.brain.alarm.sirenHeight, z: b.z, radius: T.brain.alarm.sirenRadius, wallLossDb: T.perception.hearing.sirenWallLossDb });
+        acoustics.hear(him.x, y, him.z, heard);
+        expect(heard.clarity).toBeGreaterThanOrEqual(1);
+      }
+    }
+  });
+
+  it('starts the player on ground with a way to the camp', () => {
+    // One of the camps that started him on a shelf he could slide off and never get back to.
+    const w = generateWorld(campMission('REV-0010'), T);
+    const walk = new GridSearch(w.grid.map);
+    walk.flood([cellIndex(w.grid.map, w.camp.site.x, w.camp.site.z)], { maxExpansions: w.grid.map.nx * w.grid.map.nz });
+    expect(walk.cost[cellIndex(w.grid.map, w.spawn.x, w.spawn.z)]!).toBeGreaterThanOrEqual(0);
+  }, 120_000);
 
   it('a flush camp can stop him when he runs; an escort camp has a perch that can have him', () => {
     for (const w of each('flush')) {

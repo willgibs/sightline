@@ -197,7 +197,8 @@ export function deliverSound(ctx: TickContext, e: Extract<SimEvent, SoundFields>
     if (!acoustics) {
       acoustics = acousticsOf(ctx.world, T);
       acoustics.humming = ctx.index.of('generator').every((x) => x.generator.running);
-      acoustics.spread(e, ctx.work);
+      // A siren is the one thing every man in the camp is meant to hear, indoors or not.
+      acoustics.spread(e.type === 'siren' ? { x: e.x, y: e.y, z: e.z, radius: e.radius, wallLossDb: H.sirenWallLossDb } : e, ctx.work);
     }
     acoustics.hear(ear.x, ear.y, ear.z, heard);
     if (heard.clarity < 1) continue;

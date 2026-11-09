@@ -532,6 +532,7 @@ export const defaultTuning = {
       // arrives by the straight line only (A11: a shout's whole flood cost a frame).
       floodReach: 25,
       wallLossDb: 12, // the straight route loses this much per wall it passes through (as Rainbow Six Siege's does)
+      sirenWallLossDb: 3, // a siren's a good deal lower and louder than anything else in the camp, and walls barely touch it: it's meant to be heard indoors
       terrainLossDb: 15, // and this much where the ground is in the way
       maxWalls: 4, // through more walls than this, the straight route is silent
       maskDb: 17, // a steady sound hides anything more than this far below it (psychoacoustics: 15–20 dB)

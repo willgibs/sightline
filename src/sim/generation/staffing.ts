@@ -341,7 +341,8 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
         const chest = m.y + gen.sight.chest;
         let count = 0;
         for (const v of perches.views) if (chest >= v[c]!) count++;
-        const door = buried(crux) ? seenThroughDoor(m) : 0;
+        // Everywhere but the old walk: a man at rest in line with an open door is a free shot, buried or not.
+        const door = crux !== 'walk' ? seenThroughDoor(m) : 0;
         const d = dx * dx + dz * dz;
         if (count < bestCount || (count === bestCount && (door < bestDoor || (door === bestDoor && d < bestD)))) {
           best = { x: m.x, z: m.z };
@@ -719,7 +720,8 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
     const walkers = placed.map((q, i) => ({ q, i })).filter(({ q }) => q.routine.offset !== undefined && q.plan.role !== 'target');
     for (let tries = 0; tries < S.witnessTries && bad > 0; tries++) {
       const { q, i } = walkers[tries % walkers.length] ?? { q: null, i: -1 };
-      if (!q) return;
+      // No walkers to shift: the turns below are for exactly these camps.
+      if (!q) break;
       const before = { routine: q.routine, xz: q.xz, sight: q.sight };
       const routine = { ...q.routine, offset: (q.routine.offset! + (q.routine.period * (1 + (tries % 7))) / 8) % q.routine.period };
       const xz = track(routine);

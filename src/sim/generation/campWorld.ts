@@ -71,7 +71,7 @@ export function generateCampWorld(spec: MissionSpec, tuning: Tuning, clock?: () 
     report.problems.push(...repaired.validation.rules.filter((r) => !r.ok).map((r) => `${r.rule}: ${r.detail}`));
   }
   const playHalf = terrain.heightfield.size / 2 - G.world.playMargin;
-  const spawn = chooseSpawn(spec.insertion, terrain.heightfield, terrain.features, colliders, report, playHalf, camp.site);
+  const spawn = chooseSpawn(spec.insertion, terrain.heightfield, terrain.features, colliders, report, playHalf, camp.site, grid.map);
   return {
     grid,
     spec,
