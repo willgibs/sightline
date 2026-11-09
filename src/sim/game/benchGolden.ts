@@ -29,7 +29,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       "lab D camps valid at the first attempt, no repair (of 6)": 5,
       "lab D camps repaired": 1,
       "lab D rules still broken": 0,
-      "lab D most re-analyses in a repair (of 12)": 0,
+      "lab D most re-analyses in a repair (of 12)": 11,
       "lab D camps with a way in and out (of 6)": 1,
       "lab D clusters left unsolved": 0,
       "lab D busiest search (of 400000 expansions)": 400000,

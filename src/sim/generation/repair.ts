@@ -98,6 +98,7 @@ function attemptsFor(camp: Camp, validation: Validation, raster: Raster, parts: 
       for (const deg of V.repairTurns) {
         out.push({ name: `turn ${g.role} ${index} by ${deg}°`, apply: () => turn(g, deg * DEG, hf) });
       }
+      if (g.holdsDoor) return;
       for (const metres of V.repairMoves) {
         out.push({ name: `move ${g.role} ${index} ${metres} m along his arc`, apply: () => move(g, metres, hf, grid) });
       }

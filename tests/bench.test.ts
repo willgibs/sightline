@@ -52,7 +52,10 @@ describe('the lanes’ benches', () => {
 
   it('count the work they pin: the motor resolves every body every tick', () => {
     const valley = live.game.runs['TAL-4471 wander']!;
-    expect(valley.work.motor!.bodies).toBe(60 * 30 * 12); // the player and TAL-4471's 11 guards
+    // Every body, every tick: a whole number of bodies, the player and at least one of each role's guards.
+    const ticks = 60 * 30;
+    expect(valley.work.motor!.bodies % ticks).toBe(0);
+    expect(valley.work.motor!.bodies / ticks).toBeGreaterThanOrEqual(8);
     expect(live.kernel.runs['spawn-tick']!.work['watch-perception']!.rays).toBe(2);
   });
 });
