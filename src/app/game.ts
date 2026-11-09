@@ -35,6 +35,7 @@ import { CampGauges } from '../lab/gauges';
 import { commanderOf } from '../sim/game/comms';
 import { stimulus, type StimulusName } from '../sim/game/drops';
 import type { Command } from '../sim/kernel/commands';
+import type { Driver } from '../sim/kernel/scene';
 import { Replay, REPLAY_SOUND_SPEED } from './replay';
 import { Timeline } from './timeline';
 import { frameSpan, type SoundTiming } from '../audio/engine';
@@ -173,6 +174,8 @@ export class Game {
   /** With &lab in a camp scene: what the camp is doing to you, and the switches (labPanel.ts). */
   private gauges: CampGauges | null = null;
   private labPanel: LabPanel | null = null;
+  /** The attack script a compound simulator is running, if any. */
+  private attack: Driver<Simulation> | null = null;
   /** Stimuli waiting for the next tick (the compound simulator). */
   private readonly drops: Command[] = [];
   private clock: FixedStepClock;
@@ -630,6 +633,11 @@ export class Game {
     const drop = site.height + 1 - (p.y + p.eyeHeight);
     this.input.pitch = dist > 1 ? Math.max(-0.35, Math.min(0.1, Math.atan2(drop, dist))) : 0;
     if (this.detached) this.setDetached(false);
+    this.attack = null;
+    if (this.scene?.name === 'compound') {
+      this.overTheCamp();
+      this.attack = this.scene.driver?.() ?? null;
+    }
   }
 
   /** Hot-reloaded tuning (dev only). */
@@ -982,6 +990,11 @@ export class Game {
   private tick(): void {
     const frozen = this.detached || this.bench !== null;
     this.input.sampleTick(this.raw, frozen, this.sim.tick);
+    if (this.attack) {
+      // An attack script plays alongside whatever you drop by hand.
+      const scripted = this.attack.next(this.sim, { ...this.raw });
+      this.drops.push(...(scripted.commands ?? []));
+    }
     if (this.drops.length > 0) {
       this.raw.commands = [...this.raw.commands, ...this.drops];
       this.drops.length = 0;
@@ -1364,6 +1377,15 @@ export class Game {
     if (id === this.sim.playerId) return 'you';
     const g = this.sim.guards.find((x) => x.id === id);
     return g ? `${this.world.camp.guards[g.guard.spawn]?.role ?? 'guard'} ${id}` : `entity ${id}`;
+  }
+
+  /** The compound simulator opens with the camera already up above the camp, looking down on it. */
+  private overTheCamp(): void {
+    this.setDetached(true);
+    const s = this.world.camp.site;
+    this.fly.set(s.x, this.world.terrain.heightAt(s.x, s.z) + 70, s.z + 110);
+    this.input.yaw = 0;
+    this.input.pitch = -0.55;
   }
 
   /** The compound simulator: something happens where the fly camera is pointing, and a shot comes from the camera itself. */

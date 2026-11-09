@@ -50,7 +50,7 @@ export class LabPanel {
     if (drop) {
       const keys = document.createElement('div');
       keys.className = 'lab-note';
-      keys.textContent = `Fly with N. ${DROP_KEYS.map(([code, , label]) => `${code.slice(5)} ${label}`).join(' · ')}`;
+      keys.textContent = `WASD to fly, Space and Q up and down, Shift fast. ${DROP_KEYS.map(([code, , label]) => `${code.slice(5)} ${label}`).join(' · ')}`;
       root.appendChild(keys);
       window.addEventListener('keydown', (e) => {
         const key = DROP_KEYS.find(([code]) => code === e.code);
