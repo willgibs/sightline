@@ -21,6 +21,7 @@ export class Hud {
   private readonly labels: HTMLElement[] = [];
   private toastTimer = 0;
   private lastHeading = -1;
+  private lastMark: number | null = null;
   /** The compass's drawn width in CSS pixels: what the stylesheet gives it (narrower on small screens). */
   private compassWidth = 440;
 
@@ -101,10 +102,12 @@ export class Hud {
     this.lastHeading = -1;
   }
 
-  updateCompass(yaw: number): void {
+  /** The compass strip, and a mark on it for the way out, once there's somewhere to go (`mark`: its heading in degrees). */
+  updateCompass(yaw: number, mark: number | null = null): void {
     const heading = headingDegrees(yaw);
-    if (Math.abs(heading - this.lastHeading) < 0.05) return;
+    if (Math.abs(heading - this.lastHeading) < 0.05 && mark === this.lastMark) return;
     this.lastHeading = heading;
+    this.lastMark = mark;
     const ctx = this.ctx;
     const w = this.compassWidth;
     const h = 34;
@@ -139,6 +142,13 @@ export class Hud {
       }
     }
     ctx.globalAlpha = 1;
+    if (mark !== null) {
+      // The short way round to it, pinned to the strip's end when it's behind you.
+      const off = ((mark - heading + 540) % 360) - 180;
+      const x = Math.max(16, Math.min(w - 16, w / 2 + (off / span) * w));
+      ctx.fillStyle = '#b4531f';
+      ctx.fillText('OUT', x, 13);
+    }
     ctx.fillStyle = '#1d2227';
     ctx.beginPath();
     ctx.moveTo(w / 2 - 4, h);

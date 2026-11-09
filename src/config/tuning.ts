@@ -558,6 +558,7 @@ export const defaultTuning = {
       guardReach: 1.1, // metres at which a walking guard opens a shut door
       radius: 14, // metres a door is heard at
     },
+    getOut: { radius: 15 }, // metres from the way out at which you've got out (Lab F)
     // Sabotage (E7): held at arm's length, with nothing but your hands.
     sabotage: {
       reach: 1.6, // metres from the body to the thing

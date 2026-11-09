@@ -177,7 +177,7 @@ describe('architecture', () => {
 
   it('reaches every lane through its index.ts from outside the simulation, and keeps the tuning free of it', () => {
     const offenders: string[] = [];
-    for (const dir of ['src/app', 'src/render', 'src/audio', 'src/headless', 'src/config']) {
+    for (const dir of ['src/app', 'src/render', 'src/audio', 'src/headless', 'src/config', 'src/lab']) {
       for (const f of files(join(root, dir))) {
         const from = relative(root, f);
         for (const spec of specifiers(f)) {

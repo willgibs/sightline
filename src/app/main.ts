@@ -16,6 +16,7 @@ import './styles.css';
  *   &params=...              with these parameters (a scenario: game/scenes/sightScenario.ts)
  *   ?trials=<seed>&lab=movement  a sitting of the movement lab's exit test instead (C8): noise and visibility
  *   ?trials=<seed>           a sitting of trial mode, the perception lab's exit test (A12); any seed, or none for a fresh one (&fresh forgets a sitting kept in this browser)
+ *   &lab             in a camp scene: the lab panel, with the gauges and the engine switches (labPanel.ts)
  *   ?view=debug      start in the debug view
  *   ?spawn=edge      start where the road leaves the map instead of on an overlook
  *   ?bench           run the 20-second performance flythrough and report
@@ -94,6 +95,7 @@ function startGame(): void {
       scene: params.has('trials') ? SCENES[trialScene]!() : sceneName ? SCENES[sceneName]?.(params.get('params') ?? undefined) : null,
       trials: params.has('trials') ? (movementTrials ? MOVEMENT_SITTING : '') + normalizeSeed(params.get('trials') || randomSeed()) : null,
       trialsFresh: params.has('fresh'),
+      lab: params.has('lab'),
       replayUrl: params.get('replay'),
       camp: campFromParams(params),
     });

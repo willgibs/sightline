@@ -245,7 +245,12 @@ export function rulesPredict(p: SightParams, tuning: Tuning): boolean {
   return p.d <= zone * V.stance[p.stance] * light;
 }
 
-/** What the player will do, and who watches: the trial's brief. */
+/**
+ * What the player will do, and who the guard is: the trial's brief, and nothing the view is
+ * meant to show. The light, the cover, the sky behind you and the distance are read from
+ * the scene, because the exit test is prediction from the honest view (Nov 8). The guard's
+ * job stays in words until roles can be told apart by what they carry.
+ */
 export function briefOf(p: SightParams): string {
   const doing =
     p.move === 'still'
@@ -261,9 +266,8 @@ export function briefOf(p: SightParams): string {
           : p.move === 'sprint'
             ? 'run'
             : 'walk';
-  const where = { open: 'in the open', shade: "in the tall wall's shade", bush: 'in the bush', wall: 'behind the low wall', crest: "on the ridge's crest" }[p.spot];
   const who = p.guard === 'marksman' ? 'a marksman with binoculars' : 'a sentry';
-  return `You ${doing} ${where}, ${p.d} m from ${who}. Will he see you within 8 seconds?`;
+  return `You ${doing}. The guard is ${who}. Will he see you within 8 seconds?`;
 }
 
 /** Which cues a player can read at a trial's freeze, as the simulation knows them. */

@@ -19,7 +19,7 @@ It's early, and wireframe on purpose. The rule is to prove the core with plain s
 
 **Phase 0** (foundations) passed its gate on Nov 7, 2026. It built a deterministic simulation, a walkable wireframe valley, and the tooling every later system builds on.
 
-**Phase 1 is under way.** It has five labs. Each lab is an isolated wireframe scene, built to its exit test before anything is integrated:
+**Phase 1 is under way.** It has six labs. Each lab is an isolated wireframe scene, built to its exit test before anything is integrated:
 
 | Lab | Builds | Exit test |
 | --- | --- | --- |

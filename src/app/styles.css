@@ -886,3 +886,47 @@ body.exploring #overlay {
   margin-top: 6px;
   color: #ffe9b0;
 }
+
+/* The lab panel (&lab): a development instrument, out of the way of the view. */
+.lab-panel {
+  position: fixed;
+  top: 58px;
+  right: 14px;
+  z-index: 20;
+  padding: 10px 12px;
+  max-width: 260px;
+  background: var(--panel);
+  color: var(--panel-ink);
+  font: 11px/1.5 var(--mono);
+  border-radius: 6px;
+  backdrop-filter: blur(6px);
+}
+
+.lab-title {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.lab-lines {
+  margin: 0;
+  font: inherit;
+}
+
+.lab-switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-top: 8px;
+}
+
+.lab-switches label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.lab-note {
+  margin-top: 6px;
+  opacity: 0.65;
+}

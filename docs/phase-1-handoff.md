@@ -28,7 +28,7 @@ Written on Nov 7, 2026, at the end of the session that ran the foundation pass, 
 ## What Phase 1 is
 
 Part 4 of the design doc (Roadmap) defines it.
-- There are five labs. Each is an isolated wireframe scene, built to its final quality bar before integration, and the labs can run in parallel.
+- There are six labs (F, the camp fights back, was added on Nov 8: `docs/camp-engine.md`). Each is an isolated wireframe scene, built to its final quality bar before integration, and the labs can run in parallel.
 - Phase 1 ends at the gate **Labs pass**, when each lab meets its exit test.
 - Phase 2 then joins the labs into one core mission, which ends at the gate **Concept proven**.
 - The labs build only what the core mission needs, each piece in depth. "The core (Phases 1–2)" lists what's in and what waits for Phase 3.

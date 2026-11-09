@@ -2,6 +2,18 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-08 · Lab F: the owner's calls, and what review changed
+
+**The owner's calls:** a sixth lab, required by *Labs pass*; firing gives you away a little; a mission ends when you get out. Sandboxes are near-term development instruments, not shipped games, and every step has to be human-playable.
+
+**The way out is the end of the road, not the nearest edge.** From the perches that can see the target the nearest edge is a 92 s walk (`npm run experiment -- way-out`), which nothing the camp does could interrupt. The end of the road is 289 s on foot, and it's the way the reinforcements come in. E12's overlook keeps the old rule, because it measures whether the target falls or gets away.
+
+**A trial's brief names only the action.** "In the tall wall's shade, 40 m from a sentry" told the player what the honest view was meant to show. Nobody had sat yet, so this was the cheapest moment to change it.
+
+**Dead ground exists; hiding from one guessed point doesn't find it.** Of guards a perch can see, 100% can reach ground it can't see within 2 s, if they know the exact perch. A man hiding from one point 30 m wrong is really hidden 30% of the time. Hiding from every listed perch near the camp's belief works 100% of the time, within 2 s for 70%. The note below said cover within 12 m rarely hides a guard from a ridge. That was true of how we chose it, not of the ground.
+
+**Two independent reviews changed the order of work.** `docs/camp-engine.md`, section 12, has what they found and what changed. In short: a person plays it before the rest gets built, hiding has to end, and shooting once and leaving must not win.
+
 ## 2026-11-08 · The camp needs hands
 
 **The owner's call on the ridge shot:** contest it, and contest it through how a camp fights. A compound expecting attack has counter-snipers, and a camp under fire takes up defensive positions, returns fire, inspects where the shot came from and calls for support. Asked to assess that "through a lens of engines", we wrote `docs/camp-engine.md`. It's a proposal: nothing in it is built, and its calls are the owner's.
@@ -10,7 +22,7 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 **What the measurement adds** (30 camps, series `lab-e-overlook`, a perfect shooter staying on the best perch): the camp fired no rounds at him in any run, no guard ever detected him, the nearest came a median 272 m, and 30 s after his first shot its estimate of his position was a median 62 m off. 4.8 guards stood in a clear line from the perch at the first kill, and 4.8 did 20 s later. The camp knows where he is and has no way to act on it.
 
-**The scripts behind these numbers weren't kept.** That's a gap: a number an owner's call rests on should be one command away. The experiment runner in the proposal's first slice closes it.
+Those scripts weren't kept. The numbers are now one command away: `npm run experiment -- friction`, `-- gallery`. The estimate is a median 74 m off when the runs with no estimate at all count as the worst, and 62 m without them.
 
 ## 2026-11-08 · One overlook, from both sides (E12)
 

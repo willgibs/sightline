@@ -12,12 +12,12 @@ import { SITTING, SPOT_MAX, briefOf, generateSitting, legibleCues, outcomeOf, ru
  * pairwise spread, the freezes, the scoring and the pass mark. This module supplies what
  * is the lab's own: two kinds of situation, each drawn around the edge of its outcome.
  *
- * - **Noise** (game/scenes/noiseScenario.ts): "You crouch-walk on gravel, 7 m from a sentry
- *   with his back to you. Will he hear you within 8 seconds?" What flips one: the surface,
- *   the gait, the distance, a generator's hum beside him.
- * - **Visibility** (the sight scenario): "You stay crouched, still, in the tall wall's
- *   shade, 40 m from a sentry. Will he see you within 8 seconds?" What flips one: the
- *   light, the skyline behind you, the gait (stance and movement together), the distance.
+ * - **Noise** (game/scenes/noiseScenario.ts): "You crouch-walk. The sentry has his back to
+ *   you. Will he hear you within 8 seconds?" What flips one: the surface, the gait, the
+ *   distance, a generator's hum beside him, all read from the scene.
+ * - **Visibility** (the sight scenario): "You stay crouched, still. The guard is a sentry.
+ *   Will he see you within 8 seconds?" What flips one: the light, the skyline behind you,
+ *   the gait (stance and movement together), the distance, all read from the scene.
  *
  * A sitting is 3 + 2 warm-ups and 15 + 15 scored, the scored ones shuffled together.
  *
@@ -108,12 +108,11 @@ function stepNoise(p: NoiseParams, f: Factor, up: boolean): NoiseParams | null {
   }
 }
 
-const SURFACE_WORDS: Readonly<Record<NoiseSurface, string>> = { grass: 'on grass', dirt: 'on bare dirt', rock: 'on rock', gravel: 'on gravel', wood: 'on boards', water: 'through shallow water', metal: 'on metal plate' };
 const GAIT_WORDS: Readonly<Record<NoiseGait, string>> = { crawl: 'crawl', crouch: 'crouch-walk', walk: 'walk', sprint: 'run' };
 
+/** What the player will do, and nothing the scene is meant to show: the ground, the distance and the generator are read and heard (Nov 8). */
 function briefNoise(p: NoiseParams): string {
-  const hum = p.mask === 0 ? '' : p.mask === 1 ? ', a generator running a few metres from him' : ', a generator running right beside him';
-  return `You ${GAIT_WORDS[p.gait]} ${SURFACE_WORDS[p.surface]}, ${p.d} m from a sentry with his back to you${hum}. Will he hear you within ${p.secs} seconds?`;
+  return `You ${GAIT_WORDS[p.gait]}. The sentry has his back to you. Will he hear you within ${p.secs} seconds?`;
 }
 
 /** Noise trials: will he hear this move? */

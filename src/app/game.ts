@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Tuning } from '../config/tuning';
 import { FixedStepClock } from '../sim/kernel/core/clock';
-import { headingDegrees, lerp, moveTowards } from '../sim/kernel/core/math';
+import { headingDegrees, lerp, moveTowards, yawFromDirection } from '../sim/kernel/core/math';
 import { headBob } from '../sim/body';
 import type { ReportCode } from '../sim/kernel/events';
 import { BARKS, beliefRadius, explainChain, groundLight, lightName, movementVisibility, stanceVisibility } from '../sim/perception';
@@ -30,6 +30,9 @@ import { InputController } from './input';
 import { Overlay } from './overlay';
 import { GameSound } from './sound';
 import { BrowserStore, DevInbox, PlaytestCapture, type StoredRun } from './playtest';
+import { LabPanel } from './labPanel';
+import { CampGauges } from '../lab/gauges';
+import { commanderOf } from '../sim/game/comms';
 import { Replay, REPLAY_SOUND_SPEED } from './replay';
 import { Timeline } from './timeline';
 import { frameSpan, type SoundTiming } from '../audio/engine';
@@ -77,9 +80,13 @@ export interface GameOptions {
   trials?: string | null;
   /** Start that sitting over, forgetting any answers kept in this browser. */
   trialsFresh?: boolean;
+  /** Show the lab panel in a camp scene (&lab): the gauges and the engine switches. */
+  lab?: boolean;
 }
 
 const TIME_SCALES = [0.25, 0.5, 1, 2, 4, 8];
+/** Ticks between updates of the lab panel: a ray per guard each time. */
+const LAB_PANEL_EVERY = 15;
 /** Seconds of unsaved play after which closing the tab asks first (in the deployed game). */
 const UNSAVED_WARNING_SECONDS = 60;
 
@@ -161,6 +168,9 @@ export class Game {
   private readonly soundTiming: SoundTiming = { shown: 0, scale: 1, hold: 0 };
   /** About how long a frame takes: jumps to a long frame, eases back over a second or so. */
   private frameSpan = 0;
+  /** With &lab in a camp scene: what the camp is doing to you, and the switches (labPanel.ts). */
+  private gauges: CampGauges | null = null;
+  private labPanel: LabPanel | null = null;
   private clock: FixedStepClock;
   private readonly stats = new FrameStats();
   private readonly raw = neutralInput();
@@ -589,6 +599,10 @@ export class Game {
     this.cues.clear();
     this.exitReplayMode();
     this.sim = this.scene ? startScene(this.scene, this.tuning, this.world) : new Simulation(this.world, this.tuning);
+    if (this.opts.lab && this.scene && commanderOf(this.sim)) {
+      this.gauges = new CampGauges(this.sim);
+      this.labPanel ??= new LabPanel(document.body, this.scene.params ?? '');
+    }
     const recorder = new Recorder(this.sim, BUILD);
     this.recorder = recorder;
     this.sound.setSimulation(this.sim);
@@ -934,7 +948,7 @@ export class Game {
     this.instruments.draw(this.instrumentState(view, scoped, optic === Optic.Binoculars && rifle ? eased : 0, rifle));
     // A click from now on is about this frame: the line of sight the player steered, before any sway.
     this.input.latch.frameShown(this.sim.tick, this.clock.alpha, pose.yaw, pose.pitch);
-    this.hud.updateCompass(view.yaw);
+    this.hud.updateCompass(view.yaw, this.wayOutHeading());
     this.hud.setPrompt(this.detached || this.replay ? null : this.curr.use ? `${this.input.map.describe('use')} · ${USE_LINES[this.curr.use]}${this.curr.useProgress > 0 ? ` ${Math.round(this.curr.useProgress * 100)}%` : ''}` : this.curr.climb ? `${this.input.map.describe('climb')} · ${this.curr.climb === 'ladder' ? 'climb' : 'mantle'}` : null);
     this.cues.draw(this.curr, view, this.time);
     this.hud.setRange(this.debug ? this.aimText : null);
@@ -983,6 +997,10 @@ export class Game {
       this.fail('tick', e);
       return;
     }
+    if (this.gauges) {
+      this.gauges.observe(this.sim, events);
+      if (this.sim.tick % LAB_PANEL_EVERY === 0) this.labPanel!.update(this.gauges.read(this.sim));
+    }
     const swap = this.prev;
     this.prev = this.curr;
     this.recorder?.record(this.sim, events);
@@ -990,6 +1008,7 @@ export class Game {
     this.curr = this.sim.snapshot(swap);
     for (const e of events) {
       if (e.type === 'outcome') this.decided = true;
+      if (e.type === 'objective') this.hud.toast('Target down. Get out: follow the road out of the valley.');
       else if (e.type === 'ranged') this.ranged = { range: e.range, at: performance.now() / 1000 };
       else if (e.type === 'shot' && e.speed > 0 && e.source === this.sim.playerId) {
         const fire = this.sim.lastInput.commands.find((c) => c.kind === 'fire');
@@ -1337,6 +1356,14 @@ export class Game {
     if (id === this.sim.playerId) return 'you';
     const g = this.sim.guards.find((x) => x.id === id);
     return g ? `${this.world.camp.guards[g.guard.spawn]?.role ?? 'guard'} ${id}` : `entity ${id}`;
+  }
+
+  /** The heading of the way out, once the target is down and there's somewhere to go; null otherwise. */
+  private wayOutHeading(): number | null {
+    if (!this.sim) return null;
+    const o = commanderOf(this.sim)?.camp.objective;
+    if (!o?.getOut || o.status !== 'done') return null;
+    return headingDegrees(yawFromDirection(o.getOut.x - this.sim.player.x, o.getOut.z - this.sim.player.z));
   }
 
   /** The rifle and the vitals in the debug panel (sim/ballistics, sim/body/vitals.ts). */

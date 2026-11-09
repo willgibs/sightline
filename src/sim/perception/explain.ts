@@ -84,6 +84,8 @@ export function describe(e: SimEvent): string {
       return `alarm box ${e.box}: ${e.stage}`;
     case 'sabotage':
       return `the ${e.what} was sabotaged`;
+    case 'objective':
+      return 'the target is down: now get out';
     case 'door':
       return `a door was ${e.open ? 'opened' : 'shut'}`;
     case 'siren':

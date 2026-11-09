@@ -91,6 +91,7 @@ function events(): { sim: Simulation; all: SimEvent[]; valley: number; range: Si
     { type: 'alarm', id: 0, tick, t: tick / 30, source: guard, cause: 1, box: 0, stage: 'raised' },
     { type: 'reinforce', id: 0, tick, t: tick / 30, source: guard, cause: 1, count: 3, x: 300, z: 0 },
     { type: 'sabotage', id: 0, tick, t: tick / 30, source: guard, cause: 1, what: 'generator', x: 3, z: 5 },
+    { type: 'objective', id: 0, tick, t: tick / 30, source: guard, cause: 1, stage: 'get-out' },
     { type: 'door', id: 0, tick, t: tick / 30, source: guard, cause: 1, ...voice, loudness: 14 / defaultTuning.noise.radiusPerUnit, radius: 14, open: 1 },
     { type: 'siren', id: 0, tick, t: tick / 30, source: guard, cause: 1, ...voice, loudness: 900 / defaultTuning.noise.radiusPerUnit, radius: 900 },
   ];

@@ -1,17 +1,19 @@
 # The camp as an engine: how it fights back, and how we prove it
 
-A proposal, Nov 8, 2026, answering the owner's questions about how a camp should respond to an attacker. **Nothing here is built.** The calls that belong to the owner are in *Decisions* at the end.
+The design for Lab F, Nov 8, 2026, answering the owner's questions about how a camp should respond to an attacker. The owner has made the three biggest calls (section 10). What's built is ticked off in `docs/phase-1-plan.md`, Lab F; everything else below is still a design.
 
 Where it draws from:
 - `docs/research/notes/labs/camp_defense.md`: what real defenders do, and what shipped games learned. Every claim has a source and a confidence tag.
 - `docs/lab-opportunities.md`: where all five labs test less than the best idea on hand.
 - `docs/decisions.md`, *One overlook*: the measurements behind section 1.
 
+**Read section 9 first if you only read one thing.** Two independent reviews on Nov 8, one as a game designer and one as an engine programmer, kept the core idea and changed what comes first. Section 12 has what they found.
+
 ## 1. Where the camp stands
 
 The owner's test: "I'm not just popping off a few perfect shots from a position comfortably to win every match." Today, that is what happens.
 
-Measured on 30 fresh generated camps, with everything lab E built awake, and a perfect shooter on the best overview who never moves and fires every 5 s.
+Measured on 30 fresh generated camps, with everything lab E built awake, and a perfect shooter on the best overview who never moves and fires every 5 s. `npm run experiment -- friction` and `-- gallery` reproduce these.
 
 | | Today |
 | --- | --- |
@@ -20,19 +22,19 @@ Measured on 30 fresh generated camps, with everything lab E built awake, and a p
 | Runs in which any guard ever detected him | **0** |
 | Nearest any guard came | a median 272 m, never within 100 m |
 | Every marksman dead | a median 6 s after his first shot |
-| The camp's estimate of his position, 30 s after his first shot | a median **62 m off** |
-| Guards in a clear line from the perch at the moment of the first kill | 4.8, 56% of those left |
-| The same, 20 s later | **4.8, 61%** |
+| The camp's estimate of his position, 30 s after his first shot | a median **74 m off**, counting the runs where it had none |
+| Share of standing guards in a clear line from the perch at the first kill | 56% |
+| The same, 20 s later | **61%** |
 
 A shooter who waits for one clean moment takes the target in 28 of 30 camps. He is never found.
 
-**The camp senses and thinks. It has no hands.** It knows within about 60 m where he is, and it can't do anything about it. Reading the code says why:
+**The camp senses and thinks. It has no hands.** It knows roughly where he is, and it can't do anything about it. Reading the code says why:
 
 - **He can't be seen.** Stance caps every guard's range. Prone, a marksman's 400 m becomes 120 m, or 180 m against the sky. The ridges stand 240–420 m out. Firing shows nothing at all.
 - **He can't be reached.** The search map stops 160 m from the camp's centre, so the commander can't send anyone to a ridge. Apart from a guard who wanders out on his own, only the reinforcement squad goes, 90 s after lockdown.
 - **He can't be hit.** Every role has the same aim, about 5.8 m of error at 300 m.
-- **The gallery never closes.** Nothing gets people out of the shooter's view. Ordering cover made things worse, three ways (*One overlook*), because ad-hoc cover within 12 m doesn't hide anyone from a ridge, and men ran across open ground to reach it.
-- **Nothing after the shot counts.** The mission ends when the target falls, so a witnessed kill still wins.
+- **The gallery never closes.** Nothing gets people out of the shooter's view. Ordering cover made things worse, three ways (*One overlook*): men hid from one believed point, which rarely hides them from the real one, and they crossed open ground to do it.
+- **Nothing after the shot counts.** The mission ended when the target fell, so a witnessed kill still won. Even with a way out to reach, the nearest edge of the valley is a 92 s walk from the perches that can see the target (`npm run experiment -- way-out`), and nothing the camp does could interrupt that. So the way out is the end of the road: about five minutes on foot, and the way the reinforcements come in.
 
 No number can be tuned to fix this. A camp needs ways to reach a shooter, and we need a design for them.
 
@@ -105,8 +107,9 @@ Each has one job, its own state in `sim.state`, a bench, and a sandbox (section 
 | 0–2 s | Each man | Men in the open drop where they stand, or reach defilade if it's within a couple of seconds. Callers and runners keep going | Bodies go down |
 | 2–5 s | Nearest gun and rifles | Rake the believed ridge: pressure, not accuracy | Rounds crack past, tracers |
 | 3–10 s | Voices, radio | Reports; the picture forms | Shouting |
-| 5–15 s | Everyone | **Stand-to:** each man to his fighting position, in dead ground from the believed perch. The target goes to a hard room or his vehicle | The gallery closes |
+| 5–15 s | Everyone | **Stand-to:** each man to his fighting position, in dead ground from the believed perch, or behind a parapet where he's a smaller target. Tower men stay and fight. The target goes to a hard room or his vehicle | The gallery closes |
 | 15–30 s | Observer pair | Glass the believed ridge | A glint, if you're looking |
+| 45–60 s | Sections | **Stand-to ends.** Hiding doesn't win a fight, so sections move: sweep toward the believed perch, walk the target's escort out, fetch the casualties | Men come back into the open, doing something |
 | 20–45 s | Mortar, if there is one | Spotting round, then fire on a registered point | The tube's thump, then seconds to move |
 | 22–60 s | Pairs | One goes to inspect the believed perch. Others go for your **way out**, because a moving sniper is at his weakest | Men moving along the treeline |
 | ~90 s | Truck | A squad that hunts | Engine on the road |
@@ -114,8 +117,23 @@ Each has one job, its own state in `sim.state`, a bench, and a sandbox (section 
 
 These are starting numbers from the sources, to be set by play. The drill answers what went wrong when we ordered cover: a man drops only if that's the safe move, a runner keeps running, and the positions are known in advance, so nobody crosses open ground looking for one.
 
+**Can a camp really get out of the way? Yes, if it knows its own ground.** Measured over 24 camps, three perches each (`npm run experiment -- dead-ground`), for the 44% of guard positions a perch can see:
+
+| How a man picks where to go | Reached within a 2 s run | Within 5 s | Really hidden from the shooter |
+| --- | --- | --- | --- |
+| He knows the exact perch | 100%, a median 2 m | 100% | 100% |
+| He hides from one believed point, 30 m wrong | 100% | 100% | **30%** |
+| He hides from every *listed* perch near what the camp believes, 60 m wrong | 70% | 90% | **100%** |
+| The same, from the bearing alone | 60% | 90% | **100%** |
+| The same, and the shooter is somewhere the list doesn't have | 70% | 90% | 80% |
+| He runs for the nearest roof | 50% | 80% | 30% |
+
+So the ground is there. Hiding from one guessed point is what fails, and that is what we tried. A man who hides from every perch the camp's own range card lists in that direction is safe, a few metres away. Lab D already computes those perches. Ground stores which perches see which spots, so choosing costs no rays in play. It also gives the player something to find: a firing point the camp's list doesn't have leaves one man in five in the open.
+
+**Hiding can't be the end of it.** Hidden men can't shoot you either, and the nearest perch that exposes half of them again is a median 353 m away: two minutes on foot. So stand-to has to expire, and the camp has to come back out with a job to do. That is the rhythm: you shoot, they vanish, you move while they hunt, and they're out again when you next have a line.
+
 **What gives a shooter away** has to be decided first, since everything above depends on it. The recommendation:
-- A **firing signature**: dust and flash that lift the stance cap for a moment for anyone looking that way, less with a suppressor.
+- A **firing signature**: a discrete flash with a bearing, seen by anyone looking that way, handled like a lens glint. It can't go through the detection meter: a one-second lift at 300 m fills a few percent of it. A suppressor shrinks it, and needs a cost of its own, or it simply stays on.
 - **Optics for observers**: much longer range in a narrow cone. A man glassing the right 30 m of ridge can find you. A sentry looking around can't.
 - The same law for both sides. You find his observer exactly the way he finds you.
 
@@ -154,6 +172,7 @@ Each tool below is a chain. Ranked, best first. `First` marks the proposed first
 
 | Tool | The chain | You see or hear | How you beat it | |
 | --- | --- | --- | --- | --- |
+| **A signal you can hear** | First man to react → whistle or horn code, heard at 600 m | Whistle blasts across the valley | Kill the man before he blows it; it needs no power, so it's also the generator's fallback | First |
 | **Hidden counter-sniper pair** | Observer glasses → tells the shooter → aimed shot | A glint if the sun allows; a changeover | Find him first; kill the observer; stay out of his cone | First |
 | **Crew-served gun on a sector** | Any bearing → gunner on the mount → rakes it | Tracers, noise, the mount | Be off the bearing; kill the gunner (someone may take over); use its noise | First |
 | **Fighting positions** (Ground) | Generated dead ground for each man | They vanish into known places | Fire from a direction the plan didn't expect | First |
@@ -176,6 +195,7 @@ Every plan on this ladder should be possible, and the outcomes should fall in th
 | Plan | What it does | Expected |
 | --- | --- | --- |
 | Careless | Walks in, fires loud | Loses fast |
+| **Shoot once and leave** | Takes the clean moment, then walks off | **Must not win.** It's what wins today |
 | Perfect and static | Today's bot | **Must lose or fail to finish** |
 | Timed one shot | Waits for the clean moment, then stays | Kills him, doesn't get out |
 | Shoot and relocate | Moves along dead ground after each engagement | Wins sometimes |
@@ -196,20 +216,23 @@ Plays we want to exist, and to be able to measure:
 ## 5. What the player's side needs
 
 - **Getting out has to count.** Kill and get out, at least in the sandboxes and the live camp. Without it the camp's response can't matter. Phase 2 makes it the mission's rule.
-- **Being shot at has to matter.** `startle()` exists and nothing calls it. Hits and near misses should raise the heart rate. The shot is only ever judged calm today.
+- **Being shot at has to matter.** Today nothing a bullet does near you changes anything. A raised heart rate alone isn't enough: at the worst of it, prone and rested, sway stays under 9 cm at 300 m. A near miss should knock the rifle off its rest, so you have to settle again.
+- **You need your own picture.** The scope covers 19 m at 290 m: one building, three men at most. Bare-eyed, a man is 6–8 pixels and they all look alike. So what the camp does has to reach you by ear, and roles have to show in what men carry. Marking through the binoculars comes forward from Phase 2.
 - **The relocation network.** Real walking routes between perches, with their exposure. Certification uses a straight line at 2 m/s today.
 
-## 6. Sandboxes: engines you can play
+## 6. Sandboxes: instruments for proving engines
 
-The owner's idea: test engines, and combinations of engines, in small environments that are almost mini-games, so assessing a foundation system is fun and also tells us something. The architecture is unusually good for this. A run is deterministic, every entity has its own random stream, and a run can be saved, restored and forked. Turn one engine off and everything that changes is that engine's doing, and nothing else.
+The owner's idea: test engines, and combinations of engines, in small environments that play almost like mini-games. They're development instruments, for our near-term purposes of testing, proving and hardening the foundation. They aren't features: no scoreboards, no polish, nothing that has to last. Each can be retired when it has done its job. Developer tooling and lab architecture get built as freely as this needs.
+
+The architecture is unusually good for this. A run is deterministic, every entity has its own random stream, and a run can be saved, restored and forked. Turn one engine off and everything that changes is that engine's doing.
 
 ### What a sandbox is
 
 A scene with a seed, a short run (one to five minutes), and four additions:
-- **A score** you want to beat, and an instant restart.
-- **Engine switches**: any engine can be off. Switches are tuning patches, so recordings embed them and replay exactly.
+- **A goal and a number**, so that a run has a point, and an instant restart.
+- **Engine switches**: any engine can be off. A switch is a scene parameter (`off=radio,alarm`), so a recording names it and re-simulates it. It makes the part absent, as if the camp had never had it: nobody discovers a dead set. It leaves the system in place doing nothing, so everything else keeps its order.
 - **A bot ladder**, so every sandbox runs headless over many seeds. A person's score lands on the same scale as the bots'.
-- **Vitals**: the engine's own numbers, in the debug view and the results.
+- **Gauges**: what the camp is doing to you, the same ones for a person and for a bot. `&lab` in the address shows them, and the switches, beside the game.
 
 Sandbox runs are pinned on the bench, so a change that kills a behaviour fails CI.
 
@@ -220,7 +243,7 @@ Sandbox runs are pinned on the bench, so a change that kills a behaviour fails C
 | **The Duel** | You and one counter-sniper pair, a valley between you, the same rules for both | Who finds whom first, and how fast | Perception, optics, firing signature, ballistics | What gives a shooter away, and that it's symmetrical. Bots can play both seats over thousands of seeds |
 | **Hold the Perch** | One perch, the whole response on. How many before you must go, and do you get away? | Kills, weighted by getting out alive | Everything | "Shoot, then relocate", directly. Its first run is today's camp: zero incoming |
 | **Dominoes** | A yard of 8–12 men and an officer, five rounds. Break the group | Men pinned or routed per round | Nerve, leader radius, contagion | Men's behaviour affects each other. Near misses work |
-| **Pair Shot** | Short vignettes of two to four guards in mutual view at 200–300 m | Clean pairs, and the gap between shots | Ballistics, perception, Drill | The design's signature skill exists at all. There is about 0.2 s of slack today |
+| **Pair Shot** | Short vignettes of two to four guards in mutual view at 200–300 m | Clean pairs, and the gap between shots | Ballistics, perception, Drill | The design's signature skill exists at all. There is about 0.2 s of slack today, and a man who drops takes your aim with him |
 | **Break the Chain** | A gun or mortar with its observer, radio and crew is working you over. Stop it | Seconds until silence, more for the cheapest link | Means, comms, sabotage | Each link's loss really stops it, and you can tell which is which |
 | **Hunted** | You've fired. Cut-offs and the QRF are out. Reach the extraction point | Time and sightings | Picture, Command, movement | Getting away is a game of its own |
 | **Second Front** | Make them look one way, then go the other | Distance inside the wire before anyone looks round | Picture, Command, Means | Forcing them to deploy can be used against them |
@@ -235,25 +258,26 @@ Sandbox runs are pinned on the bench, so a change that kills a behaviour fails C
 
 ### A first try, on today's camp
 
-To see whether the idea earns its keep, we switched today's systems off one at a time: the same 16 camps, the same perfect shooter on the best perch, a shot every 5 s.
+To see whether the idea earns its keep, we switched today's systems off one at a time: the same 30 camps, the same perfect shooter on the best perch, a shot every 5 s (`npm run experiment -- switch-off`, two minutes).
 
-| Switched off | Guards down, of 9.8 | Target got away | Target shot | Siren sounded |
+| Switched off | Guards down, of 9.6 | Target got away | Target shot | Siren sounded |
 | --- | --- | --- | --- | --- |
-| Nothing | 9.0 | 13 | 1 | 14 |
-| The commander | 8.9 | 13 | 0 | 14 |
-| The radio | 8.8 | 13 | 0 | 14 |
-| The commander and the radio | 9.0 | 13 | 0 | 14 |
-| Reinforcements | 9.4 | 13 | 1 | 14 |
-| The target's truck | 8.9 | 0 | 8 | 14 |
-| The generator | 8.3 | 0 | 1 | 0 |
-| The generator and the truck | 8.3 | 0 | 1 | 0 |
+| Nothing | 8.7 | 22 | 3 | 25 |
+| The commander, and so reinforcements | 8.5 | 23 | 0 | 25 |
+| The radio | 8.5 | 23 | 1 | 25 |
+| The commander and the radio | 8.5 | 23 | 1 | 25 |
+| The alarm boxes | 8.3 | 0 | 12 | 0 |
+| Reinforcements | 9.0 | 22 | 3 | 25 |
+| The target's truck | 8.3 | 0 | 13 | 25 |
+| The generator, cut before the run starts | 7.9 | 0 | 4 | 0 |
+| The alarm boxes and the truck | 8.3 | 0 | 12 | 0 |
 
-It took minutes, and it says more than we knew:
-- **The commander and the radio change nothing** against a ridge. Everything lab E built for coordination is a dead engine in this fight.
-- **Reinforcements are only more targets.** With them off, he shoots slightly more of the camp's own guards, because the squad stops soaking up his rounds.
-- **Only the siren and the truck decide anything.** The one way the camp can beat him is by running the target out.
-- **The generator is a single point of failure.** Cut it and the siren never sounds, in any camp. There's no fallback: no runner, no whistle, no backup. A cut that strong may be right for the player, but it should be a choice.
-- **The generator and the truck are redundant** together: the second adds nothing once the first is gone. That is the pair analysis, working by hand.
+It says more than we knew:
+- **The commander and the radio change nothing** against a ridge. Everything lab E built for coordination has nothing to reach him with.
+- **Reinforcements are only more targets.** Without them he drops slightly more of the camp's own guards, because the squad stops soaking up his rounds.
+- **Only the siren and the truck decide anything.** The one way the camp can beat him is by running the target out, and it needs both.
+- **The generator is a single point of failure.** Cut it and the siren never sounds, in any camp. There's no fallback: no runner, no whistle, no backup. That's why cuts should degrade the camp and force a visible fallback, instead of ending the fight.
+- **Some pairs are redundant.** Once the alarm boxes are gone, taking the truck as well changes nothing. That's the pair analysis, done by hand.
 
 ### The numbers an engine has to show
 
@@ -269,50 +293,67 @@ It took minutes, and it says more than we knew:
 | **Explained** | Share of responses with a whole chain of causes back to something sensed |
 | **Dominance** | How far the best plan is ahead of the next, per camp |
 
-## 7. How we'd know it works: a proposed lab
+## 7. Human-playable, at every step
+
+Simulations say what's possible. They can't say whether it plays. A camp can be perfect on paper and miserable through a scope, so:
+
+- **Nothing is done on bot numbers alone.** Every slice ends with something the owner can play in a few minutes on the public build, with two or three questions. A slice isn't finished until the numbers and a person agree.
+- **Bots are limited to what a person can do.** The perfect shooter stays, as the upper limit of what one perch could ever do. Decisions rest on a person-limited shooter: seconds to find a target, range it and hold; some misses; and knowing only what the honest view shows.
+- **Every threat has a human budget.** For anything that can hurt you, the cue, the moment to take it in, and what you'd do about it must fit inside its lead time, and a test holds that, as `tests/fairness.test.ts` does for a guard's meter.
+- **It has to read through a scope.** You watch a camp through a straw. Whatever you need to know reaches you through what's in view or through your ears: shouts, the siren, the gun, a crack overhead. Anything you must read gets drawn at the range it matters, with `npm run look`, and judged.
+- **Frame rate is a real machine's.** New per-tick work is counted on the bench, and the owner checks it in the browser.
+- **Sittings keep their evidence.** The dev build saves each run for `npm run playtest`, and M marks anything that can't be explained.
+
+## 8. How we'd know it works: the lab
 
 **Lab F · The camp fights back.** Exit test, over held-out camps and every preparedness level:
 
-1. The ladder holds its order. Perfect and static loses or can't finish on 90% of camps that expect attack. The patient planner wins most.
+1. The ladder holds its order. Shoot once and leave doesn't win on camps that expect attack. Perfect and static loses or can't finish on 90% of them. The patient planner wins most.
 2. No plan is best on more than half the camps.
 3. The gallery closes: under 20% of standing guards in a clear line 15 s after a shot, on camps that expect attack. A relaxed camp stays slower.
 4. A shooter who stays is under effective fire within a time we set, and moving along dead ground buys back a measured amount.
-5. Every capability stops when any one link is cut, and its signature can be read.
+5. Every capability degrades when a link is cut, and the camp visibly falls back: a runner for a dead radio, a whistle for a dead siren. No single cut wins by itself, or the generator would be everyone's opening move.
 6. Every response explains itself back to something sensed. No-omniscience holds after contact, by fork.
 7. The owner plays three sandboxes and one camp and can say "I got outplayed", not "I was cheated".
 
 Lab E's test stands alongside this, and E12 ("one overlook doesn't clear the camp") closes here.
 
-## 8. Order of work
+These are scored with the person-limited shooter, not the perfect one, and every number is for guards who aren't on a tower: tower men hold 22% of the posts and can't leave them.
 
-Each slice ends with something to play and numbers to read.
+## 9. Order of work
 
-| Slice | Builds | Plays as | Size |
+**A person feels it first.** Nothing past the bench gets built on the numbers alone.
+
+| Step | Builds | What you play | Size |
 | --- | --- | --- | --- |
-| **0 · The bench** | Fork, an experiment runner with intervals, the sandbox harness, the vitals | Hold the Perch against today's camp: the "before" | Medium |
-| **1 · Can you be found?** | Firing signature, optics, the counter-sniper pair | The Duel | Medium |
-| **2 · The gallery closes** | Nerve, Drill, Ground's fighting positions | Dominoes, Pair Shot, Hold the Perch again | Large |
-| **3 · The camp reaches out** | Picture, Command, the gun, cut-offs, close protection, get-out rule | Hunted, Break the Chain | Large |
-| **4 · The camp remembers** | Mortar, smoke, hardening, Memory, re-phased routines | Be the Camp, Second Front, the tournament, the exit test | Large |
+| **0 · The bench** | Done: experiments, switches, gauges, the panel, the way out. Still to come: forking a run, re-rolling the dice on one camp, a shooter limited to what a person can do, a cap on route-finding per tick, a fight pinned on the bench | Today's camp with the panel on: the "before" | Medium |
+| **1 · The first fight** | A signal you can hear, men who leave the line and come back, tower men who fire back, near misses that knock you off your rest, the flash | Fifteen minutes, three questions: what did the camp do, why did you move, what would you do next? | Medium |
+| **2 · The camp hunts** | Stance for guards, Picture and Command, sections that sweep, routes that reach the ridges, cut-offs on the road, the fallbacks | Getting out, with someone coming | Large |
+| **3 · The camp has means** | The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels | Break the Chain, The Duel | Large |
+| **4 · If play asks for it** | Mortar, smoke, hardening, Memory, decoys, Second Front, Be the Camp, the tournament | | Large |
 
-Slice 0 needs no taste calls and helps every lab, so it's the natural start.
+Step 4 waits for evidence. The owner named artillery, so the mortar stays on the list, but building it before anyone has felt step 1 would be guessing.
 
-## 9. Decisions
+## 10. Decisions
 
-Work proceeds on the recommendation unless the owner says otherwise.
+**Decided by the owner, Nov 8:**
+1. Lab F joins Phase 1, and *Labs pass* requires it. Within-mission means and posture move forward from Phase 3. Doctrine across an operation stays in Phase 3.
+2. Firing gives you away a little: dust and flash that lift the stance cap for a moment, less with a suppressor.
+3. A mission ends when you get out, not when the target falls.
+
+**Still open.** Work proceeds on the recommendation unless the owner says otherwise.
 
 | # | The call | Recommended |
 | --- | --- | --- |
-| 1 | Add Lab F to Phase 1, so *Labs pass* requires it. This moves within-mission means and posture forward from Phase 3. Doctrine across an operation stays in Phase 3 | Yes |
-| 2 | Does firing give you away a little: dust and flash that lift the stance cap for a moment? | Yes, less with a suppressor |
-| 3 | The mission ends when you get out, not when the target falls | Yes, in sandboxes and the live camp now |
 | 4 | Preparedness as a camp property: relaxed, alert, prepared. "A compound expecting attack" is one of them | Yes, three levels, from the mission spec |
 | 5 | Does a mortar belong in the setting? | Yes, in prepared camps |
 | 6 | Wounds: a leg shot always kills today. Wounded who cry out make casualties a decision | Try it in Dominoes before deciding |
-| 7 | When you're shot at: heart rate and sway only, or a screen effect too? | Heart rate and sway only |
+| 7 | When you're shot at, what happens to you? | A near miss knocks the rifle off its rest and raises your heart rate. No screen effects |
+| 9 | Tower men can't leave their towers. Do they stay and fight from behind a parapet? | Yes |
+| 10 | Should a camp that expects attack keep its target out of the open, so the ridge shot isn't there for free? | Yes, by preparedness level |
 | 8 | Hidden traits, such as the odd fanatic who doesn't break, stop players solving morale but cut against "predict the camp" | None to begin with: training is visible |
 
-## 10. Beyond the camp
+## 11. Beyond the camp
 
 `docs/lab-opportunities.md` lists 53 opportunities across the labs, ranked, each with its source. Those most worth taking:
 
@@ -321,3 +362,36 @@ Work proceeds on the recommendation unless the owner says otherwise.
 - **B · The pair shot has about 0.2 s of slack, by arithmetic on the tuning,** and nobody has tried it (Pair Shot, above).
 - **D · Certified ways in assume guards ignore their own meter.** A real guard turns at 30%.
 - **Shared · An experiment runner.** The numbers behind an owner's call should be one command away.
+
+## 12. What the reviews found
+
+Two independent reviews, Nov 8. The notes are theirs. What changed in this design is marked.
+
+**As a game designer** (checked on 30 camps and through the real scope; feel only reasoned): right problem and core idea, wrong centre of gravity.
+
+| Finding | What changed |
+| --- | --- |
+| The fight is skippable: every row of the response starts after a shot that may already have won, and nobody stays to be punished | The way out moved to the end of the road. "Shoot once and leave" is the first plan on the ladder, and it must not win |
+| Hiding ends the game: hidden men can't shoot you either, and 92% of exposed men can hide from a whole ridge within 5 s | Stand-to ends at 45–60 s and sections come back out with a job. Parapets make smaller targets, not none |
+| The camp gets a picture and you don't: voices stop at 60 m, the scope covers 19 m, everyone looks alike | A whistle code heard at 600 m, role tells, marking brought forward |
+| Incoming fire doesn't bite | A near miss knocks the rifle off its rest |
+| "Stops when any link is cut" makes the generator everyone's opening move | Cuts degrade the camp and force a visible fallback |
+| A firing signature through the meter does nothing at range; a free suppressor stays on | A discrete flash with a bearing. The suppressor needs a cost |
+| The order is wrong: nobody has played any of this | A person's hands come before the rest of it (section 9). The Duel waits, because bots don't search the way eyes do |
+
+**As an engine programmer** (measurements run; some items only read): yes, it can be built well here. What would have bitten:
+
+| Finding | What changed |
+| --- | --- |
+| Routes to the ridges mostly fail: 192 of 704 found none, because routing starts on the coarse layer, where indoors is a sealed pocket | Step 2 routes out through the fine layer first |
+| Nothing caps route-finding in a tick: the worst tick today took 56 ms | A node allowance, and a camp fight pinned on the bench |
+| The firing signature can't work through the meter; optics need a zone of their own | As above; the discrete flash comes first |
+| Guards can't change stance, and they're all drawn standing | An optional stance in their orders, and in the snapshot |
+| Towers hold 22% of guards, and a scripted stand-to that was told the exact perch stalled at 34% of guards in view | Tower men stay and fight, and the exit test counts the rest |
+| Lab D's raster isn't the truth: 28% of cells it calls dead have a clear real line | Every candidate position is checked with real rays |
+| Switches were events, not absences: switching off the radio made a camp uneasy before the first shot | Fixed: a switch now makes a part absent, and the table above was re-run |
+| Forking has traps: bots keep memory, and the recorder refuses to start mid-run | Fork is built as re-simulation plus an intervention |
+| Dice can't be re-rolled on one camp, and one fork proves nothing | A salt in the tuning. The experiment runner pairs by seed |
+| Bots are handed the whole simulation | A view limited to what a player could see |
+| Guards' rifles keep a 100 m zero, 0.52 m low at 300 m, and bullets can hit their friends | Aim is solved per shot, spread goes per role, and a guard won't fire through a friend |
+| CI is near its limit on Windows | One canary per sandbox in CI; the ladders run weekly |
