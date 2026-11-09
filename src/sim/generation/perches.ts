@@ -32,7 +32,7 @@ export interface PerchSpot {
   heightAbovePad: number;
 }
 
-export function findPerches(hf: Heightfield, site: Site, gen: GenTuning, map: GridLayer): PerchSpot[] {
+export function findPerches(hf: Heightfield, site: Site, gen: GenTuning, map: GridLayer, start: { x: number; z: number } = site): PerchSpot[] {
   const O = gen.overwatch;
   const A = gen.analysis;
   const eyeY = site.height + 1.6;
@@ -42,7 +42,7 @@ export function findPerches(hf: Heightfield, site: Site, gen: GenTuning, map: Gr
   const maxTan = dtanDeg(A.perchSlopeDeg);
   const under = makeTerrainSample();
   const walk = new GridSearch(map);
-  walk.flood([cellIndex(map, site.x, site.z)], { maxExpansions: map.nx * map.nz });
+  walk.flood([cellIndex(map, start.x, start.z)], { maxExpansions: map.nx * map.nz });
   const reachable = (x: number, z: number): boolean => {
     const c = cellIndex(map, x, z);
     return c >= 0 && walk.cost[c]! >= 0;
@@ -155,8 +155,8 @@ export interface PerchViews {
   views: Float32Array[];
 }
 
-export function perchViews(R: Raster, hf: Heightfield, site: Site, gen: GenTuning, map: GridLayer): PerchViews {
-  const spots = findPerches(hf, site, gen, map);
+export function perchViews(R: Raster, hf: Heightfield, site: Site, gen: GenTuning, map: GridLayer, start: { x: number; z: number } = site): PerchViews {
+  const spots = findPerches(hf, site, gen, map, start);
   return { spots, views: spots.map((p) => perchViewshed(R, hf, p)) };
 }
 

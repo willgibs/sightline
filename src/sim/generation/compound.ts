@@ -233,6 +233,8 @@ export interface CampLayout {
   skeleton: Skeleton;
   /** The loops its patrols walk, in the frame (staffing.ts). */
   loops: PatrolLoop[];
+  /** A strip of road through the plot to paint on the ground, if it has one, in the frame. */
+  road: Rect | null;
 }
 
 declare module './camp' {
@@ -786,6 +788,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     breach,
     skeleton,
     loops: plot.loops,
+    road: plot.road,
   };
   const generator = devices.findIndex((d) => d.kind === 'generator');
   for (const d of devices) d.feed = d.kind === 'generator' ? -1 : generator;
@@ -1057,6 +1060,26 @@ export function blockVehicles(camp: Camp, grid: SpatialGrid, gen: GenTuning): vo
         const dz = L.z0 + (j + 0.5) * L.cell - v.z;
         if (Math.abs(dx * v.fx + dz * v.fz) <= hl && Math.abs(-dx * v.fz + dz * v.fx) <= hw) block(j * L.nx + i);
       }
+    }
+  }
+}
+
+/**
+ * Paints a type's road through its plot onto the terrain's surfaces, once the camp is final: a
+ * rebuilt camp's own road, not every attempt's.
+ */
+export function paintRoad(camp: Camp, hf: Heightfield): void {
+  const L = camp.layout;
+  if (!L?.road) return;
+  const R = L.road;
+  const { n, surfaces } = hf;
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const dx = hf.coord(i) - camp.site.x;
+      const dz = hf.coord(j) - camp.site.z;
+      const a = dx * L.ux + dz * L.uz;
+      const b = dx * L.vx + dz * L.vz;
+      if (a >= R.a0 && a <= R.a1 && b >= R.b0 && b <= R.b1) surfaces[j * n + i] = Surface.Dirt;
     }
   }
 }

@@ -5,6 +5,7 @@ import type { SpatialGrid } from '../kernel/world/grid';
 import { cellIndex } from '../kernel/world/grid';
 import { GridSearch } from '../kernel/world/search';
 import type { Camp } from './camp';
+import { campWalkStart } from './site';
 import type { AnalysisParts, CampAnalysis } from './campAnalysis';
 import { cruxExcess, needsWayIn } from './crux';
 
@@ -187,7 +188,8 @@ function unanswered(camp: Camp, a: CampAnalysis, hf: Heightfield, grid: SpatialG
   const posts = camp.guards.filter((g) => g.role === 'marksman').map((g) => ({ x: g.x, y: (g.elevated ? g.y : hf.heightAt(g.x, g.z)) + S.eye, z: g.z }));
   // Where the camp can walk: a flood over the map's grid from the camp.
   const search = new GridSearch(grid.map);
-  const start = cellIndex(grid.map, camp.site.x, camp.site.z);
+  const from = campWalkStart(camp);
+  const start = cellIndex(grid.map, from.x, from.z);
   const reachable = new Uint8Array(eyes.length);
   if (start >= 0) {
     search.flood([start], { maxExpansions: grid.map.nx * grid.map.nz });

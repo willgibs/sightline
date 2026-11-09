@@ -84,6 +84,8 @@ export interface Plot {
   barracks: SlotName[];
   /** Gates besides the one the road comes in by. */
   gates: Array<{ side: Side; a: number; b: number; width: number }>;
+  /** A strip of road through the plot to paint on the ground, if it has one, in the frame. */
+  road: Rect | null;
   /** Which way a door faces from (a, b): toward the plot's heart. */
   inward(a: number, b: number): Point2;
 }
@@ -153,6 +155,7 @@ function yardPlot(x: PlotInput): Plot {
     motor: ['front-left', 'front-right'],
     barracks: ['mid-left', 'mid-right', 'back-mid', 'back-left', 'back-right'],
     gates: [],
+    road: null,
     inward: (a, b) => ({ x: -a, z: -b }),
   };
 }
@@ -219,6 +222,7 @@ function spinePlot(x: PlotInput): Plot {
     motor: [`left-${rows - 1}`, `right-${rows - 1}`],
     barracks,
     gates: [{ side: 'back', a: -HA, b: gateB, width: type.gateWidth }],
+    road: { a0: -HA, a1: HA, b0: roadB0, b1: roadB1 },
     // Every shed's door opens on to the road.
     inward: (_a, b) => ({ x: 0, z: gateB - b }),
   };
@@ -259,6 +263,7 @@ function steadingPlot(x: PlotInput): Plot {
     motor: ['out-fl', 'out-fr'],
     barracks: ['byre'],
     gates: [],
+    road: { a0: fa + Y, a1: HA, b0: roadB0, b1: roadB1 },
     inward: (a, b) => ({ x: fa - a, z: fb - b }),
   };
 }

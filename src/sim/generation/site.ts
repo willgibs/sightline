@@ -27,6 +27,26 @@ export function siteAt(x: number, z: number, ux = 1, uz = 0): Site {
   return { x, z, ux, uz, radius: 0, height: 0 };
 }
 
+/**
+ * Where a walk from the camp starts: its site's centre, or, where a building stands there (a
+ * keep), just inside its gate. The walk is on a layer that can't see into a building.
+ */
+export function campWalkStart(camp: Camp): { x: number; z: number } {
+  const L = camp.layout;
+  const { site } = camp;
+  if (L) {
+    for (const b of L.buildings) {
+      const dx = site.x - b.x;
+      const dz = site.z - b.z;
+      if (Math.abs(dx * b.ux + dz * b.uz) <= b.length / 2 && Math.abs(-dx * b.uz + dz * b.ux) <= b.depth / 2) {
+        const gate = L.openings.find((o) => o.kind === 'gate')!;
+        return { x: site.x + L.ux * (gate.a - 3) + L.vx * gate.b, z: site.z + L.uz * (gate.a - 3) + L.vz * gate.b };
+      }
+    }
+  }
+  return { x: site.x, z: site.z };
+}
+
 /** The area the fine grid covers: every camp structure's footprint and a margin. Nothing assumes where the camp is. */
 export function siteBounds(camp: Camp, colliders: ColliderSet, margin: number): { minX: number; minZ: number; maxX: number; maxZ: number } {
   let minX = Infinity;
