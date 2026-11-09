@@ -23,6 +23,7 @@ export const GEN_VERSION = 5;
  * down is a chain of circles along its axis, and the eye is the centre of the head wherever a
  * lean or lying down puts it (lab C, C2).
  * 9: the valley's guards perceive (A13: lab A's sight, hearing and awareness join its
- * systems).
+ * systems). 10: men in a camp that fights get down at the spots that hide them, from a
+ * longer search; a route with one end in the camp is found through fields (Lab F).
  */
-export const SIM_VERSION = 9;
+export const SIM_VERSION = 10;

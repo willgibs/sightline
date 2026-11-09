@@ -74,9 +74,11 @@ function scopeFlash(g: GuardEntity, role: GuardRole | undefined, px: number, py:
  * him (A4: 1 in the sun, less in shade, as the simulation finds it); his detection meter
  * (A8: what the honest view shows from the cue up); his rung on the awareness ladder
  * (0 unaware to 4 combat; A8: his posture and weapon); and how brightly his scope flashes
- * at the player (E8: 0 unless he's a marksman glassing the ground; 0–1).
+ * at the player (E8: 0 unless he's a marksman glassing the ground; 0–1); and what his
+ * shape needs when he's down (Lab F): eye height, how far he's lain out, his long axis and
+ * the ground's rise under his head, pelvis and feet.
  */
-export const GUARD_FIELDS = 10;
+export const GUARD_FIELDS = 16;
 
 /** The slice of state the renderer needs, copied once per tick for interpolation. */
 export interface Snapshot {
@@ -312,6 +314,12 @@ export class Simulation extends KernelSimulation {
       s.guards[o + 7] = e.senses ? e.senses.sight.meter : 0;
       s.guards[o + 8] = e.senses ? rung(e.senses.awareness.state) : 0;
       s.guards[o + 9] = scopeFlash(e, this.world.camp.guards[e.guard.spawn]?.role, p.x, p.y + p.eyeHeight, p.z, sun, this.tuning);
+      s.guards[o + 10] = b.eyeHeight;
+      s.guards[o + 11] = b.lying;
+      s.guards[o + 12] = b.axis;
+      s.guards[o + 13] = b.riseHead;
+      s.guards[o + 14] = b.risePelvis;
+      s.guards[o + 15] = b.riseFeet;
     }
     const shapes = this.solids.shapes;
     s.solids.length = shapes.length;

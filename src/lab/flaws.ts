@@ -1,8 +1,10 @@
+import { groundSpot } from '../sim/brain';
 import { commanderOf } from '../sim/game/comms';
 import type { Attacked } from '../sim/game/attacks';
 import type { Simulation } from '../sim/game/sim';
 import type { SimEvent } from '../sim/kernel/events';
 import { Blocks } from '../sim/kernel/world/colliders';
+import { Cell, cellIndex } from '../sim/kernel/world/grid';
 import { sightLine } from '../sim/kernel/world/query';
 
 /**
@@ -39,6 +41,8 @@ export class FlawWatch {
   private readonly fired = new Map<number, number>();
   private readonly calls: number[] = [];
   private readonly seenSince = new Map<number, number>();
+  /** Men flat on the ground, by shot, for whom there was nowhere better: asked once each, because asking costs rays. */
+  private readonly nowhere = new Set<string>();
 
   constructor(private readonly truth: readonly Attacked[]) {}
 
@@ -71,7 +75,7 @@ export class FlawWatch {
       if (!b) continue;
       const spawn = sim.world.camp.guards[g.guard.spawn];
       const speed = Math.sqrt(g.body.vx * g.body.vx + g.body.vz * g.body.vz);
-      if (WALKING.has(b.act) && b.routeOk && b.route.points.length > 0 && !b.covered && speed < 0.05) {
+      if (WALKING.has(b.act) && b.routeOk && b.route.points.length > 0 && !b.covered && b.linger < 0 && speed < 0.05) {
         const s = (this.still.get(g.id) ?? 0) + dt;
         this.still.set(g.id, s);
         if (s >= 4) this.add(sim, 'stuck', g.id, `${b.act}, not moving for ${s.toFixed(0)} s`, `stuck${g.id}${Math.floor(sim.tick / (15 * hz))}`);
@@ -79,7 +83,10 @@ export class FlawWatch {
       if (b.act === 'cover' && lastAny && (sim.tick - lastAny.tick) / hz > F.drill.standTo.max + 15) this.add(sim, 'hiding-on', g.id, `still in cover ${((sim.tick - lastAny.tick) / hz).toFixed(0)} s after the last thing happened`, `hide${g.id}`);
       if (!lastShot) continue;
       const since = (sim.tick - lastShot.tick) / hz;
-      if (lastShot.what === 'shot' && since >= 5 && since < 6 && g.senses?.awareness.state === 'unaware' && (this.seenSince.get(g.id) ?? sim.tick) <= lastShot.tick) this.add(sim, 'deaf', g.id, `still unaware ${since.toFixed(0)} s after an unsuppressed shot`, `deaf${g.id}${lastShot.tick}`);
+      // Under a roof, a distant report can really be too faint: only a man outdoors is deaf.
+      const cell = cellIndex(sim.world.grid.site, g.body.x, g.body.z);
+      const indoors = cell >= 0 && (sim.world.grid.site.flags[cell]! & Cell.Roofed) !== 0;
+      if (!indoors && lastShot.what === 'shot' && since >= 5 && since < 6 && g.senses?.awareness.state === 'unaware' && (this.seenSince.get(g.id) ?? sim.tick) <= lastShot.tick) this.add(sim, 'deaf', g.id, `still unaware ${since.toFixed(0)} s after an unsuppressed shot`, `deaf${g.id}${lastShot.tick}`);
       if (spawn?.elevated) {
         const dx = lastShot.from.x - g.body.x;
         const dz = lastShot.from.z - g.body.z;
@@ -90,7 +97,7 @@ export class FlawWatch {
         if (sightLine(view, lastShot.from.x, lastShot.from.y, lastShot.from.z, g.body.x, y, g.body.z, Blocks.Bullet)) {
           const s = (this.lined.get(g.id) ?? 0) + dt;
           this.lined.set(g.id, s);
-          if (s > 6) this.add(sim, 'in-the-line', g.id, `standing in the shooter's clear line for ${s.toFixed(0)} s (${b.act})`, `line${g.id}${lastShot.tick}`);
+          if (s > 6 && this.couldHaveMoved(sim, g.id, g.body.stance, g.body.x, g.body.z, lastShot)) this.add(sim, 'in-the-line', g.id, `standing in the shooter's clear line for ${s.toFixed(0)} s (${b.act})`, `line${g.id}${lastShot.tick}`);
         }
       } else if (since >= 20) this.lined.delete(g.id);
       let near = 0;
@@ -101,6 +108,16 @@ export class FlawWatch {
         if (s > 4) this.add(sim, 'pile-up', g.id, `${near + 1} men within 2.5 m for ${s.toFixed(0)} s (${b.act})`, `pile${g.id}${Math.floor(sim.tick / (15 * hz))}`);
       } else this.pile.delete(g.id);
     }
+  }
+
+  /** A man flat on the ground with truly nothing to get behind, from the real shooter's bearing, has done what he can. */
+  private couldHaveMoved(sim: Simulation, id: number, stance: string, x: number, z: number, shot: Attacked): boolean {
+    if (stance !== 'prone') return true;
+    const key = `${id}.${shot.tick}`;
+    if (this.nowhere.has(key)) return false;
+    if (groundSpot(sim.world, sim.tuning, x, z, shot.from.x, shot.from.z) !== null) return true;
+    this.nowhere.add(key);
+    return false;
   }
 
   /** How many of each kind. */

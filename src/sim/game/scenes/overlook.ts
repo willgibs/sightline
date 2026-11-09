@@ -8,7 +8,9 @@ import { placePlayer } from '../setup';
 import { parseSwitches, switchedOff, type CampSwitch } from '../switches';
 import type { Simulation } from '../sim';
 import type { Scene } from '.';
-import { liveCamp } from './liveCamp';
+import { bestOverview, liveCamp } from './liveCamp';
+
+export { bestOverview };
 
 /**
  * "One overlook doesn't clear the camp" (E12), from both sides, on any generated camp:
@@ -46,11 +48,6 @@ export function parseOverlook(text: string | undefined): OverlookParams {
     else throw new Error(`An overlook scenario doesn't know '${part}'`);
   }
   return p;
-}
-
-/** The camp's best overview: the perch that sees the most guard time. */
-export function bestOverview(world: World): { x: number; z: number } {
-  return [...world.report.camp!.perches].sort((a, b) => b.coverage - a.coverage || a.x - b.x || a.z - b.z)[0]!; // the coordinates break a tie
 }
 
 /** The cleanest certified shot at the target, on this camp, from any perch: where, and when in the cycle. */

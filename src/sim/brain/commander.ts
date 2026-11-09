@@ -311,6 +311,7 @@ function whereIs(m: CampMind, g: RosterEntry): { x: number; z: number } {
   const age = (m.tick - g.tick) / m.tuning.sim.tickHz;
   // Heard from recently, believe that; otherwise the routine he published.
   if (age < m.tuning.brain.camp.rosterTrust && g.tick > 0) return g;
+  if (g.reserve) return g.reserve;
   const post = m.world.camp.guards[g.post]!;
   routinePose(post.routine, m.time, pose);
   return { x: pose.x, z: pose.z };

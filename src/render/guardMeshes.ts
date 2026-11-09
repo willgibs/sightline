@@ -4,7 +4,7 @@ import { GUARD_FIELDS, type Snapshot } from '../sim/game/sim';
 import { lerp } from '../sim/kernel/core/math';
 import type { Tuning } from '../config/tuning';
 import { bodyShape, type BodyState } from '../sim/body';
-import { emptyShape } from '../sim/kernel/world/shape';
+import { emptyShape, type Capsule } from '../sim/kernel/world/shape';
 import { createFlatMaterial, type LookUniforms } from './materials';
 import { palette } from './palette';
 
@@ -24,6 +24,10 @@ interface GuardMesh {
   hold: number;
   /** His scope's flash (E8): one point of constant size at his head, so it reads at any range and any zoom. */
   flash: THREE.Points;
+  /** Where the rifle sits on a man standing; down, it moves with his head. */
+  rifleAt: THREE.Vector3;
+  /** He's down, and his parts have been moved to where his shape says. */
+  posed: boolean;
 }
 
 /**
@@ -64,6 +68,14 @@ export class GuardMeshes {
   /** How near the body's axis, and its height, within which the camera is inside it. */
   private readonly reach: number;
   private readonly height: number;
+  private readonly spec: Tuning['bodies']['guard'];
+  /** A standing man's torso and legs: where each is centred, and its length between the spheres at its ends. */
+  private readonly torsoRest: { y: number; length: number };
+  private readonly legsRest: { y: number; length: number };
+  private readonly shape = emptyShape();
+  private readonly pose = { x: 0, y: 0, z: 0, yaw: 0, eyeHeight: 0, lean: 0, axis: 0, lying: 0, riseHead: 0, risePelvis: 0, riseFeet: 0 };
+  private readonly at = new THREE.Vector3();
+  private readonly to = new THREE.Vector3();
 
   constructor(
     private readonly roleOf: (spawn: number) => GuardRole,
@@ -75,11 +87,11 @@ export class GuardMeshes {
     const spec = tuning.bodies.guard;
     const standing = { x: 0, y: 0, z: 0, yaw: 0, stance: 'stand', eyeHeight: spec.eyeHeight.stand } as BodyState;
     const s = bodyShape(standing, spec, emptyShape());
-    const capsule = (c: typeof s.torso, segments: number): THREE.BufferGeometry => {
-      const g = new THREE.CapsuleGeometry(c.r, c.by - c.ay, 3, segments);
-      g.translate(0, (c.ay + c.by) / 2, 0);
-      return g;
-    };
+    this.spec = spec;
+    this.torsoRest = { y: (s.torso.ay + s.torso.by) / 2, length: s.torso.by - s.torso.ay };
+    this.legsRest = { y: (s.legs.ay + s.legs.by) / 2, length: s.legs.by - s.legs.ay };
+    // Centred on the origin, so a part can be stretched and turned about its middle.
+    const capsule = (c: typeof s.torso, segments: number): THREE.BufferGeometry => new THREE.CapsuleGeometry(c.r, c.by - c.ay, 3, segments);
     this.bodyGeo = capsule(s.torso, 10);
     this.legsGeo = capsule(s.legs, 8);
     this.headY = s.head.y;
@@ -104,6 +116,8 @@ export class GuardMeshes {
     const body = new THREE.Mesh(this.bodyGeo, this.honestMaterial);
     body.userData.role = role;
     const legs = new THREE.Mesh(this.legsGeo, this.honestMaterial);
+    body.position.y = this.torsoRest.y;
+    legs.position.y = this.legsRest.y;
     const head = new THREE.Group();
     head.position.set(0, this.headY, 0);
     const skull = new THREE.Mesh(this.headGeo, this.honestMaterial);
@@ -114,7 +128,7 @@ export class GuardMeshes {
     const rifle = new THREE.Mesh(this.rifleGeo, this.honestMaterial);
     root.add(legs, body, head, rifle);
     this.group.add(root);
-    const g: GuardMesh = { root, head, body, legs, plain: [skull, rifle], visor, rifle, role, lit: true, hold: -1, flash };
+    const g: GuardMesh = { root, head, body, legs, plain: [skull, rifle], visor, rifle, role, lit: true, hold: -1, flash, rifleAt: new THREE.Vector3(), posed: false };
     this.holdRifle(g, 0);
     this.paint(g);
     return g;
@@ -130,15 +144,72 @@ export class GuardMeshes {
     g.hold = hold;
     const r = g.rifle;
     if (hold === 0) {
-      r.position.set(0.2, this.rifleY, -0.18);
+      g.rifleAt.set(0.2, this.rifleY, -0.18);
       r.rotation.set(-0.35, 0.25, 0.2);
     } else if (hold === 1) {
-      r.position.set(0.17, this.rifleY + 0.14, -0.34);
+      g.rifleAt.set(0.17, this.rifleY + 0.14, -0.34);
       r.rotation.set(-0.12, 0.06, 0.04);
     } else {
-      r.position.set(0.1, this.headY - 0.07, -0.42);
+      g.rifleAt.set(0.1, this.headY - 0.07, -0.42);
       r.rotation.set(0, 0, 0);
     }
+    r.position.copy(g.rifleAt);
+  }
+
+  /**
+   * A man who's down is drawn where his shape says, from the same numbers sight and hits use
+   * (rule 14). A man standing costs nothing: his parts are already where he stands.
+   */
+  private posture(g: GuardMesh, x: number, y: number, z: number, yaw: number, b: Float32Array, a: Float32Array, o: number, oa: number, alpha: number): void {
+    const eye = lerp(a[oa + 10]!, b[o + 10]!, alpha);
+    if (eye >= this.spec.eyeHeight.stand - 1e-3) {
+      if (!g.posed) return;
+      g.posed = false;
+      g.body.position.set(0, this.torsoRest.y, 0);
+      g.legs.position.set(0, this.legsRest.y, 0);
+      g.body.quaternion.identity();
+      g.legs.quaternion.identity();
+      g.body.scale.set(1, 1, 1);
+      g.legs.scale.set(1, 1, 1);
+      g.head.position.set(0, this.headY, 0);
+      g.rifle.position.copy(g.rifleAt);
+      return;
+    }
+    g.posed = true;
+    const p = this.pose;
+    p.x = x;
+    p.y = y;
+    p.z = z;
+    p.yaw = yaw;
+    p.eyeHeight = eye;
+    p.lying = lerp(a[oa + 11]!, b[o + 11]!, alpha);
+    p.axis = lerpAngle(a[oa + 12]!, b[o + 12]!, alpha);
+    p.riseHead = lerp(a[oa + 13]!, b[o + 13]!, alpha);
+    p.risePelvis = lerp(a[oa + 14]!, b[o + 14]!, alpha);
+    p.riseFeet = lerp(a[oa + 15]!, b[o + 15]!, alpha);
+    const s = bodyShape(p as unknown as BodyState, this.spec, this.shape);
+    // The parts hang off a root at his feet, turned with him.
+    const c = Math.cos(yaw);
+    const n = Math.sin(yaw);
+    const local = (wx: number, wy: number, wz: number, out: THREE.Vector3): void => {
+      const dx = wx - x;
+      const dz = wz - z;
+      out.set(dx * c - dz * n, wy - y, dx * n + dz * c);
+    };
+    const fit = (m: THREE.Mesh, part: Capsule, rest: { length: number }): void => {
+      local(part.ax, part.ay, part.az, this.at);
+      local(part.bx, part.by, part.bz, this.to);
+      m.position.addVectors(this.at, this.to).multiplyScalar(0.5);
+      this.to.sub(this.at);
+      const length = this.to.length();
+      if (length < 1e-6) return;
+      m.quaternion.setFromUnitVectors(UP, this.to.divideScalar(length));
+      m.scale.set(1, rest.length > 1e-6 ? length / rest.length : 1, 1);
+    };
+    fit(g.body, s.torso, this.torsoRest);
+    fit(g.legs, s.legs, this.legsRest);
+    local(s.head.x, s.head.y, s.head.z, g.head.position);
+    g.rifle.position.set(g.rifleAt.x + g.head.position.x, g.rifleAt.y + g.head.position.y - this.headY, g.rifleAt.z + g.head.position.z);
   }
 
   /** Puts a guard's materials on: by role in the debug view, plain in the honest one; lit or in shade. */
@@ -191,6 +262,7 @@ export class GuardMeshes {
       }
       const rung = b[o + 8]!;
       this.holdRifle(g, rung >= 4 ? 2 : rung >= 2 ? 1 : 0);
+      this.posture(g, x, y, z, yaw, b, a, o, oa, alpha);
       this.shine(g, b[o + 9]!);
       const dx = eye.x - x;
       const dz = eye.z - z;
@@ -236,6 +308,8 @@ export class GuardMeshes {
     void this.look;
   }
 }
+
+const UP = new THREE.Vector3(0, 1, 0);
 
 function lerpAngle(a: number, b: number, t: number): number {
   let d = b - a;
