@@ -85,7 +85,7 @@ function startGame(): void {
       overlay,
       seed: normalizeSeed(params.get('seed')),
       tuning: tickRateChoice(defaultTuning, params.get('hz')),
-      debug: params.get('view') === 'debug',
+      debug: params.get('view') === 'debug' || sceneName === 'compound',
       spawn: (params.get('spawn') === 'edge' ? 'edge' : 'overlook') as SpawnKind,
       bench: params.has('bench'),
       pixelRatio: dprParam > 0 ? Math.min(3, Math.max(0.5, dprParam)) : Math.min(window.devicePixelRatio || 1, 1.5),

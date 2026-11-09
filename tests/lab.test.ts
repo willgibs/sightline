@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { formatReport, report, seedsOf, type Experiment, type RunResult } from '../src/lab/experiment';
-import { excludesZero, mean, median, pairedDifference, wilson } from '../src/lab/stats';
+import { formatReport, report, seedsOf, withDice, type Experiment, type RunResult } from '../src/lab/experiment';
+import { clusteredRate, excludesZero, mean, median, pairedDifference, splitVariance, wilson } from '../src/lab/stats';
 import { liveCamp } from '../src/sim/game/scenes/liveCamp';
 import { overlook } from '../src/sim/game/scenes/overlook';
 import { commanderOf } from '../src/sim/game/comms';
 import { CAMP_SWITCHES, parseSwitches } from '../src/sim/game/switches';
+import { Simulation } from '../src/sim/game/sim';
+import { SYSTEMS } from '../src/sim/game/systems';
+import { campMission, generateWorld, worldFingerprint } from '../src/sim/generation';
+import { neutralInput } from '../src/sim/kernel/input';
 import { resimulate } from '../src/sim/kernel/record/resim';
 import { runScene, sceneSystems, startScene, type Scene } from '../src/sim/kernel/scene';
-import type { Simulation } from '../src/sim/game/sim';
+import { withSystem, type System } from '../src/sim/kernel/systems';
+import { testWorld } from './fixtures';
 
 /** The lab bench (Lab F): its statistics, its reports, and engine switches. */
 
@@ -34,6 +39,45 @@ describe('statistics', () => {
   it('calls a difference clear only when the seeds agree about it', () => {
     expect(excludesZero(pairedDifference([1, 2, 3, 4], [2, 3, 4, 5.5]))).toBe(true);
     expect(excludesZero(pairedDifference([1, 2, 3, 4], [2, 1, 4, 3]))).toBe(false);
+  });
+
+  it('splits the spread between the camp and the dice', () => {
+    // Every camp the same on every roll: all of it is the camp.
+    const camps = splitVariance([
+      [1, 1, 1],
+      [4, 4, 4],
+      [7, 7, 7],
+    ]);
+    expect(camps.campShare).toBe(1);
+    expect(camps.dice).toBe(0);
+    // Every camp with the same three rolls: none of it is.
+    const dice = splitVariance([
+      [1, 4, 7],
+      [1, 4, 7],
+      [1, 4, 7],
+    ]);
+    expect(dice.campShare).toBe(0);
+    expect(dice.camp).toBe(0);
+    expect(dice.dice).toBe(3);
+    // A worked example: means 2 and 5, within-camp variance 1, between-camp mean square 13.5.
+    const both = splitVariance([
+      [1, 2, 3],
+      [4, 5, 6],
+    ]);
+    expect(both.dice).toBeCloseTo(1, 10);
+    expect(both.camp * both.camp).toBeCloseTo((13.5 - 1) / 3, 10);
+    expect(splitVariance([[5], [6]]).campShare).toBeNaN();
+    expect(splitVariance([[2, 2], [2, 2]]).campShare).toBeNaN();
+  });
+
+  it('counts rolls on one camp as less than that many camps', () => {
+    const naive = wilson(12, 30);
+    const same = clusteredRate(12, 30, 5, { camp: 1, dice: 0, campShare: 1 });
+    expect(same.high - same.low).toBeGreaterThan(naive.high - naive.low);
+    expect(same.value).toBeCloseTo(naive.value, 10);
+    // Rolls that say nothing about each other are as good as camps.
+    expect(clusteredRate(12, 30, 5, { camp: 0, dice: 1, campShare: 0 })).toEqual(naive);
+    expect(clusteredRate(12, 30, 1, null)).toEqual(naive);
   });
 });
 
@@ -70,6 +114,87 @@ describe('experiments', () => {
   it('a series is always the same camps', () => {
     expect(seedsOf('some series', 5)).toEqual(seedsOf('some series', 5));
     expect(seedsOf('some series', 5)).not.toEqual(seedsOf('another series', 5));
+  });
+
+  it('with several rolls of the dice, each camp counts once and the report says what is luck', () => {
+    // Two rolls of two camps. Arm b is 1 better on every camp, whatever the luck.
+    const flat = (x: number[]): RunResult[] => x.map((v) => ({ x: v, r: v > 2 ? 1 : 0 }));
+    const results = new Map([
+      ['a', flat([1, 3, 5, 7])],
+      ['b', flat([2, 4, 6, 8])],
+    ]);
+    const [first, second] = report(exp, results, 2);
+    expect(first!.measures[0]!.value.value).toBe(4);
+    expect(first!.measures[0]!.n).toBe(4);
+    expect(second!.measures[0]!.change!.value).toBe(1);
+    expect(first!.measures[0]!.split!.campShare).toBeGreaterThan(0.5);
+    const text = formatReport(exp, [first!, second!], 2, 2);
+    expect(text).toContain('2 camps, 2 rolls of the dice on each');
+    expect(text).toContain('The camp or the dice?');
+    // One roll each: the same report as ever.
+    expect(report(exp, new Map([['a', runs([1, 2, 3], [0, 0, 1])], ['b', runs([2, 3, 4], [1, 1, 1])]]))[0]!.measures[0]!.split).toBeNull();
+  });
+});
+
+describe('the dice', () => {
+  const params = 'seed=LEB-2534&plan=clear&pace=5';
+  const hashOf = (dice: number): string => {
+    const tuning = withDice(T, dice);
+    const sc = overlook(params) as Scene<Simulation>;
+    const sim = startScene(sc, tuning);
+    const driver = sc.driver!();
+    const raw = sc.game.still(sim);
+    for (let k = 0; k < 400; k++) sim.step(driver.next(sim, raw));
+    return sim.hash();
+  };
+
+  it('re-roll a run on the same camp, and the same roll is the same run', () => {
+    const roll0 = hashOf(0);
+    expect(hashOf(0)).toBe(roll0);
+    const roll1 = hashOf(1);
+    expect(roll1).not.toBe(roll0);
+    expect(hashOf(1)).toBe(roll1);
+    expect(hashOf(2)).not.toBe(roll1);
+    // Generation reads only tuning.gen, so the valley can't have moved.
+    const camp = campMission('LEB-2534');
+    expect(worldFingerprint(generateWorld(camp, withDice(T, 7)))).toBe(worldFingerprint(generateWorld(camp, T)));
+  }, 60_000);
+
+  it('roll 0 is the game as it ships', () => {
+    expect(T.sim.dice).toBe(0);
+    expect(withDice(T, 0)).toBe(T);
+    expect(withDice(T, 3).sim.dice).toBe(3);
+    expect(T.sim.dice).toBe(0);
+  });
+
+  it('keep every entity its own stream on any roll: who else is there shifts nobody (rule 3)', () => {
+    const drawn = (present: readonly number[], dice: number): Map<number, number> => {
+      const out = new Map<number, number>();
+      const system: System = {
+        name: 'test-dice',
+        phase: 'mission',
+        reads: [],
+        writes: ['rng.test'],
+        emits: [],
+        run(ctx) {
+          for (const id of present) out.set(id, ctx.draw(id, 'test', (rng) => rng.next()));
+        },
+      };
+      const sim = new Simulation(testWorld(), withDice(T, dice), withSystem(SYSTEMS, system));
+      sim.step(neutralInput());
+      return out;
+    };
+    const everyone = drawn([2, 3, 4], 5);
+    const without = drawn([2, 4], 5);
+    expect(without.get(2)).toBe(everyone.get(2));
+    expect(without.get(4)).toBe(everyone.get(4));
+    expect(new Set(everyone.values()).size).toBe(3);
+    expect(drawn([2], 6).get(2)).not.toBe(everyone.get(2));
+  });
+
+  it('are refused unless they are a whole number', () => {
+    expect(() => new Simulation(testWorld(), { ...T, sim: { ...T.sim, dice: 1.5 } })).toThrow(/dice/);
+    expect(() => new Simulation(testWorld(), { ...T, sim: { ...T.sim, dice: -1 } })).toThrow(/dice/);
   });
 });
 

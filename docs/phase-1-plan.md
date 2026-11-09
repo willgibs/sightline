@@ -9,6 +9,7 @@ This is the working plan. Its checkboxes are kept current as work lands, and wha
 - `docs/phase-1-handoff.md`: what is already in place.
 - `docs/foundation-shape.md`: the shape every lab builds into. A narrow kernel, lanes whose contracts are enforced by tests, and a bench for every lane.
 - `docs/research/`: the seeds each lab starts from.
+- `docs/pillars.md`: the owner's three pillars (world, camp, player), and the camp as a system that takes inputs.
 - `docs/camp-engine.md`: Lab F's design: how a camp fights back, as engines, and sandboxes as development instruments for proving them.
 - `docs/lab-opportunities.md`: where each lab tests less than the best idea on hand, ranked, with sources.
 
@@ -999,11 +1000,16 @@ Added on Nov 8, the owner's call. *Labs pass* requires it. Design and reasoning:
   - [x] Gauges, and the lab panel (`&lab`).
   - [x] A mission ends when you get out (the owner's call): on the live camp, at the end of the road, marked on the compass once the target is down.
   - [x] Trial briefs name only the action (see the exit tests).
-  - [ ] Fork a run: re-simulation plus one intervention.
-  - [ ] Re-roll the dice on one camp: a salt in the tuning.
-  - [ ] A shooter limited to what a person can do, through a view of what a player could see; "shoot once and leave" on the ladder.
-  - [ ] A cap on route-finding per tick (the worst tick today is 56 ms), and a camp fight pinned on the bench.
-- [ ] F1 · The first fight. A signal you can hear at range, men who leave the line and come back, tower men who fire back, near misses that knock you off your rest, the flash. Fifteen minutes in the owner's hands: what did the camp do, why did you move, what would you do next?
+  - [x] Fork a run: re-simulation plus one intervention (`src/lab/fork.ts`, `npm run whatif`). `npm run experiment -- relocate` and `-- relocate-quiet` use it for what moving buys.
+  - [x] Re-roll the dice on one camp: `tuning.sim.dice`, and `--dice N` on every experiment, which says how much of each number is the camp and how much is luck.
+  - [x] A shooter limited to what a person can do, through a view of what a player could see (`game/bots/playerView.ts`, `game/bots/person.ts`), and the ladder of plans (`npm run experiment -- ladder`, the `ladder` scene), which really walks out.
+  - [x] A camp fight pinned on the bench (`camp-fight`, the brain lane's first pinned run), kept short for CI. The full ladder runs weekly.
+  - [x] A cap on route-finding per tick (`brain.nav.nodesPerTick`, with F1).
+- [ ] F1 · The first fight. Fifteen minutes in the owner's hands: what did the camp do, why did you move, what would you do next?
+  - [x] A camp that fights (`camp.fights`, `off=fight` for the old one): a whistle heard at 600 m, men who leave the line for spots no listed perch toward the threat can see and come back after a stand-to of 45–60 s, tower men who fire back at the believed point, a near miss that knocks you off your rest, a muzzle flash anyone looking can see.
+  - [x] The compound simulator (`?scene=compound`): the camp with no player, and stimuli dropped anywhere. Attack scripts, and flaw detectors (`npm run flaws`, `npm run experiment -- flaws`).
+  - [ ] Drive the flaws down. Standing in the shooter's line is the largest today, and most of it is men misled by a suppressed shot's crack.
+  - [ ] The owner's sitting.
 - [ ] F2 · The camp hunts. Stance for guards, Picture and Command, sections that sweep, routes that reach the ridges, cut-offs on the road, fallbacks.
 - [ ] F3 · The camp has means. The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels.
 - [ ] F4 · If play asks for it. Mortar, smoke, hardening, Memory, decoys, and the rest of the sandboxes.

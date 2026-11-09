@@ -30,9 +30,12 @@ import { InputController } from './input';
 import { Overlay } from './overlay';
 import { GameSound } from './sound';
 import { BrowserStore, DevInbox, PlaytestCapture, type StoredRun } from './playtest';
-import { LabPanel } from './labPanel';
+import { DROP_KEYS, LabPanel } from './labPanel';
 import { CampGauges } from '../lab/gauges';
 import { commanderOf } from '../sim/game/comms';
+import { stimulus, type StimulusName } from '../sim/game/drops';
+import type { Command } from '../sim/kernel/commands';
+import type { Driver } from '../sim/kernel/scene';
 import { Replay, REPLAY_SOUND_SPEED } from './replay';
 import { Timeline } from './timeline';
 import { frameSpan, type SoundTiming } from '../audio/engine';
@@ -170,7 +173,13 @@ export class Game {
   private frameSpan = 0;
   /** With &lab in a camp scene: what the camp is doing to you, and the switches (labPanel.ts). */
   private gauges: CampGauges | null = null;
+  /** The mouse has let go of the view, for clicking the panels, with the world still running (toggleMouse). */
+  private mouseFree = false;
   private labPanel: LabPanel | null = null;
+  /** The attack script a compound simulator is running, if any. */
+  private attack: Driver<Simulation> | null = null;
+  /** Stimuli waiting for the next tick (the compound simulator). */
+  private readonly drops: Command[] = [];
   private clock: FixedStepClock;
   private readonly stats = new FrameStats();
   private readonly raw = neutralInput();
@@ -218,7 +227,7 @@ export class Game {
   private settings: Settings = loadSettings();
   /** The rules decided the run during the last ticks: show the outcome once they're drawn. */
   private decided = false;
-  private readonly drawnLabels: Array<{ x: number; y: number; text: string; color: string }> = [];
+  private readonly drawnLabels: Array<{ x: number; y: number; text: string; color: string; detail?: string }> = [];
   /** The scene being played, if any (sim/kernel/scene.ts): its world, systems and setup. */
   private scene: Scene | null;
   /** What the last drawn frame showed, so a paused screen isn't drawn again unchanged. */
@@ -242,6 +251,7 @@ export class Game {
     });
     this.input = new InputController(opts.canvas);
     if (this.debug) this.input.contexts.add('debug');
+    this.devKeys();
     this.timeline = new Timeline(
       {
         onToggle: () => this.action('replayPlay'),
@@ -350,9 +360,15 @@ export class Game {
     });
     // Watching a replay, a click on the view takes the mouse for looking (the fly camera).
     this.opts.canvas.addEventListener('click', () => {
-      if (!this.replay) return;
+      if (!this.replay && !this.mouseFree) return;
       this.sound.unlock();
       if (!this.input.locked) this.input.requestLock();
+    });
+    // With the mouse free there's no capture for Esc to end, so it pauses here.
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'Escape' || !this.mouseFree) return;
+      this.endMouseFree();
+      this.onUnlocked();
     });
     // A replay opened from a link or a dropped file starts silent: browsers start sound only
     // on a click or a key, and while watching, any will do.
@@ -599,9 +615,12 @@ export class Game {
     this.cues.clear();
     this.exitReplayMode();
     this.sim = this.scene ? startScene(this.scene, this.tuning, this.world) : new Simulation(this.world, this.tuning);
-    if (this.opts.lab && this.scene && commanderOf(this.sim)) {
+    if (this.scene && commanderOf(this.sim) && (this.opts.lab || this.scene.name === 'compound')) {
       this.gauges = new CampGauges(this.sim);
-      this.labPanel ??= new LabPanel(document.body, this.scene.params ?? '');
+      this.labPanel ??= new LabPanel(this.hud.dock, this.scene.params ?? '', this.scene.name === 'compound' ? (what) => this.dropWherePointing(what) : null);
+      this.hud.setLab(true);
+      if (this.scene.name === 'compound') this.hud.setExtraKeys(DROP_KEYS.map(([code, , text]) => [code.slice(5), text]));
+      this.devKeys();
     }
     const recorder = new Recorder(this.sim, BUILD);
     this.recorder = recorder;
@@ -626,6 +645,11 @@ export class Game {
     const drop = site.height + 1 - (p.y + p.eyeHeight);
     this.input.pitch = dist > 1 ? Math.max(-0.35, Math.min(0.1, Math.atan2(drop, dist))) : 0;
     if (this.detached) this.setDetached(false);
+    this.attack = null;
+    if (this.scene?.name === 'compound') {
+      this.overTheCamp();
+      this.attack = this.scene.driver?.() ?? null;
+    }
   }
 
   /** Hot-reloaded tuning (dev only). */
@@ -678,6 +702,7 @@ export class Game {
   }
 
   private onLocked(): void {
+    this.endMouseFree();
     this.paused = false;
     this.trial?.begin();
     if (this.pausedAt) this.capture.paused(performance.now() - this.pausedAt);
@@ -688,6 +713,7 @@ export class Game {
   }
 
   private onUnlocked(): void {
+    if (this.mouseFree) return;
     // Watching a replay, letting go of the mouse just frees it for the timeline.
     if (this.replay) return;
     if (this.bench || this.failure || (this.overlay.visible && this.overlay.currentMode === 'outcome')) return;
@@ -725,6 +751,12 @@ export class Game {
         break;
       case 'flyCamera':
         this.setDetached(!this.detached);
+        break;
+      case 'dockHide':
+        this.hud.dock.toggleHidden();
+        break;
+      case 'mouseFree':
+        this.toggleMouse();
         break;
       case 'slower':
       case 'faster': {
@@ -781,11 +813,41 @@ export class Game {
     }
   }
 
+  /** The panels' own keys work wherever the panels show. */
+  private devKeys(): void {
+    if (this.debug || this.replay || this.gauges) this.input.contexts.add('dev');
+    else this.input.contexts.delete('dev');
+  }
+
+  /**
+   * Tab: the mouse lets go of the view so the panels can be clicked, with the world still
+   * running and every key still working. Tab again, or a click on the world, takes it back.
+   */
+  private toggleMouse(): void {
+    if (!this.input.locked) {
+      this.input.requestLock();
+      return;
+    }
+    if (!this.replay) {
+      this.mouseFree = true;
+      this.input.freeKeys = true;
+    }
+    this.input.releaseLock();
+    this.hud.toast('Mouse free · click a panel, or point and drop · Tab or a click on the world to look again');
+  }
+
+  private endMouseFree(): void {
+    if (!this.mouseFree) return;
+    this.mouseFree = false;
+    if (!this.replay) this.input.freeKeys = false;
+  }
+
   private setDebugView(on: boolean): void {
     this.debug = on;
     // Watching a replay, the debug keys work in either view.
     if (on || this.replay) this.input.contexts.add('debug');
     else this.input.contexts.delete('debug');
+    this.devKeys();
     if (this.sim) this.sim.drawDebug = on;
     this.renderer.setDebug(on);
     this.hud.setDebug(on);
@@ -861,6 +923,8 @@ export class Game {
   };
 
   private drawFrame(now: number): void {
+    // Something else took the screen (the run ended, a failure): the panels aren't what's in front.
+    if (this.mouseFree && this.overlay.visible) this.endMouseFree();
     // The frame as it really was (for the playtest report), and as the game takes it: a
     // frame longer than a quarter second (a hitch, a debugger) doesn't jump the world.
     const frameMs = this.lastNow ? now - this.lastNow : 0;
@@ -978,6 +1042,15 @@ export class Game {
   private tick(): void {
     const frozen = this.detached || this.bench !== null;
     this.input.sampleTick(this.raw, frozen, this.sim.tick);
+    if (this.attack) {
+      // An attack script plays alongside whatever you drop by hand.
+      const scripted = this.attack.next(this.sim, { ...this.raw });
+      this.drops.push(...(scripted.commands ?? []));
+    }
+    if (this.drops.length > 0) {
+      this.raw.commands = [...this.raw.commands, ...this.drops];
+      this.drops.length = 0;
+    }
     // In trial mode the trial moves the player; the mouse only looks.
     if (this.trial) {
       this.trial.input(this.sim, this.raw);
@@ -1202,11 +1275,26 @@ export class Game {
     const w = window.innerWidth;
     const h = window.innerHeight;
     this.drawnLabels.length = 0;
+    // What you're looking right at, or pointing at, says everything it has; the rest stay short.
+    const cx = this.input.locked ? w / 2 : this.input.mouseX;
+    const cy = this.input.locked ? h / 2 : this.input.mouseY;
+    let closest = -1;
+    let bestD = 80 * 80;
     for (const s of shapes) {
       if (s.kind !== 'label') continue;
       const at = this.renderer.project(s.x, s.y, s.z, w, h);
-      if (at) this.drawnLabels.push({ x: at.x, y: at.y, text: s.text, color: palette.debug.tones[s.tone] });
+      // Off the edge of the view, or behind a panel, it's only in the way.
+      if (!at || at.x < 4 || at.y < 4 || at.x > w - 4 || at.y > h - 4 || this.hud.dock.covers(at.x, at.y)) continue;
+      if (s.detail !== undefined) {
+        const d = (at.x - cx) * (at.x - cx) + (at.y - cy) * (at.y - cy);
+        if (d < bestD) {
+          bestD = d;
+          closest = this.drawnLabels.length;
+        }
+      }
+      this.drawnLabels.push({ x: at.x, y: at.y, text: s.text, color: palette.debug.tones[s.tone], detail: s.detail });
     }
+    if (closest >= 0) this.drawnLabels[closest]!.text = this.drawnLabels[closest]!.detail!;
     this.hud.setLabels(this.drawnLabels);
   }
 
@@ -1265,9 +1353,9 @@ export class Game {
         ? 'fly camera'
         : `${scale}× speed${short}`;
     const lines = [
-      `SIGHTLINE · DEBUG VIEW · build ${BUILD}${this.scene ? ` · scene ${this.scene.name} v${this.scene.version}` : ''}`,
-      `seed ${w.seed} · tick ${this.sim.tick.toLocaleString('en-US')} · ${clock(played)} played · ${mode}`,
-      `${this.tuning.sim.tickHz} Hz · ${s.fps.toFixed(0)} fps · frame ${s.frameMs.toFixed(1)} ms (p95 ${s.p95Ms.toFixed(1)}) · cpu ${s.cpuMs.toFixed(1)} ms · sim ${(this.tickMs * 1000).toFixed(0)} µs/tick`,
+      `${s.fps.toFixed(0)} fps · seed ${w.seed} · tick ${this.sim.tick.toLocaleString('en-US')} · ${clock(played)} played · ${mode}`,
+      `build ${BUILD}${this.scene ? ` · scene ${this.scene.name} v${this.scene.version}` : ''}`,
+      `${this.tuning.sim.tickHz} Hz · frame ${s.frameMs.toFixed(1)} ms (p95 ${s.p95Ms.toFixed(1)}) · cpu ${s.cpuMs.toFixed(1)} ms · sim ${(this.tickMs * 1000).toFixed(0)} µs/tick`,
       `${r.calls} draws · ${(r.triangles / 1000).toFixed(0)}k tris · ${(r.lines / 1000).toFixed(0)}k lines`,
       `systems ${this.systemCosts.map((c) => `${c.name} ${c.usPerTick.toFixed(0)}`).join(' · ') || '—'} µs`,
       ``,
@@ -1292,6 +1380,8 @@ export class Game {
       ``,
       ...this.perceptionLines(),
       ...this.campLines(),
+      ...this.whyLines(),
+      ``,
       `SOUND`,
       this.sound.report(),
       ``,
@@ -1301,31 +1391,43 @@ export class Game {
   }
 
   /**
-   * The debug panel's perception section: each guard who perceives, where he stands on the
-   * awareness ladder, his meter and what he believes; and the last change of awareness
-   * explained back to what caused it (design doc · Fairness rules).
+   * The debug panel's perception section: each guard who perceives, on one line: what he's
+   * doing, where he stands on the awareness ladder, his meter and where he believes you are.
    */
   private perceptionLines(): string[] {
     const guards = this.sim.guards.filter((g) => g.senses);
     if (guards.length === 0) return [];
     const T = this.tuning;
-    const lines = ['', 'PERCEPTION'];
+    const aware = guards.filter((g) => g.senses!.awareness.state !== 'unaware').length;
+    const lines = ['', `PERCEPTION · ${guards.length} guards · ${aware} aware`];
+    const name = (g: (typeof guards)[number]): string => `${(this.world.camp.guards[g.guard.spawn]?.role ?? 'guard').replace('-operator', '')} ${g.id}`;
+    const wide = Math.max(...guards.map((g) => name(g).length));
+    const acts = Math.max(...guards.map((g) => g.brain?.act.length ?? 0));
     for (const g of guards) {
       const s = g.senses!;
-      const role = this.world.camp.guards[g.guard.spawn]?.role ?? 'guard';
       const b = s.belief;
-      const believes = b ? `believes you at ${b.x.toFixed(0)}, ${b.z.toFixed(0)} ± ${beliefRadius(b, this.sim.tick, T.sim.tickHz, T.perception.awareness.believedSpeed).toFixed(1)} m${b.seen ? ' (seen)' : ''}` : 'no belief';
-      lines.push(`${role} ${g.id} · ${s.awareness.state} · meter ${Math.round(s.sight.meter * 100)}% · ${believes}`);
+      const believes = b ? ` ${b.x.toFixed(0)},${b.z.toFixed(0)}±${beliefRadius(b, this.sim.tick, T.sim.tickHz, T.perception.awareness.believedSpeed).toFixed(0)}${b.seen ? ' seen' : ''}` : '';
+      lines.push(`${name(g).padEnd(wide)} ${(g.brain?.act ?? '').padEnd(acts)} ${s.awareness.state} ${Math.round(s.sight.meter * 100)}%${believes}`);
     }
-    const last = [...this.log.all].reverse().find((e) => e.type === 'alert');
-    if (last) for (const line of explainChain(this.log.explain(last.id), (id) => this.who(id))) lines.push(`  ${line}`);
     return lines;
+  }
+
+  /** The debug panel's why: the last change of awareness and the last reaction, each explained back to what caused it (design doc · Fairness rules). */
+  private whyLines(): string[] {
+    const all = [...this.log.all].reverse();
+    const chain = (e: (typeof all)[number] | undefined): string[] => (e ? explainChain(this.log.explain(e.id), (id) => this.who(id)) : []);
+    const noticed = chain(all.find((e) => e.type === 'alert'));
+    const reacted = chain(all.find((e) => e.type === 'act' && e.to !== 'routine' && e.to !== 'return'));
+    if (noticed.length + reacted.length === 0) return [];
+    // The newest thing explained, on the line that shows while it's closed.
+    const latest = reacted[reacted.length - 1] ?? noticed[noticed.length - 1]!;
+    return ['', `WHY · ${latest}`, ...(noticed.length ? ['Last alert:', ...noticed] : []), ...(reacted.length ? ['Last reaction:', ...reacted] : [])];
   }
 
   /**
    * The debug panel's camp section (lab E): the camp's level and what it settles to, the
-   * search under way, its belief map and estimate of a shooter, its orders; each guard's
-   * act and why, and the last reaction explained back to what caused it.
+   * search under way, its belief map, its estimate of a shooter and its orders.
+   * Each guard's act is on his perception line, and what caused the last reaction under why.
    */
   private campLines(): string[] {
     const commander = this.sim.index.of('commander')[0];
@@ -1341,21 +1443,40 @@ export class Game {
     const est = c.shots.estimate;
     if (est) lines.push(`shooter believed at ${est.x.toFixed(0)}, ${est.z.toFixed(0)} · ${c.shots.bearings.length} bearings${c.reinforceCalled >= 0 ? ` · reinforcements called ${((tick - c.reinforceCalled) / hz).toFixed(0)} s ago` : ''}`);
     if (c.tasks.length) lines.push(`orders: ${c.tasks.map((t) => `${t.kind} (${t.assigned.length}/${t.capacity})`).join(', ')}`);
-    for (const g of this.sim.guards) {
-      if (!g.brain) continue;
-      const role = this.world.camp.guards[g.guard.spawn]?.role ?? 'guard';
-      lines.push(`${role} ${g.id} · ${g.brain.act}`);
-    }
-    const last = [...this.log.all].reverse().find((e) => e.type === 'act' && e.to !== 'routine' && e.to !== 'return');
-    if (last) for (const line of explainChain(this.log.explain(last.id), (id) => this.who(id))) lines.push(`  ${line}`);
     return lines;
   }
 
-  /** Who an entity is, for explanations: you, or a guard by role. */
+  /** Who an entity is, for explanations: you, the camp, or a guard by role. */
   private who(id: number): string {
     if (id === this.sim.playerId) return 'you';
+    if (id === this.sim.index.of('commander')[0]?.id) return 'the camp';
     const g = this.sim.guards.find((x) => x.id === id);
     return g ? `${this.world.camp.guards[g.guard.spawn]?.role ?? 'guard'} ${id}` : `entity ${id}`;
+  }
+
+  /** The compound simulator opens with the camera already up above the camp, looking down on it. */
+  private overTheCamp(): void {
+    this.setDetached(true);
+    const s = this.world.camp.site;
+    this.fly.set(s.x, this.world.terrain.heightAt(s.x, s.z) + 70, s.z + 110);
+    this.input.yaw = 0;
+    this.input.pitch = -0.55;
+  }
+
+  /** The compound simulator: something happens where you're pointing, the free mouse or the crosshair, and a shot comes from the camera itself. */
+  private dropWherePointing(what: StimulusName): void {
+    if (!this.sim) return;
+    if (!this.detached) this.setDetached(true);
+    const yaw = this.input.yaw;
+    const pitch = this.input.pitch;
+    const d = this.mouseFree ? this.renderer.rayThrough(this.input.mouseX, this.input.mouseY, window.innerWidth, window.innerHeight) : { x: -Math.sin(yaw) * Math.cos(pitch), y: Math.sin(pitch), z: -Math.cos(yaw) * Math.cos(pitch) };
+    const hit = raycast({ world: this.world, solids: this.sim.solids, bodies: this.sim.queryBodies() }, this.fly.x, this.fly.y, this.fly.z, d.x, d.y, d.z, 2000, Blocks.All, emptyHit());
+    if (hit.what === 'none') {
+      this.hud.toast('Nothing there to drop it on');
+      return;
+    }
+    this.drops.push(stimulus(what, { x: hit.x, y: hit.y, z: hit.z }, { x: this.fly.x, y: this.fly.y, z: this.fly.z }));
+    this.hud.toast(`${what}, at ${hit.x.toFixed(0)}, ${hit.z.toFixed(0)}`);
   }
 
   /** The heading of the way out, once the target is down and there's somewhere to go; null otherwise. */
@@ -1430,6 +1551,7 @@ export class Game {
     this.log.clear();
     this.cues.clear();
     this.replay = r;
+    this.devKeys();
     this.world = r.world;
     this.scene = r.scene;
     this.seed = r.rec.header.mission.seed;
@@ -1533,6 +1655,7 @@ export class Game {
   private exitReplayMode(): void {
     if (!this.replay) return;
     this.replay = null;
+    this.devKeys();
     this.timeline.hide();
     document.body.classList.remove('replaying');
     if (this.detached) this.setDetached(false);
@@ -1625,6 +1748,12 @@ export class Game {
       if (!xs.every((x) => typeof x === 'number' && Number.isFinite(x))) throw new TypeError(`sightline.${what}() takes finite numbers, got ${xs.map(String).join(', ')}`);
     };
     return {
+      /** The compound simulator: drops a stimulus at a world point, from another (`what`: game/drops.ts). */
+      drop: (what: StimulusName, x: number, y: number, z: number, fromX = x, fromY = y, fromZ = z) => {
+        ready('drop');
+        finite('drop', x, y, z, fromX, fromY, fromZ);
+        this.drops.push(stimulus(what, { x, y, z }, { x: fromX, y: fromY, z: fromZ }));
+      },
       play: () => {
         ready('play');
         this.sound.unlock();

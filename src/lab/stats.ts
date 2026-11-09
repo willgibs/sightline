@@ -49,6 +49,54 @@ export function pairedDifference(a: readonly number[], b: readonly number[]): In
   return mean(a.map((x, k) => b[k]! - x));
 }
 
+/** How the spread between runs divides into what the camp decides and what the dice decide. */
+export interface VarianceSplit {
+  /** Standard deviation between the camps' own means, with the dice's share taken out. */
+  camp: number;
+  /** Standard deviation between rolls of the dice on one camp. */
+  dice: number;
+  /** The camp's share of the variance, 0 to 1; NaN if nothing varies at all. */
+  campShare: number;
+}
+
+/**
+ * One group per camp, one value per roll of the dice: the classic one-way split (random
+ * effects, by mean squares), which also gives the two a fair weight when some rolls have
+ * no value. Between-camp variance has the dice's share taken out of it, so a camp whose
+ * mean is only luck counts for nothing. NaN entries are left out.
+ */
+export function splitVariance(groups: readonly (readonly number[])[]): VarianceSplit {
+  const kept = groups.map((g) => g.filter((x) => !Number.isNaN(x))).filter((g) => g.length > 0);
+  const n = kept.reduce((a, g) => a + g.length, 0);
+  if (kept.length === 0 || n === kept.length) return { camp: NaN, dice: NaN, campShare: NaN };
+  const grand = kept.reduce((a, g) => a + g.reduce((p, q) => p + q, 0), 0) / n;
+  let between = 0;
+  let within = 0;
+  for (const g of kept) {
+    const m = g.reduce((p, q) => p + q, 0) / g.length;
+    between += g.length * (m - grand) * (m - grand);
+    for (const x of g) within += (x - m) * (x - m);
+  }
+  const dice = within / (n - kept.length);
+  // With one camp there's nothing to say about camps.
+  if (kept.length === 1) return { camp: NaN, dice: Math.sqrt(dice), campShare: NaN };
+  const size = (n - kept.reduce((a, g) => a + g.length * g.length, 0) / n) / (kept.length - 1);
+  const camp = Math.max(0, (between / (kept.length - 1) - dice) / size);
+  return { camp: Math.sqrt(camp), dice: Math.sqrt(dice), campShare: camp + dice > 0 ? camp / (camp + dice) : NaN };
+}
+
+/**
+ * A proportion over several rolls of the dice per camp. Rolls on one camp resemble each
+ * other, so they aren't that many independent trials: the count shrinks by how much they
+ * do (the design effect) before Wilson's interval is taken. With one roll each, or rolls
+ * that resemble each other no more than strangers do, it's Wilson's interval as it stands.
+ */
+export function clusteredRate(k: number, n: number, rolls: number, split: VarianceSplit | null): Interval {
+  const icc = split && !Number.isNaN(split.campShare) ? split.campShare : 0;
+  const effect = 1 + (rolls - 1) * icc;
+  return wilson(k / effect, n / effect);
+}
+
 /** True if an interval doesn't contain zero: the difference is more than the camps' own variation. */
 export function excludesZero(i: Interval): boolean {
   return i.low > 0 || i.high < 0;

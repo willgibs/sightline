@@ -4,7 +4,8 @@
   --paper: #e4e7ea;
   --panel: rgba(20, 23, 27, 0.78);
   --panel-ink: #e9ecef;
-  --panel-soft: rgba(233, 236, 239, 0.58);
+  --panel-soft: rgba(233, 236, 239, 0.74);
+  --panel-light: rgba(20, 23, 27, 0.6);
   --accent: #e8590c;
   --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
   --sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
@@ -64,48 +65,132 @@ body {
   filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.85));
 }
 
-.debug-panel,
 .legend,
 .reticle,
 .range {
   display: none;
 }
 
-#hud.is-debug .debug-panel,
 #hud.is-debug .legend,
 #hud.is-debug .reticle,
 #hud.is-debug .range {
   display: block;
 }
 
-.debug-panel {
+/* The dock (devDock.ts): slim panels at the edges, so the world stays the thing you look at. */
+.dev-dock {
   position: absolute;
-  top: 14px;
-  left: 14px;
-  margin: 0;
-  padding: 12px 14px;
-  max-width: calc(100vw - 28px);
-  background: var(--panel);
-  color: var(--panel-ink);
-  font: 11px/1.55 var(--mono);
-  border-radius: 6px;
-  white-space: pre;
-  backdrop-filter: blur(6px);
-  overflow: hidden;
+  top: 10px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  pointer-events: auto;
 }
 
-/* Below the compass, so neither covers the other at any width. */
-#hud.is-debug .debug-panel {
-  top: 58px;
-  max-height: calc(100vh - 110px);
+.dev-dock-left {
+  left: 10px;
+  width: 270px;
+}
+
+.dev-dock-right {
+  right: 10px;
+  width: 200px;
+}
+
+#hud.is-debug .dev-dock,
+#hud.is-lab .dev-dock-right {
+  display: flex;
+}
+
+#hud.dock-hidden .dev-dock {
+  display: none;
+}
+
+/* The dock's own keys, where the key legend doesn't show: a lab panel in the honest view. */
+.dev-hint {
+  display: none;
+  order: 9999;
+  padding: 2px 7px;
+  background: var(--panel-light);
+  color: var(--panel-soft);
+  font: 10px/1.4 var(--mono);
+  border-radius: 4px;
+}
+
+#hud.is-lab:not(.is-debug) .dev-hint {
+  display: block;
+}
+
+.dev-section {
+  background: var(--panel-light);
+  color: var(--panel-ink);
+  border-radius: 4px;
+}
+
+.dev-head {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 7px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: 600 10.5px/1.35 var(--mono);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dev-title {
+  flex: none;
+}
+
+.dev-brief {
+  overflow: hidden;
+  color: var(--panel-soft);
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dev-body {
+  display: none;
+  padding: 0 7px 5px;
+  color: var(--panel-soft);
+  font: 10px/1.45 var(--mono);
+}
+
+.is-open > .dev-body {
+  display: block;
+}
+
+.dev-text {
+  max-height: 40vh;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Clear of the compass, on a window too narrow for both across the top. */
+@media (max-width: 1080px) {
+  .dev-dock {
+    top: 50px;
+    max-height: calc(100vh - 100px);
+  }
 }
 
 .legend {
   position: absolute;
-  left: 14px;
-  bottom: 14px;
-  padding: 7px 10px;
-  background: var(--panel);
+  left: 10px;
+  right: 10px;
+  bottom: 8px;
+  width: fit-content;
+  max-width: calc(100vw - 20px);
+  padding: 5px 9px;
+  background: var(--panel-light);
+  line-height: 1.5;
   color: var(--panel-soft);
   font: 10.5px/1 var(--mono);
   border-radius: 6px;
@@ -164,8 +249,8 @@ body {
   position: absolute;
   left: 0;
   top: 0;
-  padding: 1px 5px;
-  background: var(--panel);
+  padding: 0 4px;
+  background: var(--panel-light);
   color: var(--panel-ink);
   font: 10px/1.4 var(--mono);
   border-left: 2px solid;
@@ -555,8 +640,8 @@ body {
   display: none;
 }
 
-/* The panel stops above the replay's keys and timeline. */
-.replaying #hud.is-debug .debug-panel {
+/* The panels stop above the replay's keys and timeline. */
+.replaying .dev-dock {
   max-height: calc(100vh - 58px - 112px);
 }
 
@@ -887,46 +972,23 @@ body.exploring #overlay {
   color: #ffe9b0;
 }
 
-/* The lab panel (&lab): a development instrument, out of the way of the view. */
-.lab-panel {
-  position: fixed;
-  top: 58px;
-  right: 14px;
-  z-index: 20;
-  padding: 10px 12px;
-  max-width: 260px;
-  background: var(--panel);
-  color: var(--panel-ink);
-  font: 11px/1.5 var(--mono);
-  border-radius: 6px;
-  backdrop-filter: blur(6px);
-}
-
-.lab-title {
-  margin-bottom: 4px;
-  font-weight: 600;
-}
-
-.lab-lines {
-  margin: 0;
-  font: inherit;
+.legend-extra span {
+  margin-right: 12px;
 }
 
 .lab-switches {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 10px;
-  margin-top: 8px;
+  gap: 2px 8px;
 }
 
 .lab-switches label {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   cursor: pointer;
 }
 
-.lab-note {
-  margin-top: 6px;
-  opacity: 0.65;
+.lab-switches input {
+  margin: 0;
 }

@@ -49,6 +49,8 @@ export interface GuardMind {
   readonly brain: BrainState | null;
   /** Where the camp's alarm boxes are: static knowledge, from the camp's layout (E7). */
   readonly alarms: readonly { x: number; z: number }[];
+  /** Whether his camp fights back (Lab F): a fact about the camp, like its alarm boxes. */
+  readonly fights: boolean;
   /** Where the camp's escape vehicle stands, if it has one (static, like the alarm boxes): the target's way out at lockdown. */
   readonly escape: Readonly<{ x: number; z: number }> | null;
   /** A number in [0, 1) from his own stream: the only way a brain rolls dice (rule 3). */
@@ -61,6 +63,8 @@ export interface GuardMind {
 export interface NavAllowance {
   work: SearchOptions['work'];
   searches: { left: number };
+  /** The work counter's nodes when the tick began, so a tick's route-finding can be capped by what it has actually expanded. */
+  nodesAtStart: number;
 }
 
 /** A mind's awareness: the state, the tick he entered it, his focus, if any, and why (perception/senses.ts). */
