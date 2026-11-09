@@ -334,11 +334,36 @@ These are scored with the person-limited shooter, not the perfect one, and every
 | --- | --- | --- | --- |
 | **0 · The bench** | Done: experiments, switches, gauges, the panel, the way out, forking a run, re-rolling the dice on one camp, a shooter limited to what a person can do, a fight pinned on the bench | Today's camp with the panel on: the "before" | Medium |
 | **1 · The first fight** | Built: a whistle you can hear, men who leave the line and come back, tower men who fire back, near misses that knock you off your rest, a muzzle flash anyone looking can see. The compound simulator and its flaw detectors. So far: a perfect shooter's kills fall from 8.7 to 7.0 of 9.6, and the share of guards in his line 20 s after a shot from 61% to 41% | The compound simulator first, then a real perch. Fifteen minutes, three questions: what did the camp do, why did you move, what would you do next? | Medium |
-| **2 · The camp hunts** | Stance for guards, Picture and Command, sections that sweep, routes that reach the ridges, cut-offs on the road, the fallbacks | Getting out, with someone coming | Large |
+| **2 · The camp hunts** | Done: stance for guards, routes that reach the ridges. Still to come: Picture and Command, sections that sweep, cut-offs on the road, the fallbacks | Getting out, with someone coming | Large |
 | **3 · The camp has means** | The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels | Break the Chain, The Duel | Large |
 | **4 · If play asks for it** | Mortar, smoke, hardening, Memory, decoys, Second Front, Be the Camp, the tournament | | Large |
 
 Step 4 waits for evidence. The owner named artillery, so the mortar stays on the list, but building it before anyone has felt step 1 would be guessing.
+
+### Step 2 in detail: what it has to change
+
+The bench says what's wrong, and it isn't the first 30 seconds any more. After the first shot, nothing the camp does reaches the shooter:
+
+- **Moving buys nothing.** Forked 2 s after his first shot, moving 30 m or 100 m changes no number: about 3 rounds at him, no detection, nobody within 250 m (`npm run experiment -- relocate`).
+- **Shoot once and leave wins**, 31 of 48 runs, and it walks out (`npm run experiment -- ladder`).
+
+So the job of step 2 is that the camp comes after him, in a way he can see coming and get ahead of. Routes to the ridges and stance for guards are done. The rest, in order:
+
+1. **Picture: firing points, not one ellipse.** The fused bearings pick out listed perches under them, each with a weight. With no news the weight spreads, to neighbouring perches and toward the ways out, because a shooter who's stopped firing has probably moved. A fresh shot re-fixes it. The list is the camp's range card, which it's fair for it to know.
+2. **Command: find, cut off, fix.** When a stand-to ends the men who come out have jobs. A pair goes to each of the top firing points, a pair or the truck goes to each way out, and the tower men and marksmen keep the fix under fire and glass. Each is a capped slot, filled from whoever's left, so every man you kill leaves a visible hole.
+3. **Sections that sweep.** Two to four men move as a section with a shared front taken from the bearing, half moving while half watch, so a shooter who waits for them has a target that shoots back. What they reach, they clear with their eyes, through perception, and the map remembers.
+4. **Fallbacks.** Cut the radio and sections act on their last order and shout. Lose the officer and the plan gets sloppier, by rule. Nothing stops dead when one link is cut.
+
+**How we'll know**, all on the person-limited shooter:
+
+| Number | Today | Wanted |
+| --- | --- | --- |
+| Shoot once and leave wins (`ladder`) | 31 of 48 | Under a third, and only by a route he chose before firing |
+| Staying put after the first shot | Never found | Found within about 2 minutes, nearly always |
+| Moving 100 m right after the shot (`relocate`) | Changes nothing | Clearly better than staying, on the nearest hunter and on being found |
+| Shoot and relocate (`ladder`) | 10 of 48 | Better than shooting once and leaving |
+
+**What you play:** a real perch (`?scene=live-camp&params=seed=LEB-2534%26perch=1&lab`), one shot, then get out. It should feel like being hunted, and the way out should be something you have to think about before you fire.
 
 ## 10. Decisions
 

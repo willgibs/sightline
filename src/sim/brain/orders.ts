@@ -1,4 +1,4 @@
-import type { Gait, MoveIntent } from '../body';
+import type { Gait, MoveIntent, Stance } from '../body';
 
 /**
  * Orders: how a brain steers its body. A brain decides in the 'decide' phase, after the
@@ -25,6 +25,8 @@ export interface MoveOrder {
   pitch: number;
   /** Head turn relative to the body. */
   headYaw: number;
+  /** The stance to be in: standing, if there's none. */
+  stance?: Stance;
 }
 
 export type Order = MoveOrder;

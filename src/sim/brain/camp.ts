@@ -25,6 +25,8 @@ export interface RosterEntry {
   z: number;
   tick: number;
   status: 'ok' | 'missing' | 'dead';
+  /** A reinforcement's own place, where the camp expects him when he's not heard from. */
+  reserve?: { x: number; z: number };
 }
 
 /** An order the commander has given (E5): where, and why. */

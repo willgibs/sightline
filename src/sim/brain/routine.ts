@@ -35,5 +35,6 @@ export function keepRoutine(mind: GuardMind, out: Order): Order {
   out.yaw = pose.yaw;
   out.pitch = 0;
   out.headYaw = pose.headYaw;
+  delete out.stance;
   return out;
 }

@@ -1,6 +1,6 @@
 import type { Tuning } from '../../config/tuning';
 import { dcos } from '../kernel/core/detmath';
-import { Cell, Edge, cellIndex } from '../kernel/world/grid';
+import { Cell, Edge, cellIndex, type GridLayer } from '../kernel/world/grid';
 import type { World } from '../kernel/world/world';
 import { navigatorOf } from './nav';
 
@@ -15,9 +15,13 @@ import { navigatorOf } from './nav';
  * metres off. It reads only the static world (rule 13). A shooter somewhere the list
  * doesn't have is the counter: he catches about one man in five still in the open.
  *
- * Breadth first over the grid's fine layer, with a budget on the cells it looks at (rule
- * 18). Each candidate is checked with real rays, because the analysis's coarse raster
- * disagrees with the truth about a quarter of the time.
+ * Crouched is what it looks for, because from there he can fight. A fold of the ground that
+ * only hides a man lying flat is taken when it's clearly nearer. With neither in reach
+ * there's nothing for it but to get down where he is.
+ *
+ * Breadth first over the grid's fine layer, with budgets on the cells it walks and the rays
+ * it casts (rule 18). Each candidate is checked with real rays, because the analysis's
+ * coarse raster disagrees with the truth about a quarter of the time.
  */
 
 interface Point {
@@ -25,34 +29,77 @@ interface Point {
   z: number;
 }
 
-/** The spot to go to, or null if there's none within reach: he's outside the fine layer, or nothing hides him. */
-export function groundSpot(world: World, tuning: Tuning, x: number, z: number, threatX: number, threatZ: number): Point | null {
+/** Where to go, and how low he has to be there for it to hide him. */
+export interface GroundSpot extends Point {
+  stance: 'crouch' | 'prone';
+}
+
+/** Which cells a search has been to, by generation, so a search costs nothing to start. Working memory: nothing carries over between calls. */
+const visits = new WeakMap<GridLayer, { seen: Uint32Array; now: number }>();
+
+function visited(L: GridLayer): { seen: Uint32Array; now: number } {
+  let v = visits.get(L);
+  if (!v) {
+    v = { seen: new Uint32Array(L.nx * L.nz), now: 0 };
+    visits.set(L, v);
+  }
+  v.now++;
+  return v;
+}
+
+/**
+ * The spot to go to, or null if there's none within reach: he's outside the fine layer, or
+ * nothing hides him. `wide`: he only has a crack or a strike to go on, so the bearing is rough.
+ */
+export function groundSpot(world: World, tuning: Tuning, x: number, z: number, threatX: number, threatZ: number, wide = false): GroundSpot | null {
   const F = tuning.brain.fight.drill;
   const L = world.grid.site;
   const start = cellIndex(L, x, z);
   if (start < 0) return null;
   const nav = navigatorOf(world, tuning);
-  const blockers = perchesToward(world, tuning, x, z, threatX, threatZ);
   const eye = tuning.bodies.player.eyeHeight.prone;
-  const head = tuning.bodies.guard.eyeHeight.stand;
-  const heightAt = (p: Point): number => world.terrain.heightAt(p.x, p.z);
-  const seen = new Set<number>([start]);
+  const eyes = perchesToward(world, tuning, x, z, threatX, threatZ, wide).map((p) => ({ x: p.x, y: world.terrain.heightAt(p.x, p.z) + eye, z: p.z }));
+  const heads = tuning.bodies.guard.eyeHeight;
+  let rays = 0;
+  const hidden = (px: number, py: number, pz: number): boolean => {
+    for (const e of eyes) {
+      rays++;
+      if (nav.seesPoint(e.x, e.y, e.z, px, py, pz)) return false;
+    }
+    return true;
+  };
+  const v = visited(L);
+  v.seen[start] = v.now;
   let frontier = [start];
-  let looked = 0;
+  let walked = 0;
+  let lying: GroundSpot | null = null;
+  let lyingAt = 0;
   const steps = Math.floor(F.maxRun / L.cell);
+  const near = Math.max(1, Math.round(F.spacing / L.cell));
+  const longer = Math.round(F.preferUpright / L.cell);
   for (let step = 0; step <= steps && frontier.length > 0; step++) {
+    if (lying && step > lyingAt + longer) return lying;
+    const run = step * L.cell;
+    const k = near * (run < F.nearRun ? 1 : run < 2 * F.nearRun ? 2 : 4);
     const next: number[] = [];
     for (const c of frontier) {
-      if (++looked > F.cells) return null;
+      if (++walked > F.cells || rays > F.rays) return lying;
       const i = c % L.nx;
       const j = Math.floor(c / L.nx);
-      const here = { x: L.x0 + (i + 0.5) * L.cell, z: L.z0 + (j + 0.5) * L.cell };
-      const y = heightAt(here) + head;
-      if (!blockers.some((p) => nav.seesPoint(p.x, heightAt(p) + eye, p.z, here.x, y, here.z))) return here;
-      const go = (k: number): void => {
-        if (!seen.has(k) && (L.flags[k]! & Cell.Walkable) !== 0) {
-          seen.add(k);
-          next.push(k);
+      if (step === 0 || (i % k === 0 && j % k === 0)) {
+        const px = L.x0 + (i + 0.5) * L.cell;
+        const pz = L.z0 + (j + 0.5) * L.cell;
+        const ground = world.terrain.heightAt(px, pz);
+        if (hidden(px, ground + heads.crouch, pz)) return { x: px, z: pz, stance: 'crouch' };
+        if (!lying && hidden(px, ground + heads.prone, pz)) {
+          lying = { x: px, z: pz, stance: 'prone' };
+          lyingAt = step;
+        }
+      }
+      const go = (n: number): void => {
+        if (v.seen[n] !== v.now && (L.flags[n]! & Cell.Walkable) !== 0) {
+          v.seen[n] = v.now;
+          next.push(n);
         }
       };
       if (i + 1 < L.nx && (L.edges[c]! & Edge.East) !== 0) go(c + 1);
@@ -62,15 +109,16 @@ export function groundSpot(world: World, tuning: Tuning, x: number, z: number, t
     }
     frontier = next;
   }
-  return null;
+  return lying;
 }
 
 /** The listed perches near the bearing he believes it came from, or the believed point itself if there are none. */
-function perchesToward(world: World, tuning: Tuning, x: number, z: number, threatX: number, threatZ: number): Point[] {
+function perchesToward(world: World, tuning: Tuning, x: number, z: number, threatX: number, threatZ: number, wide: boolean): Point[] {
   const dx = threatX - x;
   const dz = threatZ - z;
   const len = Math.sqrt(dx * dx + dz * dz) || 1;
-  const cosLimit = dcos((tuning.brain.fight.drill.bearingDeg * Math.PI) / 180);
+  const D = tuning.brain.fight.drill;
+  const cosLimit = dcos(((wide ? D.wideDeg : D.bearingDeg) * Math.PI) / 180);
   const out: Point[] = [];
   for (const p of world.report.camp?.perches ?? []) {
     const px = p.x - x;

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { emptyRoute, emptySteering, followRoute, navigatorOf, routeLength, type Route } from '../src/sim/brain/nav';
 import { plainTuning } from '../src/lab/experiments/variety';
+import { campMission } from '../src/sim/generation';
 import { generateWorld } from '../src/sim/generation/world';
 import { player } from '../src/sim/game/entities';
 import { placePlayer } from '../src/sim/game/setup';
@@ -266,4 +267,28 @@ describe('walking a route', () => {
     hold(sim, 40, () => done[0]! && done[1]!);
     expect(done).toEqual([true, true]);
   });
+});
+
+describe('routes off the camp', () => {
+  it('reaches the ground that overlooks the camp from every post, and leaves by the side it is going to', () => {
+    const world = generateWorld(campMission('LEB-2534'), T);
+    const nav = navigatorOf(world, T);
+    const route = emptyRoute();
+    const perches = world.report.camp!.perches as ReadonlyArray<{ x: number; z: number }>;
+    let found = 0;
+    let tried = 0;
+    let worst = 0;
+    for (const g of world.camp.guards) {
+      if (g.elevated) continue;
+      for (const p of perches) {
+        tried++;
+        if (nav.find(g.x, g.z, p.x, p.z, {}, route) !== 'found') continue;
+        found++;
+        worst = Math.max(worst, routeLength(route, g.x, g.z) / Math.hypot(p.x - g.x, p.z - g.z));
+      }
+    }
+    expect(found / tried).toBeGreaterThan(0.95);
+    // Leaving by whichever edge is nearest, a route to the far side goes round the whole camp.
+    expect(worst).toBeLessThan(2);
+  }, 60_000);
 });

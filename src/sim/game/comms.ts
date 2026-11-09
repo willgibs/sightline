@@ -1,7 +1,8 @@
-import { REPORT_KINDS, alertRung, createBrain, createCamp, digest, fuseShots, mapMass, plan, spreadCamp, standStill, type CampMind, type CampOrder, type CampState, type Report, type Task, type Told, type Via } from '../brain';
+import { REPORT_KINDS, alertRung, createBrain, createCamp, digest, fuseShots, mapMass, navigatorOf, plan, spreadCamp, standStill, type CampMind, type CampOrder, type CampState, type Report, type Task, type Told, type Via } from '../brain';
 import type { DebugDraw } from '../kernel/debugDraw';
 import type { SimEvent } from '../kernel/events';
 import { createBody } from '../body';
+import { yawFromDirection } from '../kernel/core/math';
 import { air } from '../kernel/env';
 import { Faction, type EntityBase } from '../kernel/state';
 import type { ScheduleHandler, System, TickContext } from '../kernel/systems';
@@ -36,6 +37,8 @@ declare module '../kernel/state' {
 
 /** Puts a commander in a run: the camp's single memory (E4, E5). */
 export function giveCommander(sim: Simulation): CommanderEntity {
+  // Ahead of the first tick: the first man sent up a ridge mustn't be what makes a frame late.
+  navigatorOf(sim.world, sim.tuning).prepare();
   const site = sim.world.camp.site;
   const camp = createCamp(site.x, site.z, sim.tuning);
   for (const g of sim.guards) {
@@ -209,7 +212,11 @@ export const checkinDeadline: ScheduleHandler = (ctx, entry) => {
   const post = ctx.world.camp.guards[pending.post];
   if (!post) return;
   const silence = ctx.emit({ type: 'checkin', source: c.id, cause: entry.b, post: pending.post, stage: 'silence' });
-  c.camp.inbox.push({ kind: 'missing', x: post.x, y: post.y, z: post.z, radius: ctx.tuning.brain.comms.radius.missing, tick: ctx.tick, from: pending.guard, fromX: post.x, fromZ: post.z, cause: silence });
+  // A reinforcement has his own place: that's where someone goes to see.
+  const reserve = c.camp.roster.find((m) => m.id === pending.guard)?.reserve;
+  const x = reserve?.x ?? post.x;
+  const z = reserve?.z ?? post.z;
+  c.camp.inbox.push({ kind: 'missing', x, y: post.y, z, radius: ctx.tuning.brain.comms.radius.missing, tick: ctx.tick, from: pending.guard, fromX: x, fromZ: z, cause: silence });
 };
 
 const orders: CampOrder[] = [];
@@ -247,14 +254,14 @@ export function squadArrives(ctx: TickContext, c: CommanderEntity, x: number, z:
       const body = createBody(ctx.world, ctx.solids, ctx.tuning.bodies.guard, px, pz, faceX, faceZ);
       const senses = createSenses(false);
       const brain = createBrain();
-      return { id, kind: 'guard', faction: Faction.Camp, body, guard: { spawn: post >= 0 ? post : 0, headYaw: 0, order: standStill() }, senses, brain };
+      return { id, kind: 'guard', faction: Faction.Camp, body, guard: { spawn: post >= 0 ? post : 0, headYaw: 0, order: standStill(), reserve: { x: px, z: pz, yaw: yawFromDirection(faceX, faceZ) } }, senses, brain };
     });
   }
   const event = ctx.emit({ type: 'reinforce', source: c.id, cause, count: T.count, x, z });
   // They hunt: the camp's latest belief, by radio, as an order to go and search there.
   for (const g of ctx.index.of('guard')) {
     if (!g.brain || g.guard.order.tick !== 0 || g.brain.act !== 'routine' || c.camp.roster.some((m) => m.id === g.id)) continue;
-    c.camp.roster.push({ id: g.id, post: g.guard.spawn, x: g.body.x, z: g.body.z, tick: ctx.tick, status: 'ok' });
+    c.camp.roster.push({ id: g.id, post: g.guard.spawn, x: g.body.x, z: g.body.z, tick: ctx.tick, status: 'ok', ...(g.guard.reserve ? { reserve: { x: g.guard.reserve.x, z: g.guard.reserve.z } } : {}) });
     const target = c.camp.search ?? (c.camp.shots.estimate ? { x: c.camp.shots.estimate.x, z: c.camp.shots.estimate.z } : { x: site.x, z: site.z });
     g.brain.task = { id: c.camp.nextTask++, kind: 'search', x: target.x, z: target.z, issued: ctx.tick, cause: event };
   }

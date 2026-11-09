@@ -3,6 +3,7 @@ import { decide, keepRoutine, react, standStill, type ActChange, type GuardMind,
 import type { Percept } from '../perception';
 import type { World } from '../kernel/world/world';
 import { createBody, type BodyState } from '../body';
+import type { GuardSpawn } from '../generation';
 import type { GuardEntity } from './entities';
 import type { Solids } from '../kernel/world/solids';
 
@@ -22,6 +23,8 @@ export interface GuardState {
   headYaw: number;
   /** What his brain last ordered: carried out every tick until it orders something else. */
   order: Order;
+  /** A reinforcement's own place, where he got down from the truck (comms.ts): it's where he goes back to, instead of the post he's borrowed his role from. */
+  reserve?: { x: number; z: number; yaw: number };
 }
 
 /** A guard's starting state, from the camp's spawn at `index`: on his post, or on the deck of his tower. */
@@ -56,7 +59,7 @@ export function guardMind(g: GuardEntity, world: World, tuning: Tuning, tick: nu
   out.id = g.id;
   out.self = g.body;
   out.head = g.guard.headYaw;
-  out.post = world.camp.guards[g.guard.spawn]!;
+  out.post = g.guard.reserve ? reservePost(world.camp.guards[g.guard.spawn]!, g.guard.reserve) : world.camp.guards[g.guard.spawn]!;
   out.world = world;
   out.tuning = tuning;
   out.tick = tick;
@@ -72,6 +75,20 @@ export function guardMind(g: GuardEntity, world: World, tuning: Tuning, tick: nu
   out.escape = facts.escape;
   out.fights = facts.fights === true;
   return out;
+}
+
+/** Reserve places made into posts, by the place in his state. Only a saving: a restored run makes them again, the same. */
+const reserves = new WeakMap<object, GuardSpawn>();
+
+/** The post a reinforcement goes back to: the one he borrowed his role from, moved to his own place, holding it. */
+function reservePost(borrowed: GuardSpawn, at: { x: number; z: number; yaw: number }): GuardSpawn {
+  let post = reserves.get(at);
+  if (!post) {
+    const { routine } = borrowed;
+    post = { ...borrowed, x: at.x, z: at.z, route: null, routine: { ...routine, offset: undefined, legs: [{ kind: 'hold', t0: 0, t1: routine.period, x: at.x, z: at.z, yawFrom: at.yaw, yawTo: at.yaw }] } };
+    reserves.set(at, post);
+  }
+  return post;
 }
 
 /** A mind for guardMind to fill: every field is written on each use. */
