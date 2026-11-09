@@ -63,6 +63,14 @@ describe('with only the yard weighted', () => {
     expect(w.camp.layout!.type).toBe('yard');
     // The layout's two new fields aside, every generated field: colliders, guards, report.
     for (const key of ['type', 'loops', 'road']) delete (w.camp.layout as unknown as Record<string, unknown>)[key];
+    // Nor do the fields the second storey added, which a one-storey camp leaves empty.
+    for (const key of ['windows', 'storeys', 'stairs']) delete (w.camp as unknown as Record<string, unknown>)[key];
+    for (const key of ['storeys', 'stairs']) delete (w.grid as unknown as Record<string, unknown>)[key];
+    for (const b of w.camp.layout!.buildings as unknown as Array<Record<string, unknown>>) {
+      delete b.storeys;
+      delete b.floorY;
+      delete b.storey;
+    }
     expect(worldFingerprint(w)).toBe(BEFORE_TYPES);
   }, 120_000);
 });

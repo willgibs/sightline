@@ -14,6 +14,7 @@ import { naturalPeriod, nearestWalkable, patrolRoutine, pickScan, postRoutine, w
 import { dropDuty, seesDrop, trackOf, type GuardTrack } from './field';
 import { cellOf, centreOf, lineOfSight, lineOfSightStrict, type Raster } from './raster';
 import { overviewPerches, perchSeesDeck, type PerchViews } from './perches';
+import { Cell } from '../kernel/world/grid';
 import { contactRate, reachOf, sightRate } from './sight';
 import { routinePose, type Routine, type RoutinePose } from './routine';
 
@@ -353,14 +354,15 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
     })();
     const scan = { scanAmp: R.headScanDeg * DEG * 0.4, scanPeriod: scanEvery, scanPhase: 0 };
     const lookIn = lookAt(inside, across);
-    // A buried target stays indoors, at the spot the perches can't reach.
+    // A buried target stays indoors, at the spot the perches can't reach: upstairs, where his building has an upper floor.
     if (buried(crux)) {
       plan.stops = undefined;
       plan.legs = undefined;
       plan.loop = undefined;
       plan.perCycle = undefined;
       plan.options = undefined;
-      plan.post = { at: inside, look: lookIn, scan: 'glance' };
+      const up = hq.storey >= 0 ? upstairsSpot() : null;
+      plan.post = up ? { at: up.at, look: up.look, scan: 'glance', elevated: hq.floorY } : { at: inside, look: lookIn, scan: 'glance' };
       return;
     }
     // His walk out: to one of the other buildings; failing those, a few steps out of his own door.
@@ -418,6 +420,38 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
     plan.loop = undefined;
     plan.perCycle = undefined;
     plan.post = { at: inside, look: lookIn, scan: 'glance' };
+  }
+
+  /**
+   * His spot on the upper floor of his building: the floor cell the fewest perches can see
+   * him at through a window, then the farthest from the windows and from the head of the
+   * stairs, so getting at him means going up and finding him. He faces away from the stairs.
+   */
+  function upstairsSpot(): { at: Point2; look: number } | null {
+    const storey = grid.storeys[hq.storey];
+    if (!storey) return null;
+    const floor = storey.layer;
+    const head = (camp.stairs ?? []).find((st) => st.storey === hq.storey);
+    const chest = hq.floorY + gen.sight.chest;
+    const windows = (camp.windows ?? []).filter((w) => camp.layout!.buildings[w.building] === hq);
+    let best: { at: Point2; seen: number; apart: number } | null = null;
+    for (let j = 0; j < floor.nz; j += 2) {
+      for (let i = 0; i < floor.nx; i += 2) {
+        const c = j * floor.nx + i;
+        if ((floor.flags[c]! & Cell.Walkable) === 0) continue;
+        const x = floor.x0 + (i + 0.5) * floor.cell;
+        const z = floor.z0 + (j + 0.5) * floor.cell;
+        let seen = 0;
+        for (const p of perches.spots) if (perchSeesDeck(raster, hf, p, x, chest, z)) seen++;
+        let apart = Infinity;
+        for (const w of windows) apart = Math.min(apart, (w.x - x) * (w.x - x) + (w.z - z) * (w.z - z));
+        if (head) apart = Math.min(apart, (head.headX - x) * (head.headX - x) + (head.headZ - z) * (head.headZ - z));
+        if (!best || seen < best.seen || (seen === best.seen && apart > best.apart)) best = { at: { x, z }, seen, apart };
+      }
+    }
+    if (!best) return null;
+    const look = head ? lookAt(best.at, { x: 2 * best.at.x - head.headX, z: 2 * best.at.z - head.headZ }) : 0;
+    return { at: best.at, look };
   }
 
   // Each guard is placed in turn, posts first: on a routine that keeps him at least

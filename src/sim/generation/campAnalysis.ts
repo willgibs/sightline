@@ -104,7 +104,7 @@ export function analyzeCamp(
   search: (S: Space, E: Exposure, M: Meter, Q: Search) => Infiltration = infiltrate,
 ): { analysis: CampAnalysis; parts: AnalysisParts } {
   const A = gen.analysis;
-  const R = raster ?? buildRaster(camp, hf, colliders, grid.site, A.cell, A.margin);
+  const R = raster ?? buildRaster(camp, hf, colliders, grid.site, A.cell, A.margin, grid);
   const T = buildTimeline(camp, R, gen);
   const target = camp.objective?.target ?? -1;
   // Everyone's view but the target's (for the way out, once he's dead), and with his.
@@ -219,6 +219,13 @@ export function analyzeCamp(
           const m = centreOf(R, c);
           if ((m.x - p.x) * (m.x - p.x) + (m.z - p.z) * (m.z - p.z) <= radius * radius) set.add(c);
         }
+      }
+      // And any upper floor's cells: a target upstairs is reached from upstairs.
+      for (let e = 0; e < R.extra; e++) {
+        const c = R.na * R.nb + e;
+        if (!R.walk[c] || set.has(c)) continue;
+        const m = centreOf(R, c);
+        if ((m.x - p.x) * (m.x - p.x) + (m.z - p.z) * (m.z - p.z) <= radius * radius) set.add(c);
       }
     }
     return [...set].sort((a, b) => a - b); // unique: cell indices

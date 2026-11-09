@@ -48,16 +48,62 @@ export interface GridLayer {
   edges: Uint8Array;
 }
 
+/** A walkable storey above the ground: the floor of an upper level, as a small layer over its footprint. */
+export interface Storey {
+  layer: GridLayer;
+  /** The height of its floor. */
+  y: number;
+}
+
+/**
+ * A stair: from a cell of the site layer to a cell of a storey's layer (`storey` is its index in
+ * `storeys`, foot is a site cell, head is a storey cell), with the cost of the climb in
+ * COST_PER_METRE units. A stair is a walk edge between levels, so a flood or a path crosses it
+ * like any other move (search.ts).
+ */
+export interface Stair {
+  storey: number;
+  foot: number;
+  head: number;
+  cost: number;
+}
+
 export interface SpatialGrid {
   map: GridLayer;
   site: GridLayer;
+  /** Walkable floors above the ground, and the stairs joining them to it. Empty on a one-storey camp. */
+  storeys: Storey[];
+  stairs: Stair[];
+}
+
+/** What generation hands the grid: a floor's footprint and height. */
+export interface StoreySpec {
+  minX: number;
+  minZ: number;
+  maxX: number;
+  maxZ: number;
+  y: number;
+}
+
+/** A flight of stairs: where it starts and ends, and how far along it a body walks, metres. */
+export interface StairSpec {
+  storey: number;
+  footX: number;
+  footZ: number;
+  headX: number;
+  headZ: number;
+  length: number;
 }
 
 const sample = makeTerrainSample();
 const ids: number[] = [];
 
-/** Builds both layers. `site` is the area the fine layer covers: the camp and a margin. */
-export function buildGrid(terrain: Heightfield, colliders: ColliderSet, site: { minX: number; minZ: number; maxX: number; maxZ: number }, G: GenTuning): SpatialGrid {
+/**
+ * Builds both layers, and a layer for each storey. `site` is the area the fine layer covers:
+ * the camp and a margin. A storey's layer is laid on the site layer's cells, so the two line
+ * up cell for cell, and a stair joins the cell of its foot to the cell of its head.
+ */
+export function buildGrid(terrain: Heightfield, colliders: ColliderSet, site: { minX: number; minZ: number; maxX: number; maxZ: number }, G: GenTuning, storeys: readonly StoreySpec[] = [], stairs: readonly StairSpec[] = []): SpatialGrid {
   const map = layer(terrain.coord(0), terrain.coord(0), terrain.cell, terrain.cells, terrain.cells);
   const fine = G.grid.siteCell;
   const sx = Math.max(1, Math.ceil((site.maxX - site.minX) / fine));
@@ -65,7 +111,108 @@ export function buildGrid(terrain: Heightfield, colliders: ColliderSet, site: { 
   const siteLayer = layer(site.minX, site.minZ, fine, sx, sz);
   fill(map, terrain, colliders, G);
   fill(siteLayer, terrain, colliders, G);
-  return { map, site: siteLayer };
+  const built = storeys.map((s): Storey => {
+    // On the site layer's cell lines.
+    const x0 = site.minX + Math.floor((s.minX - site.minX) / fine) * fine;
+    const z0 = site.minZ + Math.floor((s.minZ - site.minZ) / fine) * fine;
+    const L = layer(x0, z0, fine, Math.max(1, Math.ceil((s.maxX - x0) / fine)), Math.max(1, Math.ceil((s.maxZ - z0) / fine)));
+    fillStorey(L, s.y, colliders, G);
+    return { layer: L, y: s.y };
+  });
+  const joined = stairs.flatMap((st): Stair[] => {
+    const up = built[st.storey];
+    if (!up) throw new Error(`A stair to storey ${st.storey}, and there are ${built.length}`);
+    const foot = nearestWalkableCell(siteLayer, st.footX, st.footZ);
+    const head = nearestWalkableCell(up.layer, st.headX, st.headZ);
+    return foot < 0 || head < 0 ? [] : [{ storey: st.storey, foot, head, cost: Math.ceil(st.length * 100) }];
+  });
+  return { map, site: siteLayer, storeys: built, stairs: joined };
+}
+
+/** The walkable cell of a layer nearest a point, within a metre and a half, or −1. */
+function nearestWalkableCell(L: GridLayer, x: number, z: number): number {
+  let best = -1;
+  let bestD = Infinity;
+  const reach = Math.ceil(1.5 / L.cell);
+  const ci = Math.floor((x - L.x0) / L.cell);
+  const cj = Math.floor((z - L.z0) / L.cell);
+  for (let j = cj - reach; j <= cj + reach; j++) {
+    for (let i = ci - reach; i <= ci + reach; i++) {
+      if (i < 0 || j < 0 || i >= L.nx || j >= L.nz) continue;
+      const k = j * L.nx + i;
+      if ((L.flags[k]! & Cell.Walkable) === 0) continue;
+      const dx = L.x0 + (i + 0.5) * L.cell - x;
+      const dz = L.z0 + (j + 0.5) * L.cell - z;
+      const d = dx * dx + dz * dz;
+      if (d < bestD) {
+        bestD = d;
+        best = k;
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * A storey's layer: a standing body fits on a floor at height y if something solid is under
+ * the cell's centre at that height and nothing is in the way up to the top of its head. Its
+ * walk edges are straight walks at that height. Otherwise as `fill`.
+ */
+function fillStorey(L: GridLayer, y: number, colliders: ColliderSet, G: GenTuning): void {
+  const B = G.grid;
+  for (let j = 0; j < L.nz; j++) {
+    for (let i = 0; i < L.nx; i++) {
+      const x = L.x0 + (i + 0.5) * L.cell;
+      const z = L.z0 + (j + 0.5) * L.cell;
+      let flags = 0;
+      let cover = 0;
+      let floored = false;
+      let blocked = false;
+      colliders.query(x - B.bodyRadius, z - B.bodyRadius, x + B.bodyRadius, z + B.bodyRadius, ids);
+      for (let q = 0; q < ids.length; q++) {
+        const c: Collider = colliders.list[ids[q]!]!;
+        const over = footprintContains(c, x, z, 0);
+        if (over && (c.flags & Blocks.Move) !== 0 && Math.abs(c.y1 - y) <= 0.06) floored = true;
+        if ((c.flags & Blocks.Move) !== 0 && c.y1 > y + B.stepHeight && c.y0 < y + B.bodyHeight && footprintContains(c, x, z, B.bodyRadius)) blocked = true;
+        if (!over) continue;
+        if ((c.flags & Blocks.Sound) !== 0 && c.y0 < y + 0.5 && c.y1 > y + 2) flags |= Cell.BlocksSound;
+        if (c.y0 >= y + 1.9) flags |= Cell.Roofed;
+        if ((c.flags & Blocks.Sight) !== 0 && c.y0 < y + 0.5 && c.y1 > y) cover = Math.max(cover, Math.min(255, Math.round((c.y1 - y) * 10)));
+      }
+      const k = j * L.nx + i;
+      L.flags[k] = floored && !blocked ? flags | Cell.Walkable : flags;
+      L.cover[k] = cover;
+    }
+  }
+  const step = Math.min(0.25, L.cell / 2);
+  const n = Math.ceil(L.cell / step);
+  for (let j = 0; j < L.nz; j++) {
+    for (let i = 0; i < L.nx; i++) {
+      const k = j * L.nx + i;
+      if ((L.flags[k]! & Cell.Walkable) === 0) continue;
+      const x = L.x0 + (i + 0.5) * L.cell;
+      const z = L.z0 + (j + 0.5) * L.cell;
+      colliders.query(x - B.bodyRadius, z - B.bodyRadius, x + L.cell + B.bodyRadius, z + L.cell + B.bodyRadius, ids);
+      let edges = 0;
+      if (i + 1 < L.nx && (L.flags[k + 1]! & Cell.Walkable) !== 0 && clearPathAt(colliders, y, x, z, L.cell, 0, n, B)) edges |= Edge.East;
+      if (j + 1 < L.nz && (L.flags[k + L.nx]! & Cell.Walkable) !== 0 && clearPathAt(colliders, y, x, z, 0, L.cell, n, B)) edges |= Edge.North;
+      L.edges[k] = edges;
+    }
+  }
+}
+
+/** As clearPath, at a fixed floor height. */
+function clearPathAt(colliders: ColliderSet, y: number, x: number, z: number, dx: number, dz: number, n: number, B: GenTuning['grid']): boolean {
+  if (ids.length === 0) return true;
+  for (let s = 1; s < n; s++) {
+    const px = x + (dx * s) / n;
+    const pz = z + (dz * s) / n;
+    for (let q = 0; q < ids.length; q++) {
+      const c = colliders.list[ids[q]!]!;
+      if ((c.flags & Blocks.Move) !== 0 && c.y1 > y + B.stepHeight && c.y0 < y + B.bodyHeight && footprintContains(c, px, pz, B.bodyRadius)) return false;
+    }
+  }
+  return true;
 }
 
 function layer(x0: number, z0: number, cell: number, nx: number, nz: number): GridLayer {
@@ -132,6 +279,15 @@ function clearPath(terrain: Heightfield, colliders: ColliderSet, x: number, z: n
     }
   }
   return true;
+}
+
+/** Which storey (index) a body with its feet at height y stands on at (x, z), or −1 for the ground. */
+export function storeyAt(grid: SpatialGrid, x: number, y: number, z: number): number {
+  for (let k = 0; k < grid.storeys.length; k++) {
+    const s = grid.storeys[k]!;
+    if (y >= s.y - 0.4 && cellIndex(s.layer, x, z) >= 0) return k;
+  }
+  return -1;
 }
 
 /** The cell index of (x, z) in a layer, or −1 outside it. */

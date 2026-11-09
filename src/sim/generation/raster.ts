@@ -1,5 +1,5 @@
 import { Blocks, type ColliderSet, type RayHit } from '../kernel/world/colliders';
-import { Cell, cellIndex, type GridLayer } from '../kernel/world/grid';
+import { Cell, cellIndex, type GridLayer, type Storey } from '../kernel/world/grid';
 import type { Heightfield } from '../kernel/world/heightfield';
 import type { Camp } from './camp';
 
@@ -14,9 +14,16 @@ import type { Camp } from './camp';
  * - `top`, the top of whatever stands on the ground there and stops sight (a wall, a
  *   container, a crate), or the ground if nothing does;
  * - an overhead slab that stops sight, `lo` to `hi` (a roof, a tower's deck, a lintel), or
- *   none (lo > hi): a line passes under a roof but not through it;
+ *   none (lo > hi): a line passes under a roof but not through it; and, on a camp with an
+ *   upper floor, a second one (`lo2`, `hi2`), so a body upstairs is between a floor and a
+ *   roof and a window is the gap between its sill and its head;
  * - whether a body can stand there, and cross to each side neighbour (from the spatial
  *   grid's site layer, which knows doorways to the half metre).
+ *
+ * Cells beyond the grid's na × nb are **extra cells**: the floors of upper storeys and the
+ * treads of the stairs up to them, each with its own floor height (`ground`) and its own
+ * links to other cells (`links`), so the searches and the exposure field (field.ts) reach
+ * the upper floor by the same maths.
  *
  * Doorways are carved open after the walls, with their lintels as slabs, so guards inside a
  * building see out of its doors and nothing else. The props outside are rasterized by their
@@ -40,9 +47,17 @@ export interface Raster {
   top: Float32Array;
   lo: Float32Array;
   hi: Float32Array;
+  /** A second overhead slab, above the first, on a camp with an upper floor. */
+  lo2: Float32Array;
+  hi2: Float32Array;
   walk: Uint8Array;
   /** Move bits to the side neighbours: 1 (+a), 2 (+b), 4 (−a), 8 (−b). */
   moves: Uint8Array;
+  /** Extra cells after na·nb (upper floors, stair treads): their count, world positions, and every cell's links to others. */
+  extra: number;
+  exX: Float32Array;
+  exZ: Float32Array;
+  links: Map<number, number[]> | null;
 }
 
 export const MOVE_BITS = [1, 2, 4, 8] as const;
@@ -53,15 +68,21 @@ export const MOVE_DIRS: ReadonlyArray<readonly [number, number]> = [
   [0, -1],
 ];
 
-/** Builds the raster over the camp and `margin` metres around its fence. */
-export function buildRaster(camp: Camp, hf: Heightfield, colliders: ColliderSet, layer: GridLayer, cell: number, margin: number): Raster {
+/**
+ * Builds the raster over the camp and `margin` metres around its fence. `levels` is the
+ * spatial grid's upper floors and stairs: on a camp with some, the raster gets their cells too.
+ */
+export function buildRaster(camp: Camp, hf: Heightfield, colliders: ColliderSet, layer: GridLayer, cell: number, margin: number, levels: { storeys: readonly Storey[] } = { storeys: [] }): Raster {
   const L = camp.layout!;
   const site = camp.site;
   const halfA = L.halfA + margin;
   const halfB = L.halfB + margin;
   const na = Math.ceil((2 * halfA) / cell);
   const nb = Math.ceil((2 * halfB) / cell);
-  const n = na * nb;
+  const grids = na * nb;
+  // Extra cells: an upper floor's cells and its flights' treads, listed up front.
+  const up = upperCells(camp, hf, levels, cell, -halfA, -halfB, L.ux, L.uz, L.vx, L.vz, site.x, site.z);
+  const n = grids + up.count;
   const R: Raster = {
     ox: site.x,
     oz: site.z,
@@ -78,9 +99,17 @@ export function buildRaster(camp: Camp, hf: Heightfield, colliders: ColliderSet,
     top: new Float32Array(n),
     lo: new Float32Array(n).fill(Infinity),
     hi: new Float32Array(n).fill(-Infinity),
+    lo2: new Float32Array(n).fill(Infinity),
+    hi2: new Float32Array(n).fill(-Infinity),
     walk: new Uint8Array(n),
     moves: new Uint8Array(n),
+    extra: up.count,
+    exX: new Float32Array(up.count),
+    exZ: new Float32Array(up.count),
+    links: null,
   };
+  // Two slabs only where something can stand between them: a one-storey camp keeps its one slab exactly.
+  const twoSlab = up.count > 0;
   for (let j = 0; j < nb; j++) {
     for (let i = 0; i < na; i++) {
       const p = worldOf(R, i + 0.5, j + 0.5);
@@ -107,6 +136,7 @@ export function buildRaster(camp: Camp, hf: Heightfield, colliders: ColliderSet,
       for (let i = i0; i <= i1; i++) {
         const k = j * na + i;
         if (!overhead && y0 <= R.ground[k]! + 0.5) R.top[k] = Math.max(R.top[k]!, y1);
+        else if (twoSlab) overheadSlab(R, k, y0, y1);
         else {
           R.lo[k] = Math.min(R.lo[k]!, y0);
           R.hi[k] = Math.max(R.hi[k]!, y1);
@@ -231,7 +261,212 @@ export function buildRaster(camp: Camp, hf: Heightfield, colliders: ColliderSet,
       }
     }
   }
+  if (up.count > 0) addUpperCells(R, up);
   return R;
+}
+
+/** An extra cell, as listed before the raster exists: where it is, how high its floor is, and its neighbours by index. */
+interface ExtraCell {
+  x: number;
+  z: number;
+  y: number;
+}
+
+interface UpperCells {
+  count: number;
+  cells: ExtraCell[];
+  /** Links between extra cells (indices into `cells`) and ground cells' links (as raster cells, by foot). */
+  pairs: Array<readonly [number, number]>;
+  /** Ground raster cells to join: [ground cell's world point, extra index]. */
+  joins: Array<{ x: number; z: number; extra: number }>;
+}
+
+/**
+ * Lists the cells of a camp's upper floors and the treads of its stairs, in the raster's
+ * frame: each upper floor's cells are the raster cells inside its building's footprint where
+ * the grid's storey layer says a body can stand; each flight is a chain of cells from the
+ * ground at its foot to the floor at its head, one per metre of run.
+ */
+function upperCells(camp: Camp, hf: Heightfield, levels: { storeys: readonly Storey[] }, cell: number, a0: number, b0: number, ux: number, uz: number, vx: number, vz: number, ox: number, oz: number): UpperCells {
+  const out: UpperCells = { count: 0, cells: [], pairs: [], joins: [] };
+  const L = camp.layout;
+  if (!L || levels.storeys.length === 0) return out;
+  const worldOfFrame = (a: number, b: number): { x: number; z: number } => ({ x: ox + ux * a + vx * b, z: oz + uz * a + vz * b });
+  const frameOfWorld = (x: number, z: number): { a: number; b: number } => ({ a: (x - ox) * ux + (z - oz) * uz, b: (x - ox) * vx + (z - oz) * vz });
+  const layerWalk = (layer: GridLayer, x: number, z: number): boolean => {
+    const c = cellIndex(layer, x, z);
+    return c >= 0 && (layer.flags[c]! & Cell.Walkable) !== 0;
+  };
+  for (const b of L.buildings) {
+    if (b.storey < 0) continue;
+    const storey = levels.storeys[b.storey]!;
+    const f = frameOfWorld(b.x, b.z);
+    const du = Math.abs(b.ux * ux + b.uz * uz);
+    const dv = Math.abs(b.ux * vx + b.uz * vz);
+    const ha = (du * b.length + dv * b.depth) / 2;
+    const hb = (dv * b.length + du * b.depth) / 2;
+    const index = new Map<number, number>();
+    const iMin = Math.floor((f.a - ha - a0) / cell);
+    const jMin = Math.floor((f.b - hb - b0) / cell);
+    const iMax = Math.floor((f.a + ha - a0) / cell);
+    const jMax = Math.floor((f.b + hb - b0) / cell);
+    const sub = [-0.25, 0.25];
+    for (let j = jMin; j <= jMax; j++) {
+      for (let i = iMin; i <= iMax; i++) {
+        const ca = a0 + (i + 0.5) * cell;
+        const cb = b0 + (j + 0.5) * cell;
+        if (Math.abs(ca - f.a) > ha || Math.abs(cb - f.b) > hb) continue;
+        let any = false;
+        for (const sa of sub) for (const sb of sub) if (!any) {
+          const p = worldOfFrame(ca + sa * cell, cb + sb * cell);
+          any = layerWalk(storey.layer, p.x, p.z);
+        }
+        if (!any) continue;
+        const p = worldOfFrame(ca, cb);
+        index.set(j * 100000 + i, out.cells.length);
+        out.cells.push({ x: p.x, z: p.z, y: storey.y });
+      }
+    }
+    // Links between floor cells that a body can walk between: three straight lines across
+    // the shared side, as the ground's moves are found (a cell is a body's width of floor).
+    for (const [key, e] of index) {
+      const j = Math.floor(key / 100000);
+      const i = key - j * 100000;
+      for (const [nj, ni] of [[j, i + 1], [j + 1, i]] as const) {
+        const other = index.get(nj * 100000 + ni);
+        if (other === undefined) continue;
+        const pa = out.cells[e]!;
+        const pb = out.cells[other]!;
+        const across = nj === j ? { x: vx, z: vz } : { x: ux, z: uz };
+        let clear = false;
+        for (const off of [0, -0.3, 0.3]) {
+          if (clear) break;
+          let ok = true;
+          const ox2 = across.x * off * cell;
+          const oz2 = across.z * off * cell;
+          for (let s = 0; s <= 4 && ok; s++) ok = layerWalk(storey.layer, pa.x + ox2 + ((pb.x - pa.x) * s) / 4, pa.z + oz2 + ((pb.z - pa.z) * s) / 4);
+          clear = ok;
+        }
+        if (clear) out.pairs.push([e, other]);
+      }
+    }
+    // Its flights: a chain of cells from the ground at the foot to the floor at the head.
+    for (const st of camp.stairs ?? []) {
+      if (st.storey !== b.storey) continue;
+      const len = Math.sqrt((st.headX - st.footX) * (st.headX - st.footX) + (st.headZ - st.footZ) * (st.headZ - st.footZ));
+      const count = Math.max(2, Math.ceil(len / cell));
+      const groundY = hf.heightAt(st.footX, st.footZ);
+      const chain: number[] = [];
+      for (let k = 0; k < count; k++) {
+        const t = (k + 1) / (count + 1);
+        chain.push(out.cells.length);
+        out.cells.push({ x: st.footX + (st.headX - st.footX) * t, z: st.footZ + (st.headZ - st.footZ) * t, y: groundY + (storey.y - groundY) * t });
+      }
+      out.joins.push({ x: st.footX, z: st.footZ, extra: chain[0]! });
+      for (let k = 0; k + 1 < count; k++) out.pairs.push([chain[k]!, chain[k + 1]!]);
+      // The head joins the floor cell nearest it.
+      let best = -1;
+      let bestD = Infinity;
+      for (const e of index.values()) {
+        const c = out.cells[e]!;
+        if (!layerWalk(storey.layer, c.x, c.z)) continue;
+        const d = (c.x - st.headX) * (c.x - st.headX) + (c.z - st.headZ) * (c.z - st.headZ);
+        if (d < bestD) {
+          bestD = d;
+          best = e;
+        }
+      }
+      if (best >= 0) out.pairs.push([chain[count - 1]!, best]);
+    }
+  }
+  out.count = out.cells.length;
+  return out;
+}
+
+function addUpperCells(R: Raster, up: UpperCells): void {
+  const grids = R.na * R.nb;
+  const links = new Map<number, number[]>();
+  const link = (a: number, b: number): void => {
+    let la = links.get(a);
+    if (!la) links.set(a, (la = []));
+    la.push(b);
+    let lb = links.get(b);
+    if (!lb) links.set(b, (lb = []));
+    lb.push(a);
+  };
+  up.cells.forEach((e, k) => {
+    const c = grids + k;
+    R.exX[k] = e.x;
+    R.exZ[k] = e.z;
+    R.ground[c] = e.y;
+    R.top[c] = e.y;
+    R.walk[c] = 1;
+  });
+  for (const [a, b] of up.pairs) link(grids + a, grids + b);
+  for (const j of up.joins) {
+    // The stair's foot, on the ground cell nearest it that a body can stand on.
+    const c = nearestWalkableCell(R, j.x, j.z, 3);
+    if (c >= 0) link(c, grids + j.extra);
+  }
+  R.links = links;
+}
+
+/**
+ * Puts one overhead piece in a cell, keeping up to two separate slabs: the lower in lo/hi,
+ * the upper in lo2/hi2. Pieces that touch merge, so a thick wall stays one slab and a floor
+ * under a roof stays two; more than two, and the upper two merge (that errs toward blocking).
+ */
+function overheadSlab(R: Raster, k: number, y0: number, y1: number): void {
+  const merge = (a0: number, a1: number): void => {
+    R.lo2[k] = Math.min(R.lo2[k]!, a0);
+    R.hi2[k] = Math.max(R.hi2[k]!, a1);
+  };
+  if (R.lo[k]! > R.hi[k]!) {
+    R.lo[k] = y0;
+    R.hi[k] = y1;
+    return;
+  }
+  // Touching or overlapping the lower slab: one slab.
+  if (y0 <= R.hi[k]! + 0.05 && y1 >= R.lo[k]! - 0.05) {
+    R.lo[k] = Math.min(R.lo[k]!, y0);
+    R.hi[k] = Math.max(R.hi[k]!, y1);
+    return;
+  }
+  if (y1 < R.lo[k]!) {
+    // Below the lower slab: it takes the lower place, and what was lower moves up.
+    merge(R.lo[k]!, R.hi[k]!);
+    R.lo[k] = y0;
+    R.hi[k] = y1;
+    return;
+  }
+  merge(y0, y1);
+}
+
+/** The ground cell nearest a point that a body can stand on and walk away from, within `radius` cells, or −1. */
+function nearestWalkableCell(R: Raster, x: number, z: number, radius: number): number {
+  const c = cellOf(R, x, z);
+  if (c < 0) return -1;
+  if (R.walk[c] && R.moves[c]! !== 0) return c;
+  const f = frameOf(R, x, z);
+  const ci = Math.floor((f.a - R.a0) / R.cell);
+  const cj = Math.floor((f.b - R.b0) / R.cell);
+  let best = -1;
+  let bestD = Infinity;
+  for (let j = cj - radius; j <= cj + radius; j++) {
+    for (let i = ci - radius; i <= ci + radius; i++) {
+      if (i < 0 || j < 0 || i >= R.na || j >= R.nb) continue;
+      const k = j * R.na + i;
+      if (!R.walk[k] || R.moves[k] === 0) continue;
+      const ca = R.a0 + (i + 0.5) * R.cell - f.a;
+      const cb = R.b0 + (j + 0.5) * R.cell - f.b;
+      const d = ca * ca + cb * cb;
+      if (d < bestD) {
+        bestD = d;
+        best = k;
+      }
+    }
+  }
+  return best;
 }
 
 /** The world point at fractional cell coordinates (i, j). */
@@ -258,6 +493,10 @@ export function cellOf(R: Raster, x: number, z: number): number {
 
 /** The middle of a cell, in the world, at its ground. */
 export function centreOf(R: Raster, k: number): { x: number; y: number; z: number } {
+  if (k >= R.na * R.nb) {
+    const e = k - R.na * R.nb;
+    return { x: R.exX[e]!, y: R.ground[k]!, z: R.exZ[e]! };
+  }
   const i = k % R.na;
   const j = (k - i) / R.na;
   const p = worldOf(R, i + 0.5, j + 0.5);
@@ -285,7 +524,7 @@ export function lineOfSightStrict(R: Raster, ex: number, ey: number, ez: number,
   const blocked = (i: number, j: number, y: number): boolean => {
     if (i < 0 || j < 0 || i >= R.na || j >= R.nb) return false;
     const k = j * R.na + i;
-    return y < R.top[k]! || (y >= R.lo[k]! && y <= R.hi[k]!);
+    return y < R.top[k]! || (y >= R.lo[k]! && y <= R.hi[k]!) || (y >= R.lo2[k]! && y <= R.hi2[k]!);
   };
   let pi = -1;
   let pj = -1;
@@ -347,7 +586,7 @@ export function lineOfSight(R: Raster, ex: number, ey: number, ez: number, tx: n
     if (i < 0 || j < 0 || i >= R.na || j >= R.nb) continue;
     const k = j * R.na + i;
     const y = ey + (ty - ey) * f;
-    if (y < R.top[k]! || (y >= R.lo[k]! && y <= R.hi[k]!)) return false;
+    if (y < R.top[k]! || (y >= R.lo[k]! && y <= R.hi[k]!) || (y >= R.lo2[k]! && y <= R.hi2[k]!)) return false;
   }
   return true;
 }

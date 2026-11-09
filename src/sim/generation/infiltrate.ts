@@ -28,6 +28,13 @@ export interface Space {
   nb: number;
   walk: Uint8Array;
   moves: Uint8Array;
+  /** Moves besides the grid's: to and from cells after na·nb (an upper floor, a stair), and any extra links of a grid cell. */
+  links?: ReadonlyMap<number, readonly number[]> | null;
+}
+
+/** All the cells of a space: its grid and any upper floor's beyond it. */
+function cellCount(S: Space): number {
+  return S.walk.length;
 }
 
 export interface Exposure {
@@ -89,14 +96,18 @@ const OUTSIDE = -1;
 /** Moves and waits from a cell, in a fixed order: the four sides, then staying put. */
 function neighbours(S: Space, c: number, out: number[]): number[] {
   out.length = 0;
-  const i = c % S.na;
-  const j = (c - i) / S.na;
-  const m = S.moves[c]!;
-  for (let d = 0; d < 4; d++) {
-    if ((m & MOVE_BITS[d]!) === 0) continue;
-    const [di, dj] = MOVE_DIRS[d]!;
-    out.push((j + dj) * S.na + (i + di));
+  if (c < S.na * S.nb) {
+    const i = c % S.na;
+    const j = (c - i) / S.na;
+    const m = S.moves[c]!;
+    for (let d = 0; d < 4; d++) {
+      if ((m & MOVE_BITS[d]!) === 0) continue;
+      const [di, dj] = MOVE_DIRS[d]!;
+      out.push((j + dj) * S.na + (i + di));
+    }
   }
+  const more = S.links?.get(c);
+  if (more) out.push(...more);
   out.push(c);
   return out;
 }
@@ -116,7 +127,7 @@ export function rimCells(S: Space): number[] {
 
 /** Steps from every cell to the nearest of `goals`, over the moves (−1 where none). */
 export function stepsTo(S: Space, goals: readonly number[]): Int32Array {
-  const n = S.na * S.nb;
+  const n = cellCount(S);
   const dist = new Int32Array(n).fill(-1);
   const queue = new Int32Array(n);
   let head = 0;
@@ -149,7 +160,7 @@ function nextMeter(m: number, rate: number, M: Meter, stayed = false): number {
  * safe intervals, and tests hold both to the brute-force answer.
  */
 export function spaceTimeSearch(S: Space, E: Exposure, M: Meter, Q: Search): Infiltration {
-  const cells = S.na * S.nb;
+  const cells = cellCount(S);
   const h = stepsTo(S, Q.goalCells);
   const rim = Q.from ? [] : rimCells(S).filter((c) => h[c]! >= 0);
   const rimH = rim.length > 0 ? Math.min(...rim.map((c) => h[c]!)) : Infinity;
@@ -233,7 +244,7 @@ export function spaceTimeSearch(S: Space, E: Exposure, M: Meter, Q: Search): Inf
  * which tests check, while expanding far fewer states when the way in means waiting.
  */
 export function infiltrate(S: Space, E: Exposure, M: Meter, Q: Search): Infiltration {
-  const cells = S.na * S.nb;
+  const cells = cellCount(S);
   const H = Q.horizon;
   const h = stepsTo(S, Q.goalCells);
   const rim = Q.from ? [] : rimCells(S).filter((c) => h[c]! >= 0);
@@ -553,7 +564,7 @@ class LabelHeap {
  * exact; the search must agree with it.
  */
 export function bruteForce(S: Space, E: Exposure, M: Meter, Q: Search): { found: boolean; time: number } {
-  const cells = S.na * S.nb;
+  const cells = cellCount(S);
   const NONE = 255;
   let now = new Uint8Array(cells).fill(NONE);
   let next = new Uint8Array(cells);

@@ -1,11 +1,13 @@
 import type { WorkCounts } from '../work';
-import { Edge, type GridLayer } from './grid';
+import { Edge, type GridLayer, type Stair, type Storey } from './grid';
 
 /**
- * Search over a layer of the spatial grid (grid.ts), the map layer or the site layer: one
- * answer for lab A's hearing (a bounded flood from each sound), lab D's analysis (who can
- * reach what) and lab E's navigation (A* between two cells). Generation and the
- * simulation use the same code.
+ * Search over a layer of the spatial grid (grid.ts), the map layer or the site layer, and
+ * the storeys above it, joined by stairs: one answer for lab A's hearing (a bounded flood
+ * from each sound), lab D's analysis (who can reach what) and lab E's navigation (A* between
+ * two cells). Generation and the simulation use the same code. With storeys the cells are
+ * one index space: the base layer's first, then each storey's, so a stair is a move like any
+ * other. With none it is the base layer alone, bit for bit.
  *
  * Every search is exact and the same in every engine:
  * - Costs are whole numbers, in COST_PER_METRE units, so no rounding ever reorders a queue.
@@ -85,18 +87,77 @@ export class GridSearch {
   /** The length cost of a move to a side and to a corner, in COST_PER_METRE units. */
   readonly side: number;
   readonly corner: number;
+  /** The storeys above the base layer, and the first index of each one's cells. */
+  readonly levels: ReadonlyArray<{ layer: GridLayer; base: number }>;
+  private readonly ground: { layer: GridLayer; base: number };
+  /** Moves between levels: the stairs, both ways, by the cell they leave. */
+  private readonly links: ReadonlyMap<number, ReadonlyArray<{ to: number; cost: number }>> | null;
   private readonly closed: Uint8Array;
   private readonly buckets = new BucketQueue();
   private readonly heap = new MinHeap();
   private readonly touched: number[] = [];
+  /** The grid-wide (i, j) of the last cell `place` was given. */
+  private pi = 0;
+  private pj = 0;
 
-  constructor(readonly layer: GridLayer) {
-    const n = layer.nx * layer.nz;
+  constructor(readonly layer: GridLayer, storeys: readonly Storey[] = [], stairs: readonly Stair[] = []) {
+    const n0 = layer.nx * layer.nz;
+    let n = n0;
+    this.levels = storeys.map((s) => {
+      const base = n;
+      n += s.layer.nx * s.layer.nz;
+      return { layer: s.layer, base };
+    });
     this.cost = new Int32Array(n).fill(NOT_REACHED);
     this.parent = new Int32Array(n).fill(NOT_REACHED);
     this.closed = new Uint8Array(n);
     this.side = Math.round(layer.cell * COST_PER_METRE);
     this.corner = Math.round(layer.cell * COST_PER_METRE * Math.SQRT2);
+    this.ground = { layer, base: 0 };
+    if (stairs.length === 0) {
+      this.links = null;
+    } else {
+      const links = new Map<number, Array<{ to: number; cost: number }>>();
+      const add = (a: number, b: number, cost: number): void => {
+        const out = links.get(a);
+        if (out) out.push({ to: b, cost });
+        else links.set(a, [{ to: b, cost }]);
+      };
+      for (const st of stairs) {
+        const head = this.levels[st.storey]!.base + st.head;
+        add(st.foot, head, st.cost);
+        add(head, st.foot, st.cost);
+      }
+      this.links = links;
+    }
+  }
+
+  /** The grid-wide cell (the storey layers line up with the base layer's cells) of a cell index, as (i, j). */
+  private place(c: number): void {
+    const L = this.layer;
+    if (c < L.nx * L.nz) {
+      this.pi = c % L.nx;
+      this.pj = (c - this.pi) / L.nx;
+      return;
+    }
+    for (const lv of this.levels) {
+      const m = lv.layer.nx * lv.layer.nz;
+      if (c < lv.base + m) {
+        const local = c - lv.base;
+        const i = local % lv.layer.nx;
+        this.pi = i + Math.round((lv.layer.x0 - L.x0) / L.cell);
+        this.pj = (local - i) / lv.layer.nx + Math.round((lv.layer.z0 - L.z0) / L.cell);
+        return;
+      }
+    }
+    throw new Error(`No cell ${c} in this search`);
+  }
+
+  /** The layer a cell index belongs to, and the first index of its cells. */
+  levelOf(c: number): { layer: GridLayer; base: number } {
+    if (c < this.layer.nx * this.layer.nz) return this.ground;
+    for (const lv of this.levels) if (c < lv.base + lv.layer.nx * lv.layer.nz) return lv;
+    throw new Error(`No cell ${c} in this search`);
   }
 
   /** The cell index of (i, j). */
@@ -195,9 +256,20 @@ export class GridSearch {
 
   /** The cheapest cost of a path from `a` to `b` on an open layer: what A* aims by. */
   estimate(a: number, b: number, corners = true): number {
-    const nx = this.layer.nx;
-    const di = Math.abs((a % nx) - (b % nx));
-    const dj = Math.abs(Math.floor(a / nx) - Math.floor(b / nx));
+    let di: number;
+    let dj: number;
+    if (this.levels.length === 0) {
+      const nx = this.layer.nx;
+      di = Math.abs((a % nx) - (b % nx));
+      dj = Math.abs(Math.floor(a / nx) - Math.floor(b / nx));
+    } else {
+      this.place(a);
+      const ai = this.pi;
+      const aj = this.pj;
+      this.place(b);
+      di = Math.abs(ai - this.pi);
+      dj = Math.abs(aj - this.pj);
+    }
     if (!corners) return (di + dj) * this.side;
     const lo = Math.min(di, dj);
     return (di + dj - 2 * lo) * this.side + lo * this.corner;
@@ -205,10 +277,17 @@ export class GridSearch {
 
   /** Calls `relax` for every open move out of `c`, in NEIGHBOURS order, with its cost. */
   private visit(c: number, opts: SearchOptions, relax: (to: number, cost: number) => void): void {
-    const L = this.layer;
+    let L = this.layer;
+    let base = 0;
+    if (c >= L.nx * L.nz) {
+      const lv = this.levelOf(c);
+      L = lv.layer;
+      base = lv.base;
+    }
     const nx = L.nx;
-    const i = c % nx;
-    const j = (c - i) / nx;
+    const local = c - base;
+    const i = local % nx;
+    const j = (local - i) / nx;
     const count = (opts.neighbours ?? 8) === 8 ? 8 : 4;
     const price = opts.cost;
     for (let k = 0; k < count; k++) {
@@ -216,20 +295,28 @@ export class GridSearch {
       const ti = i + di;
       const tj = j + dj;
       if (ti < 0 || tj < 0 || ti >= nx || tj >= L.nz) continue;
-      const to = tj * nx + ti;
+      const to = base + tj * nx + ti;
       const corner = di !== 0 && dj !== 0;
-      if (corner ? !this.cornerOpen(i, j, di, dj) : !this.sideOpen(i, j, di, dj)) continue;
+      if (corner ? !this.cornerOpen(L, i, j, di, dj) : !this.sideOpen(L, i, j, di, dj)) continue;
       const length = corner ? this.corner : this.side;
       const cost = price ? price(c, to, length) : length;
       if (cost === -1) continue;
       if (!Number.isInteger(cost) || cost < 0) throw new Error(`A grid move costs ${cost}: costs are whole numbers, or −1 for no move`);
       relax(to, cost);
     }
+    // The stairs out of this cell, if any: a move between levels.
+    const out = this.links?.get(c);
+    if (out) {
+      for (const link of out) {
+        const cost = price ? price(c, link.to, link.cost) : link.cost;
+        if (cost === -1) continue;
+        relax(link.to, cost);
+      }
+    }
   }
 
-  /** The walk edge between (i, j) and its side neighbour (i + di, j + dj). */
-  private sideOpen(i: number, j: number, di: number, dj: number): boolean {
-    const L = this.layer;
+  /** The walk edge between (i, j) and its side neighbour (i + di, j + dj), on layer L. */
+  private sideOpen(L: GridLayer, i: number, j: number, di: number, dj: number): boolean {
     if (di === 1) return (L.edges[j * L.nx + i]! & Edge.East) !== 0;
     if (di === -1) return (L.edges[j * L.nx + i - 1]! & Edge.East) !== 0;
     if (dj === 1) return (L.edges[j * L.nx + i]! & Edge.North) !== 0;
@@ -237,8 +324,8 @@ export class GridSearch {
   }
 
   /** A diagonal is open only if both two-step paths around it are. */
-  private cornerOpen(i: number, j: number, di: number, dj: number): boolean {
-    return this.sideOpen(i, j, di, 0) && this.sideOpen(i + di, j, 0, dj) && this.sideOpen(i, j, 0, dj) && this.sideOpen(i, j + dj, di, 0);
+  private cornerOpen(L: GridLayer, i: number, j: number, di: number, dj: number): boolean {
+    return this.sideOpen(L, i, j, di, 0) && this.sideOpen(L, i + di, j, 0, dj) && this.sideOpen(L, i, j, 0, dj) && this.sideOpen(L, i, j + dj, di, 0);
   }
 
   private reach(c: number, cost: number, from: number): void {
@@ -258,7 +345,7 @@ export class GridSearch {
   }
 
   private check(c: number): void {
-    if (!Number.isInteger(c) || c < 0 || c >= this.cost.length) throw new Error(`No cell ${c} in a ${this.layer.nx} × ${this.layer.nz} layer`);
+    if (!Number.isInteger(c) || c < 0 || c >= this.cost.length) throw new Error(`No cell ${c} in this search of ${this.cost.length} cells`);
   }
 }
 

@@ -627,7 +627,7 @@ function lookAround(m: GuardMind, out: Order): void {
 }
 
 /** Walks toward a goal by the navigator, then says whether he's there. */
-function walk(m: GuardMind, out: Order, x: number, z: number, pace: number, gait: Gait, lookX: number, lookZ: number): 'walking' | 'arrived' | 'stuck' {
+function walk(m: GuardMind, out: Order, x: number, z: number, pace: number, gait: Gait, lookX: number, lookZ: number, goalY?: number): 'walking' | 'arrived' | 'stuck' {
   const b = m.brain!;
   const T = m.tuning.brain;
   const hz = m.tuning.sim.tickHz;
@@ -639,7 +639,7 @@ function walk(m: GuardMind, out: Order, x: number, z: number, pace: number, gait
       return 'walking';
     }
     m.nav.searches.left--;
-    const r = navigatorOf(m.world, m.tuning).find(m.self.x, m.self.z, x, z, { work: m.nav.work }, b.route);
+    const r = navigatorOf(m.world, m.tuning).find(m.self.x, m.self.z, x, z, { work: m.nav.work }, b.route, m.self.y, goalY);
     b.routed = m.tick;
     b.routeOk = r === 'found';
     b.goalX = x;
@@ -1079,7 +1079,10 @@ function performInvestigate(m: GuardMind, out: Order): void {
     b.x = focus.x;
     b.z = focus.z;
   }
-  const w = walk(m, out, b.x, b.z, T.paces.investigate, 'walk', b.x, b.z);
+  // Where it was has a height: a sound or a sighting upstairs is gone up to.
+  const a = m.awareness;
+  const goalY = a.state === 'combat' && m.belief ? m.belief.y : a.focus ? a.fy : m.belief ? m.belief.y : undefined;
+  const w = walk(m, out, b.x, b.z, T.paces.investigate, 'walk', b.x, b.z, goalY);
   if (w === 'arrived') {
     b.linger = m.tick + Math.round(T.linger.investigate * hz);
     lookAround(m, out);

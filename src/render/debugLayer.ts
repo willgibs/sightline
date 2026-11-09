@@ -599,6 +599,34 @@ function buildGridPoints(world: World): THREE.Points {
       col.push(c.r, c.g, c.b);
     }
   }
+  // An upper floor's cells, at its height, and each stair as a line of points from foot to head.
+  const walked = new THREE.Color(palette.debug.gridRoof);
+  for (const st of world.grid.storeys) {
+    const U = st.layer;
+    for (let j = 0; j < U.nz; j++) {
+      for (let i = 0; i < U.nx; i++) {
+        const f = U.flags[j * U.nx + i]!;
+        const c = (f & Cell.Walkable) === 0 ? null : f & Cell.BlocksSound ? sound : walked;
+        if (!c) continue;
+        pos.push(U.x0 + (i + 0.5) * U.cell, st.y + 0.15, U.z0 + (j + 0.5) * U.cell);
+        col.push(c.r, c.g, c.b);
+      }
+    }
+  }
+  for (const st of world.grid.stairs) {
+    const U = world.grid.storeys[st.storey]!.layer;
+    const fx = L.x0 + ((st.foot % L.nx) + 0.5) * L.cell;
+    const fz = L.z0 + (Math.floor(st.foot / L.nx) + 0.5) * L.cell;
+    const hx = U.x0 + ((st.head % U.nx) + 0.5) * U.cell;
+    const hz = U.z0 + (Math.floor(st.head / U.nx) + 0.5) * U.cell;
+    for (let k = 0; k <= 12; k++) {
+      const t = k / 12;
+      const x = fx + (hx - fx) * t;
+      const z = fz + (hz - fz) * t;
+      pos.push(x, world.terrain.heightAt(fx, fz) + t * (world.grid.storeys[st.storey]!.y - world.terrain.heightAt(fx, fz)) + 0.15, z);
+      col.push(sound.r, sound.g, sound.b);
+    }
+  }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));

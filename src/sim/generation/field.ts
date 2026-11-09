@@ -3,7 +3,7 @@ import { DEG, dcos, dsin, datan2 } from '../kernel/core/detmath';
 import type { Camp } from './camp';
 import { lineOfSight, type Raster } from './raster';
 import { routinePose, type Routine, type RoutinePose } from './routine';
-import { coneRamp, contactRate, fillSeconds, rangeRamp, reachOf } from './sight';
+import { coneRamp, contactRate, fillSeconds, rangeRamp, reachOf, sightRate } from './sight';
 
 /**
  * One cycle of the camp, as lab D's analysis sees it (D7). Every routine divides the
@@ -129,7 +129,8 @@ export interface Field {
 export function exposureField(R: Raster, T: Timeline, gen: GenTuning, only?: (guard: number) => boolean): Field {
   const S = gen.sight;
   const A = gen.analysis;
-  const cells = R.na * R.nb;
+  const grids = R.na * R.nb;
+  const cells = R.walk.length; // the grid's cells and any upper floor's
   const K = T.samples;
   const rate = new Uint8Array(K * cells);
   const sum = new Float32Array(cells);
@@ -278,6 +279,34 @@ export function exposureField(R: Raster, T: Timeline, gen: GenTuning, only?: (gu
       }
       seen.length = 0;
     }
+    // An intruder on an upper floor or on the stairs: there are few such cells, so each guard's
+    // line to his head and chest, rather than the sweep; his cones and contact by the same law.
+    if (R.extra > 0) {
+      for (let gi = 0; gi < T.guards.length; gi++) {
+        if (only && !only(gi)) continue;
+        const g = T.guards[gi]!;
+        for (let e = 0; e < R.extra; e++) {
+          const c = grids + e;
+          if (!R.walk[c]) continue;
+          const dx = R.exX[e]! - g.x[k]!;
+          const dz = R.exZ[e]! - g.z[k]!;
+          const d = Math.sqrt(dx * dx + dz * dz);
+          if (d < 1e-6 || d > (g.far ? farReach : coreReach)) continue;
+          const cos = ((dx * R.ux + dz * R.uz) * g.ga[k]! + (dx * R.vx + dz * R.vz) * g.gb[k]!) / d;
+          const off = datan2(Math.sqrt(Math.max(0, 1 - cos * cos)), cos) / DEG;
+          if (sightRate(d, off, 1, g.far, S) <= 0 && contactRate(d, 1, S) <= 0) continue;
+          const floor = R.ground[c]!;
+          let share = 0;
+          if (lineOfSight(R, g.x[k]!, g.eye[k]!, g.z[k]!, R.exX[e]!, floor + S.crouchHead, R.exZ[e]!)) share += 0.5;
+          if (lineOfSight(R, g.x[k]!, g.eye[k]!, g.z[k]!, R.exX[e]!, floor + S.crouchChest, R.exZ[e]!)) share += 0.5;
+          if (share <= 0) continue;
+          const r = Math.max(sightRate(d, off, share, g.far, S), contactRate(d, share, S));
+          if (r <= 0) continue;
+          if (sum[c] === 0) touched.push(c);
+          sum[c] = sum[c]! + r * perLevel;
+        }
+      }
+    }
     for (const c of touched) {
       rate[c * K + k] = Math.min(255, Math.ceil(sum[c]! - 1e-9));
       sum[c] = 0;
@@ -322,7 +351,7 @@ class ViewMarcher {
 
   /** One ray; returns how many cells it recorded in rayCells, rayHalves and rayDists. */
   march(ea: number, eb: number, eye: number, ca: number, cb: number, range: number): number {
-    const { na, nb, cell, a0, b0, walk, ground, top, lo, hi } = this.R;
+    const { na, nb, cell, a0, b0, walk, ground, top, lo, hi, lo2, hi2 } = this.R;
     const reachUp = this.groundMax + this.head - eye;
     let horizon = -Infinity;
     let slabs = 0;
@@ -357,6 +386,12 @@ class ViewMarcher {
         this.slabD[slabs] = d;
         this.slabLo[slabs] = lo[c]!;
         this.slabHi[slabs] = hi[c]!;
+        slabs++;
+      }
+      if (lo2[c]! <= hi2[c]! && slabs < 1024) {
+        this.slabD[slabs] = d;
+        this.slabLo[slabs] = lo2[c]!;
+        this.slabHi[slabs] = hi2[c]!;
         slabs++;
       }
     }

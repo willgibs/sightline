@@ -140,7 +140,8 @@ export function perchViewshed(R: Raster, hf: Heightfield, p: PerchSpot): Float32
         last = c;
         const vis = p.eye + horizon * d;
         if (vis < minVis[c]!) minVis[c] = vis;
-        const block = R.lo[c]! <= R.hi[c]! ? Math.max(R.top[c]!, R.hi[c]!) : R.top[c]!;
+        let block = R.lo[c]! <= R.hi[c]! ? Math.max(R.top[c]!, R.hi[c]!) : R.top[c]!;
+        if (R.lo2[c]! <= R.hi2[c]!) block = Math.max(block, R.hi2[c]!);
         horizon = Math.max(horizon, (block - p.eye) / d);
       }
       d += R.cell * 0.5;

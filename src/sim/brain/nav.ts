@@ -1,7 +1,7 @@
 import type { Tuning } from '../../config/tuning';
 import { datan2 } from '../kernel/core/detmath';
 import { Blocks, footprintContains, type Collider } from '../kernel/world/colliders';
-import { Cell, cellIndex, type GridLayer } from '../kernel/world/grid';
+import { Cell, cellIndex, storeyAt, type GridLayer } from '../kernel/world/grid';
 import { sightLine, type QueryView } from '../kernel/world/query';
 import { Solids } from '../kernel/world/solids';
 import { COST_PER_METRE, GridSearch, type MoveCost, type SearchOptions } from '../kernel/world/search';
@@ -82,7 +82,7 @@ export class Navigator {
     private readonly world: World,
     private tuning: Tuning,
   ) {
-    this.site = new GridSearch(world.grid.site);
+    this.site = new GridSearch(world.grid.site, world.grid.storeys, world.grid.stairs);
     this.map = new GridSearch(world.grid.map);
     this.view = { world, solids: new Solids(world.colliders), bodies: [] };
   }
@@ -94,14 +94,21 @@ export class Navigator {
   /**
    * Finds a route for a body at (ax, az) to (bx, bz), written to `out`. With `route`
    * possibly left empty: 'no-route' or 'out-of-budget' write nothing but an empty route.
+   * `ay` and `by` are the heights of the ends' feet where one may be on an upper floor: a
+   * body upstairs, or a goal upstairs. A route is still points in the plane: walking toward
+   * the head of a flight is what takes a body up it.
    */
-  find(ax: number, az: number, bx: number, bz: number, opts: FindOptions, out: Route): RouteResult {
+  find(ax: number, az: number, bx: number, bz: number, opts: FindOptions, out: Route, ay?: number, by?: number): RouteResult {
     out.points.length = 0;
     out.next = 0;
     out.best = FAR;
     out.progressTick = 0;
     out.sideUntil = -1;
     out.stalls = 0;
+    // An end on an upper floor: the levels' own search.
+    const aLevel = ay === undefined ? -1 : storeyAt(this.world.grid, ax, ay, az);
+    const bLevel = by === undefined ? -1 : storeyAt(this.world.grid, bx, by, bz);
+    if (aLevel >= 0 || bLevel >= 0) return this.findLevels(ax, az, aLevel, bx, bz, bLevel, opts, out);
     const N = this.tuning.brain.nav;
     const raw = this.raw;
     raw.length = 0;
@@ -127,6 +134,134 @@ export class Navigator {
     if (r !== 'found') return r;
     this.stitch(ax, az, bx, bz, inA, inB, opts);
     return this.finish(ax, az, bx, bz, out);
+  }
+
+  /**
+   * A route with an end on an upper floor: the one search over the site layer and its
+   * storeys, crossing the stairs, pulled taut within each level and never across a stair.
+   * With its far end beyond the site, it goes by way of the stairs' foot, and the rest of
+   * the way as any route on the ground.
+   */
+  private findLevels(ax: number, az: number, aLevel: number, bx: number, bz: number, bLevel: number, opts: FindOptions, out: Route): RouteResult {
+    const grid = this.world.grid;
+    const site = grid.site;
+    const beyondA = cellIndex(site, ax, az) < 0;
+    const beyondB = cellIndex(site, bx, bz) < 0;
+    if (beyondA || beyondB) {
+      const level = aLevel >= 0 ? aLevel : bLevel;
+      const stair = grid.stairs.find((st) => st.storey === level);
+      if (!stair) return 'no-route';
+      const footX = cellX(site, stair.foot);
+      const footZ = cellZ(site, stair.foot);
+      const inner = emptyRoute();
+      const outer = emptyRoute();
+      if (beyondB) {
+        const r = this.findLevels(ax, az, aLevel, footX, footZ, -1, opts, inner);
+        if (r !== 'found') return r;
+        const t = this.find(footX, footZ, bx, bz, opts, outer);
+        if (t !== 'found') return t;
+      } else {
+        const r = this.find(ax, az, footX, footZ, opts, outer);
+        if (r !== 'found') return r;
+        const t = this.findLevels(footX, footZ, -1, bx, bz, bLevel, opts, inner);
+        if (t !== 'found') return t;
+      }
+      const first = beyondB ? inner : outer;
+      const second = beyondB ? outer : inner;
+      out.points.push(...first.points, ...second.points);
+      return 'found';
+    }
+    const start = this.cellOn(aLevel, ax, az);
+    const goal = this.cellOn(bLevel, bx, bz);
+    if (start < 0 || goal < 0) return 'no-route';
+    const N = this.tuning.brain.nav;
+    const r = this.site.path(start, goal, { maxExpansions: N.siteExpansions, work: opts.work, cost: this.siteCost(opts.cost) }, this.siteCells);
+    if (!r.found) return r.exhausted ? 'out-of-budget' : 'no-route';
+    this.pullLevels(ax, az, bx, bz, out);
+    return 'found';
+  }
+
+  /** A cost function for the site search: one written for the site's cells prices only moves on the ground. */
+  private siteCost(cost: MoveCost | undefined): MoveCost | undefined {
+    if (!cost || this.site.levels.length === 0) return cost;
+    const n = this.site.layer.nx * this.site.layer.nz;
+    return (from, to, length) => (from >= n || to >= n ? length : cost(from, to, length));
+  }
+
+  /** The walkable cell nearest a point on a level: −1 is the site layer, in this search's index space. */
+  private cellOn(level: number, x: number, z: number): number {
+    if (level < 0) return this.nearestWalkable(this.world.grid.site, x, z);
+    const lv = this.site.levels[level]!;
+    const c = this.nearestWalkable(lv.layer, x, z);
+    return c < 0 ? -1 : lv.base + c;
+  }
+
+  /**
+   * Waypoints from a cell path that crosses levels: pulled taut within each level (each
+   * level's `clear`), and the two ends of each stair kept, so nothing is pulled across one.
+   * The goal itself last, if the last cell can reach it.
+   */
+  private pullLevels(ax: number, az: number, bx: number, bz: number, out: Route): void {
+    const cells = this.siteCells;
+    const pts = out.points;
+    pts.length = 0;
+    const raw: Array<{ x: number; z: number; level: number }> = cells.map((c) => {
+      const lv = this.site.levelOf(c);
+      const local = c - lv.base;
+      const level = lv.base === 0 ? -1 : this.site.levels.indexOf(lv);
+      return { x: cellX(lv.layer, local), z: cellZ(lv.layer, local), level };
+    });
+    const N = this.tuning.brain.nav;
+    let px = ax;
+    let pz = az;
+    let i = 0;
+    while (i < raw.length) {
+      const level = raw[i]!.level;
+      let end = i;
+      while (end + 1 < raw.length && raw[end + 1]!.level === level) end++;
+      let k = i;
+      while (k <= end) {
+        let far = k;
+        for (let j = k + 1; j <= end && j - k <= N.pullAhead; j++) {
+          if (this.clearAt(level, px, pz, raw[j]!.x, raw[j]!.z)) far = j;
+        }
+        pts.push(raw[far]!.x, raw[far]!.z);
+        px = raw[far]!.x;
+        pz = raw[far]!.z;
+        k = far + 1;
+      }
+      i = end + 1;
+    }
+    const last = raw[raw.length - 1]!;
+    if (this.clearAt(last.level, px, pz, bx, bz)) pts.push(bx, bz);
+  }
+
+  /** As `clear`, on a level: −1 is the ground; a storey is walked at its floor's height, on its own layer. */
+  private clearAt(level: number, ax: number, az: number, bx: number, bz: number): boolean {
+    if (level < 0) return this.clear(ax, az, bx, bz);
+    const { world } = this;
+    const storey = world.grid.storeys[level]!;
+    const G = this.tuning.gen.grid;
+    const dx = bx - ax;
+    const dz = bz - az;
+    const len = Math.sqrt(dx * dx + dz * dz);
+    if (len < 1e-6) return true;
+    const step = this.tuning.brain.nav.sampleStep;
+    const n = Math.max(1, Math.ceil(len / step));
+    const r = G.bodyRadius;
+    const ids = this.ids;
+    world.colliders.query(Math.min(ax, bx) - r, Math.min(az, bz) - r, Math.max(ax, bx) + r, Math.max(az, bz) + r, ids);
+    for (let s = 1; s <= n; s++) {
+      const px = ax + (dx * s) / n;
+      const pz = az + (dz * s) / n;
+      const c = cellIndex(storey.layer, px, pz);
+      if (c < 0 || (storey.layer.flags[c]! & Cell.Walkable) === 0) return false;
+      for (let q = 0; q < ids.length; q++) {
+        const col = world.colliders.list[ids[q]!]!;
+        if ((col.flags & Blocks.Move) !== 0 && col.y1 > storey.y + G.stepHeight && col.y0 < storey.y + G.bodyHeight && footprintContains(col, px, pz, r)) return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -236,7 +371,7 @@ export class Navigator {
     const start = this.nearestWalkable(L, ax, az);
     const goal = this.nearestWalkable(L, bx, bz);
     if (start < 0 || goal < 0) return 'no-route';
-    const r = search.path(start, goal, { maxExpansions, work: opts.work, cost: search === this.site ? opts.cost : undefined }, out);
+    const r = search.path(start, goal, { maxExpansions, work: opts.work, cost: search === this.site ? this.siteCost(opts.cost) : undefined }, out);
     if (r.found) return 'found';
     return r.exhausted ? 'out-of-budget' : 'no-route';
   }

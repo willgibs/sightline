@@ -3,7 +3,7 @@ import { ambientSources } from '../generation';
 import { dpow } from '../kernel/core/detmath';
 import { audibility } from '../kernel/sound';
 import { Blocks, type Collider, type RayHit } from '../kernel/world/colliders';
-import { Cell, cellIndex, type GridLayer } from '../kernel/world/grid';
+import { Cell, cellIndex, storeyAt, type GridLayer } from '../kernel/world/grid';
 import { COST_PER_METRE, GridSearch, NEIGHBOURS } from '../kernel/world/search';
 import type { WorkCounts } from '../kernel/work';
 import { Solids } from '../kernel/world/solids';
@@ -101,7 +101,7 @@ export class Acoustics {
     tuning: Tuning,
   ) {
     this.layer = world.grid.site;
-    this.search = new GridSearch(this.layer);
+    this.search = new GridSearch(this.layer, world.grid.storeys, world.grid.stairs);
     this.tuning = tuning;
     this.solids = new Solids(world.colliders);
   }
@@ -124,7 +124,7 @@ export class Acoustics {
     this.steadySources();
     this.source = s;
     this.start = -1;
-    const at = this.startCell(s.x, s.z);
+    const at = this.startCell(s.x, s.y, s.z);
     if (at < 0) return;
     this.start = at;
     this.offset = this.cellDistance(at, s.x, s.z);
@@ -216,6 +216,8 @@ export class Acoustics {
     out.walls = walls;
     if (walls <= most) {
       let loss = walls * (s.wallLossDb ?? H.wallLossDb);
+      // A floor between them, on a camp with upper floors: muffled, not stopped.
+      if (this.world.grid.storeys.length > 0) loss += this.floorsOnLine(s.x, sy, s.z, x, y, z) * H.floorLossDb;
       if (straight > 1e-6 && this.world.terrain.raycast(s.x, sy, s.z, dx / straight, dy / straight, dz / straight, straight) < straight - 0.05) loss += H.terrainLossDb;
       const level = audibility(s.radius, straight) * (loss > 0 ? dpow(10, -loss / 20) : 1);
       if (level > 0) {
@@ -226,7 +228,7 @@ export class Acoustics {
     }
     // Around: the flood's path to the listener's cell, never shorter than the straight line.
     if (start < 0) return;
-    const cell = cellIndex(this.layer, x, z);
+    const cell = this.listenerCell(x, y, z);
     if (cell < 0) return;
     const cost = costOf(cell);
     if (cost < 0) return;
@@ -243,8 +245,7 @@ export class Acoustics {
 
   /** Walks the last flood's path back from the listener toward the sound, to the last cell the listener can see. */
   private apparent(x: number, y: number, z: number, out: Heard): void {
-    const L = this.layer;
-    const from = cellIndex(L, x, z);
+    const from = this.listenerCell(x, y, z);
     if (from < 0) return;
     const lift = this.tuning.perception.hearing.lift;
     // Thief's doorway: follow parents while no wall stands between the listener and the cell.
@@ -252,25 +253,42 @@ export class Acoustics {
     for (let c = this.search.parent[from]!, k = 0; c >= 0 && k < 4096; c = this.search.parent[c]!, k++) {
       const cx = this.centreX(c);
       const cz = this.centreZ(c);
-      if (this.wallsOnLine(x, y, z, cx, this.world.terrain.heightAt(cx, cz) + lift, cz, 1) > 0) break;
+      if (this.wallsOnLine(x, y, z, cx, this.floorOf(c, cx, cz) + lift, cz, 1) > 0) break;
       visible = c;
     }
     // Back to the sound's own cell with nothing in the way: it comes from the sound itself.
     if (visible === this.start) return;
     out.fromX = this.centreX(visible);
     out.fromZ = this.centreZ(visible);
-    out.fromY = this.world.terrain.heightAt(out.fromX, out.fromZ) + lift;
+    out.fromY = this.floorOf(visible, out.fromX, out.fromZ) + lift;
+  }
+
+  /** The cell a listener at (x, y, z) reads a sound's flood at: on the floor he's on, if he's upstairs. */
+  private listenerCell(x: number, y: number, z: number): number {
+    const level = storeyAt(this.world.grid, x, y, z);
+    if (level < 0) return cellIndex(this.layer, x, z);
+    const lv = this.search.levels[level]!;
+    const c = cellIndex(lv.layer, x, z);
+    return c < 0 ? -1 : lv.base + c;
+  }
+
+  /** The height of a cell's floor in the search's index space: the ground's, or its storey's. */
+  private floorOf(cell: number, x: number, z: number): number {
+    const lv = this.search.levelOf(cell);
+    return lv.base === 0 ? this.world.terrain.heightAt(x, z) : this.world.grid.storeys[this.search.levels.indexOf(lv)]!.y;
   }
 
   private centreX(cell: number): number {
-    const L = this.layer;
-    return L.x0 + ((cell % L.nx) + 0.5) * L.cell;
+    const lv = this.search.levelOf(cell);
+    const local = cell - lv.base;
+    return lv.layer.x0 + ((local % lv.layer.nx) + 0.5) * lv.layer.cell;
   }
 
   private centreZ(cell: number): number {
-    const L = this.layer;
-    const i = cell % L.nx;
-    return L.z0 + ((cell - i) / L.nx + 0.5) * L.cell;
+    const lv = this.search.levelOf(cell);
+    const local = cell - lv.base;
+    const i = local % lv.layer.nx;
+    return lv.layer.z0 + ((local - i) / lv.layer.nx + 0.5) * lv.layer.cell;
   }
 
   /**
@@ -304,8 +322,43 @@ export class Acoustics {
     return walls;
   }
 
-  /** The cell a flood starts from: the sound's own, or the nearest walkable neighbour (in the search's fixed order). */
-  private startCell(x: number, z: number): number {
+  /**
+   * Floors on the straight line from a to b: anything solid and thin that stops sound and lies
+   * across the line above the ground, a floor or a roof slab rather than a wall. Up to `max`.
+   */
+  private floorsOnLine(ax: number, ay: number, az: number, bx: number, by: number, bz: number, max = 4): number {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const dz = bz - az;
+    const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (len < 1e-9 || Math.abs(dy) < 0.5) return 0;
+    const ux = dx / len;
+    const uy = dy / len;
+    const uz = dz / len;
+    let t = 0;
+    let floors = 0;
+    for (let k = 0; k < 32 && floors < max; k++) {
+      this.solids.raycast(ax + ux * t, ay + uy * t, az + uz * t, ux, uy, uz, len - t, Blocks.Sound, this.hit);
+      if (this.hit.id < 0) break;
+      const c = this.solids.get(this.hit.id);
+      const at = t + this.hit.dist;
+      const ground = this.world.terrain.heightAt(ax + ux * at, az + uz * at);
+      if (c.y1 - c.y0 <= 0.6 && c.y0 > ground + 1) floors++;
+      t = at + exitDistance(c, ax + ux * at, ay + uy * at, az + uz * at, ux, uy, uz) + 1e-4;
+      if (t >= len) break;
+    }
+    return floors;
+  }
+
+  /** The cell a flood starts from: the sound's own, or the nearest walkable neighbour (in the search's fixed order); on its floor, if it's upstairs. */
+  private startCell(x: number, y: number, z: number): number {
+    const level = storeyAt(this.world.grid, x, y, z);
+    if (level >= 0) {
+      const lv = this.search.levels[level]!;
+      const own = cellIndex(lv.layer, x, z);
+      if (own >= 0 && (lv.layer.flags[own]! & Cell.Walkable) !== 0) return lv.base + own;
+      return this.nearestOn(lv.layer, x, z, lv.base);
+    }
     const L = this.layer;
     const c = cellIndex(L, x, z);
     if (c < 0) return -1;
@@ -318,6 +371,22 @@ export class Acoustics {
       if (ni < 0 || nj < 0 || ni >= L.nx || nj >= L.nz) continue;
       const n = nj * L.nx + ni;
       if ((L.flags[n]! & Cell.Walkable) !== 0) return n;
+    }
+    return -1;
+  }
+
+  /** The nearest walkable cell to a point on a layer, by its neighbours in the search's fixed order, or −1. */
+  private nearestOn(L: GridLayer, x: number, z: number, base: number): number {
+    const c = cellIndex(L, x, z);
+    if (c < 0) return -1;
+    const i = c % L.nx;
+    const j = (c - i) / L.nx;
+    for (const [di, dj] of NEIGHBOURS) {
+      const ni = i + di;
+      const nj = j + dj;
+      if (ni < 0 || nj < 0 || ni >= L.nx || nj >= L.nz) continue;
+      const n = nj * L.nx + ni;
+      if ((L.flags[n]! & Cell.Walkable) !== 0) return base + n;
     }
     return -1;
   }
@@ -338,7 +407,7 @@ export class Acoustics {
     this.steady = [];
     for (const a of ambientSources(this.world, this.tuning)) {
       const s: SoundSource = { x: a.x, y: a.y - H.lift, z: a.z, radius: a.radius };
-      const start = this.startCell(s.x, s.z);
+      const start = this.startCell(s.x, s.y + H.lift, s.z);
       const costs = new Map<number, number>();
       let offset = 0;
       if (start >= 0) {

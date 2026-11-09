@@ -176,6 +176,8 @@ export const defaultTuning = {
           breachSides: ['back', 'left', 'right'],
           towers: [2, 4],
           vehicleDoorGap: 0, // metres his vehicle keeps off every door: the plain yard's never needed it
+          storeys: { hq: 1 }, // a module with 2 here has a second floor, stairs and windows
+          windowPost: 0, // a marksman at an upper window of the target's building, if it has one
           modules: { hq: [12, 9, 3.2], barracks: [18, 8, 3], mess: [13, 9, 3], storage: [13, 10, 4.4], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
         },
         // A keep on a hilltop: a tight walled plot, one narrow gate, and in the middle of it the
@@ -194,7 +196,9 @@ export const defaultTuning = {
           breachSides: ['back', 'left', 'right'],
           towers: [2, 4],
           vehicleDoorGap: 3,
-          modules: { hq: [16, 12, 6.2], barracks: [16, 8, 3], mess: [12, 8, 3], storage: [12, 9, 3.6], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
+          storeys: { hq: 2 },
+          windowPost: 1,
+          modules: { hq: [16, 12, 6], barracks: [16, 8, 3], mess: [12, 8, 3], storage: [12, 9, 3.6], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
         },
         // A depot strung along a road: a long plot with the road running right through it, gate to
         // gate, long sheds on both sides with their doors on the road. The road is the yard.
@@ -212,7 +216,9 @@ export const defaultTuning = {
           breachSides: ['left', 'right'],
           towers: [2, 3],
           vehicleDoorGap: 3,
-          modules: { hq: [13, 9, 3.4], barracks: [20, 9, 3], mess: [13, 9, 3], storage: [24, 11, 5], radio: [7, 5, 2.8], shed: [6, 4, 2.6] },
+          storeys: { hq: 2 },
+          windowPost: 0,
+          modules: { hq: [13, 9, 6], barracks: [20, 9, 3], mess: [13, 9, 3], storage: [24, 11, 5], radio: [7, 5, 2.8], shed: [6, 4, 2.6] },
         },
         // A farm and its outbuildings: no fence, a farmhouse, a barn and a byre round a small
         // farmyard, then huts scattered across the plot, low field walls, a silo a marksman holds.
@@ -230,9 +236,18 @@ export const defaultTuning = {
           breachSides: ['back', 'left', 'right'],
           towers: [1, 1],
           vehicleDoorGap: 3,
-          modules: { hq: [13, 10, 3.2], barracks: [18, 8, 3.2], mess: [12, 8, 3], storage: [22, 12, 7], radio: [6, 5, 2.8], shed: [6, 5, 2.6] },
+          storeys: { hq: 2 },
+          windowPost: 1,
+          modules: { hq: [13, 10, 6], barracks: [18, 8, 3.2], mess: [12, 8, 3], storage: [22, 12, 7], radio: [6, 5, 2.8], shed: [6, 5, 2.6] },
         },
       },
+      // A two-storey building (compound.ts): floor to floor, how thick its slabs are, the stairs
+      // up (a straight flight against a wall), and the windows of its upper floor.
+      storey: 3,
+      floorThickness: 0.2,
+      stairs: { rise: 0.25, tread: 0.3, width: 1.1 }, // a rise inside the motor's stepHeight
+      window: { sill: 0.95, head: 2.15, width: 1.2, every: 4 }, // metres above the floor, wide, and how far apart along a wall
+      rail: 1, // round the stairwell upstairs
       fieldWall: 1.1, // a farm's field walls: low enough to see over, and to crawl behind
       fieldRun: [14, 30], // metres of wall between gaps
       fieldGap: [5, 11], // metres of gap
@@ -601,6 +616,7 @@ export const defaultTuning = {
       // arrives by the straight line only (A11: a shout's whole flood cost a frame).
       floodReach: 25,
       wallLossDb: 12, // the straight route loses this much per wall it passes through (as Rainbow Six Siege's does)
+      floorLossDb: 9, // and this much per floor it passes through: an upper floor passes a sound muffled, not stopped
       sirenWallLossDb: 3, // a siren's a good deal lower and louder than anything else in the camp, and walls barely touch it: it's meant to be heard indoors
       terrainLossDb: 15, // and this much where the ground is in the way
       maxWalls: 4, // through more walls than this, the straight route is silent
