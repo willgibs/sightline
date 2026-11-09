@@ -664,6 +664,9 @@ function terrainBlocks(world: World, b: BodyState, x: number, z: number, feet: n
   world.terrain.sample(x, z, sample);
   const rise = sample.height - feet;
   if (sample.slopeTan > tanMax && rise > 0.002) return true;
+  // Nor out of it: from ground too steep to stand on, across a seam to a higher, gentler
+  // triangle, is still gaining height on ground you can't climb.
+  if (b.standingOn < 0 && b.slopeTan > tanMax && rise > 0.002) return true;
   const dx = x - b.x;
   const dz = z - b.z;
   // 2 cm of slack absorbs the kink where two walkable triangles meet.

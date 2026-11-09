@@ -2,6 +2,12 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · What the long bot runs found in the motor
+
+The weekly run on main, and the same runs on the tree crown branch, broke a body's promise in about one run in five: "gained N m on ground too steep to stand on" (rule 10). Most of it was real: a body on steep ground could step up across a triangle seam onto a higher, gentler one, by up to 45 mm, because only the destination's slope was asked about. The motor now also refuses a rise when the body starts on steep ground. The rest wasn't a broken promise at all: a mantle from steep ground rises as a mantle should, and the check now applies to bodies that stay on the ground. Six of the seven failing valleys pass an hour of play.
+
+**Still open:** one failing run (RAK-4743, the fuzzing bot) ends with a torso 1.3 mm inside a rock as a body starts to lie down beside it on a slope. It's in the lying-down chain and is small and rare, but it is a broken promise, and the weekly run will keep saying so until it's fixed.
+
 ## 2026-11-09 · What you can't see through, you can't shoot through
 
 **Why.** The owner's first sitting found kill shots "through tree cover". Those shots had really gone over the treetops, but the worry was right: on a generated map a tree's crown stopped nothing. Of the lines from perches to posts that the simulation called clear, 11% passed through more crown than anyone could see through, and a bullet went through at no cost. "The fact that it can happen invites lots of problems."
