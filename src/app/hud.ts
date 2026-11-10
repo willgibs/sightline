@@ -2,10 +2,23 @@ import { DevDock } from './devDock';
 import { headingDegrees } from '../sim/kernel/core/math';
 import { labelKeys } from './keys';
 import { ActionMap, keysHtml, type Action } from './actions';
+import { Kit } from './kit';
+import { Minimap } from './minimap';
 
 /**
- * The heads-up display. The honest view shows only what the shipped game will: a
- * compass strip. The debug view adds panels docked at the edges (devDock.ts), a key
+ * Whether the player's own readouts belong on screen now: the kit and the map are about
+ * the body you're in, and for you alone. A replay is someone's run being watched, a sitting
+ * is blind (A12), and a benchmark or the fly camera isn't anyone's eyes. The compound
+ * simulator has no player at all (`docs/pillars.md`), only a body parked out of the way.
+ */
+export function showsPlayerHud(now: { replay: boolean; trial: boolean; bench: boolean; detached: boolean; scene: string | null }): boolean {
+  return !now.replay && !now.trial && !now.bench && !now.detached && now.scene !== 'compound';
+}
+
+/**
+ * The heads-up display. The honest view shows only what the shipped game will: a compass
+ * strip, and in the corner what you carry (kit.ts) and the picture of the ground you were
+ * given (minimap.ts). The debug view adds panels docked at the edges (devDock.ts), a key
  * legend and a rangefinder tag at the aim point.
  */
 export class Hud {
@@ -18,6 +31,11 @@ export class Hud {
   private readonly promptEl: HTMLElement;
   /** The slim panels at the edges of the screen in the debug view (devDock.ts). */
   readonly dock: DevDock;
+  /** The bottom-right corner: the map above what you carry. */
+  private readonly corner: HTMLElement;
+  readonly kit: Kit;
+  readonly map: Minimap;
+  private opticUp = false;
   private readonly panelBodies = new Map<string, string>();
   private readonly extraKeys: HTMLElement;
   /** Labels systems drew (sim/debugDraw.ts), placed over the world in the debug view. */
@@ -84,7 +102,35 @@ export class Hud {
     const replayKeys = root.querySelector<HTMLElement>('.replay-legend')!;
     replayKeys.innerHTML = replayLegend.map(([actions, text]) => `<span>${keysHtml(map, actions)}${text}</span>`).join('');
     labelKeys(replayKeys);
+    this.corner = document.createElement('div');
+    this.corner.className = 'corner';
+    // Under whatever comes and goes on top of it (a toast, a caption) with the map enlarged.
+    root.prepend(this.corner);
+    this.map = new Minimap(this.corner, keysHtml(map, ['minimap']));
+    this.kit = new Kit(this.corner);
+    labelKeys(this.corner);
+    this.map.onResize = () => this.settleCorner();
+    this.kit.onResize = () => this.settleCorner();
     this.resizeCompass();
+  }
+
+  /**
+   * Keeps the corner off everything else that lives along the bottom and the right: it
+   * stands on the key legend when that shows, and the right-hand dock stops above it.
+   * Measured only when one of them changes.
+   */
+  private settleCorner(): void {
+    const legend = this.legend.offsetHeight;
+    // The legend stands 8 px off the bottom edge; the corner 6 above that, or 10 off the edge with no legend there.
+    this.root.style.setProperty('--floor', `${legend > 0 ? legend + 14 : 10}px`);
+    this.root.style.setProperty('--corner', `${this.corner.offsetHeight}px`);
+  }
+
+  /** An optic is up: the corner of the screen goes dark round it, and what's written there goes pale to read on it. */
+  setOptic(up: boolean): void {
+    if (up === this.opticUp) return;
+    this.opticUp = up;
+    this.root.classList.toggle('is-optic', up);
   }
 
   /** What the body could do right now: a small prompt, or nothing. */
@@ -95,6 +141,7 @@ export class Hud {
 
   setDebug(on: boolean): void {
     this.root.classList.toggle('is-debug', on);
+    this.settleCorner();
   }
 
   setVisible(on: boolean): void {
@@ -108,6 +155,8 @@ export class Hud {
     this.compass.height = Math.round(34 * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.lastHeading = -1;
+    this.map.resize(window.innerWidth, window.innerHeight);
+    this.settleCorner();
   }
 
   /** The compass strip, and a mark on it for the way out, once there's somewhere to go (`mark`: its heading in degrees). */
@@ -199,6 +248,7 @@ export class Hud {
       span.append(k, text);
       this.extraKeys.appendChild(span);
     }
+    this.settleCorner();
   }
 
   setRange(text: string | null): void {

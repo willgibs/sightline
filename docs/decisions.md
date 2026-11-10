@@ -27,6 +27,19 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 - **The GPU is asked its name once.** A play session is saved every minute with it, and the answer waits on the GPU's own process.
 
 **Tools.** `npm run hitches` times scenes' ticks in a process of their own, built as the game's code is built, and names the slow ones with the work they did. `npm run experiment -- route-cost` is what each number of landmarks buys. The brain lane's bench pins a fight's worst tick as work (grid cells, rays), which is the same on every machine. A play session's telemetry now keeps its slowest frames and whose work each was.
+## 2026-11-10 · The honest view's corner: what you carry, and the picture you were given
+
+**Why.** The owner, after playing: he couldn't tell whether the suppressor was on without scoping in, which stance he was in without toggling it, which load he had without changing it, or how many rounds were left. And a camp with fair defenses owes the attacker what he'd have had from scouting imagery, without the gear that hands either side too much (heartbeat sensors, UAVs). The design doc's *UI and HUD* says ammo only when you reload, and a tactical map of only what you've observed; this is his later word on the first, and the observed map is still to come.
+
+**Built.** One column in the bottom-right corner, over the snapshot and the world, and never touching the simulation.
+- **The card** (`app/kit.ts`): a figure for the stance, the word for it, the rounds, the zero, the load, and the suppressor on, off, fitting or removing. The fields keep their places. While a job is on, a line runs out under the row it's about, and no shot leaves until it has.
+- **The map** (`app/minimap.ts`): north up, the whole play area, your position and heading on it. Key 1 (actions.ts) enlarges it, hides it, brings it back; every letter was taken.
+
+**What a photograph can know.** The map is made from the world as generated and nothing else: the ground's relief and contours, the camp's fence and walls, roofs as plain outlines, the road, the creek, the woods. No guard, no target, no vehicle, nothing live. It can't see under a roof, so no doors and no rooms, and nothing tells one building from another: the door screens inside a target's building are `block`s like a perimeter wall, so a wall under a roof is left off (`satelliteOf`, held by `tests/hud.test.ts`, which also scans the file for anything live). Towers, containers, sandbags and vehicles are left off too, to keep to what was asked for; adding the towers is one line, and whether to is the owner's call.
+
+**It costs almost nothing.** The picture is painted once per world and per size, the first time it's wanted (12 ms small, 23 ms enlarged, at twice the pixels, in Chromium). Each frame moves one small marker with a CSS transform, and writes that only when it has moved by a quarter of a pixel or turned by a degree. `tests/browser/hud.test.ts` holds it to that: 400 updates, no drawing.
+
+**It stays out of the way.** The card and the map are the player's, so they sit out replays, a sitting (A12: blind means no change on screen, and the key does nothing), the benchmark, the fly camera and the compound simulator, which has no player. With an optic up the map fades, since in a small window the corner is inside the glass, and the card goes to the scope's own colours. It stands on the key legend in the debug view, and the right-hand dock stops above it.
 
 ## 2026-11-09 · The takedown: a camp that protects its target, as a mode
 
