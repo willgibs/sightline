@@ -1,6 +1,6 @@
 # Sightline · Game Design & Build Plan
 
-> **This is a copy.** The design doc lives at [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), which only the owner's account can open, and the live doc wins wherever the two differ. This is its revision 43, kept in step with it on Nov 10, 2026, for sessions that can't open it, such as a Claude Code session without the Claude Docs connector. The live doc's four diagrams are written out here as text. Don't edit this copy to change the design: change the live doc, or propose the change to the owner, then export it again over this file.
+> **This is a copy.** The design doc lives at [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), which only the owner's account can open, and the live doc wins wherever the two differ. This is its revision 44, kept in step with it on Nov 10, 2026, for sessions that can't open it, such as a Claude Code session without the Claude Docs connector. The live doc's four diagrams are written out here as text. Don't edit this copy to change the design: change the live doc, or propose the change to the owner, then export it again over this file.
 
 Nov 7, 2026 · @Will Gibson
 
@@ -643,6 +643,8 @@ Calls 1–3 shape the core and have working defaults; the rest are deliberately 
 
 | Date | Decision | Outcome |
 | --- | --- | --- |
+| Nov 10, 2026 | A camp responds in phases | Owner: cover first, then identify the threat, then an intelligent gunfight from cover by trained men, who follow someone breaking contact and never converge as a ring. Taller buildings come too, without having to clear every corner of every building to claim success. Scheduled, not built |
+| Nov 10, 2026 | What the target does depends on the camp | Owner: some camps keep the target inside and others make the target run, so play can't be reduced to always cutting a radio or disabling a vehicle. "There needs to be a clear method to the madness": what a camp will do has to be readable. Scheduled, not built |
 | Nov 10, 2026 | What you carry, and a satellite picture | Owner, after playing the takedown: the honest view needs a GUI, and the attacker should have what they could get from scouting satellite imagery. A corner card shows stance, suppressor, load, rounds and zero, over a light map of what a photograph could know. "Both sides realistically equipped, without gear that reduces the dynamics": no heartbeat sensors or UAVs |
 | Nov 9, 2026 | What you can't see through, you can't shoot through | Owner, after the first sitting: a kill through tree cover from hundreds of metres is unfair, and "the fact that it can happen invites lots of problems." A tree's crown stops sight and bullets once a line has been through about a metre of it, by one law. A thin tip or rim only dims the line, and the crown round your own eye doesn't count |
 | Nov 8, 2026 | No promised approach | Owner: a target anyone can shoot from any ridge makes every mission one shot from success and forces the same easy map. The guarantee that perches see the target goes. Each seed is built around a decisive problem, and validation promises only a way through it |
