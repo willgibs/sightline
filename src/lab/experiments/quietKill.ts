@@ -1,4 +1,4 @@
-import type { Tuning } from '../../config/tuning';
+import { defaultTuning, type Tuning } from '../../config/tuning';
 import { commanderOf } from '../../sim/game/comms';
 import { stimulus, type StimulusName } from '../../sim/game/drops';
 import { compound } from '../../sim/game/scenes/compound';
@@ -37,18 +37,8 @@ export const FLAT: Shots = {
   bolt: { faint: 0.8, clear: 0.8, clearAt: 4 },
 };
 
-/**
- * Each sound by how clearly it was heard. A report is unmistakable unless it's faint (a
- * suppressed one at the edge of hearing). A crack is a shot to a man within about 40 m of the
- * bullet's path, and a snap that turns his head farther off. A strike is a thud: it makes a man
- * look, more so close by, and what he then sees is what tells him.
- */
-export const GRADED: Shots = {
-  report: { faint: 0.55, clear: 0.8, clearAt: 2 },
-  crack: { faint: 0.4, clear: 0.8, clearAt: 4 },
-  impact: { faint: 0.3, clear: 0.62, clearAt: 26 },
-  bolt: { faint: 0.55, clear: 0.8, clearAt: 2 },
-};
+/** Each sound by how clearly it was heard: the takedown's numbers (sim/game/scenes/takedown.ts). */
+export const GRADED: Shots = defaultTuning.modes.takedown.shots;
 
 const withShots = (tuning: Tuning, shots: Shots, subsonic: boolean, whistle = tuning.perception.awareness.whistle): Tuning => ({
   ...tuning,

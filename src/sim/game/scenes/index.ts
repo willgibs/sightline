@@ -15,6 +15,7 @@ import { NOISE_TABLE, noiseScenario } from './noiseScenario';
 import { SIGHT_TABLE, sightScenario } from './sightScenario';
 import { shootingRange } from './shootingRange';
 import { spawnTick } from './spawnTick';
+import { takedown } from './takedown';
 
 /** A scene of Sightline (kernel/scene.ts): its game is SIGHTLINE, and its runs are the game's simulations. */
 export type Scene = KernelScene<Simulation>;
@@ -41,6 +42,7 @@ export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   overlook,
   ladder,
   'shooting-range': shootingRange,
+  takedown,
 };
 
 /** The scene a recording was made in, with its parameters, if this build has it. */

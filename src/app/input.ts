@@ -189,11 +189,13 @@ export class InputController {
     for (const c of codes) this.down.add(c);
   }
 
-  /** Automation: request a stance toggle as if C or Z were tapped. */
-  tap(code: 'KeyC' | 'KeyZ'): void {
+  /** Automation: a stance toggle as if C or Z were tapped, or the rifle's suppressor (T) or load (Y) changed. */
+  tap(code: 'KeyC' | 'KeyZ' | 'KeyT' | 'KeyY'): void {
     if (code === 'KeyC') this.pressed.add('crouch');
     else if (code === 'KeyZ') this.pressed.add('prone');
-    else throw new TypeError(`tap() takes 'KeyC' or 'KeyZ', not ${String(code)}`);
+    else if (code === 'KeyT' || code === 'KeyY') {
+      if (this.armed) this.simple.push({ kind: code === 'KeyT' ? 'suppressor' : 'load' });
+    } else throw new TypeError(`tap() takes 'KeyC', 'KeyZ', 'KeyT' or 'KeyY', not ${String(code)}`);
   }
 
   /** A key or button went down: hold it, and trigger what it is bound to in the active contexts. */
@@ -235,7 +237,7 @@ export class InputController {
       else if (a === 'shotDrop') this.latch.latch('shotDrop');
       else if (a === 'dropNoise') this.latch.latch('noise');
       else if (a === 'dropBody') this.latch.latch('bodyDrop');
-      else if (a === 'zeroUp' || a === 'zeroDown' || a === 'suppressor') {
+      else if (a === 'zeroUp' || a === 'zeroDown' || a === 'suppressor' || a === 'load') {
         if (this.armed) this.simple.push({ kind: a });
       } else this.onAction?.(a);
     }

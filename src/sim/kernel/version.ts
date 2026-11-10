@@ -32,5 +32,8 @@ export const GEN_VERSION = 7;
  * 13: the escape vehicle drives round the yard and down the road, and is away only at the end of it.
  * 14: terrain inside a body's rim backs it off toward its own centre where the ground there
  * would have carried it onto the high ground: the foot of a low ledge is no way up it.
+ * 15: the camp's own men step out of the way of its vehicles, and an escape held up by
+ * anyone else ends with the target getting out again; a camp can protect its target
+ * (brain/protect.ts). No pinned run meets any of these, so no fingerprint moved.
  */
-export const SIM_VERSION = 14;
+export const SIM_VERSION = 15;

@@ -224,8 +224,9 @@ export class Instruments {
     ctx.fillStyle = '#c9d1d9';
     if (rifle) {
       const parts = [`ZERO ${rifle.zero} m`, `${rifle.rounds} RD${rifle.rounds === 1 ? '' : 'S'}`];
+      if (rifle.load !== 'match') parts.push(rifle.load.toUpperCase());
       if (rifle.suppressed) parts.push('SUPPRESSED');
-      if (rifle.fitting > 0) parts.push(rifle.suppressed ? 'FITTING…' : 'REMOVING…');
+      if (rifle.fitting > 0) parts.push(rifle.swapping ? 'LOADING…' : rifle.suppressed ? 'FITTING…' : 'REMOVING…');
       else if (rifle.bolt > 0) parts.push('BOLT');
       const y = Math.min(h - 22, cy + r + 8);
       ctx.fillText(parts.join('   '), cx, y);

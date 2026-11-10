@@ -91,6 +91,7 @@ export class LabPanel {
       `their guess ${Number.isNaN(r.estimateOff) ? 'none' : `${metres(r.estimateOff)} off`}`,
       `camp        ${r.level}${r.siren ? ', siren' : ''}`,
       `target      ${r.targetStatus}`,
+      ...(r.protection ? [`protection  ${r.protection}`] : []),
     ].join('\n');
     // In the honest view nothing else brings the dock up to date.
     this.dock.refresh();

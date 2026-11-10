@@ -62,6 +62,10 @@ const BOUNDS: ReadonlyArray<readonly [path: string, min: number, max: number, in
   ['perception.awareness.shots.crack.clearAt', 1.01, 10000],
   ['perception.awareness.shots.impact.clearAt', 1.01, 10000],
   ['perception.awareness.shots.bolt.clearAt', 1.01, 10000],
+  ['modes.takedown.shots.report.clearAt', 1.01, 10000],
+  ['modes.takedown.shots.crack.clearAt', 1.01, 10000],
+  ['modes.takedown.shots.impact.clearAt', 1.01, 10000],
+  ['modes.takedown.shots.bolt.clearAt', 1.01, 10000],
   // Budgets that size searches inside a tick (rule 18), so a hostile recording can't hang a guard's brain.
   ['brain.nav.siteExpansions', 1, 500000, true],
   ['brain.nav.mapExpansions', 1, 500000, true],
@@ -137,6 +141,7 @@ export function tuningProblems(t: unknown): string[] {
   const Z = tuning.ballistics.rifle.zero;
   if (Z.min > Z.max || Z.start < Z.min || Z.start > Z.max) problems.push('ballistics.rifle.zero must run from min to max, with start between');
   if (!(tuning.ballistics.rifle.load in tuning.ballistics.loads)) problems.push(`ballistics.rifle.load '${tuning.ballistics.rifle.load}' names no load`);
+  if ((tuning.ballistics.rifle.carries as Record<string, boolean>)[tuning.ballistics.rifle.load] !== true) problems.push('ballistics.rifle.carries must include the load the rifle starts with');
   return problems;
 }
 
