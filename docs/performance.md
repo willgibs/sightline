@@ -78,3 +78,36 @@ Left, in order of what I'd do next:
 3. **A checkpoint every ten seconds costs about 2.5 ms**, because the state is hashed twice.
 4. **Collections of garbage of 15 to 25 ms**, about once a minute with the debug view on. The honest view makes far less.
 5. **The largest steady cost is guards' sight**: about a third of the simulation's time, spread evenly, so it never hitches. It would be the first thing to matter with many more guards.
+
+## 6. The sweep: what else was looked for
+
+After the hitches, the owner asked for a sweep for the scope overlay's kind of thing: work done every frame or tick that doesn't need doing, full redraws of what didn't change, caches built in play, costs that grow with the world. This is everything found, with what it costs. Measured Nov 10 on `main` after the fixes above and the scope overlay's, in Chromium on this Mac's GPU at 1728×1117 ×2 (`npm run frames`) and in the simulation built as the game's code is (`npm run hitches`).
+
+**The short answer: nothing else of that size is there.** The page writes nothing at all while you stand, walk or look through the binoculars. No change of view costs a frame: scoping in, the debug view, a first look the other way and a shot each take one frame, the first time as the second. With the frame-rate limit off a frame takes 1.4 ms, so a 120 Hz screen has six times the room it needs. A quiet tick of the simulation takes 0.05 ms.
+
+**Found, and left, largest first:**
+
+| What | What it costs | Why it's left |
+| --- | --- | --- |
+| Building the valley, on the page's own thread | 3.0 s (LEB-2534) to 10.5 s (HOT-7106) at load. About a third of it, on camps that have to be flushed, is a search for a way in that those camps' rules never ask for | Skipping the search changes what a world's report holds, so it needs a new generation version and belongs with the generator's next change |
+| Sound is made at the click on "begin" | One frame of 150 to 180 ms as the first run starts: the audio device is opened and the engine built then | Browsers only let sound start from a click. Making it earlier and waking it at the click is the fix, and Safari is the browser it could break, which I can't run |
+| Preparing a camp's routes, and the rehearsal | 0.23 s and 0.2 to 0.3 s at load | They are what bought the fight's smoothness. Both could run off the page's thread with the valley's building |
+| The save every minute | 10 to 25 ms on the page's thread, and at every pause and outcome | Needs a worker, not a tweak |
+| A look for dead ground | Up to 900 rays a search, about 3 ms at worst, and no more than one search past 300 rays a tick. A fight's worst tick is one of these or a long route: 3.5 to 4 ms | The rays are real. Skipping the trees a high ray passes over is exact and would roughly halve them. If the camp's first phase is everyone taking cover at once, keep what each perch can see of each cell, which is a fact about the camp, and the search becomes a lookup |
+| A checkpoint every ten seconds | 2.5 ms: the state is hashed twice | The recording's format would change |
+| The motor resolves every body every tick, moving or not | 44% of a quiet tick: 23 µs for eleven bodies | 0.07% of a tick, in the most delicate code in the project |
+| Guards' sight | 34 µs a tick in a fight, a third of the simulation, spread evenly. It already casts no ray at anything out of reach | It would matter first with many more guards |
+| Garbage collection | Pauses of 7 to 25 ms about once a minute, most with the debug view on | The honest view allocates little. Worth another look once the save is in a worker |
+| Every static mesh's matrix is recomputed every frame | 0.05 to 0.07 ms a frame, a tenth of the page's work | Too small to be worth a wrong picture |
+| The debug view writes its range label and panel titles every frame | 0.15 ms a frame more than the honest view (0.68 against 0.53) | The dev view only |
+| The compass is redrawn every frame while turning | 35 calls on a canvas of 880×68: too small to measure | |
+| The scope's overlay is a canvas of 3456×2234, where the 3D picture is capped at 2592×1675 | 31 MB, drawn only when something on it changes since the overlay's fix | Another session's file. Worth a look if sharpness there doesn't need it |
+| A camp's landmarks | About 10 MB while the camp is loaded | It's what a route costs a twelfth of the looking for |
+
+**For the two rulings on the roadmap** (the target's behaviour by the camp's problem; the camp answering in phases, cover first):
+- **Cover first is the one to watch.** Looks for dead ground share a tick's budget: four searches, and no new one once 300 rays are cast. Sixteen men told to take cover in the same instant would start over about four to sixteen ticks, a tenth to half a second. If that reads wrong, don't raise the budget: keep what each perch can see of each cell, as above.
+- **The rehearsal rehearses what a sniper provokes.** A phase or a target's behaviour that only something else sets off (someone inside the wire) won't be warm on its first use until the rehearsal's script provokes it too (`game/rehearsal.ts`).
+- Routes by landmarks and the faster search make more movement cheaper, whatever the phases ask for.
+
+`npm run frames` is the instrument for the page's half of this, and would have shown the scope's overlay as a canvas "cleared whole ×1.0" every frame.
+
