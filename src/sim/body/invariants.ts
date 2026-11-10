@@ -22,21 +22,23 @@ import { bodyShape } from './shape';
  *
  * Height gained on steep ground is measured where it is gained: along the line the body
  * moved over this tick, triangle by triangle, counting only what the terrain rises on the
- * triangles too steep to stand on (Heightfield.gainOnSteep). The check used to charge the
- * whole tick's rise to where the tick began. A body that slides off a steep face and
- * carries on up walkable ground in the same tick has gained nothing on the face, and that
- * case stopped about one long bot run in five once the valleys got scarps and gorges, with
- * the motor doing nothing wrong. What a body on the terrain at both ends of a tick is held to:
- * - it never ends a tick on steep ground higher than it began it, wherever it began. Steep
- *   ground is a barrier from walkable ground too, which the old check never looked at;
- * - it gains no height on the steep ground it began the tick on, wherever it ends: no part
- *   of its own speed goes uphill there (motor.ts, driveGround).
+ * triangles too steep to stand on (Heightfield.gainOnSteep). What a body that walks, on the
+ * terrain at both ends of a tick, is held to:
+ * - from steep ground it ends the tick no higher, wherever it ends. Sliding off a steep
+ *   face onto walkable ground that rises the way it's going used to carry it up that
+ *   ground in the same tick, which stopped about one long bot run in five; the motor now
+ *   refuses the rise (motor.ts, terrainBlocks), and it walks up from the next tick;
+ * - onto steep ground it ends no higher either, wherever it began. The check only ever
+ *   looked at bodies that began on steep ground;
+ * - it gains nothing on the steep triangle it began the tick on: no part of its own speed
+ *   goes uphill there (motor.ts, driveGround).
+ * A mantle is the way up a rock from anywhere, steep ground included: these are about walking.
  * `seamGain` is reported and held to no limit: the most the terrain rose on steep triangles
- * under one tick's move with neither promise broken. That is a corner of a steep triangle
- * clipped on the way to walkable ground, or the far side of a notch ridden up after sliding
- * down into it and ending no higher. The motor judges a move by where it ends (motor.ts,
- * terrainBlocks), so it allows these: a few centimetres in a tick, never more than a
- * walkable grade over the move, and nothing a body can climb by.
+ * under one tick's move with no promise broken. That is a corner of a steep triangle
+ * clipped between two pieces of walkable ground, or the far side of a notch ridden up after
+ * sliding down into it and ending no higher. The motor judges a move by where it begins
+ * and ends, so it allows these: a few centimetres in a tick, never more than a walkable
+ * grade over the move, and nothing a body can climb by.
  */
 
 export interface InvariantReport {
@@ -145,21 +147,18 @@ export class InvariantWatch {
     if (rise > spec.stepHeight + 1e-9) broke(`rose ${rise.toFixed(4)} m in a tick`);
     // On a ladder, its own rate, up or down (a fall begins only by letting go).
     if (b.motor === 'ladder' && b.ladder!.t >= spec.ladder.reachTime && Math.abs(rise) > spec.ladder.downRate * this.sim.dt + 1e-9) broke(`moved ${rise.toFixed(4)} m on a ladder in a tick`);
+    // A mantle is the way up a rock from anywhere, steep ground included: this promise is about walking.
     if (was.onTerrain && b.motor === 'ground' && b.standingOn < 0) {
       // On the terrain at both ends of the tick: what it climbed on steep triangles on the way.
       const tanMax = dtanDeg(spec.maxSlopeDeg);
       const gain = world.terrain.gainOnSteep(was.x, was.z, b.x, b.z, tanMax, this.piece);
       const endsSteep = world.terrain.sample(b.x, b.z, this.sample).slopeTan > tanMax;
-      // What it climbed on steep ground: the whole tick's rise if it ends there, and otherwise
-      // whatever it gained on the triangle it began on.
-      const climbed = endsSteep ? Math.max(rise, this.piece.first) : this.piece.first;
+      // From steep ground, or onto it, it ends the tick no higher; and whatever it does, it
+      // gains nothing on the triangle it began on.
+      const climbed = was.onSteep || endsSteep ? Math.max(rise, this.piece.first) : 0;
       r.steepGain = Math.max(r.steepGain, climbed);
-      if (climbed >= STEEP_TOLERANCE) broke(endsSteep && rise >= STEEP_TOLERANCE ? `ended ${rise.toFixed(4)} m higher, on ground too steep to stand on` : `gained ${climbed.toFixed(4)} m on ground too steep to stand on`);
+      if (climbed >= STEEP_TOLERANCE) broke(was.onSteep ? `gained ${climbed.toFixed(4)} m on ground too steep to stand on` : `ended ${rise.toFixed(4)} m higher, on ground too steep to stand on`);
       else r.seamGain = Math.max(r.seamGain, gain);
-    } else if (was.onSteep && b.standingOn < 0) {
-      // It left steep ground some other way (into the air, onto a path of its own): it may not have gone up doing so.
-      r.steepGain = Math.max(r.steepGain, rise);
-      if (rise >= STEEP_TOLERANCE) broke(`rose ${rise.toFixed(4)} m off ground too steep to stand on`);
     }
     const height = bodyHeight(b, spec);
     // Standing, the body is its circle; lying down, the chain below takes its place.

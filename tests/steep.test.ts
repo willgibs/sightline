@@ -10,7 +10,7 @@ import { Blocks, circleOverlaps } from '../src/sim/kernel/world/colliders';
 import { makeTerrainSample } from '../src/sim/kernel/world/heightfield';
 import { InvariantWatch, STEEP_TOLERANCE } from '../src/sim/body';
 import { ChaosBot } from '../src/sim/game/bots/chaos';
-import { testWorld } from './fixtures';
+import { EAST, testWorld } from './fixtures';
 
 /**
  * Ground too steep to stand on is a barrier from every angle, on real valleys. Before the
@@ -193,12 +193,11 @@ describe('height gained on steep ground, measured where it is gained', () => {
     expect(f.gainOnSteep(0.3, -1.1, 4.7, 2.9, tanMax)).toBeCloseTo(f.heightAt(4.7, 2.9) - f.heightAt(0.3, -1.1), 4);
   });
 
-  it('lets a body slide off a steep face and carry on up walkable ground', () => {
-    let worstRise = 0;
+  it('stops a body rising as it slides off a steep face, and lets it walk up the far side from the next tick', () => {
     let tried = 0;
     for (const speed of [1.4, 3, 5.5]) {
       for (const offDeg of [0, 30, 60]) {
-        // Near enough the bottom that the slowest of them is across it within the tick.
+        // Near enough the bottom that the slowest of them would be across it within the tick.
         for (const start of [0.005, 0.01, 0.02]) {
           const sim = new Simulation(gully, T);
           const watch = new InvariantWatch(sim);
@@ -211,24 +210,30 @@ describe('height gained on steep ground, measured where it is gained', () => {
           const a = (offDeg * Math.PI) / 180;
           p.vx = speed * Math.cos(a);
           p.vz = speed * Math.sin(a);
-          const y0 = p.y;
           gully.terrain.sample(p.x, p.z, s);
+          p.slopeTan = s.slopeTan;
           expect(s.slopeTan).toBeGreaterThan(tanMax);
+          const y0 = p.y;
+          // The tick it leaves the face: its speed would carry it up the far side, and may not.
           watch.beforeTick();
           sim.step(neutralInput(p.yaw));
           watch.afterTick();
+          expect(p.y - y0).toBeLessThan(STEEP_TOLERANCE);
+          // Then it walks east, across the bottom and up ground it can stand on.
+          for (let i = 0; i < 45; i++) {
+            watch.beforeTick();
+            sim.step({ ...neutralInput(EAST), moveZ: 1 });
+            watch.afterTick();
+          }
           tried++;
-          worstRise = Math.max(worstRise, p.y - y0);
-          // It ends on the far side, and the motor has kept its promise.
-          expect(p.x).toBeGreaterThan(0);
+          expect(p.x).toBeGreaterThan(1);
+          expect(p.y).toBeGreaterThan(y0 + 0.3);
           expect(watch.report.first).toBeNull();
           expect(watch.report.steepGain).toBeLessThan(STEEP_TOLERANCE);
         }
       }
     }
     expect(tried).toBe(27);
-    // The case is real: it rose, by far more than the tolerance, and all of it on walkable ground.
-    expect(worstRise).toBeGreaterThan(4 * STEEP_TOLERANCE);
   });
 
   it('still catches a body that goes up a steep face, wherever its tick began', () => {
@@ -253,12 +258,12 @@ describe('height gained on steep ground, measured where it is gained', () => {
       return watch;
     };
     // Up the face from on it.
-    expect(lifted(face, 0.5, 0.52).report.first?.what).toMatch(/ended 0\.01\d+ m higher, on ground too steep/);
+    expect(lifted(face, 0.5, 0.52).report.first?.what).toMatch(/gained 0\.01\d+ m on ground too steep/);
     // Onto the face from the walkable apron below it: the check that charged a tick's rise to where it began never saw this.
     expect(lifted(face, -0.01, 0.02).report.first?.what).toMatch(/ended 0\.02\d+ m higher, on ground too steep/);
     // Up the last of a face and over its brow onto walkable ground (the fuzz run's NEM-4083): what it gained on the face counts.
     const brow = testWorld({ cell: 0.5, height: (x) => (x < 0 ? x * steep : x * gentle), spawn: { x: -20, z: 0 } });
-    expect(lifted(brow, -0.03, 0.01).report.first?.what).toMatch(/gained 0\.02\d+ m on ground too steep/);
+    expect(lifted(brow, -0.03, 0.01).report.first?.what).toMatch(/gained 0\.03\d+ m on ground too steep/);
     // Down one face of a notch and a little way up the other, ending no higher: a slide, and no promise broken.
     const notch = testWorld({ cell: 0.5, height: (x) => Math.abs(x) * steep, spawn: { x: -20, z: 0 } });
     const slid = lifted(notch, -0.06, 0.02);
@@ -276,11 +281,14 @@ describe('the foot of a low ledge', () => {
    * radius away. The terrain inside its rim was the top of the ledge, not the face, and that
    * ground fell away from the edge, so "back off downhill" pointed onto it: the body was
    * carried 1.2 m sideways and 0.43 m up in one tick, onto ground it had no way to climb to.
+   * Refusing the rise alone (a body on steep ground ends no higher) leaves the push pointing
+   * the wrong way, and the body held at the foot of the ledge: it has to back off the right way.
    */
   // A top that falls gently away from its edge at x = 0, a face 0.2 m wide and 1 m high, low ground beyond.
   const ledge = testWorld({ size: 24, cell: 0.2, height: (x) => (x <= 0 ? 1 + x * 0.06 : x >= 0.2 ? 0 : 1 - x * 5), spawn: { x: 8, z: 0.1 } });
 
-  it('is not a way up onto it', () => {
+  it('is not a way up onto it, and not a place to be held', () => {
+    const s = makeTerrainSample();
     let tried = 0;
     for (const below of [0.46, 0.48, 0.52, 0.6]) {
       for (const z of [0.05, 0.1, 0.15]) {
@@ -295,7 +303,9 @@ describe('the foot of a low ledge', () => {
         p.vx = p.vz = 0;
         p.standingOn = -1;
         p.motor = 'ground';
-        for (let i = 0; i < 20; i++) {
+        ledge.terrain.sample(p.x, p.z, s);
+        p.slopeTan = s.slopeTan;
+        for (let i = 0; i < 30; i++) {
           watch.beforeTick();
           sim.step(neutralInput(p.yaw));
           watch.afterTick();
@@ -305,6 +315,9 @@ describe('the foot of a low ledge', () => {
         }
         tried++;
         expect(watch.report.first).toBeNull();
+        // And not held there: it's slid down off the face, clear of the ledge.
+        expect(p.x).toBeGreaterThan(0.2);
+        expect(p.y).toBeLessThan(0.05);
       }
     }
     expect(tried).toBe(12);

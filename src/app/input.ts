@@ -14,6 +14,8 @@ import { ActionMap, type Action, type Context } from './actions';
 
 /** A single mouse event further than this is a browser glitch (a jump on locking), not a flick. */
 const MAX_MOUSE_STEP = 400;
+/** A press of the scope button shorter than this, in ms, is a tap: the scope stays up. */
+const SCOPE_TAP_MS = 250;
 
 export class InputController {
   yaw = 0;
@@ -36,6 +38,7 @@ export class InputController {
   armed = false;
   /** The scope raised by its toggle key (V), for a trackpad; cleared when the rifle is lowered otherwise. */
   private scopeToggled = false;
+  private zoomPressedAt = -Infinity;
   /** Actions that happen once per press, outside the tick: the debug keys, the marker. */
   onAction: ((action: Action) => void) | null = null;
   onLockChange: ((locked: boolean) => void) | null = null;
@@ -94,7 +97,12 @@ export class InputController {
     on(document, 'mousedown', (e) => {
       if (this.locked) this.inputDown(`Mouse${e.button}`, null);
     });
-    on(document, 'mouseup', (e) => this.down.delete(`Mouse${e.button}`));
+    on(document, 'mouseup', (e) => {
+      const input = `Mouse${e.button}`;
+      // A tap of the scope button leaves the scope up, so a trackpad can then click to fire; holding it just peeks.
+      if (this.map.actions.zoom.inputs.includes(input) && this.down.has(input) && performance.now() - this.zoomPressedAt < SCOPE_TAP_MS) this.scopeToggled = !this.scopeToggled;
+      this.down.delete(input);
+    });
     on(document, 'contextmenu', (e) => {
       if (this.locked) e.preventDefault();
     });
@@ -215,6 +223,7 @@ export class InputController {
       e.preventDefault();
     }
     if (repeat) return;
+    if (this.map.actions.zoom.inputs.includes(input)) this.zoomPressedAt = performance.now();
     this.down.add(input);
     for (const a of actions) {
       if (this.map.actions[a].kind !== 'pressed') continue;

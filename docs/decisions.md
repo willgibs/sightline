@@ -14,7 +14,7 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 **Changed.** The runner hands a process all of one camp's runs together, and an experiment may keep the world it last built for its next run (`src/lab/worlds.ts`, one world a process). A world is only read once it's built, and depends on nothing but its mission and the generation half of the tuning, so arms and rolls of the dice can share it. `ladder`, `flaws` and `quiet-kill` do. The overlook experiments don't, because their scene keeps a plan from the building.
 
-**Measured,** the same command before and after, on six camps and six processes: `quiet-kill` 135 s to 40 s, `ladder` 22 s to 14 s. The reports are the same to the character.
+**Measured,** the same command before and after, on six camps and six processes: `quiet-kill` 135 s to 40 s, `ladder` 22 s to 14 s. The reports are the same to the character. All 24 camps and ten arms of `quiet-kill` took 351 s before and 63 s after.
 
 ## 2026-11-09 · The way-in search, a fifth quicker, bit for bit
 
@@ -48,29 +48,43 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 | Suppressed, by how clearly, and a whistle only turns heads | 84% | 84% | 9 of 24 | 9 of 24 |
 | Subsonic at 90 m, by how clearly, and a whistle only turns heads | 67% | 75% | 7 of 23 | 7 of 23 |
 
-**What it says.** Grading what a guard hears barely moves the camp: 99% to 95%, and 98% to 85% for the quietest rifle shot there is. So the law of sound isn't what makes a camp all-or-nothing. What does is how news spreads once one man has it: he shouts, the radio carries it, and in a camp that fights someone blows a whistle that carries 600 m and raises everyone who hears it to searching. Making that whistle a call to look up, and no more, takes the quietest shot to 67%. Even a silent kill, with no whistle blown at all, has 60% of the camp searching 20 s later. Where the siren sounds, it sounds a median 7 s after the man falls, and the target is gone a median 25 s after he fell. The defaults stay as they were: the graded reading is a taste call, and by itself it doesn't buy a quiet kill. `docs/foundation-review.md` says what would.
+**What it says.** Grading what a guard hears barely moves the camp: 99% to 95%, and 98% to 85% for the quietest rifle shot there is. So the law of sound isn't what makes a camp all-or-nothing. What does is how news spreads once one man has it: he shouts, the radio carries it, and in a camp that fights someone blows a whistle that carries 600 m and raises everyone who hears it to searching. Making that whistle a call to look up, and no more, takes the quietest shot to 67%. Even a silent kill, with no whistle blown at all, has 60% of the camp searching 20 s later. Where the siren sounds, it sounds a median 7 s after the man falls, and the target is gone a median 27 s after he fell. The defaults stay as they were: the graded reading is a taste call, and by itself it doesn't buy a quiet kill. `docs/foundation-review.md` says what would.
 
-## 2026-11-09 · The foot of a low ledge is no way up it
+## 2026-11-09 · The foot of a low ledge is no way up it, and a watch that measures where height is gained
 
-**What the new watch found.** Measured where it's gained (the entry below), one run in about fifty still broke the promise, and this one was real: a body sliding down the last of a near-vertical face was carried 1.2 m sideways and 0.43 m up onto the ledge above it in one tick (ROK-8470, tick 286). Terrain rising more than a step inside a body's rim backs it off "downhill", by the ground at the rim point. Where a scarp is narrower than the body, that ground is the top of the ledge, not its face, and if the top falls away from its edge, downhill pointed onto it. Anything under a step high could be mounted that way.
+Two sessions took up the long bot runs' broken promise the same afternoon. The one that landed first is the entry *What the long bot runs found in the motor*, below: a body on steep ground could end a tick higher on a gentler triangle across a seam, and the motor now refuses any rise from steep ground. This entry is what the second found on top of it.
 
-**Changed.** Backing off never goes toward the high ground: where the rim point's own downhill would, the body backs off toward its own centre. It's the same push everywhere else.
+**Where the height was gained.** In the five failing runs traced here, every millimetre was gained on the walkable triangle: the body slid down or across the steep one, crossed the seam, and its speed carried it up the far side. By the letter of rule 10 that isn't height gained on steep ground. The fix below reads the rule more strictly, that a body on steep ground ends no higher wherever it ends, and that's the better promise: it's simple, and the motor can keep it exactly. A body that slides into a gully now stops rising for that tick and walks up from the next.
 
-**What moved.** `SIM_VERSION` 13, and the golden recording is rewritten for it. No pinned run met the case, so no fingerprint and no bench number moved. `tests/steep.test.ts` holds a handmade ledge to it, and fails without the change.
-
-**Checked.** 40 fresh valleys with both bots for 15 minutes each, the movement scenes and 200 ladder towers: 3.7 million ticks, 34 hours of play, every promise held (`npm run fuzz -- --seeds 40 --minutes 15`). The worst gain on steep ground was 2.0 mm, the motor's own allowance.
-
-## 2026-11-09 · The steep-ground promise, measured where it's kept
-
-**What was happening.** Long bot runs stopped on "gained N m on ground too steep to stand on" about one time in five (5 of 24 runs of 12 minutes, on fresh valleys), and nobody knew why. In all five the motor had done nothing wrong. The body had slid off a steep triangle, across it or down it, onto a walkable one that rose the way it was going, and every millimetre was gained on the walkable one. The watch charged the whole tick's rise to where the tick began. It started with the valleys' scarps and gorges, which put steep and walkable triangles side by side far more often.
-
-**The watch now measures the gain where it happens** (`Heightfield.gainOnSteep`): along the line the body moved, triangle by triangle, counting what the terrain rises on the triangles too steep to stand on. It holds a body on the terrain at both ends of a tick to the two things the motor keeps exactly:
-- it never ends a tick on steep ground higher than it began it, wherever it began (the old check never looked at a body that began on walkable ground);
+**The watch measures the gain where it happens** (`Heightfield.gainOnSteep`): along the line the body moved, triangle by triangle, counting what the terrain rises on the triangles too steep to stand on. It holds a body that walks to three things:
+- from steep ground it ends the tick no higher, wherever it ends;
+- onto steep ground it ends no higher either, wherever it began (the check only ever looked at bodies that began on steep ground);
 - it gains nothing on the steep triangle it began the tick on.
 
-**A known inexactness, reported and left.** The motor judges a move by where it ends, so on its way to ground it can stand on, a body can cross a corner of a steep triangle uphill: up to 58 mm in a tick over 34 hours of bot play, never faster than a walkable grade over the move, and nothing it can climb by. The watch reports the most it sees (`seamGain`, and on the body lane's bench) and holds it to no limit. Making it exact means cutting a move at the first steep triangle that rises and sliding along that triangle's contour. That moves every pinned run near steep ground, for something no player can see, so it's written down in the motor's header and left until there's a reason.
+**A real hole that the stricter rule would have turned into a stuck body.** A body sliding down the last of a near-vertical face was carried 1.2 m sideways and 0.43 m up onto the ledge above it in one tick (ROK-8470, tick 286, about one run in fifty). Terrain rising more than a step inside a body's rim backs it off "downhill", by the ground at the rim point. Where a scarp is narrower than the body, that ground is the top of the ledge, not its face, and if the top falls away from its edge, downhill pointed onto it. With the rise refused and the push still pointing the wrong way, the body is held where it is. Backing off now never goes toward the high ground: where the rim point's own downhill would, the body backs off toward its own centre. `SIM_VERSION` 14. `tests/steep.test.ts` holds a handmade ledge to it: without the change the body is lifted or held, and with it the body slides clear.
 
-**What it did.** No behaviour changed: this is the instrument. The five valleys that failed hold, and so does every one found since.
+**A known inexactness, reported and left.** The motor judges a move by where it begins and ends, so between two pieces of ground it can stand on, a body can cross a corner of a steep triangle uphill: up to 68 mm in a tick over 34 hours of bot play, never faster than a walkable grade over the move, and nothing it can climb by. The watch reports the most it sees (`seamGain`, and on the body lane's bench) and holds it to no limit. Making it exact means cutting a move at the first steep triangle that rises and sliding along that triangle's contour. That moves every pinned run near steep ground, for something no player can see, so it's written down in the motor's header and left until there's a reason.
+
+**Checked,** on the merged code: 40 fresh valleys with both bots for 15 minutes each, the movement scenes, 200 ladder towers, and ROK-8470 again. 3.7 million ticks, 34 hours of play, and every promise held (`npm run fuzz -- --seeds 40 --minutes 15`). The worst rise from or onto steep ground was 2.0 mm, the motor's own allowance.
+
+## 2026-11-09 · The owner's first fight: what it found
+
+**The escape really was broken.** The owner's reading: the box "seems to run into a building, get stuck, the target gets in, marked as escaped." On LEB-2534, the camp they played, that's exactly it. The vehicle's way out was a straight line to the gate, and on 21 of 24 camps that line went through something solid. It was held up 12 m along, and four seconds later the camp counted it as away, because giving up in the road ended the same way as reaching the end of it.
+
+**Changed.** The vehicle finds a way across the yard on the site grid with room for its width (`yardRoute`), then follows the road itself, and is away only at the end of it. A vehicle with no way out of the yard counts as disabled, and that's 1 camp in 40.
+
+**The target can be found.** The debug view marks him TARGET, and TARGET aboard once he's in the vehicle.
+
+**The camp's return fire can be read.** The simulated shooter is a stand-in, so it stays small: a figure where the shots come from, and the panel measures each of the camp's rounds along the path it really flew against that spot (`fired back`: how many, the closest, how many would have struck). It can't be hurt. Being hunted is for a person to feel, from a perch (the owner, Nov 9: use whichever method really answers the question).
+
+**Input.** A tap of the scope button now leaves the scope up, so a trackpad can scope and then click to fire; holding it still peeks. Runs kept in the browser can be deleted one at a time or all together.
+
+**What this didn't fix.** On 19 of 24 camps the target is gone a median of 29 s after the first shot (fastest 21 s), which is the owner's larger point: it leaves one long shot or an ambush on the road, and neither takes the base. It's on their desk as a decision.
+## 2026-11-09 · What the long bot runs found in the motor
+
+The weekly run on main, and the same runs on the tree crown branch, broke a body's promise in about one run in five: "gained N m on ground too steep to stand on" (rule 10). Most of it was real: a body on steep ground could step up across a triangle seam onto a higher, gentler one, by up to 45 mm, because only the destination's slope was asked about. The motor now also refuses a rise when the body starts on steep ground. The rest wasn't a broken promise at all: a mantle from steep ground rises as a mantle should, and the check now applies to bodies that stay on the ground. Six of the seven failing valleys pass an hour of play.
+
+**Still open:** one failing run (RAK-4743, the fuzzing bot) ends with a torso 1.3 mm inside a rock as a body starts to lie down beside it on a slope. It's in the lying-down chain and is small and rare, but it is a broken promise, and the weekly run will keep saying so until it's fixed.
 
 ## 2026-11-09 · What you can't see through, you can't shoot through
 

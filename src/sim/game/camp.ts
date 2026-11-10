@@ -5,7 +5,9 @@ import type { System, TickContext } from '../kernel/systems';
 import { Faction, type EntityBase } from '../kernel/state';
 import { clearOfBodies } from '../body';
 import { Blocks, type Collider } from '../kernel/world/colliders';
-import { Cell, cellAt } from '../kernel/world/grid';
+import { Cell, cellAt, cellIndex } from '../kernel/world/grid';
+import { GridSearch } from '../kernel/world/search';
+import type { WorkCounts } from '../kernel/work';
 import { Surface } from '../kernel/world/surfaces';
 import type { World } from '../kernel/world/world';
 
@@ -71,10 +73,126 @@ export function boardingPoint(world: World, v: VehicleSpec, tuning: Tuning): { x
   return sides[0]!;
 }
 
-/** The way the target's vehicle leaves (E7): from the gate on, down the road. */
-export function escapeRoute(world: World): Array<{ x: number; z: number }> {
+/** The way the target's vehicle leaves (E7): from the gate on, down the road itself, as far as `driveOut` takes it. */
+export function escapeRoute(world: World, tuning: Tuning): Array<{ x: number; z: number }> {
   const escape = world.camp.layout?.skeleton.escape;
-  return escape ? escape.slice(3).map((p) => ({ x: p.x, z: p.z })) : [];
+  if (!escape) return [];
+  const gate = escape[3]!;
+  const route = [{ x: gate.x, z: gate.z }];
+  const road = world.features.road.points;
+  let first = 0;
+  let nearest = Infinity;
+  road.forEach((p, k) => {
+    const d = (p.x - gate.x) * (p.x - gate.x) + (p.z - gate.z) * (p.z - gate.z);
+    if (d < nearest) {
+      nearest = d;
+      first = k;
+    }
+  });
+  let gone = 0;
+  for (let k = first + 1; k < road.length && gone < tuning.brain.alarm.flee.driveOut; k++) {
+    const p = road[k]!;
+    const last = route[route.length - 1]!;
+    gone += Math.sqrt((p.x - last.x) * (p.x - last.x) + (p.z - last.z) * (p.z - last.z));
+    route.push({ x: p.x, z: p.z });
+  }
+  // A camp whose road ends at its gate still has the old way out.
+  return route.length > 1 ? route : escape.slice(3).map((p) => ({ x: p.x, z: p.z }));
+}
+
+/**
+ * The way a vehicle gets across the yard from where it's parked to the gate: round the
+ * buildings on the site grid, with room for its width. Cells near anything a body can't
+ * cross are closed, its own parking place excepted. The waypoints are pulled straight
+ * where the yard allows. Null if it's boxed in, or the search runs out (rule 18).
+ */
+export function yardRoute(world: World, tuning: Tuning, v: VehicleSpec, work?: WorkCounts): Array<{ x: number; z: number }> | null {
+  const gate = world.camp.layout?.skeleton.escape[3];
+  if (!gate) return null;
+  const L = world.grid.site;
+  const F = tuning.brain.alarm.flee;
+  const parked = Math.sqrt(v.length * v.length + v.width * v.width) / 2 + tuning.gen.grid.bodyRadius + L.cell;
+  const shut = new Uint8Array(L.nx * L.nz);
+  for (let j = 0; j < L.nz; j++) {
+    for (let i = 0; i < L.nx; i++) {
+      const c = j * L.nx + i;
+      if ((L.flags[c]! & Cell.Walkable) !== 0) continue;
+      const dx = L.x0 + (i + 0.5) * L.cell - v.x;
+      const dz = L.z0 + (j + 0.5) * L.cell - v.z;
+      if (dx * dx + dz * dz > parked * parked) shut[c] = 1;
+    }
+  }
+  // Walkable already keeps a body's radius from anything solid; the rest of its half-width is the vehicle's.
+  const k = Math.ceil(Math.max(0, v.width / 2 + F.clearance - tuning.gen.grid.bodyRadius) / L.cell);
+  const closed = widen(shut, L.nx, L.nz, k);
+  const open = (c: number): boolean => closed[c] === 0 && (L.flags[c]! & Cell.Walkable) !== 0;
+  const nearest = (x: number, z: number): number => {
+    const ci = Math.floor((x - L.x0) / L.cell);
+    const cj = Math.floor((z - L.z0) / L.cell);
+    const reach = Math.ceil(F.routeReach / L.cell);
+    let best = -1;
+    let bestD = Infinity;
+    for (let j = Math.max(0, cj - reach); j <= Math.min(L.nz - 1, cj + reach); j++) {
+      for (let i = Math.max(0, ci - reach); i <= Math.min(L.nx - 1, ci + reach); i++) {
+        const c = j * L.nx + i;
+        if (!open(c)) continue;
+        const dx = L.x0 + (i + 0.5) * L.cell - x;
+        const dz = L.z0 + (j + 0.5) * L.cell - z;
+        const d = dx * dx + dz * dz;
+        if (d < bestD) {
+          bestD = d;
+          best = c;
+        }
+      }
+    }
+    return best;
+  };
+  const start = nearest(v.x, v.z);
+  const goal = nearest(gate.x, gate.z);
+  if (start < 0 || goal < 0) return null;
+  const cells: number[] = [];
+  const found = new GridSearch(L).path(start, goal, { cost: (_, to, length) => (open(to) ? length : -1), maxExpansions: F.routeExpansions, ...(work ? { work } : {}) }, cells);
+  if (!found.found) return null;
+  const at = (c: number) => ({ x: L.x0 + ((c % L.nx) + 0.5) * L.cell, z: L.z0 + (Math.floor(c / L.nx) + 0.5) * L.cell });
+  const clearLine = (a: number, b: number): boolean => {
+    const p = at(a);
+    const q = at(b);
+    const steps = Math.ceil(Math.sqrt((q.x - p.x) * (q.x - p.x) + (q.z - p.z) * (q.z - p.z)) / (L.cell / 2));
+    for (let s = 0; s <= steps; s++) {
+      const c = cellIndex(L, p.x + ((q.x - p.x) * s) / steps, p.z + ((q.z - p.z) * s) / steps);
+      if (c < 0 || !open(c)) return false;
+    }
+    return true;
+  };
+  const out = [at(start)];
+  for (let n = 0; n < cells.length - 1; ) {
+    let far = cells.length - 1;
+    while (far > n + 1 && !clearLine(cells[n]!, cells[far]!)) far--;
+    out.push(at(cells[far]!));
+    n = far;
+  }
+  return out;
+}
+
+/** The cells within `k` of a marked cell, by columns and then rows. */
+function widen(marked: Uint8Array, nx: number, nz: number, k: number): Uint8Array {
+  const pass = (src: Uint8Array, along: (a: number, b: number) => number, na: number, nb: number): Uint8Array => {
+    const out = new Uint8Array(src.length);
+    for (let b = 0; b < nb; b++) {
+      let last = -Infinity;
+      for (let a = 0; a < na; a++) {
+        if (src[along(a, b)]) last = a;
+        if (a - last <= k) out[along(a, b)] = 1;
+      }
+      last = Infinity;
+      for (let a = na - 1; a >= 0; a--) {
+        if (src[along(a, b)]) last = a;
+        if (last - a <= k) out[along(a, b)] = 1;
+      }
+    }
+    return out;
+  };
+  return pass(pass(marked, (a, b) => b * nx + a, nx, nz), (a, b) => a * nx + b, nz, nx);
 }
 
 /** The way a reinforcement truck comes in (E8): up the road from the edge of the map, stopping short of the gate. Null for a camp with no road laid out. */
