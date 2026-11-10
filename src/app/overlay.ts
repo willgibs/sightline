@@ -35,6 +35,12 @@ export class Overlay {
   /** The start screen's title: the phase, or the scene being played. */
   private startTitle = 'Phase 0 · Foundations';
 
+  /** Shows or hides one line of the key legend: a key that does nothing in this run isn't offered. */
+  setKey(action: Action, shown: boolean): void {
+    const line = this.root.querySelector<HTMLElement>(`.keys [data-key="${action}"]`);
+    if (line) line.style.display = shown ? '' : 'none';
+  }
+
   constructor(
     private readonly root: HTMLElement,
     handlers: OverlayHandlers,
@@ -54,11 +60,12 @@ export class Overlay {
       [['binoculars'], 'binoculars'],
       [['zeroUp', 'zeroDown'], 'zero'],
       [['suppressor'], 'suppressor'],
+      [['load'], 'load: match or subsonic'],
       [['throw'], 'throw a stone'],
       [['assists'], 'instruments'],
       [['debugView'], 'debug view'],
     ];
-    const keys = legend.map(([actions, text]) => `<span>${keysHtml(map, actions)} ${text}</span>`).join('\n          ');
+    const keys = legend.map(([actions, text]) => `<span data-key="${actions[0]}">${keysHtml(map, actions)} ${text}</span>`).join('\n          ');
     root.innerHTML = `
       <div class="overlay-panel">
         <div class="wordmark">SIGHTLINE</div>

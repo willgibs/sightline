@@ -2,6 +2,7 @@ import { campMission, defaultCampSpec, generateWorld } from '../../generation';
 import { giveBrains } from '../brains';
 import { campRules } from '../combat';
 import { campCheckins, campCommander, campDevices, commanderOf, commsVoice, giveCampDevices, giveCommander } from '../comms';
+import { giveProtection } from '../protection';
 import { player } from '../entities';
 import { truckRoute } from '../camp';
 import { vehicleDrive } from '../escape';
@@ -23,7 +24,13 @@ import type { World } from '../../kernel/world/world';
  * Parameters (`?scene=live-camp&params=seed=LEB-2534`, with `&difficulty=0.5` inside params
  * as `seed=LEB-2534%26difficulty=0.7`): which camp, and how hard. `perch=1` starts you on
  * the camp's best overview, for a sitting that's about the fight and not the walk there.
+ * `ready=alert` is a camp that protects its target (game/protection.ts): he goes to his hard
+ * room at the first sign of trouble and leaves only when the relief has come for him. Without
+ * it the camp is relaxed, and runs him to his vehicle the moment the siren sounds.
  */
+
+export const READINESS = ['relaxed', 'alert'] as const;
+export type Readiness = (typeof READINESS)[number];
 
 export interface LiveCampParams {
   seed: string;
@@ -32,9 +39,11 @@ export interface LiveCampParams {
   off: CampSwitch[];
   /** Start on the camp's best overview. */
   perch: boolean;
+  /** How ready the camp is for trouble. */
+  ready: Readiness;
 }
 
-const DEFAULTS: LiveCampParams = { seed: 'LEB-2534', difficulty: defaultCampSpec().difficulty, off: [], perch: false };
+const DEFAULTS: LiveCampParams = { seed: 'LEB-2534', difficulty: defaultCampSpec().difficulty, off: [], perch: false, ready: 'relaxed' };
 
 export function parseLiveCamp(text: string | undefined): LiveCampParams {
   const p: LiveCampParams = { ...DEFAULTS };
@@ -48,13 +57,16 @@ export function parseLiveCamp(text: string | undefined): LiveCampParams {
       p.difficulty = d;
     } else if (key === 'off') p.off = parseSwitches(value ?? '');
     else if (key === 'perch') p.perch = value !== '0';
-    else throw new Error(`A live camp doesn't know '${part}'`);
+    else if (key === 'ready') {
+      if (!(READINESS as readonly string[]).includes(value ?? '')) throw new Error(`A live camp is ${READINESS.join(' or ')}, not '${value}'`);
+      p.ready = value as Readiness;
+    } else throw new Error(`A live camp doesn't know '${part}'`);
   }
   return p;
 }
 
 export function formatLiveCamp(p: LiveCampParams): string {
-  return `seed=${p.seed}&difficulty=${p.difficulty}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}${p.perch ? '&perch=1' : ''}`;
+  return `seed=${p.seed}&difficulty=${p.difficulty}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}${p.perch ? '&perch=1' : ''}${p.ready !== 'relaxed' ? `&ready=${p.ready}` : ''}`;
 }
 
 /** The camp's best overview: the perch that sees the most guard time. */
@@ -78,6 +90,7 @@ export function liveCamp(params?: string): Scene {
       giveCommander(sim);
       giveCampDevices(sim);
       commanderOf(sim)!.camp.fights = true;
+      if (p.ready === 'alert') giveProtection(sim);
       // Here, as in the missions to come, the job isn't done until you're out: at the end of the road.
       const road = truckRoute(sim.world, sim.tuning);
       if (road) commanderOf(sim)!.camp.objective!.getOut = { x: road[0]!.x, z: road[0]!.z };

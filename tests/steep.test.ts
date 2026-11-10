@@ -10,7 +10,7 @@ import { Blocks, circleOverlaps } from '../src/sim/kernel/world/colliders';
 import { makeTerrainSample } from '../src/sim/kernel/world/heightfield';
 import { InvariantWatch, STEEP_TOLERANCE } from '../src/sim/body';
 import { ChaosBot } from '../src/sim/game/bots/chaos';
-import { testWorld } from './fixtures';
+import { EAST, testWorld } from './fixtures';
 
 /**
  * Ground too steep to stand on is a barrier from every angle, on real valleys. Before the
@@ -153,5 +153,173 @@ describe('momentum on steep ground', () => {
       watch.afterTick();
     }
     expect(watch.report.first).toBeNull();
+  });
+});
+
+describe('height gained on steep ground, measured where it is gained', () => {
+  /**
+   * The long bot runs of Nov 9: about one in five stopped on "gained N m on ground too steep
+   * to stand on", in fresh valleys with scarps and gorges (HOL-1699, GOL-5605, NUK-1016,
+   * BUD-7023, VOD-7220). In every one the body had slid off a steep triangle, across or down
+   * it, onto a walkable one that rose the way it was going, and every millimetre was gained
+   * on the walkable one. The watch charged the whole tick's rise to where the tick began.
+   * These hold it to what the promise says: height gained on the steep ground itself.
+   */
+  const steep = tanMax * 1.01;
+  const gentle = 0.5;
+  const s = makeTerrainSample();
+  // A gully: a face too steep to stand on falls to x = 0, and walkable ground rises beyond it.
+  const gully = testWorld({ cell: 0.5, height: (x) => (x < 0 ? -x * steep : x * gentle), spawn: { x: -20, z: 0 } });
+  // A walkable apron below x = 0, and a face too steep to stand on above it.
+  const face = testWorld({ cell: 0.5, height: (x) => (x < 0 ? x * gentle : x * steep), spawn: { x: -20, z: 0 } });
+
+  it('counts only what a line rises on triangles too steep to stand on', () => {
+    const g = gully.terrain;
+    // Down the last of the face and up the far side: nothing gained on the face, whatever the net.
+    expect(g.heightAt(0.1, 0.2) - g.heightAt(-0.02, 0.2)).toBeGreaterThan(0.03);
+    expect(g.gainOnSteep(-0.02, 0.2, 0.1, 0.2, tanMax)).toBe(0);
+    // Back up the face: all of it.
+    expect(g.gainOnSteep(-0.02, 0.2, -0.3, 0.2, tanMax)).toBeCloseTo(0.28 * steep, 5);
+    // From the far side over the bottom and up the face: only the part on the face.
+    expect(g.gainOnSteep(0.1, 0.2, -0.3, 0.2, tanMax)).toBeCloseTo(0.3 * steep, 5);
+    // Along the face, level: nothing, across every grid line and diagonal on the way.
+    expect(g.gainOnSteep(-1.3, -2.2, -1.3, 2.4, tanMax)).toBeCloseTo(0, 6);
+    // Up the apron and onto the face: the face's share, however the line is cut on the way.
+    const f = face.terrain;
+    expect(f.gainOnSteep(-0.4, 0.1, 0.25, 0.9, tanMax)).toBeCloseTo(0.25 * steep, 5);
+    // Wholly on walkable ground: nothing, uphill or not.
+    expect(f.gainOnSteep(-3, 0.1, -0.2, 1.7, tanMax)).toBe(0);
+    // A line of any length adds up to the terrain's own rise, when all of it is steep and uphill.
+    expect(f.gainOnSteep(0.3, -1.1, 4.7, 2.9, tanMax)).toBeCloseTo(f.heightAt(4.7, 2.9) - f.heightAt(0.3, -1.1), 4);
+  });
+
+  it('stops a body rising as it slides off a steep face, and lets it walk up the far side from the next tick', () => {
+    let tried = 0;
+    for (const speed of [1.4, 3, 5.5]) {
+      for (const offDeg of [0, 30, 60]) {
+        // Near enough the bottom that the slowest of them would be across it within the tick.
+        for (const start of [0.005, 0.01, 0.02]) {
+          const sim = new Simulation(gully, T);
+          const watch = new InvariantWatch(sim);
+          const p = sim.player;
+          p.x = -start;
+          p.z = 0.2;
+          p.y = gully.terrain.heightAt(p.x, p.z);
+          p.standingOn = -1;
+          p.motor = 'ground';
+          const a = (offDeg * Math.PI) / 180;
+          p.vx = speed * Math.cos(a);
+          p.vz = speed * Math.sin(a);
+          gully.terrain.sample(p.x, p.z, s);
+          p.slopeTan = s.slopeTan;
+          expect(s.slopeTan).toBeGreaterThan(tanMax);
+          const y0 = p.y;
+          // The tick it leaves the face: its speed would carry it up the far side, and may not.
+          watch.beforeTick();
+          sim.step(neutralInput(p.yaw));
+          watch.afterTick();
+          expect(p.y - y0).toBeLessThan(STEEP_TOLERANCE);
+          // Then it walks east, across the bottom and up ground it can stand on.
+          for (let i = 0; i < 45; i++) {
+            watch.beforeTick();
+            sim.step({ ...neutralInput(EAST), moveZ: 1 });
+            watch.afterTick();
+          }
+          tried++;
+          expect(p.x).toBeGreaterThan(1);
+          expect(p.y).toBeGreaterThan(y0 + 0.3);
+          expect(watch.report.first).toBeNull();
+          expect(watch.report.steepGain).toBeLessThan(STEEP_TOLERANCE);
+        }
+      }
+    }
+    expect(tried).toBe(27);
+  });
+
+  it('still catches a body that goes up a steep face, wherever its tick began', () => {
+    // A motor that broke its promise, stood in for by moving the body after the tick.
+    const lifted = (world: World, fromX: number, toX: number): InvariantWatch => {
+      const sim = new Simulation(world, T);
+      const watch = new InvariantWatch(sim);
+      const p = sim.player;
+      p.x = fromX;
+      p.z = 0.2;
+      p.y = world.terrain.heightAt(p.x, p.z);
+      p.vx = p.vz = 0;
+      p.standingOn = -1;
+      p.motor = 'ground';
+      watch.beforeTick();
+      sim.step(neutralInput(p.yaw));
+      p.x = toX;
+      p.y = world.terrain.heightAt(p.x, p.z);
+      p.motor = 'ground';
+      p.standingOn = -1;
+      watch.afterTick();
+      return watch;
+    };
+    // Up the face from on it.
+    expect(lifted(face, 0.5, 0.52).report.first?.what).toMatch(/gained 0\.01\d+ m on ground too steep/);
+    // Onto the face from the walkable apron below it: the check that charged a tick's rise to where it began never saw this.
+    expect(lifted(face, -0.01, 0.02).report.first?.what).toMatch(/ended 0\.02\d+ m higher, on ground too steep/);
+    // Up the last of a face and over its brow onto walkable ground (the fuzz run's NEM-4083): what it gained on the face counts.
+    const brow = testWorld({ cell: 0.5, height: (x) => (x < 0 ? x * steep : x * gentle), spawn: { x: -20, z: 0 } });
+    expect(lifted(brow, -0.03, 0.01).report.first?.what).toMatch(/gained 0\.03\d+ m on ground too steep/);
+    // Down one face of a notch and a little way up the other, ending no higher: a slide, and no promise broken.
+    const notch = testWorld({ cell: 0.5, height: (x) => Math.abs(x) * steep, spawn: { x: -20, z: 0 } });
+    const slid = lifted(notch, -0.06, 0.02);
+    expect(slid.report.first).toBeNull();
+    expect(slid.report.seamGain).toBeCloseTo(0.02 * steep, 4);
+    // And the same distances on walkable ground break nothing.
+    expect(lifted(face, -0.52, -0.5).report.first).toBeNull();
+  });
+});
+
+describe('the foot of a low ledge', () => {
+  /**
+   * The fuzz run's ROK-8470 (Nov 9): a body sliding down the last of a near-vertical face,
+   * with the top of it less than a step above its feet's reach and narrower than its own
+   * radius away. The terrain inside its rim was the top of the ledge, not the face, and that
+   * ground fell away from the edge, so "back off downhill" pointed onto it: the body was
+   * carried 1.2 m sideways and 0.43 m up in one tick, onto ground it had no way to climb to.
+   * Refusing the rise alone (a body on steep ground ends no higher) leaves the push pointing
+   * the wrong way, and the body held at the foot of the ledge: it has to back off the right way.
+   */
+  // A top that falls gently away from its edge at x = 0, a face 0.2 m wide and 1 m high, low ground beyond.
+  const ledge = testWorld({ size: 24, cell: 0.2, height: (x) => (x <= 0 ? 1 + x * 0.06 : x >= 0.2 ? 0 : 1 - x * 5), spawn: { x: 8, z: 0.1 } });
+
+  it('is not a way up onto it, and not a place to be held', () => {
+    const s = makeTerrainSample();
+    let tried = 0;
+    for (const below of [0.46, 0.48, 0.52, 0.6]) {
+      for (const z of [0.05, 0.1, 0.15]) {
+        const sim = new Simulation(ledge, T);
+        const watch = new InvariantWatch(sim);
+        const p = sim.player;
+        // On the face, with the top `below` metres above its feet: within its rim, and more than a step up.
+        p.x = below / 5;
+        p.z = z;
+        p.y = ledge.terrain.heightAt(p.x, p.z);
+        expect(1 - p.y).toBeCloseTo(below, 3);
+        p.vx = p.vz = 0;
+        p.standingOn = -1;
+        p.motor = 'ground';
+        ledge.terrain.sample(p.x, p.z, s);
+        p.slopeTan = s.slopeTan;
+        for (let i = 0; i < 30; i++) {
+          watch.beforeTick();
+          sim.step(neutralInput(p.yaw));
+          watch.afterTick();
+          // Never onto the top, and never up.
+          expect(p.x).toBeGreaterThan(0);
+          expect(p.y).toBeLessThanOrEqual(1 - below + 1e-6);
+        }
+        tried++;
+        expect(watch.report.first).toBeNull();
+        // And not held there: it's slid down off the face, clear of the ledge.
+        expect(p.x).toBeGreaterThan(0.2);
+        expect(p.y).toBeLessThan(0.05);
+      }
+    }
+    expect(tried).toBe(12);
   });
 });

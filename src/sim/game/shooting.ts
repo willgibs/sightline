@@ -108,6 +108,14 @@ const rifleSystem: System = {
       else if (c.kind === 'suppressor' && rifle.fitting <= 0) {
         rifle.suppressed = !rifle.suppressed;
         rifle.fitting = ctx.tuning.ballistics.rifle.fitTime;
+      } else if (c.kind === 'load' && rifle.fitting <= 0) {
+        // The next load in the kit, round again to the first: the magazine out and another in. A kit with one has nothing to change to.
+        const carries: Readonly<Record<string, boolean>> = ctx.tuning.ballistics.rifle.carries;
+        const loads = Object.keys(carries).filter((k) => carries[k]).sort(); // unique: a record's keys
+        if (loads.length < 2) continue;
+        rifle.load = loads[(loads.indexOf(rifle.load) + 1) % loads.length]!;
+        rifle.fitting = ctx.tuning.ballistics.rifle.loadTime;
+        rifle.swap = 'load';
       }
     }
   },
@@ -392,7 +400,8 @@ export function fireFrom(ctx: TickContext, p: PlayerEntity, from: { x: number; y
   solveAim(eye, at, 0, 0, zero, b, B.maxFlight, aim);
   const flight = launch({ x: 0, y: 0, z: 0, dx: 0, dy: 0, dz: 0, t: 0, v0: 0, k: 0, g: 0, wx: 0, wz: 0 }, eye, aim, zero, b, t);
   const shotId = ctx.emit({ type: 'shot', source: p.id, t, x: eye.x, y: eye.y, z: eye.z, dx: flight.dx, dy: flight.dy, dz: flight.dz, speed: b.v0, drag: b.k, wx: b.wx, wz: b.wz });
-  const radius = suppressed ? B.sound.suppressedReport : B.sound.report;
+  // As the rifle's own report is (shoot, above): a subsonic load's is quieter still.
+  const radius = (suppressed ? B.sound.suppressedReport : B.sound.report) * (b.v0 < a.speedOfSound ? B.sound.subsonicReport : 1);
   ctx.emit({ type: 'report', source: p.id, t, cause: shotId, x: eye.x, y: eye.y, z: eye.z, surface: Surface.Dirt, loudness: radius / T.noise.radiusPerUnit, radius, suppressed: suppressed ? 1 : 0 });
   const bullet = ctx.spawn((id): BulletEntity => ({ id, kind: 'bullet', faction: p.faction, bullet: { shooter: p.id, shot: shotId, flight, swept: t } }));
   flyAndStrike(ctx, bullet, (ctx.tick - 1) / T.sim.tickHz);
@@ -464,6 +473,7 @@ const aimSystem: System = {
     }
     rifle.bolt = Math.max(0, rifle.bolt - dt);
     rifle.fitting = Math.max(0, rifle.fitting - dt);
+    if (rifle.fitting === 0 && rifle.swap) delete rifle.swap;
     // The scope comes up while it's held, unless the body is sprinting or busy with the suppressor.
     const up = ctx.input.optic === 1 && body.gait !== 'sprint' && rifle.fitting <= 0;
     const step = dt / Math.max(B.rifle.raiseTime, 1e-6);

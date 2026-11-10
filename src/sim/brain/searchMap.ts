@@ -1,6 +1,6 @@
 import type { Tuning } from '../../config/tuning';
 import { Cell, cellIndex, type GridLayer } from '../kernel/world/grid';
-import type { World } from '../kernel/world/world';
+import type { Ground } from './mind';
 
 /**
  * The camp's search map (E4): one grid, owned by the camp, of where the intruder could
@@ -80,7 +80,7 @@ export function injectBelief(m: SearchMap, x: number, z: number, radius: number,
  * off-map neighbours keeping theirs (the sum stays the same). Called at a fixed rate
  * (rule 17).
  */
-export function spreadBelief(m: SearchMap, rate: number, world: World): void {
+export function spreadBelief(m: SearchMap, rate: number, world: Ground): void {
   const { n, p } = m;
   const out = scratch;
   out.length = p.length;
@@ -114,7 +114,7 @@ export function spreadBelief(m: SearchMap, rate: number, world: World): void {
 
 const DIRS = [1, 0, 0, 1, -1, 0, 0, -1, 1, 1, -1, 1, -1, -1, 1, -1];
 
-function neighbour(m: SearchMap, i: number, j: number, world: World): number {
+function neighbour(m: SearchMap, i: number, j: number, world: Ground): number {
   if (i < 0 || j < 0 || i >= m.n || j >= m.n) return -1;
   const x = m.x0 + (i + 0.5) * m.cell;
   const z = m.z0 + (j + 0.5) * m.cell;
@@ -122,7 +122,7 @@ function neighbour(m: SearchMap, i: number, j: number, world: World): number {
   return j * m.n + i;
 }
 
-function walkable(world: World, x: number, z: number): boolean {
+function walkable(world: Ground, x: number, z: number): boolean {
   const s = cellIndex(world.grid.site, x, z);
   const L: GridLayer = s >= 0 ? world.grid.site : world.grid.map;
   const k = s >= 0 ? s : cellIndex(L, x, z);
@@ -134,7 +134,7 @@ function walkable(world: World, x: number, z: number): boolean {
  * line of sight from there by the world's terrain and cover, lose belief. Rule 18: at
  * most `maxRays` cells are tested, nearest first in a fixed order.
  */
-export function clearSeen(m: SearchMap, x: number, z: number, radius: number, world: World, tuning: Tuning, eyeHeight: number): void {
+export function clearSeen(m: SearchMap, x: number, z: number, radius: number, world: Ground, tuning: Tuning, eyeHeight: number): void {
   const i0 = Math.floor((x - m.x0) / m.cell);
   const j0 = Math.floor((z - m.z0) / m.cell);
   const reach = Math.ceil(radius / m.cell);
@@ -162,7 +162,7 @@ export function clearSeen(m: SearchMap, x: number, z: number, radius: number, wo
 }
 
 /** True if a ground point can be seen across the terrain and cover from eye height at (x, z). */
-function seen(world: World, x: number, z: number, cx: number, cz: number, eyeHeight: number, step: number, height: number): boolean {
+function seen(world: Ground, x: number, z: number, cx: number, cz: number, eyeHeight: number, step: number, height: number): boolean {
   const ey = world.terrain.heightAt(x, z) + eyeHeight;
   const dx = cx - x;
   const dz = cz - z;

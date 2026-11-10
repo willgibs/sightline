@@ -5,8 +5,9 @@ import type { PendingSound } from './senses';
  * How guards take each kind of event they sense (A9): the wiring point for the stimuli
  * the other labs bring. A sound event (one with SoundFields) is heard by the law of sound
  * whatever it is; this says what it is heard as, which sets what it raises a guard to
- * (perception/awareness.ts, soundLevel): a sound by its clarity, a shot to searching, a
- * voice to its line's level.
+ * (perception/awareness.ts, soundLevel): a sound by its clarity, a shot by which of its
+ * sounds it was and how clearly (tuning: perception.awareness.shots), a voice to its
+ * line's level.
  *
  * Each source is wired in when it is on `main`:
  * - lab B's report, impact and bolt are shots (an impact draws the eye to where it struck),

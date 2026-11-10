@@ -29,6 +29,7 @@ export type Action =
   | 'zeroUp'
   | 'zeroDown'
   | 'suppressor'
+  | 'load'
   | 'throw'
   | 'assists'
   // Anywhere, once per press.
@@ -95,6 +96,7 @@ export const DEFAULT_ACTIONS: Readonly<Record<Action, ActionSpec>> = {
   zeroUp: { context: 'play', kind: 'pressed', inputs: ['ArrowUp', 'PageUp'], label: 'zero up' },
   zeroDown: { context: 'play', kind: 'pressed', inputs: ['ArrowDown', 'PageDown'], label: 'zero down' },
   suppressor: { context: 'play', kind: 'pressed', inputs: ['KeyT'], label: 'suppressor' },
+  load: { context: 'play', kind: 'pressed', inputs: ['KeyY'], label: 'load' },
   throw: { context: 'play', kind: 'pressed', inputs: ['KeyX'], label: 'throw' },
   assists: { context: 'play', kind: 'pressed', inputs: ['KeyH'], label: 'assists' },
   mark: { context: 'play', kind: 'pressed', inputs: ['KeyM'], label: 'mark moment' },

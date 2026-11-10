@@ -39,7 +39,15 @@ import type { DebugDraw } from '../kernel/debugDraw';
  *   shove it but never through a wall. Entities' shapes hold this only because whatever
  *   moves one never moves it into a body;
  * - on the ground, the body never gains height on ground steeper than maxSlopeDeg, from
- *   any angle of approach;
+ *   any angle of approach. Exactly: from such ground it ends a tick no higher, wherever it
+ *   ends; onto such ground it ends no higher either; and it gains nothing on the steep
+ *   triangle it began the tick on. A move is judged by where it begins and ends
+ *   (terrainBlocks), so between two pieces of ground it can stand on it may cross a corner
+ *   of a steep triangle uphill, by centimetres and never faster than a walkable grade over
+ *   the move: the watch reports the most it sees (invariants.ts, seamGain). Making that
+ *   exact means cutting a move where it meets the first steep triangle that rises, and
+ *   sliding along that triangle's contour; it changes every run near steep ground, so it
+ *   waits for a reason to;
  * - a lean (lean.ts) keeps the head and shoulders clear of anything solid, of the terrain and of
  *   other bodies, and grows by no more than its rate. (The world can force it back faster.)
  * - a lying body (chain.ts) is a chain of circles along its axis, every one of which keeps
@@ -690,8 +698,19 @@ function rimPush(world: World, x: number, z: number, feet: number, r: number, st
     // Back off along the downhill direction far enough to drop the rim point below a step.
     const s = Math.max(sample.slopeTan, 1e-6);
     const back = Math.min(r, excess / s + 1e-4);
-    px -= (sample.gx / s) * back;
-    pz -= (sample.gz / s) * back;
+    let bx = -(sample.gx / s) * back;
+    let bz = -(sample.gz / s) * back;
+    // The ground at the rim point isn't always the face: where a scarp is narrower than the
+    // body, it's the top of it, and that ground's own downhill can point further onto the
+    // top. Backing off is away from the high ground, toward the body's centre, and never the
+    // other way: a body sliding along the foot of a low ledge was otherwise carried up onto
+    // it, most of a step in a tick (the fuzz run's ROK-8470, Nov 9).
+    if (bx * ux + bz * uz > 0) {
+      bx = -ux * back;
+      bz = -uz * back;
+    }
+    px += bx;
+    pz += bz;
   }
   const l2 = px * px + pz * pz;
   if (l2 < 1e-16) return false;

@@ -25,6 +25,8 @@ export interface GuardState {
   order: Order;
   /** A reinforcement's own place, where he got down from the truck (comms.ts): it's where he goes back to, instead of the post he's borrowed his role from. */
   reserve?: { x: number; z: number; yaw: number };
+  /** He's in the way of one of the camp's own vehicles (game/escape.ts): which way to step, and until which tick. Below his brain, as a shove is: absent otherwise. */
+  aside?: { x: number; z: number; until: number };
 }
 
 /** A guard's starting state, from the camp's spawn at `index`: on his post, or on the deck of his tower. */
@@ -43,6 +45,7 @@ export interface CampFacts {
   alarms: readonly { x: number; z: number }[];
   escape: Readonly<{ x: number; z: number }> | null;
   fights?: boolean;
+  protects?: Readonly<{ x: number; z: number }> | null;
 }
 const NO_FACTS: CampFacts = { alarms: NO_ALARMS, escape: null };
 /** The awareness of a guard without senses: unaware, attending to nothing. */
@@ -74,6 +77,7 @@ export function guardMind(g: GuardEntity, world: World, tuning: Tuning, tick: nu
   out.alarms = facts.alarms;
   out.escape = facts.escape;
   out.fights = facts.fights === true;
+  out.protects = facts.protects ?? null;
   return out;
 }
 
@@ -94,7 +98,7 @@ function reservePost(borrowed: GuardSpawn, at: { x: number; z: number; yaw: numb
 /** A mind for guardMind to fill: every field is written on each use. */
 export function emptyMind(): Writable<GuardMind> {
   const unset = null as never;
-  return { fights: false, id: 0, self: unset, head: 0, post: unset, world: unset, tuning: unset, tick: 0, time: 0, percepts: NO_PERCEPTS, awareness: UNAWARE, belief: null, brain: null, draw: noDraw, nav: noNav, alarms: NO_ALARMS, escape: null };
+  return { fights: false, protects: null, id: 0, self: unset, head: 0, post: unset, world: unset, tuning: unset, tick: 0, time: 0, percepts: NO_PERCEPTS, awareness: UNAWARE, belief: null, brain: null, draw: noDraw, nav: noNav, alarms: NO_ALARMS, escape: null };
 }
 
 const noDraw = (): number => {

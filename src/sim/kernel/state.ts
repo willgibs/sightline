@@ -23,9 +23,10 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * (Solid entities are a new kind, not a change of layout: existing states read the same.)
  * 6: the outcome. 7: guards keep the order their brain last gave. 8: bodies keep a lean and a
  * mantle; the player's controls keep a climb press (lab C, Nov 8). 9: the valley's guards
- * carry their senses (A13).
+ * carry their senses (A13). 10: a vehicle on its way out keeps who is in its cab, so that he
+ * can get out again.
  */
-export const STATE_SCHEMA = 9;
+export const STATE_SCHEMA = 10;
 
 export type EntityId = number;
 

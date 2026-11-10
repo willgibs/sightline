@@ -4,6 +4,7 @@ import type { Simulation } from '../../sim/game/sim';
 import { sceneOver, sceneTicks, startScene, type Scene } from '../../sim/kernel/scene';
 import type { Arm, Experiment } from '../experiment';
 import { CampGauges } from '../gauges';
+import { keptWorld } from '../worlds';
 
 /**
  * The ladder of plans against today's camp (docs/camp-engine.md, section 4): who wins, by
@@ -41,7 +42,7 @@ export const ladderOfPlans: Experiment = {
   ],
   run(seed, arm, tuning) {
     const sc = ladder(`seed=${seed}&plan=${(arm as Arm & { plan: LadderPlan }).plan}`) as Scene<Simulation>;
-    const sim = startScene(sc, tuning);
+    const sim = startScene(sc, tuning, keptWorld(`live-camp:${seed}`, tuning, sc.world));
     const driver = sc.driver!();
     const raw = sc.game.still(sim);
     const ticks = sceneTicks(sc, tuning);

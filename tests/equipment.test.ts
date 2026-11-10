@@ -314,13 +314,16 @@ describe('reinforcements (E8)', () => {
   }, 60_000);
 
   it('swerve round someone at the side of the road, but only as far as they will go off it', () => {
-    /** A truck coming along the x axis, and someone standing just inside its left-hand side. */
+    /**
+     * A truck coming along the x axis, and someone standing just inside its left-hand side:
+     * you, since one of the camp's own men would step out of its way (tests/takedown.test.ts).
+     */
     const drive = (tuning: Tuning): { widest: number; x: number } => {
-      const guards = [testGuard({ id: 0, role: 'sentry', x: 0, y: 0, z: 1, faceX: -1, faceZ: 0, elevated: false, route: null, routeStart: 0, scanPhase: 0, scanScale: 0 })];
+      const guards = [testGuard({ id: 0, role: 'sentry', x: 0, y: 0, z: 40, faceX: -1, faceZ: 0, elevated: false, route: null, routeStart: 0, scanPhase: 0, scanScale: 0 })];
       const camp = { structures: [], guards, fenceHalf: 0, vehicles: [{ kind: 'truck' as const, x: -30, y: 0, z: 0, fx: 1, fz: 0, length: 6.2, width: 2.3, height: 2.9, escape: false }] };
       let systems: readonly System[] = SYSTEMS;
       for (const s of [campDevices, vehicleDrive]) systems = withSystem(systems, s);
-      const sim = new Simulation(testWorld({ size: 120, spawn: { x: -50, z: 50 }, camp }), tuning, systems);
+      const sim = new Simulation(testWorld({ size: 120, spawn: { x: 0, z: 1 }, camp }), tuning, systems);
       const v = sim.index.of('vehicle')[0]!;
       v.vehicle.driving = { route: [{ x: -30, z: 0 }, { x: 40, z: 0 }], leg: 1, waited: 0, then: 'dismount', cause: 0 };
       let widest = 0;

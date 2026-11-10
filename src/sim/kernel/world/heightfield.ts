@@ -27,6 +27,9 @@ export class Heightfield {
   readonly cellMax: Float32Array;
   minHeight = 0;
   maxHeight = 0;
+  /** Scratch for gainOnSteep: where a line is cut, and the triangle under one piece of it. Never read between calls. */
+  private readonly cuts: number[] = [];
+  private readonly piece: TerrainSample = { height: 0, gx: 0, gz: 0, slopeTan: 0, surface: Surface.Grass };
 
   constructor(size: number, cell: number) {
     this.cells = Math.round(size / cell);
@@ -133,6 +136,55 @@ export class Heightfield {
     out.slopeTan = Math.sqrt(out.gx * out.gx + out.gz * out.gz);
     out.surface = this.surfaceAt(x, z);
     return out;
+  }
+
+  /**
+   * Height gained on ground steeper than `tanMax` along the straight line from (x0, z0) to
+   * (x1, z1). The line is cut wherever it crosses a triangle's edge (a grid line, or a
+   * cell's diagonal), and each piece that lies on a triangle steeper than the limit adds
+   * what it rises; a piece that descends adds nothing. So this is what something moving
+   * along the line climbed on such ground, whatever it did on the rest: a line that leaves
+   * a steep face downhill and goes on up walkable ground has gained nothing on the face.
+   * Exact on the triangles everything else uses (CLAUDE.md rule 7). `out.first`, if asked
+   * for, is the share of it gained on the triangle the line starts on.
+   */
+  gainOnSteep(x0: number, z0: number, x1: number, z1: number, tanMax: number, out?: { first: number }): number {
+    const dx = x1 - x0;
+    const dz = z1 - z0;
+    if (out) out.first = 0;
+    if (dx === 0 && dz === 0) return 0;
+    const cuts = this.cuts;
+    cuts.length = 0;
+    const { min, cell } = this;
+    addCuts(cuts, (x0 - min) / cell, dx / cell);
+    addCuts(cuts, (z0 - min) / cell, dz / cell);
+    addCuts(cuts, (x0 - z0) / cell, (dx - dz) / cell); // the diagonals: u = v in each cell
+    // In order along the line. A handful at most for a tick's move: an insertion sort.
+    for (let i = 1; i < cuts.length; i++) {
+      const t = cuts[i]!;
+      let j = i - 1;
+      for (; j >= 0 && cuts[j]! > t; j--) cuts[j + 1] = cuts[j]!;
+      cuts[j + 1] = t;
+    }
+    const s = this.piece;
+    let gain = 0;
+    let a = 0;
+    for (let k = 0; k <= cuts.length; k++) {
+      const b = k < cuts.length ? cuts[k]! : 1;
+      if (b <= a) continue;
+      // One triangle holds the whole piece, so its gradient at the middle is the piece's.
+      const m = (a + b) * 0.5;
+      this.sample(x0 + dx * m, z0 + dz * m, s);
+      if (s.slopeTan > tanMax) {
+        const rise = (s.gx * dx + s.gz * dz) * (b - a);
+        if (rise > 0) {
+          gain += rise;
+          if (out && a === 0) out.first = rise;
+        }
+      }
+      a = b;
+    }
+    return gain;
   }
 
   /** Surface of the nearest vertex. */
@@ -273,6 +325,24 @@ export class Heightfield {
       if (fb < 0) return a + (b - a) * (fa / (fa - fb));
     }
     return -1;
+  }
+}
+
+/**
+ * Where a line crosses the whole numbers of one coordinate that runs from `a0` to
+ * `a0 + da` along it, as shares of the line strictly inside it, added to `out`.
+ */
+function addCuts(out: number[], a0: number, da: number): void {
+  if (da > 0) {
+    for (let k = Math.floor(a0) + 1; k < a0 + da; k++) {
+      const t = (k - a0) / da;
+      if (t > 0 && t < 1) out.push(t);
+    }
+  } else if (da < 0) {
+    for (let k = Math.ceil(a0) - 1; k > a0 + da; k--) {
+      const t = (k - a0) / da;
+      if (t > 0 && t < 1) out.push(t);
+    }
   }
 }
 

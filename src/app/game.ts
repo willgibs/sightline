@@ -41,7 +41,7 @@ import { Timeline } from './timeline';
 import { frameSpan, type SoundTiming } from '../audio/engine';
 import { FrameStats, percentile } from './perf';
 import type { SpawnKind } from '../sim/kernel/mission';
-import { startScene } from '../sim/kernel/scene';
+import { sceneTuning, startScene } from '../sim/kernel/scene';
 import type { Scene } from '../sim/game/scenes';
 import { SystemProfile } from '../sim/kernel/profile';
 import { BUILD } from './build';
@@ -120,6 +120,7 @@ const CALL_LINES: Readonly<Record<ReportCode, string>> = {
   missing: "Post isn't answering.",
   clear: 'Clear here.',
   claim: "I'll take a look.",
+  escort: 'Time to go. Move!',
   outage: "Something's dead over here.",
 };
 
@@ -159,7 +160,7 @@ export class Game {
   private shotLog: Array<{ report: ShotReport; result: string; impact: number; hit: boolean }> = [];
   /** The dope card for the dialled zero, load and air, computed when they change. */
   private dope: { key: string; rows: DopeRow[] } = { key: '', rows: [] };
-  private readonly rifleNow: RifleView = { up: 0, right: 0, raise: 0, rest: 0, rounds: 0, zero: 0, bolt: 0, fitting: 0, suppressed: false, load: '', heartRate: 0, held: 0, air: 0, glint: 0, steady: 1 };
+  private readonly rifleNow: RifleView = { up: 0, right: 0, raise: 0, rest: 0, rounds: 0, zero: 0, bolt: 0, fitting: 0, swapping: false, suppressed: false, load: '', heartRate: 0, held: 0, air: 0, glint: 0, steady: 1 };
   private readonly overlay: Overlay;
   private readonly sound: GameSound;
   /** Every run kept as it goes: in playtests/ in development, in this browser when deployed (playtest.ts). */
@@ -526,6 +527,7 @@ export class Game {
       }
       window.history.replaceState(null, '', url);
       this.overlay.setStartTitle(this.scene ? `Scene · ${this.scene.title}` : 'Phase 1 · The valley');
+      this.overlay.setKey('load', Object.values((this.scene ? sceneTuning(this.scene, this.tuning) : this.tuning).ballistics.rifle.carries).filter(Boolean).length > 1);
       this.overlay.setStatus(
         this.scene
           ? this.scene.description
@@ -687,7 +689,8 @@ export class Game {
       this.notify(`Tick rate ${next.sim.tickHz} Hz · run restarted`);
     } else if (simChanged) {
       if (!this.sim.fault) {
-        this.sim.setTuning(next);
+        // A scene that is a mode keeps its own numbers over the reloaded ones.
+        this.sim.setTuning(this.scene ? sceneTuning(this.scene, next) : next);
         this.recorder?.tuningChanged(this.sim);
       }
       this.notify('Tuning reloaded');
@@ -1165,12 +1168,20 @@ export class Game {
     };
   }
 
+  /** The load last shown in the rifle, so a change of it can be told. */
+  private shownLoad = '';
+
   /** The player's rifle as the frame shows it: between the last two ticks, like the body. Null without one. */
   private interpolatedRifle(): RifleView | null {
     const a = this.prev?.rifle;
     const b = this.curr?.rifle;
     if (!b) return null;
     const r = Object.assign(this.rifleNow, b);
+    // A change of load is felt in the hands, not read off a scope that's down for it: say which went in.
+    if (b.load !== this.shownLoad) {
+      if (this.shownLoad !== '') this.hud.toast(b.load === 'subsonic' ? 'Subsonic load · quiet, slow, heavy drop: good to about 100 m' : `${b.load[0]!.toUpperCase()}${b.load.slice(1)} load`);
+      this.shownLoad = b.load;
+    }
     if (!a) return r;
     const t = this.clock.alpha;
     r.up = lerp(a.up, b.up, t);
@@ -1854,7 +1865,7 @@ export class Game {
       },
       body: () => this.setDetached(false),
       hold: (codes: string[]) => this.input.holdKeys(codes),
-      tap: (code: 'KeyC' | 'KeyZ') => this.input.tap(code),
+      tap: (code: 'KeyC' | 'KeyZ' | 'KeyT' | 'KeyY') => this.input.tap(code),
       /** Click as if the left button were pressed now: a shot from the frame on screen. */
       click: () => this.input.click(),
       /** Sandbox (A10): drop a noise where the view points, as the debug view's key does. */

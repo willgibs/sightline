@@ -1,9 +1,13 @@
+import { createBrain, standStill } from '../brain';
 import type { Collider } from '../kernel/world/colliders';
+import { Faction } from '../kernel/state';
 import type { System, TickContext } from '../kernel/systems';
-import { clearOfBodies } from '../body';
+import { clearOfBodies, createBody } from '../body';
 import { Cell, cellIndex } from '../kernel/world/grid';
+import { createSenses } from '../perception';
 import { commanderOf, squadArrives } from './comms';
 import type { VehicleEntity } from './camp';
+import type { GuardEntity } from './entities';
 
 /**
  * Vehicles on the move: the target's, driving out along the camp's escape route once he's
@@ -12,6 +16,12 @@ import type { VehicleEntity } from './camp';
  * shape does, and swerves or waits rather than drive into anyone (kernel/world/solids.ts).
  * The target is gone from the camp once he's in the cab: bodies don't ride what they stand
  * on yet, and shooting the driver is Phase 3's.
+ *
+ * Waiting has to end. The camp's own men get out of its way: whoever is in front of it is
+ * told to step off its line, below his brain, as a shove would move him. Anyone else who
+ * holds it up for long enough (you, standing in the road) ends the escape: the target gets
+ * out beside it and goes back on foot, the vehicle is left where it stopped, and the camp
+ * has no other. A mission can't hang on a vehicle that never arrives and never gives up.
  */
 
 function place(v: VehicleEntity, x: number, z: number, ux: number, uz: number, ctx: TickContext): void {
@@ -56,7 +66,7 @@ export const vehicleDrive: System = {
   phase: 'world',
   after: ['camp-devices'],
   reads: ['vehicle.vehicle', 'vehicle.solid', 'guard.body', 'player.body', 'commander.camp'],
-  writes: ['vehicle.vehicle.driving', 'vehicle.solid', 'objective.objective.status', 'commander.camp.objective', 'commander.camp.roster', 'commander.camp.nextTask', 'guard.brain.task', 'entities'],
+  writes: ['vehicle.vehicle', 'vehicle.solid', 'objective.objective', 'commander.camp.objective', 'commander.camp.roster', 'commander.camp.nextTask', 'commander.camp.relief', 'commander.camp.devices.escape', 'guard.brain.task', 'guard.guard.aside', 'entities'],
   emits: ['reinforce'],
   run(ctx) {
     const F = ctx.tuning.brain.alarm.flee;
@@ -95,9 +105,82 @@ export const vehicleDrive: System = {
         break;
       }
       d.waited = moved ? 0 : d.waited + ctx.dt;
+      if (moved) continue;
+      makeWay(ctx, v, ux, uz, step);
+      if (d.then === 'escape' && d.waited >= F.bailOut && bailOut(ctx, v, ux, uz)) delete v.vehicle.driving;
     }
   },
 };
+
+/** The camp's own men in front of a vehicle step off its line: each to the side he's already on. */
+function makeWay(ctx: TickContext, v: VehicleEntity, ux: number, uz: number, step: number): void {
+  const ahead = { ...v.solid, x: v.solid.x + ux * step, z: v.solid.z + uz * step, ux, uz } as Collider;
+  const until = ctx.tick + Math.round(ctx.tuning.brain.alarm.flee.aside * ctx.tuning.sim.tickHz);
+  for (const g of ctx.index.of('guard')) {
+    if (clearOfBodies(ahead, [g], ctx.tuning.bodies)) continue;
+    const side = (g.body.x - v.solid.x) * -uz + (g.body.z - v.solid.z) * ux >= 0 ? 1 : -1;
+    g.guard.aside = { x: -uz * side, z: ux * side, until };
+  }
+}
+
+/**
+ * The man in the cab gets out, because the vehicle isn't going anywhere: beside it, on the
+ * nearest ground a man can stand on that nobody is standing on, as the guard he was, knowing
+ * what he knew about the alarm. The vehicle stays where it stopped and the camp counts it
+ * lost. False if there's nowhere to stand yet, and it waits on.
+ */
+function bailOut(ctx: TickContext, v: VehicleEntity, ux: number, uz: number): boolean {
+  const c = commanderOf(ctx);
+  const rider = v.vehicle.rider;
+  if (!c?.camp.objective || !rider) return false;
+  const s = v.solid as Collider & { hz: number };
+  const spec = ctx.tuning.bodies.guard;
+  const reach = s.hz + ctx.tuning.brain.alarm.flee.boardGap + spec.radius;
+  const L = ctx.world.grid.site;
+  // Out from each door in turn, a cell at a time: where it was parked is closed ground on the camp's grid.
+  for (let out = 0; out < BAIL_REACH; out++) {
+    for (const side of [1, -1]) {
+      const x = v.solid.x - uz * side * (reach + out * L.cell);
+      const z = v.solid.z + ux * side * (reach + out * L.cell);
+      const cell = cellIndex(L, x, z);
+      if (cell >= 0 && (L.flags[cell]! & Cell.Walkable) === 0) continue;
+      if (!standingRoom(ctx, x, z, spec.radius)) continue;
+      const body = createBody(ctx.world, ctx.solids, spec, x, z, -uz * side, ux * side);
+      const brain = createBrain();
+      brain.sirenAt = ctx.tick;
+      const g = ctx.spawn((id): GuardEntity => ({ id, kind: 'guard', faction: Faction.Camp, body, guard: { spawn: rider.spawn, headYaw: 0, order: standStill() }, senses: createSenses(false), brain }));
+      c.camp.roster.push({ id: g.id, post: rider.spawn, x, z, tick: ctx.tick, status: 'ok' });
+      c.camp.objective.target = g.id;
+      c.camp.objective.status = 'open';
+      for (const o of ctx.index.of('objective')) {
+        if (o.objective.status !== 'escaping') continue;
+        o.objective.status = 'open';
+        o.objective.target = g.id;
+      }
+      // There's no second vehicle, and nobody runs for this one again.
+      c.camp.devices.escape = null;
+      v.vehicle.disabled = true;
+      delete v.vehicle.rider;
+      return true;
+    }
+  }
+  return false;
+}
+
+/** How many cells out from a door a place to stand is looked for. */
+const BAIL_REACH = 6;
+
+/** Nobody is standing within a body's width of (x, z). */
+function standingRoom(ctx: TickContext, x: number, z: number, radius: number): boolean {
+  for (const e of ctx.state.entities) {
+    if (e.kind !== 'guard' && e.kind !== 'player') continue;
+    const dx = e.body.x - x;
+    const dz = e.body.z - z;
+    const gap = radius + ctx.tuning.bodies[e.kind].radius;
+    if (dx * dx + dz * dz < gap * gap) return false;
+  }
+  return true;
+}
 
 /** The truck has stopped: the squad gets down behind it (E8). */
 function dismount(ctx: TickContext, v: VehicleEntity, cause: number): void {

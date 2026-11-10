@@ -74,7 +74,8 @@ export function tell(ctx: TickContext, g: GuardEntity, r: Report, via: Via, caus
     const draw = (): number => ctx.draw(g.id, 'awareness', (rng) => rng.next());
     stimulate(s.awareness, { kind: 'voice', level, x: r.x, y: r.y, z: r.z, cause, reason: 'voice' }, ctx.tick, ctx.tuning, draw);
   }
-  if (r.kind !== 'clear') {
+  // Being told it's clear, or that it's time to go, says nothing about where an intruder is.
+  if (r.kind !== 'clear' && r.kind !== 'escort') {
     const p: Percept = { kind: 'voice', x: r.x, y: r.y, z: r.z, radius: r.radius, strength: level, tick: ctx.tick, expires: ctx.tick + Math.round(T.keep * hz), cause };
     believe(s, p, false, ctx.tick, ctx.tuning);
   }
@@ -258,13 +259,24 @@ export function squadArrives(ctx: TickContext, c: CommanderEntity, x: number, z:
     });
   }
   const event = ctx.emit({ type: 'reinforce', source: c.id, cause, count: T.count, x, z });
-  // They hunt: the camp's latest belief, by radio, as an order to go and search there.
+  // They hunt: the camp's latest belief, by radio, as an order to go and search there. In a
+  // camp that protects its target (brain/protect.ts), the first of them are what they were
+  // called for: they go to his door to bring him out, and need no further order to.
+  // With no vehicle for him there is nowhere to bring him out to, and he's safest where he is.
+  const room = c.camp.devices.escape ? c.camp.protects : undefined;
+  let fetchers = 0;
   for (const g of ctx.index.of('guard')) {
     if (!g.brain || g.guard.order.tick !== 0 || g.brain.act !== 'routine' || c.camp.roster.some((m) => m.id === g.id)) continue;
     c.camp.roster.push({ id: g.id, post: g.guard.spawn, x: g.body.x, z: g.body.z, tick: ctx.tick, status: 'ok', ...(g.guard.reserve ? { reserve: { x: g.guard.reserve.x, z: g.guard.reserve.z } } : {}) });
+    if (room && !c.camp.relief && fetchers < ctx.tuning.brain.protect.fetchers) {
+      fetchers++;
+      g.brain.task = { id: c.camp.nextTask++, kind: 'fetch', x: room.x, z: room.z, issued: ctx.tick, cause: event };
+      continue;
+    }
     const target = c.camp.search ?? (c.camp.shots.estimate ? { x: c.camp.shots.estimate.x, z: c.camp.shots.estimate.z } : { x: site.x, z: site.z });
     g.brain.task = { id: c.camp.nextTask++, kind: 'search', x: target.x, z: target.z, issued: ctx.tick, cause: event };
   }
+  if (c.camp.protects && !c.camp.relief) c.camp.relief = { at: ctx.tick, fetches: fetchers > 0 ? 1 : 0, last: ctx.tick };
 }
 
 /**
@@ -289,7 +301,10 @@ export function targetEscapes(ctx: TickContext, g: GuardEntity): void {
   const status = vehicle ? 'escaping' : 'escaped';
   c.camp.objective.status = status;
   for (const o of ctx.index.of('objective')) if (o.objective.target === g.id) o.objective.status = status;
-  if (vehicle) vehicle.vehicle.driving = { route: [{ x: vehicle.solid.x, z: vehicle.solid.z }, ...yard!, ...escapeRoute(ctx.world, ctx.tuning)], leg: 1, waited: 0, then: 'escape', cause: 0 };
+  if (vehicle) {
+    vehicle.vehicle.driving = { route: [{ x: vehicle.solid.x, z: vehicle.solid.z }, ...yard!, ...escapeRoute(ctx.world, ctx.tuning)], leg: 1, waited: 0, then: 'escape', cause: 0 };
+    vehicle.vehicle.rider = { spawn: g.guard.spawn };
+  }
   ctx.despawn(g.id);
 }
 
@@ -435,8 +450,9 @@ export const campCommander: System = {
       for (const o of orders) sendOrder(ctx, c, o.guard, o.task);
     }
     if (camp.level !== before) ctx.emit({ type: 'level', source: c.id, cause: camp.lastCause, from: before, to: camp.level });
-    // Lockdown calls reinforcements, once.
-    if (camp.level === 'lockdown' && camp.reinforceCalled < 0) {
+    // Lockdown calls reinforcements, once. A camp that protects its target calls them to bring
+    // him out, and that call is the radio's: with no set or nobody on it, it waits until there is.
+    if (camp.level === 'lockdown' && camp.reinforceCalled < 0 && (!camp.protects || radioUp(ctx, c))) {
       camp.reinforceCalled = ctx.tick;
       // They're due at the gate after the delay, so a truck sets off that much sooner than its drive.
       const route = truckRoute(ctx.world, ctx.tuning);

@@ -144,15 +144,23 @@ const guardOrders: System = {
   name: 'guard-orders',
   phase: 'intent',
   after: ['player-intent'],
-  reads: ['guard.guard.order', 'guard.body', 'solid.solid'],
-  writes: ['guard.guard.headYaw', '@intents.guard', 'guard.body'],
+  reads: ['guard.guard.order', 'guard.guard.aside', 'guard.body', 'solid.solid'],
+  writes: ['guard.guard.headYaw', 'guard.guard.aside', '@intents.guard', 'guard.body'],
   emits: ['stance'],
   run(ctx) {
     const speed = ctx.tuning.bodies.guard.speed;
     for (const g of ctx.index.of('guard')) {
       const intent = intentFor(ctx, g.id);
       g.guard.headYaw = carryOut(g.guard.order, ctx.tick, intent);
-      const want = g.guard.order.stance ?? 'stand';
+      // In the way of the camp's own vehicle: on his feet and off its line, whatever he was doing.
+      const aside = g.guard.aside;
+      if (aside && ctx.tick >= aside.until) delete g.guard.aside;
+      else if (aside) {
+        intent.wishX = aside.x * speed.walk * 2;
+        intent.wishZ = aside.z * speed.walk * 2;
+        intent.gait = 'walk';
+      }
+      const want = g.guard.aside ? 'stand' : (g.guard.order.stance ?? 'stand');
       if (g.body.stance !== want && !g.body.proneTransition) requestStance(g.body, want, ctx.tuning.bodies.guard, { world: ctx.world, solids: ctx.solids, source: g.id, emit: ctx.emit });
       // An order says how fast he'd like to go. His legs say how fast he can, down or getting up.
       const limit = g.body.proneTransition ? 0 : g.body.stance === 'prone' ? speed.crawl : g.body.stance === 'crouch' ? speed.crouch : Infinity;
@@ -176,13 +184,13 @@ const guardBrains: System = {
   name: 'guard-brains',
   phase: 'decide',
   reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.guard.reserve', 'guard.senses', 'guard.brain'],
-  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'commander.camp.devices', 'commander.camp.level', 'commander.camp.since', 'commander.camp.objective', 'commander.camp.inbox', 'commander.camp.whistled', 'alarm.alarm.raised', 'objective.objective.status', 'vehicle.vehicle.driving', 'schedule', 'entities', 'bullet.bullet'],
+  writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'commander.camp.devices', 'commander.camp.level', 'commander.camp.since', 'commander.camp.objective', 'commander.camp.inbox', 'commander.camp.whistled', 'alarm.alarm.raised', 'objective.objective.status', 'vehicle.vehicle', 'schedule', 'entities', 'bullet.bullet'],
   emits: ['act', 'call', 'shot', 'report', 'alarm', 'siren', 'level', 'whistle'],
   run(ctx) {
     const nav = navAllowance(ctx);
     const devices = commanderOf(ctx)?.camp.devices;
     // Where the boxes stand, and nothing of their state: a guard learns the alarm is up from the siren.
-    const facts = devices ? { alarms: devices.alarms.map((a) => ({ x: a.x, z: a.z })), escape: devices.escape, fights: commanderOf(ctx)?.camp.fights === true } : undefined;
+    const facts = devices ? { alarms: devices.alarms.map((a) => ({ x: a.x, z: a.z })), escape: devices.escape, fights: commanderOf(ctx)?.camp.fights === true, protects: commanderOf(ctx)?.camp.protects ?? null } : undefined;
     for (const g of [...ctx.index.of('guard')]) {
       const change = think(g, ctx.world, ctx.tuning, ctx.tick + 1, () => ctx.draw(g.id, 'brain', (rng) => rng.next()), nav, facts);
       if (change) {

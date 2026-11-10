@@ -310,41 +310,118 @@ export function infiltrate(S: Space, E: Exposure, M: Meter, Q: Search): Infiltra
   // slot's list. Within a safe interval, a label that arrived no later dominates another if
   // waiting brings its meter down to no fuller, so it also covers every move the other
   // makes; a watched sample is a single moment, where a label dominates only with no fuller
-  // a meter. A new label no better than one in its list is dropped, and a label is skipped
-  // when it comes off the heap if another in its list has since beaten it (never mutually).
-  // So the lists hold Pareto fronts of (arrival, meter), and the meter's resolution costs no
-  // memory.
+  // a meter. A new label no better than one in its list is dropped, and one that a new label
+  // beats leaves the list and is skipped when it comes off the heap (never mutually: of two
+  // alike, the second is dropped). So the lists hold Pareto fronts of (arrival, meter), and
+  // the meter's resolution costs no memory.
   let cap = 1 << 14;
+  let lF = new Float64Array(cap);
   let lT = new Float64Array(cap);
   let lM = new Int32Array(cap);
   let lC = new Int32Array(cap);
   let lS = new Int32Array(cap);
   let lP = new Int32Array(cap);
   let lN = new Int32Array(cap);
+  /** Set once another label in its list has beaten it: it's out of the list, and skipped when it comes off the heap. */
+  let lDead = new Uint8Array(cap);
   let count = 0;
   const alloc = (): number => {
     if (count === cap) {
       cap *= 2;
-      const grow = <A extends Float64Array | Int32Array>(old: A, make: (n: number) => A): A => {
+      const grow = <A extends Float64Array | Int32Array | Uint8Array>(old: A, make: (n: number) => A): A => {
         const a = make(cap);
         a.set(old);
         return a;
       };
+      lF = grow(lF, (n) => new Float64Array(n));
       lT = grow(lT, (n) => new Float64Array(n));
       lM = grow(lM, (n) => new Int32Array(n));
       lC = grow(lC, (n) => new Int32Array(n));
       lS = grow(lS, (n) => new Int32Array(n));
       lP = grow(lP, (n) => new Int32Array(n));
       lN = grow(lN, (n) => new Int32Array(n));
+      lDead = grow(lDead, (n) => new Uint8Array(n));
     }
     return count++;
   };
   /** The meter label y would have at time t, waiting in its interval (`safe`), or its own if it can't wait. */
   const settled = (y: number, t: number, safe: boolean): number => (safe && lT[y]! < t ? Math.max(0, lM[y]! - M.decay * (t - lT[y]!)) : lM[y]!);
-  const heap = new LabelHeap();
+  // The open labels, as a binary min-heap of their indices, ordered by (f, then the later
+  // arrival, then cell, slot and meter): every tie broken the same way, and no two labels
+  // alike in all five (a list never holds two with one arrival and one meter), so the order
+  // they come off in is the order of those keys and nothing else. The keys are read from
+  // the pool, so the heap moves one number where it used to move six.
+  let heap = new Int32Array(1 << 12);
+  let open = 0;
+  const less = (x: number, y: number): boolean => {
+    const fx = lF[x]!;
+    const fy = lF[y]!;
+    if (fx !== fy) return fx < fy;
+    const tx = lT[x]!;
+    const ty = lT[y]!;
+    if (tx !== ty) return tx > ty; // the later arrival first: it's nearer the goal
+    const cx = lC[x]!;
+    const cy = lC[y]!;
+    if (cx !== cy) return cx < cy;
+    const sx = lS[x]!;
+    const sy = lS[y]!;
+    if (sx !== sy) return sx < sy;
+    return lM[x]! < lM[y]!; // unique: a list never holds two labels with one arrival and one meter
+  };
+  const heapPush = (x: number): void => {
+    if (open === heap.length) {
+      const bigger = new Int32Array(heap.length * 2);
+      bigger.set(heap);
+      heap = bigger;
+    }
+    let i = open++;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      const q = heap[p]!;
+      if (!less(x, q)) break;
+      heap[i] = q;
+      i = p;
+    }
+    heap[i] = x;
+  };
+  /** Takes the least label off the heap, and returns it. */
+  const heapPop = (): number => {
+    const out = heap[0]!;
+    const last = heap[--open]!;
+    let i = 0;
+    for (;;) {
+      const l = 2 * i + 1;
+      if (l >= open) break;
+      const r = l + 1;
+      const k = r < open && less(heap[r]!, heap[l]!) ? r : l;
+      const q = heap[k]!;
+      if (!less(q, last)) break;
+      heap[i] = q;
+      i = k;
+    }
+    if (open > 0) heap[i] = last;
+    return out;
+  };
   const push = (c: number, s: number, m: number, t: number, from: number, safe: boolean) => {
     const list = heads[c]!;
     for (let y = list[s]!; y >= 0; y = lN[y]!) if (lT[y]! <= t && settled(y, t, safe) <= m) return;
+    // It stays, so whatever it beats goes: out of the list now, and skipped when the heap
+    // gets to it. Beating carries over (if this beats that, and that beat a third, this beats
+    // the third), so a list holds only labels none of the others beats, and anything a label
+    // taken out would have turned away is turned away by the one that took it out. The search
+    // therefore expands exactly what it did when beaten labels stayed in their lists, in the
+    // same order, while walking far shorter lists to do it.
+    let prev = -1;
+    for (let y = list[s]!; y >= 0; ) {
+      const next = lN[y]!;
+      const ty = lT[y]!;
+      if (t <= ty && (safe && t < ty ? Math.max(0, m - M.decay * (ty - t)) : m) <= lM[y]!) {
+        lDead[y] = 1;
+        if (prev < 0) list[s] = next;
+        else lN[prev] = next;
+      } else prev = y;
+      y = next;
+    }
     const x = alloc();
     lT[x] = t;
     lM[x] = m;
@@ -353,18 +430,8 @@ export function infiltrate(S: Space, E: Exposure, M: Meter, Q: Search): Infiltra
     lP[x] = from;
     lN[x] = list[s]!;
     list[s] = x;
-    heap.push(t + weight * (c === OUT ? rimH + 1 : h[c]!), t, c, s, m, x);
-  };
-  /** Whether another label in x's list has beaten it. */
-  const beaten = (x: number, safe: boolean): boolean => {
-    const t = lT[x]!;
-    const m = lM[x]!;
-    for (let y = heads[lC[x]!]![lS[x]!]!; y >= 0; y = lN[y]!) {
-      if (y === x || lT[y]! > t) continue;
-      const left = settled(y, t, safe);
-      if (left < m || (left === m && lT[y]! < t)) return true;
-    }
-    return false;
+    lF[x] = t + weight * (c === OUT ? rimH + 1 : h[c]!);
+    heapPush(x);
   };
   /** Arrive in cell o at time t with meter m before its exposure there (`stayed`: he was already in it, still). */
   const arrive = (o: number, t: number, m: number, from: number, stayed = false) => {
@@ -385,21 +452,29 @@ export function infiltrate(S: Space, E: Exposure, M: Meter, Q: Search): Infiltra
     push(OUT, 0, 0, 0, -1, true);
   }
   let expanded = 0;
-  const nb: number[] = [];
+  // Each cell's four sides, in the order `neighbours` gives them: the cell that way, or −1.
+  const sides = new Int32Array(cells * 4).fill(-1);
+  for (let c = 0; c < cells; c++) {
+    const m = S.moves[c]!;
+    if (m === 0) continue;
+    const i = c % S.na;
+    const j = (c - i) / S.na;
+    for (let d = 0; d < 4; d++) if ((m & MOVE_BITS[d]!) !== 0) sides[c * 4 + d] = (j + MOVE_DIRS[d]![1]) * S.na + (i + MOVE_DIRS[d]![0]);
+  }
   const goalSet = new Set(Q.goalCells);
   // A goal reached by waiting in a safe interval for it to open: it wins once nothing left
   // in the heap could arrive sooner.
   let waiting: { x: number; w: number } | null = null;
-  while (heap.size > 0) {
-    if (waiting && heap.topF() >= waiting.w) return finish(waiting.x, waiting.w);
-    const x = heap.pop();
+  while (open > 0) {
+    if (waiting && lF[heap[0]!]! >= waiting.w) return finish(waiting.x, waiting.w);
+    const x = heapPop();
     const t = lT[x]!;
     const c = lC[x]!;
     const s = lS[x]!;
     const m = lM[x]!;
     const given = s === ivStart[c]!.length; // the given start's slot
     const rate = given ? 1 : ivRate[c]![s]!;
-    if (beaten(x, rate === 0)) continue;
+    if (lDead[x] === 1) continue;
     if (c !== OUT && Q.goal(c, t)) return finish(x, t);
     if (c !== OUT && rate === 0 && goalSet.has(c)) {
       const end = ivEnd[c]![s]!;
@@ -426,13 +501,10 @@ export function infiltrate(S: Space, E: Exposure, M: Meter, Q: Search): Infiltra
       continue;
     }
     const end = rate === 0 ? ivEnd[c]![s]! : t; // how long he can stay
-    for (const o of neighbours(S, c, nb)) {
-      if (o === c) {
-        // Staying put past this interval: into whatever holds the next sample, if anything does.
-        if (end + 1 <= H) arrive(c, end + 1, Math.max(0, m - (rate === 0 ? M.decay * (end - t) : 0)), x, true);
-        continue;
-      }
-      if (h[o]! < 0) continue;
+    // The four sides, then staying put: the order the moves have always been tried in.
+    for (let d = 0; d < 4; d++) {
+      const o = sides[c * 4 + d]!;
+      if (o < 0 || h[o]! < 0) continue;
       // Every interval of the neighbour he can step into while he can still be here.
       const no = make(o);
       const st = ivStart[o]!;
@@ -446,6 +518,8 @@ export function infiltrate(S: Space, E: Exposure, M: Meter, Q: Search): Infiltra
         arrive(o, at, left, x);
       }
     }
+    // Staying put past this interval: into whatever holds the next sample, if anything does.
+    if (end + 1 <= H) arrive(c, end + 1, Math.max(0, m - (rate === 0 ? M.decay * (end - t) : 0)), x, true);
   }
   if (waiting) return finish(waiting.x, waiting.w);
   return none(expanded, false);
@@ -483,68 +557,6 @@ function firstAfter(st: Int32Array, n: number, t: number): number {
     else hi = mid;
   }
   return lo;
-}
-
-/** A binary min-heap of labels by (f, then later time, then cell, slot, meter): every tie broken the same way. */
-class LabelHeap {
-  private readonly items: number[] = [];
-  get size(): number {
-    return this.items.length / 6;
-  }
-  /** The least f in the heap. */
-  topF(): number {
-    return this.items[0]!;
-  }
-  push(f: number, t: number, c: number, s: number, m: number, label: number): void {
-    const a = this.items;
-    a.push(f, t, c, s, m, label);
-    let x = a.length / 6 - 1;
-    while (x > 0) {
-      const p = (x - 1) >> 1;
-      if (!this.less(x, p)) break;
-      this.swap(x, p);
-      x = p;
-    }
-  }
-  /** Takes the least label off the heap, and returns it. */
-  pop(): number {
-    const a = this.items;
-    const out = a[5]!;
-    const last = a.length / 6 - 1;
-    this.swap(0, last);
-    a.length = last * 6;
-    let x = 0;
-    for (;;) {
-      const l = 2 * x + 1;
-      if (l >= last) break;
-      const r = l + 1;
-      const s = r < last && this.less(r, l) ? r : l;
-      if (!this.less(s, x)) break;
-      this.swap(s, x);
-      x = s;
-    }
-    return out;
-  }
-  private less(x: number, y: number): boolean {
-    const a = this.items;
-    const X = x * 6;
-    const Y = y * 6;
-    if (a[X] !== a[Y]) return a[X]! < a[Y]!;
-    if (a[X + 1] !== a[Y + 1]) return a[X + 1]! > a[Y + 1]!; // the later arrival first: it's nearer the goal
-    if (a[X + 2] !== a[Y + 2]) return a[X + 2]! < a[Y + 2]!;
-    if (a[X + 3] !== a[Y + 3]) return a[X + 3]! < a[Y + 3]!;
-    return a[X + 4]! < a[Y + 4]!; // unique: a list never holds two labels with one arrival and one meter
-  }
-  private swap(x: number, y: number): void {
-    const a = this.items;
-    const X = x * 6;
-    const Y = y * 6;
-    for (let o = 0; o < 6; o++) {
-      const t = a[X + o]!;
-      a[X + o] = a[Y + o]!;
-      a[Y + o] = t;
-    }
-  }
 }
 
 /**

@@ -5,7 +5,7 @@ import type { AwarenessName, SimEvent } from '../src/sim/kernel/events';
 import { neutralInput } from '../src/sim/kernel/input';
 import { withSystem, type System } from '../src/sim/kernel/systems';
 import { Surface } from '../src/sim/kernel/world/surfaces';
-import { createSenses, stepLadder, stimulate, type Awareness, type Stimulus } from '../src/sim/perception';
+import { createSenses, soundLevel, stepLadder, stimulate, type Awareness, type Stimulus } from '../src/sim/perception';
 import { giveSenses } from '../src/sim/game/perception';
 import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
@@ -55,7 +55,7 @@ describe('the awareness ladder', () => {
 
   it('reacts to something alarming in about 1.5 s, telegraphed from the first instant', () => {
     const a = fresh();
-    stimulate(a, { ...sound(A.shot), reason: 'shot' }, 100, T, draw);
+    stimulate(a, { ...sound(A.shots.report.clear), reason: 'shot' }, 100, T, draw);
     const changes = climb(a, () => 0, 100, 100 + 3 * hz, draw);
     expect(changes[0]).toEqual({ tick: 100, to: 'curious' });
     const searching = changes.find((c) => c.to === 'searching')!;
@@ -96,8 +96,8 @@ describe('the awareness ladder', () => {
     expect(third.reason).toBe('repeat');
     expect(a.evidence).toBeCloseTo(A.sound.faint + A.repeat, 12);
     // One that beats the last rise by enough always counts.
-    expect(stimulate(a, sound(A.shot), 35, T, draw)).toBe(true);
-    expect(a.evidence).toBeCloseTo(A.shot, 12);
+    expect(stimulate(a, sound(A.shots.report.clear), 35, T, draw)).toBe(true);
+    expect(a.evidence).toBeCloseTo(A.shots.report.clear, 12);
   });
 
   it('settles sharper after a search: a raised floor and quicker eyes', () => {
@@ -183,5 +183,39 @@ describe('the minimal reactions', () => {
     // Settled: back at his post.
     const end = track.at(-1)!;
     expect(Math.hypot(end.x - post.x, end.z - post.z)).toBeLessThan(0.5);
+  });
+});
+
+describe('what a shot sounds like to a listener', () => {
+  const heard = (sound: string, clarity: number) => ({ arrives: 0, cause: 1, kind: 'shot' as const, sound, clarity, voice: 0, x: 0, y: 0, z: 0, radius: 1 });
+
+  it('is a shot at any clarity, as the game ships: every sound of one raises him to searching', () => {
+    for (const sound of ['report', 'crack', 'impact', 'bolt']) {
+      for (const clarity of [1, 1.5, 4, 40]) expect(soundLevel(heard(sound, clarity), T)).toBe(A.levels.searching);
+    }
+  });
+
+  it('can be read by how clearly each of its sounds was heard, each with its own idea of clear', () => {
+    const graded = structuredClone(T);
+    graded.perception.awareness.shots = {
+      report: { faint: 0.55, clear: 0.8, clearAt: 2 },
+      crack: { faint: 0.4, clear: 0.8, clearAt: 4 },
+      impact: { faint: 0.3, clear: 0.62, clearAt: 26 },
+      bolt: { faint: 0.55, clear: 0.8, clearAt: 2 },
+    };
+    // At the edge of hearing, each is its faint level; at its own clear and past it, its clear one.
+    expect(soundLevel(heard('crack', 1), graded)).toBeCloseTo(0.4, 12);
+    expect(soundLevel(heard('crack', 4), graded)).toBeCloseTo(0.8, 12);
+    expect(soundLevel(heard('crack', 9), graded)).toBeCloseTo(0.8, 12);
+    expect(soundLevel(heard('crack', 2.5), graded)).toBeCloseTo(0.6, 12);
+    // A strike is a thud: clear only close by, and never a shot by itself.
+    expect(soundLevel(heard('impact', 8), graded)).toBeLessThan(A.levels.suspicious);
+    expect(soundLevel(heard('impact', 26), graded)).toBeCloseTo(0.62, 12);
+    expect(soundLevel(heard('impact', 500), graded)).toBeLessThan(A.levels.searching);
+    // A report is unmistakable unless it's faint.
+    expect(soundLevel(heard('report', 1.05), graded)).toBeLessThan(A.levels.searching);
+    expect(soundLevel(heard('report', 2), graded)).toBeCloseTo(0.8, 12);
+    // Anything else heard as a shot is read as a report.
+    expect(soundLevel(heard('something-new', 2), graded)).toBeCloseTo(0.8, 12);
   });
 });
