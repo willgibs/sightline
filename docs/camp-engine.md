@@ -365,6 +365,22 @@ So the job of step 2 is that the camp comes after him, in a way he can see comin
 
 **What you play:** a real perch (`?scene=live-camp&params=seed=LEB-2534%26perch=1&lab`), one shot, then get out. It should feel like being hunted, and the way out should be something you have to think about before you fire.
 
+### The owner's brief for what comes next (Nov 10)
+
+From playing the takedown and the live camp, and two answers on the desk. None of it is started: weekly usage was at 88%, so it's scheduled for after the limit resets on Nov 15, in this order.
+
+**1. A camp that responds in phases (step 2).** Today men take cover and look where a shot came from, and it ends there. Walk through a camp and they neither converge nor follow; break their line of sight and they stop.
+- **Not knowing where the threat is:** cover from the rough direction first, then work out what's happening. Men near a shot come in slowly, to deal with the nearer threat.
+- **Knowing:** "threat identified, combat engaged". An intelligent gunfight by trained men: no running to a corner to hide, and they follow someone who breaks contact.
+- **Never a ring.** Once the attacker's position is known, the camp doesn't converge on one spot. Men fight from established cover, work out the problem and improve their positions: "a more realistic, methodical response than blindly running into the fire". That gives the player time to make a push.
+- It's the other half of the owner's shoot-and-circle note, and has to answer it on the person-limited shooter and in a sitting.
+
+**2. The target answers by the camp's problem** (the owner's call on `core-challenge`). Some camps keep the target inside and others make the target run, so that play "can't be reduced to always cutting a radio or disabling a vehicle". A leader expecting to win from a stronghold hunkers down. The condition: "there needs to be a clear method to the madness". A player who lost has to be able to say what they should have read, so the tells are designed with it, and read before the end of a run. The takedown's stages (`?scene=takedown`) are the parts to build from.
+
+**3. Levels (two storeys).** The second half of compound types (`docs/compound-types.md`; the draft is on `compound-storeys`). Taller buildings hide men from a perch and add vertical range to read. The limit: "I don't want to have to go clear every corner of every building to claim success."
+
+**Behind all of it:** realistic on both sides. A fence gives the view outward but stops no pot shots, so a camp that expects attack needs a real layer of walls. Defenders shouldn't make "the dumb decisions laughably made in most horror movies", and players shouldn't be left banging their heads against a wall either.
+
 ## 10. Decisions
 
 **Decided by the owner, Nov 8:**

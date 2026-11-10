@@ -1027,6 +1027,9 @@ Added on Nov 8, the owner's call. *Labs pass* requires it. Design and reasoning:
 - [ ] F2 · The camp hunts. Picture and Command, sections that sweep, cut-offs on the road, fallbacks.
   - [x] Stance for guards.
   - [x] Routes that reach the ridges: 99% of post-to-perch routes found (`npm run experiment -- routes`), at about 0.5 ms each.
+  - [ ] A camp that responds in phases (the owner's brief, Nov 10; `docs/camp-engine.md`, section 9): cover, identify, then an intelligent gunfight; men who follow; never a ring. First after the weekly limit resets on Nov 15.
+  - [ ] The target answers by the camp's problem, with tells a player can read (the owner's call, Nov 10).
+  - [ ] Levels: two storeys, the second half of compound types.
 - [ ] F3 · The camp has means. The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels.
 - [ ] F4 · If play asks for it. Mortar, smoke, hardening, Memory, decoys, and the rest of the sandboxes.
 
