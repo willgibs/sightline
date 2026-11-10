@@ -136,7 +136,8 @@ describe('navigation', () => {
   });
 
   it('goes round a camp’s walls on a fraction of the cells, by a route no longer', () => {
-    const world = generateWorld(campMission('LEB-2534'), T);
+    // The plain yard's walls and lanes, which is what the cells and routes below were measured on.
+    const world = generateWorld(campMission('LEB-2534'), yardOnly(T));
     const plain = structuredClone(T);
     plain.brain.nav.landmarks = 0;
     // Two tunings share a world's navigator, so each asks all its routes in turn.
