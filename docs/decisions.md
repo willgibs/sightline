@@ -2,6 +2,57 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · The takedown: a camp that protects its target, as a mode
+
+**Why.** A camp had one answer to everything: at the siren the target ran for his vehicle, and a median 27 s after the first loud moment the mission was lost, whatever anyone did next. The owner's first fight said the same from the other side: only two plans are worth trying, and both skip the camp. No number fixes that, because the shape is wrong (`docs/foundation-review.md`, section 3).
+
+**Built** (`brain/protect.ts`, `game/protection.ts`, `game/scenes/takedown.ts`). A camp with `protects` set answers in stages, each of which someone can see or hear, and each carried by something in the world:
+- **Stand-to.** The whistle. Men with nothing of their own to go on get down where they are and watch; the target goes to his hard room (the first roofed place his day already takes him). With no more trouble it ends.
+- **Lockdown.** The siren. He stays in his room. The radio, if it works, calls the relief.
+- **Fetch.** The relief gets down at the gate, and two of them go to his door and tell him aloud that it's time (a new report kind, `escort`, heard like any other speech). More are sent after 45 s if his vehicle hasn't moved, three times in all.
+- **Extraction.** Released, he runs for his vehicle, and they see him to it.
+
+Take a link away and the next stage doesn't happen. No radio: no relief, and nobody at his door. Nobody at his door: he doesn't know it's time, and waits 240 s before his nerve goes and he runs alone. A vehicle that won't start: he gets to it, is stranded, and goes back to his room. No vehicle at all: nobody is sent, and he stays. Nothing here knows more than a mind holds (rule 13): the target acts on the whistle and siren he heard and on what was said at his door.
+
+**A mode, and nothing else moves.** `?scene=takedown` is the live camp with `ready=alert` and numbers of its own. A scene can now carry those (`Scene.tune`, `kernel/scene.ts`): a patch over the game's tuning that only sets values, so applying it twice changes nothing, and a recording embeds the result. The takedown's are in tuning with every other number (`modes.takedown`): each sound of a shot counts for what it tells a listener by how clearly it reached him, the whistle raises a man to curious and brings on the stand-to where it handed him the alarm of someone who heard the shot, and the kit carries the subsonic load. A live camp and the valley are as they were: every pinned run's `behaviour` fingerprint is the same.
+
+**Measured** (`npm run experiment -- takedown`, 24 camps, a scripted sniper on the best overview firing every 8 s; the siren sounded on 21, and nobody shot the target):
+
+| | Siren after | Relief at the gate | Told to come | Left his room | Gone |
+| --- | --- | --- | --- | --- | --- |
+| Relaxed: he runs at the siren | 5.8 s | – | – | 6.0 s | 21 of 21, at 27 s |
+| Alert: he shelters, and is sent for | 6.6 s | 97 s | 18 of 21 | 126 s | 21 of 21, at 156 s |
+| Alert, no radio | 6.6 s | never | 0 of 21 | 247 s | 21 of 21, at 267 s |
+| Alert, no vehicle | 6.6 s | 97 s | 0 of 21 | never | 0 of 21 |
+
+Times are medians from the sniper's first shot. On most camps the target is already under his roof when it starts. On the 3 camps of 21 where he wasn't told, the sniper's first round had taken the radio operator: nobody could call the relief, and he ran alone when his nerve went.
+
+**Not settled, so not pinned.** The seconds are to be found by a person playing. `tests/takedown.test.ts` holds the order of the stages and what each link does, not when (the owner's rule: test what's settled, measure what's still moving). The lab panel has a `protection` line that says where the camp has got to.
+
+**Versions.** `SIM_VERSION` 15, for the two things below that change a camp outside the mode. `STATE_SCHEMA` 10: a vehicle on its way out keeps who is in its cab. Every pinned `state` value moved with the schema, and no `behaviour` value.
+
+## 2026-11-09 · A vehicle that's held up doesn't wait for ever
+
+**Why.** The target was removed from the world when he got into his vehicle, and the vehicle waited for as long as anything stood in its way. A guard in the yard, or you in the road, left a mission that could neither be won nor lost: the target nowhere, the vehicle not moving. An early eight-camp run of the takedown met it.
+
+**Changed** (`game/escape.ts`, in every camp).
+- **The camp's own men step out of its way.** Whoever is in front of it is moved off its line, to the side he's already on, below his brain as a shove would move him (`guard.aside`, carried out with his orders).
+- **Anyone else who holds it up for 12 s ends the escape.** The man in the cab gets out on the nearest free ground beside it, as the guard he was and knowing about the siren; the objective is open again; the vehicle stays where it stopped and the camp has no other. The vehicle keeps who is in its cab (`vehicle.rider`) so that he can.
+
+`tests/equipment.test.ts`'s truck is now held up by the player, since a guard would step aside. Running a person down is Phase 3's, with shooting the driver.
+
+## 2026-11-09 · The rifle's kit says which loads it carries
+
+**Why.** The quiet tool the design doc names, the subsonic load, existed as data and could only be chosen before a run. The takedown needs it in the hand.
+
+**Changed.** `ballistics.rifle.carries` says which loads are in the kit, and a `load` command (Y) changes to the next one, taking `loadTime` (2.5 s) with no shooting meanwhile, as the suppressor does. The game's kit carries the match load alone, so there the key does nothing and isn't offered: bringing the subsonic load forward from Phase 3 is the owner's call, and only the takedown's kit has it. The scope's readout names a load that isn't the match one, and a line says which went in.
+
+## 2026-11-09 · The first act out of the one file
+
+**Why.** `brain/brain.ts` held every act, its memory and its priorities in one place (the review, section 5). The takedown's acts were the first new ones since that was written down, so they went in the way the rebuild lays out, as a proof of the pattern.
+
+**Changed.** What every act uses to move a man (`walk`, `stand`, `lookAround`, `writeOrder` and the rest) is `brain/moves.ts`. Sheltering, standing to and fetching are `brain/protect.ts`: what they remember, when they're on offer, and how they're carried out. `brain.ts` asks the module what it offers and hands it the act. Nothing a player could see changed with the move: the pinned runs say so. The other fourteen acts are still where they were.
+
 ## 2026-11-09 · A mind is handed its camp's ground, and no more of the world
 
 **Why.** Rule 13 says a brain decides from its mind alone. The mind held the whole static world, which is more than a defender knows: it carries where the player came into the valley, the mission it was built for, and everything the generator worked out about how the camp can be taken (its certified ways in, who it found unwatched). No brain read any of that. Nothing stopped one, and the test that catches omniscience moves the player, not the world, so it wouldn't have caught it.
