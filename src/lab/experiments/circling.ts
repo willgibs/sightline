@@ -57,7 +57,7 @@ const EVERY = 10;
 const CHEST = 0.75;
 
 /** What the walk round shows, with nobody firing. */
-export function fromOutside(sim: Simulation): { inView: number; arc: number; hidden: number; overview: number; perches: number } {
+export function fromOutside(sim: Simulation): { inView: number; arc: number; hidden: number; overview: number; ground: number; perches: number } {
   const w = sim.world;
   const T = sim.tuning;
   const ring = ringAround(w, { x: w.camp.site.x, z: w.camp.site.z }, 25, 10);
@@ -92,7 +92,7 @@ export function fromOutside(sim: Simulation): { inView: number; arc: number; hid
 }
 
 /** What scouting has to do: how many men the best overview shows, and how many firing points it takes to see everyone any of them can. */
-function fromPerches(sim: Simulation): { overview: number; perches: number } {
+function fromPerches(sim: Simulation): { overview: number; ground: number; perches: number } {
   const w = sim.world;
   const T = sim.tuning;
   const view = { world: w, solids: sim.solids, bodies: [] };
@@ -103,6 +103,7 @@ function fromPerches(sim: Simulation): { overview: number; perches: number } {
   const perches = w.report.camp!.perches;
   const shows = perches.map(() => new Uint8Array(men.length));
   let seen = 0;
+  let raised = 0;
   const best = bestOverview(w);
   for (let k = 0; k < MOMENTS; k++) {
     men.forEach((g, m) => {
@@ -112,7 +113,10 @@ function fromPerches(sim: Simulation): { overview: number; perches: number } {
         const ey = w.terrain.heightAt(p.x, p.z) + eye;
         if (!(sightLine(view, p.x, ey, p.z, pose.x, y + head, pose.z, Blocks.Sight) || sightLine(view, p.x, ey, p.z, pose.x, y + head * CHEST, pose.z, Blocks.Sight))) return;
         shows[i]![m] = 1;
-        if (p.x === best.x && p.z === best.z) seen++;
+        if (p.x === best.x && p.z === best.z) {
+          seen++;
+          if (g.elevated) raised++;
+        }
       });
     });
   }
@@ -133,7 +137,7 @@ function fromPerches(sim: Simulation): { overview: number; perches: number } {
     for (const m of [...left]) if (shows[pick]![m] === 1) left.delete(m);
     count++;
   }
-  return { overview: seen / MOMENTS, perches: count };
+  return { overview: seen / MOMENTS, ground: (seen - raised) / MOMENTS, perches: count };
 }
 
 export const circling: Experiment = {
@@ -157,6 +161,7 @@ export const circling: Experiment = {
     { key: 'arc', label: "share of the walk a man's visible from (%)", kind: 'mean' },
     { key: 'hidden', label: 'men no stop ever shows (%)', kind: 'mean' },
     { key: 'overview', label: 'men in view from the best overview', kind: 'mean' },
+    { key: 'ground', label: 'of them, on the ground', kind: 'mean' },
     { key: 'perches', label: 'firing points to see everyone', kind: 'mean' },
   ],
   run(seed, arm, tuning) {

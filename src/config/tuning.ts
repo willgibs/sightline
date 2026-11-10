@@ -189,8 +189,8 @@ export const defaultTuning = {
           barbican: 0, // metres of wall running out from each side of a gate, so it can only be seen into from straight ahead
           towers: [2, 4],
           vehicleDoorGap: 0, // metres his vehicle keeps off every door: the plain yard's never needed it
-          storeys: { hq: 1 }, // a module with 2 here has a second floor, stairs and windows
-          windowPost: 0, // a marksman at an upper window of the target's building, if it has one
+          storeys: { hq: 1, barracks: 1, mess: 1, storage: 1 }, // a module with 2 here has a second floor, stairs and windows
+          windowPost: 0, // marksmen at the upper windows of its two-storey buildings, the target's first
           modules: { hq: [12, 9, 3.2], barracks: [18, 8, 3], mess: [13, 9, 3], storage: [13, 10, 4.4], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
         },
         // The same plot behind a wall: the yard can only be seen into through the gate, the breach,
@@ -208,10 +208,10 @@ export const defaultTuning = {
           breachWidth: 4,
           breachSides: ['back', 'left', 'right'],
           barbican: 12,
-          towers: [2, 4],
+          towers: [1, 3],
           vehicleDoorGap: 3,
-          storeys: { hq: 2 },
-          windowPost: 1,
+          storeys: { hq: 2, barracks: 2, mess: 1, storage: 1 },
+          windowPost: 2, // marksmen at the upper windows of its two-storey buildings, the target's first
           modules: { hq: [12, 9, 6], barracks: [18, 8, 3], mess: [13, 9, 3], storage: [13, 10, 4.4], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
         },
         // A keep on a hilltop: a tight walled plot, one narrow gate, and in the middle of it the
@@ -229,10 +229,10 @@ export const defaultTuning = {
           breachWidth: 2.4,
           breachSides: ['back', 'left', 'right'],
           barbican: 10,
-          towers: [2, 4],
+          towers: [1, 2],
           vehicleDoorGap: 3,
-          storeys: { hq: 2 },
-          windowPost: 1,
+          storeys: { hq: 2, barracks: 2, mess: 1, storage: 1 },
+          windowPost: 2, // marksmen at the upper windows of its two-storey buildings, the target's first
           modules: { hq: [16, 12, 6], barracks: [16, 8, 3], mess: [12, 8, 3], storage: [12, 9, 3.6], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
         },
         // A depot strung along a road: a long plot with the road running right through it, gate to
@@ -250,10 +250,10 @@ export const defaultTuning = {
           breachWidth: 4,
           breachSides: ['left', 'right'],
           barbican: 12,
-          towers: [2, 3],
+          towers: [1, 2],
           vehicleDoorGap: 3,
-          storeys: { hq: 2 },
-          windowPost: 0,
+          storeys: { hq: 2, barracks: 2, mess: 1, storage: 1 },
+          windowPost: 2, // marksmen at the upper windows of its two-storey buildings, the target's first
           modules: { hq: [13, 9, 6], barracks: [20, 9, 3], mess: [13, 9, 3], storage: [24, 11, 5], radio: [7, 5, 2.8], shed: [6, 4, 2.6] },
         },
         // A farm and its outbuildings: no fence, a farmhouse, a barn and a byre round a small
@@ -274,8 +274,8 @@ export const defaultTuning = {
           barbican: 10,
           towers: [1, 1],
           vehicleDoorGap: 3,
-          storeys: { hq: 2 },
-          windowPost: 1,
+          storeys: { hq: 2, barracks: 1, mess: 1, storage: 1 },
+          windowPost: 1, // marksmen at the upper windows of its two-storey buildings, the target's first
           modules: { hq: [13, 10, 6], barracks: [18, 8, 3.2], mess: [12, 8, 3], storage: [22, 12, 7], radio: [6, 5, 2.8], shed: [6, 5, 2.6] },
         },
       },

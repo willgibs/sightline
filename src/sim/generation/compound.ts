@@ -815,23 +815,6 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   const hqFaces: Face[] = !needsWayIn(crux) ? [yardFace] : [yardFace, buried(crux) && backFace === yardFace ? sideFace : backFace];
   const hqIndex = building('hq', hqFit.a, hqFit.b, hqFit.lenA, hqFit.lenB, M.hq[2]!, Surface.Wood, hqFaces, hqRng, C.doorWidth, type.storeys.hq);
   const hqB = buildings[hqIndex]!;
-  // A marksman at an upper window of a building with an upper floor, where the type posts one, watching the front.
-  if (hqB.storeys >= 2 && type.windowPost > 0) {
-    const gateAt = at(openings[0]!.a, openings[0]!.b);
-    let best: { x: number; z: number; facing: number } | null = null;
-    for (const w of windows) {
-      if (w.building !== hqIndex) continue;
-      const ox = w.x - hqB.x;
-      const oz = w.z - hqB.z;
-      const ol = Math.sqrt(ox * ox + oz * oz) || 1;
-      const gx = gateAt.x - w.x;
-      const gz = gateAt.z - w.z;
-      const gl = Math.sqrt(gx * gx + gz * gz) || 1;
-      const facing = (ox / ol) * (gx / gl) + (oz / ol) * (gz / gl);
-      if (!best || facing > best.facing) best = { x: w.x - (ox / ol) * 0.9, z: w.z - (oz / ol) * 0.9, facing };
-    }
-    if (best) towers.push({ x: best.x, z: best.z, deck: hqB.floorY, corner: 'window' });
-  }
   // A buried target's doors have screens: a short wall just inside each, so nobody gets a
   // straight line to him through the door from the yard. To reach him you step inside. A
   // screen stops short of the room's side walls, so there is always a way round it.
@@ -865,7 +848,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     const f = fit(slotOf(slot), size[0]!, size[1]!, brng);
     const face = inwardFace(f.a, f.b);
     const faces: Face[] = doorsWanted === 2 ? [face, f.lenA >= f.lenB ? (f.b > 0 ? 'b-' : 'b+') : f.a > 0 ? 'a-' : 'a+'] : [face];
-    building(module, f.a, f.b, f.lenA, f.lenB, size[2]!, surface, faces, brng, module === 'storage' ? C.doorWidth * 2 : C.doorWidth);
+    building(module, f.a, f.b, f.lenA, f.lenB, size[2]!, surface, faces, brng, module === 'storage' ? C.doorWidth * 2 : C.doorWidth, type.storeys[module]);
   }
 
   // The radio room, and its mast beside it.
@@ -875,6 +858,38 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   const radioB = rf.lenA >= rf.lenB ? rf.b : rf.b - 2;
   const radioLenA = rf.lenA >= rf.lenB ? rf.lenA - 4 : rf.lenA;
   const radioLenB = rf.lenA >= rf.lenB ? rf.lenB : rf.lenB - 4;
+  // Marksmen at the upper windows of its two-storey buildings, so height isn't only the towers: the
+  // target's building first, its window toward the gate, then each other, its window toward the wall nearest it.
+  {
+    const gateAt = at(openings[0]!.a, openings[0]!.b);
+    const best = (b: (typeof buildings)[number], index: number, toward: (w: (typeof windows)[number]) => Point2): { x: number; z: number; score: number } | null => {
+      let top: { x: number; z: number; score: number } | null = null;
+      for (const w of windows) {
+        if (w.building !== index) continue;
+        const ox = w.x - b.x;
+        const oz = w.z - b.z;
+        const ol = Math.sqrt(ox * ox + oz * oz) || 1;
+        const t = toward(w);
+        const tl = Math.sqrt(t.x * t.x + t.z * t.z) || 1;
+        const score = (ox / ol) * (t.x / tl) + (oz / ol) * (t.z / tl);
+        if (!top || score > top.score) top = { x: w.x - (ox / ol) * 0.9, z: w.z - (oz / ol) * 0.9, score };
+      }
+      return top;
+    };
+    const twoFloors = buildings.map((b, index) => ({ b, index })).filter(({ b }) => b.storeys >= 2).sort((p, q) => (p.index === hqIndex ? -1 : q.index === hqIndex ? 1 : p.index - q.index));
+    let left = type.windowPost;
+    for (const { b, index } of twoFloors) {
+      if (left <= 0) break;
+      const here = index === hqIndex ? best(b, index, (w) => ({ x: gateAt.x - w.x, z: gateAt.z - w.z })) : best(b, index, (w) => {
+        const f = toFrame(w.x, w.z);
+        const toEdge = HA - Math.abs(f.x) < HB - Math.abs(f.z) ? along(Math.sign(f.x) || 1, 0) : along(0, Math.sign(f.z) || 1);
+        return toEdge;
+      });
+      if (!here) continue;
+      towers.push({ x: here.x, z: here.z, deck: b.floorY, corner: 'window' });
+      left--;
+    }
+  }
   building('radio', radioA, radioB, radioLenA, radioLenB, M.radio[2]!, Surface.Wood, [inwardFace(radioA, radioB)], radioRng);
   // The set against the room's far wall from its door; its antenna is the mast outside.
   const radioDoor = doors[doors.length - 1]!;
