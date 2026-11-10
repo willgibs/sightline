@@ -515,25 +515,32 @@ export function infiltrate(S: Space, E: Exposure, M: Meter, Q: Search): Infiltra
     // The four sides, then staying put: the order the moves have always been tried in.
     for (let d = 0; d < 4; d++) {
       const o = sides[c * 4 + d]!;
-      if (o < 0 || h[o]! < 0) continue;
-      // Every interval of the neighbour he can step into while he can still be here.
-      const no = make(o);
-      const st = ivStart[o]!;
-      const en = ivEnd[o]!;
-      const first = intervalAt(o, t + 1);
-      for (let j = first >= 0 ? first : firstAfter(st, no, t + 1); j < no; j++) {
-        const at = Math.max(t + 1, st[j]!);
-        if (at > end + 1) break;
-        if (at > en[j]!) continue;
-        const left = rate === 0 ? Math.max(0, m - M.decay * (at - 1 - t)) : m;
-        arrive(o, at, left, x);
-      }
+      if (o >= 0) stepInto(o, t, end, rate, m, x);
     }
+    // And the moves that aren't to a side: up or down a flight of stairs.
+    const more = S.links?.get(c);
+    if (more) for (const o of more) stepInto(o, t, end, rate, m, x);
     // Staying put past this interval: into whatever holds the next sample, if anything does.
     if (end + 1 <= H) arrive(c, end + 1, Math.max(0, m - (rate === 0 ? M.decay * (end - t) : 0)), x, true);
   }
   if (waiting) return finish(waiting.x, waiting.w);
   return none(expanded, false);
+
+  /** Every interval of the cell o he can step into while he can still be where he is. */
+  function stepInto(o: number, t: number, end: number, rate: number, m: number, x: number): void {
+    if (h[o]! < 0) return;
+    const no = make(o);
+    const st = ivStart[o]!;
+    const en = ivEnd[o]!;
+    const first = intervalAt(o, t + 1);
+    for (let j = first >= 0 ? first : firstAfter(st, no, t + 1); j < no; j++) {
+      const at = Math.max(t + 1, st[j]!);
+      if (at > end + 1) break;
+      if (at > en[j]!) continue;
+      const left = rate === 0 ? Math.max(0, m - M.decay * (at - 1 - t)) : m;
+      arrive(o, at, left, x);
+    }
+  }
 
   /** The path to label x, then waiting in its cell until time t. */
   function finish(x: number, t: number): Infiltration {
