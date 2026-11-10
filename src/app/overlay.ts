@@ -63,6 +63,7 @@ export class Overlay {
       [['load'], 'load: match or subsonic'],
       [['throw'], 'throw a stone'],
       [['assists'], 'instruments'],
+      [['minimap'], 'map: enlarge, hide'],
       [['debugView'], 'debug view'],
     ];
     const keys = legend.map(([actions, text]) => `<span data-key="${actions[0]}">${keysHtml(map, actions)} ${text}</span>`).join('\n          ');
