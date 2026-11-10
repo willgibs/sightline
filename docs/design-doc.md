@@ -1,6 +1,6 @@
 # Sightline · Game Design & Build Plan
 
-> **This is a copy.** The design doc lives at [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), which only the owner's account can open, and the live doc wins wherever the two differ. This is its revision 41, kept in step with it on Nov 9, 2026, for sessions that can't open it, such as a Claude Code session without the Claude Docs connector. The live doc's four diagrams are written out here as text. Don't edit this copy to change the design: change the live doc, or propose the change to the owner, then export it again over this file.
+> **This is a copy.** The design doc lives at [Sightline · Game Design & Build Plan](https://claude.ai/artifact/Q7JxvgeF1zrrTEWNrFQy7j), which only the owner's account can open, and the live doc wins wherever the two differ. This is its revision 43, kept in step with it on Nov 10, 2026, for sessions that can't open it, such as a Claude Code session without the Claude Docs connector. The live doc's four diagrams are written out here as text. Don't edit this copy to change the design: change the live doc, or propose the change to the owner, then export it again over this file.
 
 Nov 7, 2026 · @Will Gibson
 
@@ -456,9 +456,9 @@ Audio is information first and atmosphere second, so placeholder sound with corr
 
 Clean screen by default, dense information on demand, and one focal point at a time. The information design is gameplay, so it's prototyped in the wireframe phases; visual polish comes with the Look track.
 
-- **In the world:** almost nothing. A small compass strip, detection indicators at the screen edge that fill toward a guard, and ammo only when you reload or switch.
+- **In the world:** almost nothing. A small compass strip, detection indicators at the screen edge that fill toward a guard, and one quiet corner: what you carry at a glance (stance, suppressor, load, rounds, zero), over a light map.
 - **Instruments:** a wrist watch for time and heart rate, a scope with a mil reticle and zero dial, binoculars with a rangefinder and wind readout.
-- **Tactical map:** a topographic map that shows only what you've observed. Marked guards sit at their last seen spots, and patrol routes and timings draw themselves in as you watch. Lights, alarms and generators appear once spotted. Drop pins and sketch your route: it's the notebook of your plan.
+- **Tactical map:** a topographic map that shows only what you've observed. Marked guards sit at their last seen spots, and patrol routes and timings draw themselves in as you watch. Lights, alarms and generators appear once spotted. Drop pins and sketch your route: it's the notebook of your plan. The light map in the corner is the picture a satellite took before the mission: relief, the fence, roofs as plain outlines, the road, the creek, the woods, and your own position. Nothing that moves, and nothing under a roof.
 - **Debrief:** the scrubbable replay (see Missions, scoring and the debrief).
 - **Type:** a technical monospace for readouts and a clean grotesk for text. Thin rules, no heavy game-UI frames.
 - **Accessibility:** colorblind-safe threat colors, directional subtitles for barks, assists for sway and wind, remappable controls.
@@ -643,6 +643,7 @@ Calls 1–3 shape the core and have working defaults; the rest are deliberately 
 
 | Date | Decision | Outcome |
 | --- | --- | --- |
+| Nov 10, 2026 | What you carry, and a satellite picture | Owner, after playing the takedown: the honest view needs a GUI, and the attacker should have what they could get from scouting satellite imagery. A corner card shows stance, suppressor, load, rounds and zero, over a light map of what a photograph could know. "Both sides realistically equipped, without gear that reduces the dynamics": no heartbeat sensors or UAVs |
 | Nov 9, 2026 | What you can't see through, you can't shoot through | Owner, after the first sitting: a kill through tree cover from hundreds of metres is unfair, and "the fact that it can happen invites lots of problems." A tree's crown stops sight and bullets once a line has been through about a metre of it, by one law. A thin tip or rim only dims the line, and the crown round your own eye doesn't count |
 | Nov 8, 2026 | No promised approach | Owner: a target anyone can shoot from any ridge makes every mission one shot from success and forces the same easy map. The guarantee that perches see the target goes. Each seed is built around a decisive problem, and validation promises only a way through it |
 | Nov 7, 2026 | Foundation for many games | Owner: one foundation for many games and features, with each lane aiming past the best known solution and proving it on its own bench. A narrow kernel, lanes behind contracts, a bench per lane |
