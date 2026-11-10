@@ -336,6 +336,8 @@ export function giveCampDevices(sim: Simulation): void {
   const o = camp.objective;
   const vehicle = o ? camp.vehicles?.[o.vehicle] : undefined;
   if (vehicle) c.camp.devices.escape = boardingPoint(sim.world, vehicle, sim.tuning);
+  // His way across the yard is found now, ahead of the first tick: the moment he gets in mustn't be a late frame.
+  if (vehicle && camp.layout) yardRoute(sim.world, sim.tuning, vehicle);
   const objective = sim.index.of('objective')[0];
   if (objective) giveObjective(sim, objective.objective.target);
 }

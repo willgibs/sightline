@@ -80,6 +80,8 @@ export interface NavAllowance {
   searches: { left: number };
   /** The work counter's nodes when the tick began, so a tick's route-finding can be capped by what it has actually expanded. */
   nodesAtStart: number;
+  /** And its rays, for the looks for dead ground (ground.ts), which cost rays where a route costs cells. */
+  raysAtStart: number;
 }
 
 /** A mind's awareness: the state, the tick he entered it, his focus, if any, and why (perception/senses.ts). */

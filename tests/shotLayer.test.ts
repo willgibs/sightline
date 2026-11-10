@@ -55,14 +55,17 @@ function snapshot(tick: number, extra: Partial<Snapshot> = {}): Snapshot {
 }
 
 const layer = (): ShotLayer => new ShotLayer(createLook(new THREE.Vector3(0, 1, 0), 0.001), T);
-const meshes = (l: ShotLayer): THREE.Mesh[] => l.group.children.filter((c): c is THREE.Mesh => c instanceof THREE.Mesh);
 
 describe('the shot layer', () => {
   it('raises dust where a shot strikes the ground, from the strike, thinning away', () => {
     const l = layer();
     const strike: ImpactEvent = { type: 'impact', id: 2, tick: 31, t: 31 / 30 - 0.01, source: 1, cause: 1, x: 3, y: 0, z: -300, surface: 1, loudness: 1, radius: 160, what: 'terrain', target: -1, part: 'none', speed: 600, nx: 0, ny: 1, nz: 0 };
+    // The puffs are a fixed set, made with the layer: a strike takes one, and gives it back.
+    const puffs = l.group.getObjectByName('puffs')!.children as THREE.Mesh[];
+    const made = puffs.length;
+    expect(puffs.every((p) => !p.visible)).toBe(true);
     l.addEvents([strike]);
-    const puff = meshes(l)[0]!;
+    const puff = puffs.find((p) => p.position.z === -300)!;
     expect(puff.position.toArray()).toEqual([3, 0, -300]);
     // A frame before the strike: not yet.
     l.update(snapshot(29), snapshot(30), 0.5);
@@ -76,9 +79,18 @@ describe('the shot layer', () => {
     l.update(snapshot(60), snapshot(61), 0);
     expect(opacity()).toBeLessThan(early);
     expect(puff.scale.x).toBeGreaterThan(small);
-    // Gone once its time is up.
+    // Gone once its time is up: hidden, and nothing made or thrown away.
     l.update(snapshot(200), snapshot(201), 0);
-    expect(meshes(l)).toHaveLength(0);
+    expect(puff.visible).toBe(false);
+    expect(puffs).toHaveLength(made);
+    // More strikes at once than there are puffs: the newest are all shown, and still nothing is made.
+    const many = Array.from({ length: made + 5 }, (_, k): ImpactEvent => ({ ...strike, id: 10 + k, x: 100 + k, t: 7 + k * 0.0001 }));
+    l.addEvents(many);
+    l.update(snapshot(210), snapshot(211), 0.5);
+    expect(puffs).toHaveLength(made);
+    expect(puffs.filter((p) => p.visible)).toHaveLength(made);
+    expect(puffs.some((p) => p.position.x === 100 + made + 4)).toBe(true);
+    expect(puffs.some((p) => p.position.x === 100)).toBe(false);
   });
 
   it("draws a body where the simulation has its shape, collapsing at the frame's instant", () => {
@@ -89,7 +101,7 @@ describe('the shot layer', () => {
     l.update(prev, curr, 0.5);
     const t = 35.5 / 30;
     const want = remainsShape(r, t, T, emptyShape());
-    const body = l.group.children.find((c) => c instanceof THREE.Group) as THREE.Group;
+    const body = l.group.children.find((c) => c instanceof THREE.Group && c.name !== 'puffs') as THREE.Group;
     const head = body.children[0] as THREE.Mesh;
     expect(head.position.x).toBeCloseTo(want.head.x, 9);
     expect(head.position.y).toBeCloseTo(want.head.y, 9);
