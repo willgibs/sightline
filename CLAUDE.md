@@ -23,6 +23,7 @@ The foundation pass that followed is done.
   The plan's rules for landing on `main` apply to every branch.
 - Keep the plan's checkboxes current as work lands, as the foundation plan was kept.
 - **The three pillars** (`docs/pillars.md`): world, camp, player. The camp in its core form has no player: `?scene=compound` drops shots, sounds and bodies on it, and a player is one way of providing those inputs. Keep perception and the camp's knowledge generic over what produces a stimulus.
+- **The takedown** (`?scene=takedown`, Nov 9) is the mission's contest on trial: a camp that protects its target in stages you can see and break. Whether it is the contest is the owner's call, on the desk. `docs/foundation-review.md` is the Fable 5.2 advisor's review, and what it means for the rest of the build.
 - **Lab F, the camp fights back** (the owner's call, Nov 8), is the sixth lab, and *Labs pass* requires it. `docs/camp-engine.md` is its design: how a camp fights back, as engines, and sandboxes as development instruments for proving them. Every step has to be human-playable, not only good on paper. `docs/lab-opportunities.md` lists where each lab tests less than the best idea on hand.
 
 **Phase 1:** six labs, each an isolated wireframe scene built to its exit test.
