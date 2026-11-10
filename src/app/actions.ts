@@ -32,6 +32,7 @@ export type Action =
   | 'load'
   | 'throw'
   | 'assists'
+  | 'minimap'
   // Anywhere, once per press.
   | 'mark'
   | 'debugView'
@@ -99,6 +100,7 @@ export const DEFAULT_ACTIONS: Readonly<Record<Action, ActionSpec>> = {
   load: { context: 'play', kind: 'pressed', inputs: ['KeyY'], label: 'load' },
   throw: { context: 'play', kind: 'pressed', inputs: ['KeyX'], label: 'throw' },
   assists: { context: 'play', kind: 'pressed', inputs: ['KeyH'], label: 'assists' },
+  minimap: { context: 'play', kind: 'pressed', inputs: ['Digit1'], label: 'map' },
   mark: { context: 'play', kind: 'pressed', inputs: ['KeyM'], label: 'mark moment' },
   debugView: { context: 'always', kind: 'pressed', inputs: ['F3', 'Backquote'], label: 'debug view' },
   colliders: { context: 'debug', kind: 'pressed', inputs: ['KeyB'], label: 'colliders' },

@@ -83,7 +83,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 - `npm run look`: the honest and debug views as pictures in `shots/`, from a headless browser. `-- --scene <name>`, `--seed`, `--look`, `--walk` and `--fly` choose what to look at (the header of `src/headless/look.ts`).
 - `window.sightline` exposes automation hooks for scripted screenshots and playtests. The full list is `automation()` in `src/app/game.ts`:
   - **Running:** `play()`, `pause()`.
-  - **Views:** `debug(on)`, `colliders(on)`, `grid(on)`, `overwatch(on)`.
+  - **Views:** `debug(on)`, `colliders(on)`, `grid(on)`, `overwatch(on)`, `minimap(mode)`.
   - **Camera:** `look(headingDeg, pitchDeg)`, `fly(x, y, z, headingDeg, pitchDeg)`, `body()`.
   - **Input:** `hold([codes])`, `tap('KeyC' | 'KeyZ')`, `click()`, `zoom(on)`, `noise()` and `dropBody()` (drop a noise or a body where the view points: the sandbox, A10 and A9).
   - **Time:** `timeScale(x)` (the debug view's, 0.25× to 8×).
