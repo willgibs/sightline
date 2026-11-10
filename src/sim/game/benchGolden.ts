@@ -26,10 +26,10 @@ export const BENCH_GOLDEN: PinnedBench = {
       "lab D least margin under the valley budget": 7,
       "lab D widest overwatched horizon (°)": 157,
       "lab D narrowest open horizon (°)": 152,
-      "lab D camps valid at the first attempt, no repair (of 6)": 4,
-      "lab D camps repaired": 2,
+      "lab D camps valid at the first attempt, no repair (of 6)": 6,
+      "lab D camps repaired": 0,
       "lab D rules still broken": 0,
-      "lab D most re-analyses in a repair (of 12)": 11,
+      "lab D most re-analyses in a repair (of 12)": 0,
       "lab D camps with a way in and out (of 6)": 1,
       "lab D clusters left unsolved": 0,
       "lab D busiest search (of 400000 expansions)": 400000,
@@ -175,20 +175,20 @@ export const BENCH_GOLDEN: PinnedBench = {
       "re-found within 60 s (of 16): honest, unpaced": 16,
       "reactions (in the scripted scenarios)": 62,
       "reactions unexplained": 0,
-      "overlook: guards down from one perch, of 30": 16,
+      "overlook: guards down from one perch, of 34": 19,
       "overlook: camps cleared (of 3)": 0,
       "overlook: the target got away (of 3)": 2,
-      "timed shot on an escort's camp: target down (of 3)": 3
+      "timed shot on an escort's camp: target down (of 3)": 2
     },
     "runs": {
       "camp-fight": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 11305 },
-          "bullets": { "rays": 112, "nodes": 0, "bodies": 0 },
-          "perception-hearing": { "rays": 63, "nodes": 4041, "bodies": 0 },
-          "perception-spotting": { "rays": 4258, "nodes": 0, "bodies": 0 },
-          "perception-awareness": { "rays": 0, "nodes": 68776, "bodies": 0 },
-          "guard-brains": { "rays": 0, "nodes": 14912, "bodies": 0 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 14084 },
+          "bullets": { "rays": 133, "nodes": 0, "bodies": 0 },
+          "perception-hearing": { "rays": 61, "nodes": 13609, "bodies": 0 },
+          "perception-spotting": { "rays": 2288, "nodes": 0, "bodies": 0 },
+          "perception-awareness": { "rays": 0, "nodes": 89031, "bodies": 0 },
+          "guard-brains": { "rays": 0, "nodes": 19329, "bodies": 0 }
         }
       }
     }
@@ -229,7 +229,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       "MUD-9031 wander": {
         "work": {
           "motor": { "rays": 0, "nodes": 0, "bodies": 19800 },
-          "perception-sight": { "rays": 1116, "nodes": 0, "bodies": 0 }
+          "perception-sight": { "rays": 302, "nodes": 0, "bodies": 0 }
         }
       },
       "TAL-4471 chaos": {

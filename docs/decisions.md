@@ -118,38 +118,54 @@ Two sessions took up the long bot runs' broken promise the same afternoon. The o
 
 **Checked,** on the merged code: 40 fresh valleys with both bots for 15 minutes each, the movement scenes, 200 ladder towers, and ROK-8470 again. 3.7 million ticks, 34 hours of play, and every promise held (`npm run fuzz -- --seeds 40 --minutes 15`). The worst rise from or onto steep ground was 2.0 mm, the motor's own allowance.
 
-## 2026-11-09 · Compound types: a keep on a hilltop, a depot along a road, a farm and its outbuildings
+## 2026-11-10 · Compound types: a walled compound, a keep, a depot and a farm, and why walking their outside no longer pays
 
-**The owner's call** (on the desk, Nov 9): compound types are the next thing the generator learns, on their own branch, alongside the camp work, and two-storey buildings come with them. `docs/compound-types.md` is the design, with the honest list of what a second storey asks of each system. This lands its first step: the types, on one storey. The second storey is its own pull request, after the owner's answer on the desk. `GEN_VERSION` 8.
+**The owner's call** (on the desk, Nov 9): compound types are the next thing the generator learns, on their own branch, and two-storey buildings come with them. `docs/compound-types.md` is the design, with the honest list of what a second storey asks of each system. This lands its first step: the types, on one storey. The second storey is its own pull request. `GEN_VERSION` 8.
 
-**What a type is.** A record in `gen.compound.types` (`generation/plots.ts`): how well it suits each crux and each kind of ground, its plan, the size of its plot, its modules, and a `shape`, one function per plot family. A shape produces parcels, corners, lanes, lights and door-facing, and everything downstream (modules, fixtures, cover, staffing, validation) reads those and never asks which type it is. A new type on an old shape is data alone. A seed's type comes from a root stream of its own (`compoundTypeOf`), weighted by crux × ground, so a valley re-rolled or a camp rebuilt keeps it. With every other type weighted to nothing the generator draws exactly what it did: `tests/types.test.ts` pins a yard-only TAL-4471 to the fingerprint it had before there were types, and the yard-only arm of the experiments is that generator.
+**Then the bar moved** (the owner's takedown sitting, Nov 10): "a few perch shots, then just circling the base taking out each new enemy as they came into view, never really being seen, even in the flat field just outside the compound, felt too easy. Largely the bland, simple base design." So a shape is held to this now: it makes you scout and work for an angle, and walking its outside doesn't hand you each man in turn. The first three types were built to differ and two were more open than the yard (a depot showed 3.1 men at a stop on the walk, a farm 3.9, the yard 2.6), so this reworked them.
 
-**Four shapes.** A *yard* (as first built). A *bailey* (the yard's ring with a keep in the middle, its door toward the gate, walled all round, on high ground if it can be). A *spine* (a long plot with the road running through it, gate to gate, sheds down both banks with their doors on the road). A *steading* (no fence: a farmhouse, barn and byre round a small farmyard, huts beyond, field walls in runs with gaps, a silo). The fence, the towers, patrol loops, gates, the breach and lights all come from the shape; `yard` keeps today's numbers.
+**What a type is.** A record in `gen.compound.types` (`generation/plots.ts`): how well it suits each crux and each kind of ground, its plan, the size of its plot, its modules, and a `shape`, one function per plot family. A shape produces parcels, corners, lanes, lights and door-facing, and everything downstream (modules, fixtures, cover, staffing, validation) reads those and never asks which type it is. A new type on an old shape is data alone, which is how the walled compound arrived. A seed's type comes from a root stream of its own (`compoundTypeOf`), weighted by crux × ground, so a valley re-rolled or a camp rebuilt keeps it. With every other type weighted to nothing the generator draws exactly what it did before there were types (`tests/types.test.ts`).
 
-**Measured** (100 held-out seeds, series `lab-world-variety`, as Lab D's survey was; `npm run experiment -- variety-compound`, `variety-families`, `variety-types`; the arm "yard only" is the generator before this change):
+**Four places, on four shapes.** A *walled compound* (the first plot, behind a wall). A *keep* (a bailey: a keep in the middle of a walled ring). A *depot* (a spine: the road through a long plot, gate to gate, sheds down both banks with their doors on the road). A *farm* (a steading: a court of three buildings, huts beyond, long field walls). The chain-link *yard* is out of the mix and stays in the tuning as the bench's baseline.
+
+**How walking the outside was measured** (`npm run experiment -- circling`, `lab/experiments/circling.ts`, 24 camps, the same seeds in every arm). A bot limited to what a person can do (`ShootAndCircle`, `bots/person.ts`) fires three rounds from the best overview, walks a lap of the plot 25 m out, crouched, stopping every 15 m to look in, and shoots whoever is there, against the takedown's alert camp. With nobody firing, the same walk is read for what the shape shows.
+
+| | yard (as the owner played it) | walled | keep | depot | farm | as built |
+| --- | --- | --- | --- | --- | --- | --- |
+| Men down from the walk | 4.8 ±0.8 | 2.9 ±0.7 | 2.2 ±0.6 | 2.8 ±0.6 | 3.9 ±1.0 | 2.9 ±0.7 |
+| Men in view at a stop | 2.5 ±0.4 | 1.3 ±0.1 | 1.2 ±0.1 | 1.3 ±0.1 | 1.1 ±0.1 | 1.2 ±0.1 |
+| Share of the walk a man is visible from | 32% | 15% | 13% | 15% | 17% | 15% |
+| Men no stop ever shows | 23% | 36% | 52% | 33% | 26% | 35% |
+| Men in view from the best overview | 5.3 | 5.1 | 5.2 | 5.5 | 6.2 | 5.4 |
+
+Against the yard, seed by seed, as built: 1.9 fewer men down from the walk and 1.3 fewer in view at a stop, both clear of the camps' own spread. Taken apart (a scratch tally, the same 24 camps): of the men who fall on the walk, 2.2 of 3.1 came out to look for him or came with the relief, the camp's answer and the next piece of its engine. What the shape itself hands over, through a wall line, a gate, the breach or from a tower, fell from 2.7 a lap to 0.9.
+
+**What changed to get there.** Chain link was the cause: a patrol on it is visible from 95% of the walk. (1) *A wall with windows*, the `windowed` perimeter: solid all round but for up to one stretch of chain link a side, 6 to 10 m, a place to find that shows a wedge of the camp. (2) *A gate that shows you the camp only from straight in front of it*: the walls-only compound still handed over five men from one spot beside the gate, so two walls now run out from each gatepost along the line the road takes (`barbican`, 10 to 12 m). (3) *Long, high field walls on a farm*, few gaps, a low run here and there, and its patrols 14 m in from them: along a wall with gaps a patrol passes every gap. (4) The plain yard out of the mix.
+
+**Not changed: the view from the ridges.** The best overview still shows about five men at a moment, and two firing points still show everyone a perch can. Walls hide the yard from the ground, not from a ridge. The owner's note calls a bad shot from a perch getting you killed "good"; if scouting from the ridges should cost more it is a further step (overhead cover, or more of the men indoors more of the time).
+
+**Variety** (100 held-out seeds, series `lab-world-variety`; `npm run experiment -- variety-compound`, `variety-families`, `variety-types`; the arm "yard only" is the generator before this change):
 
 | | yard only | as built |
 | --- | --- | --- |
-| Type (yard / keep / depot / farm) | 100 / 0 / 0 / 0 | 19 / 25 / 27 / 29 |
-| Plot (yard / long / wide / tight) | 37 / 15 / 26 / 22 | 12 / 28 / 31 / 29 |
-| Perimeter (chain / screen / fort / fields) | 47 / 38 / 15 / 0 | 19 / 24 / 28 / 29 |
-| Openings in the perimeter, 3 or more | 0 | 27 |
-| Nearest opening 25 m or nearer his building | 22 | 16 |
-| Best family of plan (shot / flush / take apart / way in) | 7 / 37 / 9 / 47 | 7 / 39 / 12 / 42 |
+| Type (walled / keep / depot / farm) | 0 / 0 / 0 / 0 (all yard) | 19 / 27 / 22 / 32 |
+| Plot (yard / long / wide / tight) | 36 / 17 / 26 / 21 | 9 / 25 / 36 / 30 |
+| Perimeter (chain / screen / fort / windowed / fields) | 47 / 39 / 14 / 0 / 0 | 0 / 0 / 35 / 33 / 32 |
+| Openings in the perimeter, 3 or more | 0 | 22 |
+| His door within 25 m of an opening | 21 | 10 |
+| Best family of plan (shot / flush / take apart / way in) | 7 / 42 / 8 / 43 | 5 / 31 / 20 / 44 |
 
-The mix of plans is level with yard-only overall; what the types change is which plan each kind of place calls for, which is the point: `variety-types` has a keep answered only by a flush (12) or a way in (13) with no ridge shot at all, a depot the only place a shot from a perch is the best plan (5 of the 7 where any is) alongside take-apart (6) and flush (10), and a farm with a flush (12) and a way in (11). A yard has shots 2, flush 5, way in 12. No family dominates a type by construction, and a keep isn't solved the way a depot is. Layout descriptors alone would have called the yard-only camps varied (Beukman's trap), so the plan families are the claim.
+Which plan is best depends on the place (`variety-types`): a keep is answered by a way in (19) or a flush (8), never a ridge shot; a depot by taking it apart (10) with shots (4) and a flush (6) beside it; a farm by a way in (12), a flush (11) or taking it apart (9); a walled compound by a way in (11) or a flush (6).
 
-**Lab D's bar.** 93 of 100 valid at the first attempt on a new held-out series, on the generator with tree crowns in (`npm run seeds -- --count 100 --from compound-types-exit-2`), 7 repaired, none invalid; `perch witnessed` broke 6 of those first attempts and `alarms in fire` 1. Before the crowns landed it was 98 of 100 on `compound-types-exit`. A keep's escort crux is weighted to nothing: walled in the middle of a walled plot, no perch ever has him long enough for that crux to be a crux, and validation says so.
+**Lab D's bar.** 96 of 100 valid at the first attempt, 4 repaired, none invalid on the settled generator (`npm run seeds -- --count 100 --from compound-types-exit-5`). Along the way: 89 of 100 on `compound-types-exit-3`, the first series with walls, where `perch witnessed` broke 8 first attempts, most of them on places that had two men in view for a moment now and then behind a wall. Such a place isn't a perch that sees them, so that rule now asks only of a perch that sees 5% of guard time (`witnessedFrom`); 93 of 100 on `compound-types-exit-4`, and two more changes (the gate's walls start at the gateposts) took it to the final 96. Generation: mean 2.7 s, p95 4.5 s.
 
-**What the pictures say** (`npm run look`, fly camera and honest view from the best perch): the keep is a walled plot on a hill with its towers and a tall building in the middle; the depot a long strip with sheds down a road and a gate each end; the farm has no fence, and field walls show as low broken lines round a court of three buildings.
+**What the pictures say** (`npm run look`, from above and at eye height): a walled compound reads as a walled compound, and at eye level you see down the road from straight ahead and from the side only wall, a tower and the light poles; a farm is a court of three behind long stone walls with gaps.
 
-**A bug the keep found.** Three searches walk from the site's centre on the coarse map layer (`findPerches`, spawn, `counter-perch`); a keep's centre is inside the keep, whose map cells are a sealed pocket, so nothing could reach any perch and a keep came out with no perches at all. `campWalkStart` starts those walks just inside the gate wherever a building stands on the centre.
+**Bugs found on the way.** A keep's centre is inside the keep, so a search from the site's centre finds nothing: `campWalkStart`, the walk's start, is just inside the gate wherever a building covers the centre. A vehicle parked across a door strands whoever is behind it: types keep it off doors (`vehicleDoorGap`). Main's `yardRoute` found no way out of the yard on 3 of 40 camps, two of them depots: its start was the open cell nearest the vehicle, which can be a pocket of a few cells between it and a fence. It now takes the nearest cell the gate can really be reached from: 0 of 60 boxed in, and none of those routes crosses anything solid.
 
-**Reported, not fixed:** on a yard or any camp the escape vehicle can be parked across a door (his `escapeRun` search checks ground and corridor, not doors); on farms that dropped a worker's chore route in 1 of 5 seeds, so farms, keeps and depots keep it off doors (`vehicleDoorGap`, 3 m), and the yard keeps its zero so its old camps stay identical.
+**Tests.** `tests/types.test.ts`: the pick is by weight and from its own stream; a yard-only camp matches the old generator's fingerprint; each type is what it says; a place behind walls shows fewer men from the walk than the open yard, on the same seeds; a windowed wall is a wall; a gate can be seen into from straight ahead and not from the side. `tests/person.test.ts`: the bot goes all the way round.
 
-**Tests.** `tests/types.test.ts`: the pick is by weight and from its own stream; a yard-only camp matches the old generator's fingerprint; each type is what it says (a keep with him in the middle behind a wall, a depot with a road gate to gate and every shed's door on it, a farm with low field walls and a court). `tests/compound.test.ts` and `sites.test.ts` follow the moved tuning. Routes off the camp and the variety tests stand on the plain yard or say which type they want, since the seed list now holds other types.
-
-**What moved.** `GEN_VERSION` 8, `GOLDEN_TAL_4471` (TAL-4471 is a farm now), and the pinned runs standing on generated camps (`TAL-4471 wander`, `MUD-9031 wander`, `TAL-4471 chaos`, `camp-systems`, `camp-fight`); none of the movement, perception, shooting or kernel runs. The bench pins and the golden recording are rewritten.
+**What moved.** `GEN_VERSION` 8, `GOLDEN_TAL_4471`, and the pinned runs standing on generated camps (`TAL-4471 wander`, `MUD-9031 wander`, `TAL-4471 chaos`, `camp-systems`, `camp-fight`); none of the movement, perception, shooting or kernel runs. The bench pins and the golden recording are rewritten.
 
 ## 2026-11-09 · The owner's first fight: what it found
 

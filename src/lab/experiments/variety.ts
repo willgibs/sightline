@@ -471,7 +471,7 @@ export const varietyCompound = table('variety-compound', 'the compound, and how 
   ['road off axis', bands('roadOff', '°', [15, 45])],
   ['type', kinds('type', COMPOUND_TYPES)],
   ['plot', kinds('plot', ['yard', 'long', 'wide', 'tight'])],
-  ['perimeter', kinds('perimeter', ['chain', 'screen', 'fort', 'fields'])],
+  ['perimeter', kinds('perimeter', ['chain', 'screen', 'fort', 'fields', 'windowed'])],
   ['yard', kinds('fill', ['open', 'packed'])],
   ['gates', bands('openings', '', [2.5])],
   ['deep', bands('targetDepth', 'm', [25, 45])],

@@ -1,34 +1,14 @@
 # Compound types: different kinds of place, and what a second storey asks of the engine
 
-The design, Nov 9, 2026, for the owner's call of the same day ("compound types are the next thing the generator learns, on their own branch, alongside the camp work", with two-storey buildings to come with them). It is on the owner's desk as a decision (the *Compound types* ask). **The work is paused: the next section says how far it got.**
+The design, Nov 9, 2026, for the owner's call of the same day ("compound types are the next thing the generator learns, on their own branch, alongside the camp work", with two-storey buildings to come with them). It is on the owner's desk as a decision (the *Compound types* ask). **The next section says where it stands.**
 
-## Where this stands (paused, Nov 9)
+## Where this stands (Nov 10)
 
-The owner paused this on Nov 9 until an advisor working on its own branch reports, because that work may rebuild the foundation, the generator included. Nothing here has landed on `main`, no pull request is open, and the decision on the desk is unanswered. Everything is pushed, on two branches. Both are unfinished in the ways listed below.
+**Step 1, the types on one storey, is this pull request** (`GEN_VERSION` 8): four places as records in `gen.compound.types` (a walled compound, a keep, a depot, a farm) on four plot shapes in `generation/plots.ts`. A seed picks its type from its own root stream, weighted by crux × ground, and `staffing.ts` walks the loops and zones the shape gives it. The chain-link yard is out of the mix, kept as the bench's baseline. It was paused on Nov 9 while an advisor reviewed the foundation; the advisor left the generator's output alone and listed nothing here that changes.
 
-**Step 1, the types on one storey: built and measured, not landed (branch `compound-types`, `GEN_VERSION` 8).**
+**Measured on the settled generator:** 96 of 100 valid at the first attempt on a new held-out series (`npm run seeds -- --count 100 --from compound-types-exit-5`, 4 repaired, none invalid; lab D's bar is 90), and the owner's circling case on the bench (section 4a).
 
-- **Built:** the four types as records in `gen.compound.types` (yard, keep, depot, farm) and the four plot shapes in `generation/plots.ts` (yard, bailey, spine, steading). A seed picks its type from its own root stream, weighted by crux × ground. `staffing.ts` walks the loops and zones the shape gives it. The variety experiments have a `yard only` arm and a `type` column. `docs/decisions.md` has the full entry.
-- **Measured** on the merged generator before the last merge of `main`: 93 of 100 valid at the first attempt on the held-out series `compound-types-exit-2`, 7 repaired, none invalid (lab D's bar is 90). Variety against yard-only is in the entry in `docs/decisions.md`. With only `yard` weighted, the generator draws exactly what it did before there were types (`tests/types.test.ts`). The keep, depot and farm were looked at in `npm run look` and read as themselves.
-- **Merged with `main` through #28 and #29.** After that merge the typecheck passed, `tests/escape.test.ts` and `tests/invariants.test.ts` passed, the self-test matched every pin, and the golden recording and bench were rewritten.
-- **`npm run check` has not passed yet, so this is not ready to land.** The last full run was on the commit before that merge and was stopped before it finished, so the rest of the suite is unknown. It had shown three failures. The crowns test was real (it assumed `LEB-2534` is a plain yard) and is fixed. `tests/detmath.test.ts` ("is never reached…") and `tests/systems.test.ts` ("…in the scene ladder") ran past their time limits with the machine at load 47. Their messages were never seen, so those two are unconfirmed. `main` has since given the detmath test more time.
-- **One late change is untested in full.** Main's new `yardRoute` (#29) found no way out of the yard for the escape vehicle on 3 of 40 camps here, 2 of them among 10 depots: the route started from the open cell nearest the vehicle, and that can be a pocket of a few cells between it and a fence. It now retries from the nearest cell the gate can be reached from, and 0 of 40 are boxed in. The self-test wasn't re-run after this, so a pinned run could have moved. `tests/escape.test.ts` gained two depot seeds and now checks the first leg from the vehicle, and that extended test hasn't been run. A check that no route crosses anything solid on 60 fresh seeds was stopped before it finished.
-- **Not done:** the owner's sitting. The seeds picked, each valid at the first attempt, one per type: keep `KAB-8430` (spur, *inside*), depot `HUK-0975` (hollow, *escort*), farm `FUF-9143` (hollow, *flush*). It needs the branch deployed.
-
-**Step 2, levels and two storeys: drafted, not finished (branch `compound-storeys`, `GEN_VERSION` 9).** It branches from Step 1 at the commit before the merge of #28 and #29.
-
-- **Built:** storeys and stairs in the grid (`kernel/world/grid.ts`). One `GridSearch` over a stacked index space, with one-storey searches unchanged. Routes that cross stairs and know a goal's height (`brain/nav.ts`, `brain.ts`). Hearing across floors (`floorLossDb`). Upper-floor cells and a second slab in the raster, field, perches and the certified way in. Floors, real stairs, windows and upstairs posts in the generator. Storeys in the debug grid. `tests/storeys.test.ts` covers the upper floor, the target upstairs, routes up and down, a body climbing the flight by the motor alone, and sound by the stairs and through the floor. Its six tests passed on the last run, before the last small commit.
-- **Measured only roughly:** with the *inside* crux forced, valid at the first attempt on keep 7 of 8, farm 8 of 8, depot 7 of 8.
-- **Not done:** merging Step 1's latest state, the pins at `GEN_VERSION` 9, a held-out series of 100, the variety experiments, pictures of the finished build, `npm run fuzz` over two-storey camps, and `npm run check`. A guard going upstairs because it heard something has its parts tested (the route, the climb) but hasn't been shown in a run.
-
-**What comes next, if this resumes as it is.** Run `npm run check` and the self-test on a quiet machine, merge `main`, and land Step 1. Put the sitting on the desk. Then bring Step 1 into `compound-storeys`, re-pin, measure it as section 7 says, and land Step 2.
-
-**What's worth keeping if the generator is rebuilt.**
-
-- A place is data: a tuning record says what it suits (crux × ground), its shape, its plan weights and what stands in it, so a new type on an old shape needs no code.
-- The type is drawn from the seed's own stream, so re-rolling a valley keeps it, and an "old world, exactly" test made the whole change safe to do.
-- What the new places broke, each a trap for any generator: a keep's centre is inside a building, so a search starting at the site's centre finds nothing (`campWalkStart`). A vehicle parked across a door strands whoever is behind it (`vehicleDoorGap`). A patrol loop's corner can stand on a building. A vehicle by a fence needs a route that starts on the right side of it.
-- Levels as a stacked index space with stairs as links let navigation, hearing and the certified way in share one search. The motor, sight and bullets needed nothing new.
+**Step 2, levels and two storeys, is drafted on the branch `compound-storeys`.** Storeys and stairs in the grid (`kernel/world/grid.ts`), one `GridSearch` over a stacked index space with one-storey searches unchanged, routes that cross stairs and know a goal's height, hearing across floors (`floorLossDb`), upper-floor cells and a second slab in the raster, field, perches and the certified way in, floors, real stairs, windows and upstairs posts in the generator, storeys in the debug grid, and `tests/storeys.test.ts`. Not done: merging Step 1's final state, the pins at `GEN_VERSION` 9, a held-out series of 100, the variety experiments, pictures of the finished build, `npm run fuzz` over two-storey camps, and `npm run check`. A guard going upstairs because it heard something has its parts tested (the route, the climb) but hasn't been shown in a run. It follows the owner's answer on the desk, or the desk's stated default.
 
 ## 1. The gap
 
@@ -92,14 +72,14 @@ Each is here because it changes *what a plan has to be*, not only how the camp l
 **The depot (shape `spine`).** A long, narrow plot strung along the road, which runs right through it from a gate at each end. Long sheds stand on both sides of the road, doors opening on to it; trucks are parked along it. There is no yard: the road is the yard. From a perch square-on you see a slice of road between two sheds; from a perch up the road's axis you see all of it and nothing behind the sheds. It suits *escort* (he walks the road from his office to the sheds, and the men along the road have him) and *flush* (his vehicle is on the road, a short sprint from his door, with the whole road for a long view). The two gates make "the way in" a real choice.
 
 ```
-  ████████ fence ████████████████████████████████
+  ████████ wall █████████████████████████████████
   █ shed  │ shed    │ shed   │ office │ shed     █
   gate ═══╪══ road ═══╪══════╪════════╪═══ gate
   █ pool  │ shed    │ store  │ mess   │ radio    █
   ████████████████████████████ breach ███████████
 ```
 
-**The farm (shape `steading`).** No fence: a farmhouse and a barn and a byre round a small farmyard, then sheds and a generator hut scattered further out across the plot, field walls low enough to see over and crawl behind, a silo the marksman holds. Every direction is open to walk in from, so the wall to get over is the way the farm's buildings see each other, not a fence. It suits *flush* (he bolts from the farmhouse for the cart shed across the yard) and *escort* (his walk from the house to the barn crosses open ground in view of the men in the yard), and *inside* with the house deep in the steading.
+**The farm (shape `steading`).** No fence: a farmhouse and a barn and a byre round a small farmyard, then sheds and a generator hut scattered further out across the plot, long field walls higher than a man with a few gaps and an occasional low run, a silo the marksman holds. There is no gate to come through but the lane in, and the walls are what you have to work round. It suits *flush* (he bolts from the farmhouse for the cart shed across the yard) and *escort* (his walk from the house to the barn crosses open ground in view of the men in the yard), and *inside* with the house deep in the steading.
 
 ```
     field wall    ▒▒▒▒  ▒▒▒▒▒▒▒▒    ▒▒▒▒
@@ -127,6 +107,22 @@ The owner played the takedown on the plain yard and wrote: "a few perch shots, t
 - **A gate that shows you the camp only from straight in front of it.** Two walls run out 10 to 12 m from each gate, along the line the road takes, and the road goes between them (`barbican` in a type's record). You have to stand on the road to look up it.
 - **Long, high field walls for the farm**, with gaps to find and an occasional low run. A patrol keeps 14 m in from them: right along a wall with gaps in it, he'd pass every gap.
 - **The chain-link yard is out of the mix**, kept as the bench's baseline.
+
+**The result** (`npm run experiment -- circling`, 24 camps, the same seeds in every arm; ± is the 95% interval over camps):
+
+| | The yard the owner played | Walled compound | Keep | Depot | Farm | As built (the types as they come up) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Men who go down from the walk | 4.8 ±0.8 | 2.9 ±0.7 | 2.2 ±0.6 | 2.8 ±0.6 | 3.9 ±1.0 | **2.9 ±0.7** |
+| Men in view at a stop on the walk | 2.5 ±0.4 | 1.3 ±0.1 | 1.2 ±0.1 | 1.3 ±0.1 | 1.1 ±0.1 | **1.2 ±0.1** |
+| Share of the walk a man can be seen from | 32% | 15% | 13% | 15% | 17% | **15%** |
+| Men no stop on the walk ever shows | 23% | 36% | 52% | 33% | 26% | **35%** |
+| Rounds he fired in the lap | 8.7 | 5.6 | 5.1 | 5.5 | 8.0 | **6.3** |
+| Shot dead on the walk | 13 of 24 | 16 | 14 | 20 | 11 | **16** |
+| Men in view from the best overview | 5.3 | 5.1 | 5.2 | 5.5 | 6.2 | **5.4** |
+
+Against the yard, seed by seed, the walk hands over 1.9 fewer men as built (clear of the camps' own spread), and each man can be seen from about half as much of it.
+
+**What it didn't do.** Of the men who still go down on the walk (a scratch tally, the same camps), 70% came out to look for him or came with the relief: that's the camp coming after you, the next piece of the camp's engine. What the shape itself hands over, through a wall line, the gate, the breach or from a tower, fell from 2.7 men a lap on the yard to 0.9. A farm stays the most open of the four. **From the firing points nothing changed:** the best overview still shows about five men at a moment, and two firing points still show everyone a perch can. Walls hide the yard from the ground, not from a ridge, and the owner's note calls a poor shot from a perch exposed to return fire "good". If scouting from the ridges should cost more, that is a further step, and needs overhead cover or men kept indoors more of the time.
 
 ## 5. What a second storey asks of everything that assumes one surface per column
 
