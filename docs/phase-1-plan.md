@@ -309,6 +309,7 @@ The [Sightline Desk](https://claude.ai/artifact/RB4pjU2qNsYE3zCuBYYb7f), which o
   | A few days later | A and C, second sittings | `?trials=OWNER-A2` and `?trials=OWNER-C2&lab=movement` | 25 min |
   | Once E7 and E8 are on `main` | E, and D's three camps | `?scene=live-camp&params=seed=LEB-2534`, then `KUV-9210` and `HUM-0755` | 25 min |
   | Any time | F, the first fight | `?scene=compound&params=seed=LEB-2534%26attack=sniper`, then `?scene=live-camp&params=seed=LEB-2534%26perch=1&lab`. What did the camp do, why did you move, what would you do next? | 15 min |
+  | Any time | F, the takedown | `?scene=takedown&params=seed=LEB-2534%26perch=1&lab`, and without `perch=1` to walk in. Is this the contest? Do the stages read as a camp thinking? | 20 min |
 
   What each sitting asks is in its lab's section. Lab A's questions wait until after its first sitting.
 
@@ -1020,6 +1021,8 @@ Added on Nov 8, the owner's call. *Labs pass* requires it. Design and reasoning:
   - [x] Men get out of the line from up to 40 m away and get down when they arrive, crouched or flat by what hides them. Standing in the line fell from 5.5 to 0.9 men per run against a sniper.
   - [x] Reinforcements have a place of their own, so a squad no longer stands in a heap.
   - [ ] Drive the rest of the flaws down: about one man a run in the line, mostly caught by a shot he couldn't place. Nobody stuck, no pile-ups, no silent camps.
+  - [x] The takedown (`?scene=takedown`; `docs/decisions.md`, Nov 9): a camp that protects its target in stages you can see and break. It's a mode, built by the Fable 5.2 advisor (`docs/foundation-review.md`), and its seconds are to be found by playing.
+  - [ ] Bases that can't be beaten by circling (the owner's first go at the takedown, Nov 10: "Shoot, circle, shoot, circle makes the whole base defense redundant"). Compound types answer for the ground, and F2 for the pressure.
   - [ ] The owner's sitting.
 - [ ] F2 · The camp hunts. Picture and Command, sections that sweep, cut-offs on the road, fallbacks.
   - [x] Stance for guards.
