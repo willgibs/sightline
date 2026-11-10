@@ -108,6 +108,14 @@ const rifleSystem: System = {
       else if (c.kind === 'suppressor' && rifle.fitting <= 0) {
         rifle.suppressed = !rifle.suppressed;
         rifle.fitting = ctx.tuning.ballistics.rifle.fitTime;
+      } else if (c.kind === 'load' && rifle.fitting <= 0) {
+        // The next load in the kit, round again to the first: the magazine out and another in. A kit with one has nothing to change to.
+        const carries: Readonly<Record<string, boolean>> = ctx.tuning.ballistics.rifle.carries;
+        const loads = Object.keys(carries).filter((k) => carries[k]).sort(); // unique: a record's keys
+        if (loads.length < 2) continue;
+        rifle.load = loads[(loads.indexOf(rifle.load) + 1) % loads.length]!;
+        rifle.fitting = ctx.tuning.ballistics.rifle.loadTime;
+        rifle.swap = 'load';
       }
     }
   },
@@ -465,6 +473,7 @@ const aimSystem: System = {
     }
     rifle.bolt = Math.max(0, rifle.bolt - dt);
     rifle.fitting = Math.max(0, rifle.fitting - dt);
+    if (rifle.fitting === 0 && rifle.swap) delete rifle.swap;
     // The scope comes up while it's held, unless the body is sprinting or busy with the suppressor.
     const up = ctx.input.optic === 1 && body.gait !== 'sprint' && rifle.fitting <= 0;
     const step = dt / Math.max(B.rifle.raiseTime, 1e-6);

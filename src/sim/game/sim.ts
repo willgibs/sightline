@@ -151,6 +151,8 @@ export interface RifleView {
   zero: number;
   bolt: number;
   fitting: number;
+  /** `fitting` is a change of load, not of the suppressor. */
+  swapping: boolean;
   suppressed: boolean;
   load: string;
   heartRate: number;
@@ -334,7 +336,7 @@ export class Simulation extends KernelSimulation {
     const r = pe.rifle;
     const v = pe.vitals;
     if (r && v) {
-      const view = (s.rifle ??= { up: 0, right: 0, raise: 0, rest: 0, rounds: 0, zero: 0, bolt: 0, fitting: 0, suppressed: false, load: '', heartRate: 0, held: 0, air: 0, glint: 0, steady: 1 });
+      const view = (s.rifle ??= { up: 0, right: 0, raise: 0, rest: 0, rounds: 0, zero: 0, bolt: 0, fitting: 0, swapping: false, suppressed: false, load: '', heartRate: 0, held: 0, air: 0, glint: 0, steady: 1 });
       view.up = r.sway.up;
       view.right = r.sway.right;
       view.raise = r.sway.raise;
@@ -343,6 +345,7 @@ export class Simulation extends KernelSimulation {
       view.zero = r.zero;
       view.bolt = r.bolt;
       view.fitting = r.fitting;
+      view.swapping = r.swap === 'load';
       view.suppressed = r.suppressed;
       view.load = r.load;
       view.heartRate = v.heartRate;

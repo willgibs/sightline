@@ -655,7 +655,7 @@ export const defaultTuning = {
       use: 0.7, // seconds to throw the switch, standing at it
       role: { sentry: 0.6, patrol: 0.5, marksman: 0, 'radio-operator': 0.3, officer: 0.5, worker: 1, target: 0 },
       sirenRadius: 1200,
-      flee: { pace: 4.6, arrive: 1.2, boardGap: 0.8, drive: 9, swerve: 4, swerveBy: [0, 0.5, -0.5, 1, -1, 2, -2], giveWay: 4, clearance: 0.2, routeReach: 8, routeExpansions: 200000, driveOut: 80 }, // the target's run for the vehicle at lockdown (m/s, how close counts as aboard, the gap beside it to get in; then its speed on the way out, how far off the road it goes round someone, sideways per metre forward in the order it tries them, and the seconds before it barges through)
+      flee: { pace: 4.6, arrive: 1.2, boardGap: 0.8, drive: 9, swerve: 4, swerveBy: [0, 0.5, -0.5, 1, -1, 2, -2], giveWay: 4, clearance: 0.2, routeReach: 8, routeExpansions: 200000, driveOut: 80, bailOut: 12, aside: 1.5 }, // the target's run for the vehicle at lockdown (m/s, how close counts as aboard, the gap beside it to get in; then its speed on the way out, how far off the road it goes round someone, sideways per metre forward in the order it tries them, and the seconds before it barges through)
       retry: 10, // seconds before he'll try the alarm again, after a run that came to nothing
       claimWithin: 3, // metres from the box for someone's shout to count as claiming it
       sirenHeight: 3, // metres above the box's foot that the horn sounds from
@@ -691,6 +691,17 @@ export const defaultTuning = {
       flash: { range: 520, suppressed: 140 }, // metres a muzzle flash can be seen at, by someone looking that way
     },
     getOut: { radius: 15 }, // metres from the way out at which you've got out (Lab F)
+    // A camp that protects its target (brain/protect.ts): he goes to his hard room at a whistle
+    // or a siren, and leaves it only when men come for him. Only camps with `protects` do this.
+    protect: {
+      giveUp: 240, // seconds after the siren that he waits to be sent for, before he loses his nerve and runs for it alone
+      fetchers: 2, // men sent to his door, once the relief is at the gate
+      fetchEvery: 45, // seconds before more are sent, if his vehicle still hasn't moved
+      fetches: 3, // times the camp will send for him
+      near: 4, // metres from his door at which they've reached him
+      wait: 6, // seconds they give him to hear it and come
+      call: 2.5, // seconds between telling him again
+    },
     // Sabotage (E7): held at arm's length, with nothing but your hands.
     sabotage: {
       reach: 1.6, // metres from the body to the thing
@@ -775,8 +786,8 @@ export const defaultTuning = {
       keep: 25, // seconds a guard remembers what he's been told
       maxTold: 8, // reports a guard's memory holds
       reportEvery: 20, // seconds between his calls about the same thing
-      level: { contact: 0.8, heard: 0.32, shot: 0.8, body: 0.82, missing: 0.4, clear: 0, claim: 0, outage: 0.32 }, // what a report raises him to
-      radius: { contact: 4, heard: 18, shot: 22, body: 6, missing: 8, clear: 12, claim: 8, outage: 6 }, // metres of uncertainty each kind adds to the speaker's
+      level: { contact: 0.8, heard: 0.32, shot: 0.8, body: 0.82, missing: 0.4, clear: 0, claim: 0, outage: 0.32, escort: 0 }, // what a report raises him to
+      radius: { contact: 4, heard: 18, shot: 22, body: 6, missing: 8, clear: 12, claim: 8, outage: 6, escort: 2 }, // metres of uncertainty each kind adds to the speaker's
       clearRadius: 18, // metres a searcher's "clear" report wipes from the map
       // Claims (Blacklist): "I've got it": one guard goes, those who hear him don't all pile in.
       claimWithin: 14, // metres between a claim's spot and his own for it to count
@@ -838,8 +849,10 @@ export const defaultTuning = {
       raiseTime: 0.3, // seconds to bring the scope to the eye; until it's there the shot isn't where you look
       zero: { min: 100, max: 600, step: 100, start: 100 }, // metres: the dial clicks in 100 m steps
       load: 'match', // the load the rifle starts with (a key of loads)
+      carries: { match: true, subsonic: false }, // which loads are in the kit, for the load key to change between: with one, the key does nothing (the takedown carries the subsonic too)
       suppressed: false, // the suppressor fitted at the start
       fitTime: 3, // seconds to fit or take off the suppressor; no shooting meanwhile
+      loadTime: 2.5, // seconds to change the load in the magazine; no shooting meanwhile
       unaimedMil: 25, // the barrel's pointing error with the scope down: a shot from the hip
     },
     // Each load: muzzle speed, and one quadratic drag constant (a = −k·|v|·v) at the
@@ -940,6 +953,27 @@ export const defaultTuning = {
     recoverTime: 6, // seconds to get the breath back after a full hold
     minAir: 0.25, // a breath can't be held again until this much of it is back
     closeCall: 28, // beats a minute a close call adds at once (a crack past the head, a near miss)
+  },
+
+  // A mode's numbers: what a scene sets over the game's when it's played as that mode
+  // (kernel/scene.ts, `tune`). They're here with every other number, so they hot-reload and a
+  // recording carries them.
+  modes: {
+    // The takedown (game/scenes/takedown.ts): how a camp that protects its target reads what
+    // it hears, and what's in the kit.
+    takedown: {
+      // Each sound of a shot, by how clearly it was heard (perception.awareness.shots has the
+      // reading). A crack is a shot to someone within about 40 m of the bullet's path and a
+      // snap beyond; a strike is a thud that makes a man look, and what he then sees tells him.
+      shots: {
+        report: { faint: 0.55, clear: 0.8, clearAt: 2 },
+        crack: { faint: 0.4, clear: 0.8, clearAt: 4 },
+        impact: { faint: 0.3, clear: 0.62, clearAt: 26 },
+        bolt: { faint: 0.55, clear: 0.8, clearAt: 2 },
+      },
+      whistle: 0.3, // what the camp's whistle raises a man who hears it to: curious. He looks up, and stands to
+      subsonic: true, // the kit carries the subsonic load as well as the match one
+    },
   },
 
   view: {

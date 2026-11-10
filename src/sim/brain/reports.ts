@@ -7,9 +7,10 @@
  * across the camp after a delay, if the speaker got his words out and the set and operator
  * are working). A guard knows only what reached him; the commander knows only its inbox.
  */
-export type ReportKind = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear' | 'claim' | 'outage';
+export type ReportKind = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear' | 'claim' | 'outage' | 'escort';
 
-export const REPORT_KINDS: readonly ReportKind[] = ['contact', 'heard', 'shot', 'body', 'missing', 'clear', 'claim', 'outage'];
+/** In the order events store them: only ever added to at the end. `escort` is what the men sent to bring the target out say to him at his door (protect.ts). */
+export const REPORT_KINDS: readonly ReportKind[] = ['contact', 'heard', 'shot', 'body', 'missing', 'clear', 'claim', 'outage', 'escort'];
 
 export interface Report {
   kind: ReportKind;
