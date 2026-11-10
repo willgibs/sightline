@@ -2,11 +2,14 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T, type Tuning } from '../src/config/tuning';
 import { emptyRoute, navigatorOf } from '../src/sim/brain';
 import { InvariantWatch } from '../src/sim/body/invariants';
+import { stimulus } from '../src/sim/game/drops';
+import { compound } from '../src/sim/game/scenes/compound';
 import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
 import { campMission, COMPOUND_TYPES, generateWorld, type CompoundType, type CruxKind } from '../src/sim/generation';
 import { Cell, cellIndex, storeyAt } from '../src/sim/kernel/world/grid';
 import { neutralInput } from '../src/sim/kernel/input';
+import { startScene, type Scene } from '../src/sim/kernel/scene';
 import { GridSearch } from '../src/sim/kernel/world/search';
 import type { World } from '../src/sim/kernel/world/world';
 import { yawFromDirection } from '../src/sim/kernel/core/math';
@@ -133,6 +136,27 @@ describe('a two-storey building', () => {
     expect(sim.player.y).toBeCloseTo(up.y, 1);
     expect(sim.player.standingOn).toBeGreaterThanOrEqual(0);
   }, 30_000);
+
+  it('a guard who hears something upstairs goes up the stairs to see', () => {
+    const loud = structuredClone(T);
+    loud.perception.sandbox.noise = 120;
+    const scene = { ...(compound('seed=LAS-1274') as Scene<Simulation>), world: () => world };
+    const sim = startScene(scene, loud, world);
+    const raw = scene.game.still(sim);
+    const G = world.grid;
+    const up = G.storeys[G.stairs[0]!.storey]!;
+    const target = world.camp.guards.find((g) => g.role === 'target')!;
+    const onGround = new Set(world.camp.guards.filter((g) => !g.elevated && g.role !== 'target').map((g) => g.id));
+    let climbed = false;
+    for (let t = 0; t < 90 * T.sim.tickHz && !climbed; t++) {
+      Object.assign(raw, neutralInput(sim.player.yaw));
+      raw.commands = t % (6 * T.sim.tickHz) === 2 * T.sim.tickHz && t < 50 * T.sim.tickHz ? [stimulus('noise', { x: target.x, y: up.y + 0.1, z: target.z })] : [];
+      sim.step(raw);
+      climbed = sim.guards.some((g) => onGround.has(g.id) && g.body.y >= up.y - 0.3);
+    }
+    expect(sim.fault).toBeFalsy();
+    expect(climbed).toBe(true);
+  }, 120_000);
 
   it('a sound upstairs goes round by the stairs to a listener below, and reaches a listener on its own floor directly', () => {
     const a = new Acoustics(world, T);

@@ -134,6 +134,8 @@ export interface Tasking {
   kind: TaskKind;
   x: number;
   z: number;
+  /** How high the place is, where the order said: which floor. */
+  y?: number;
   issued: number;
   cause: number;
 }
@@ -748,7 +750,7 @@ function performTask(m: GuardMind, out: Order): void {
     }
     return;
   }
-  const w = walk(m, out, task.x, task.z, task.kind === 'search' ? T.paces.search : T.paces.investigate, 'walk', task.x, task.z);
+  const w = walk(m, out, task.x, task.z, task.kind === 'search' ? T.paces.search : T.paces.investigate, 'walk', task.x, task.z, task.y);
   if (w === 'arrived') {
     b.linger = m.tick + Math.round(T.linger.search * hz);
     lookAround(m, out);

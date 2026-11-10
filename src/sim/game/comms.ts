@@ -484,7 +484,7 @@ export const orderDeliver: ScheduleHandler = (ctx, entry) => {
   const task = c.camp.tasks.find((t) => t.id === entry.b);
   if (!task) return;
   const b = g.brain;
-  b.task = { id: task.id, kind: task.kind, x: task.x, z: task.z, issued: ctx.tick, cause: task.cause };
+  b.task = { id: task.id, kind: task.kind, x: task.x, z: task.z, ...(task.y === undefined ? {} : { y: task.y }), issued: ctx.tick, cause: task.cause };
   // A new order starts afresh, even mid-task: not the old one's linger, its sweep or its cover.
   b.linger = -1;
   b.until = -1;

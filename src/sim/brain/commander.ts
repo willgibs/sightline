@@ -71,7 +71,7 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   if (r.kind === 'shot' && r.sigma !== undefined) noteShot(camp, r, tick, tuning);
   // A post gone quiet is a job for someone: walk over and see (E6).
   if (r.kind === 'missing' || r.kind === 'outage') {
-    const t = addTask(camp, 'check', r.x, r.z, 2, 1, tick);
+    const t = addTask(camp, 'check', r.x, r.z, 2, 1, tick, r.y);
     t.cause = r.cause;
     if (r.kind === 'missing') {
       const man = camp.roster.find((m) => m.id === r.from);
@@ -84,16 +84,17 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   if (r.kind === 'body') addTask(camp, 'cover', r.x, r.z, 2, 3, tick);
   // An unverified report from someone already on his way there: the camp knows, and he has it.
   if (r.kind === 'heard' && r.checking && !camp.tasks.some((t) => t.kind === 'investigate')) {
-    const t = addTask(camp, 'investigate', r.x, r.z, 2, 1, tick);
+    const t = addTask(camp, 'investigate', r.x, r.z, 2, 1, tick, r.y);
     t.assigned.push(r.from);
     t.cause = r.cause;
   }
   // A search at this level, centred on the latest report.
   if (!camp.search && alertRung(camp.level) >= alertRung('uneasy')) {
-    camp.search = { started: tick, startLevel: camp.floor, x: r.x, z: r.z, radius: Math.max(r.radius, M.injectRadius), cleared: false };
+    camp.search = { started: tick, startLevel: camp.floor, x: r.x, z: r.z, y: r.y, radius: Math.max(r.radius, M.injectRadius), cleared: false };
   } else if (camp.search) {
     camp.search.x = r.x;
     camp.search.z = r.z;
+    camp.search.y = r.y;
     camp.search.radius = Math.max(r.radius, M.injectRadius);
     camp.search.cleared = false;
   }
@@ -211,7 +212,7 @@ export function plan(m: CampMind, out: CampOrder[]): void {
   const slots = camp.level === 'uneasy' ? T.slots.uneasy : camp.level === 'alert' ? T.slots.alert : T.slots.lockdown;
   // Investigate where the last report said.
   if (camp.search && !camp.search.cleared && slots.investigate > 0 && camp.tasks.filter((t) => t.kind === 'investigate').length === 0 && camp.level === 'uneasy') {
-    addTask(camp, 'investigate', camp.search.x, camp.search.z, 2, investigators(camp, camp.search.x, camp.search.z, T.slots.lockdown.investigate + 1, m.tuning), m.tick);
+    addTask(camp, 'investigate', camp.search.x, camp.search.z, 2, investigators(camp, camp.search.x, camp.search.z, T.slots.lockdown.investigate + 1, m.tuning), m.tick, camp.search.y);
   }
   // A shooter the camp has fixed: the marksmen sweep where it believes he is (E8).
   const shot = camp.shots.estimate;
@@ -256,8 +257,8 @@ function endSearch(camp: CampState, tick: number): void {
   camp.since = tick;
 }
 
-function addTask(camp: CampState, kind: TaskKind, x: number, z: number, priority: number, capacity: number, tick: number): Task {
-  const t: Task = { id: camp.nextTask++, kind, x, z, priority, capacity, assigned: [], cause: camp.lastCause, issued: tick };
+function addTask(camp: CampState, kind: TaskKind, x: number, z: number, priority: number, capacity: number, tick: number, y?: number): Task {
+  const t: Task = { id: camp.nextTask++, kind, x, z, ...(y === undefined ? {} : { y }), priority, capacity, assigned: [], cause: camp.lastCause, issued: tick };
   camp.tasks.push(t);
   return t;
 }

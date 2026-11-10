@@ -35,6 +35,8 @@ export interface Task {
   kind: TaskKind;
   x: number;
   z: number;
+  /** How high the place is, where a report said: which floor of a building to go to. */
+  y?: number;
   priority: number;
   /** How many guards it's for, and who's on it. */
   capacity: number;
@@ -53,6 +55,8 @@ export interface SearchState {
   startLevel: AlertLevel;
   x: number;
   z: number;
+  /** How high the latest report's place was: which floor. */
+  y?: number;
   radius: number;
   /** Someone has been to the spot the latest report named and called it clear: nobody else is sent there until a new report. */
   cleared: boolean;
