@@ -6,9 +6,10 @@ import { Rng } from '../src/sim/kernel/core/rng';
 import { missionSpec } from '../src/sim/kernel/mission';
 import { Blocks } from '../src/sim/kernel/world/colliders';
 import { Cell, Edge, cellIndex, type GridLayer } from '../src/sim/kernel/world/grid';
-import { COST_PER_METRE, GridSearch } from '../src/sim/kernel/world/search';
+import { COST_PER_METRE, GridSearch, components, distanceTable, landmarkTables } from '../src/sim/kernel/world/search';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testWorld } from './fixtures';
+import { ReferenceSearch } from './reference/gridSearchReference';
 
 /** A wall along z = 0 from x = −20 to 20, with a 1.2 m doorway at x = 0. */
 const wall = (x: number, hx: number) => ({ kind: 'box' as const, x, z: 0, y0: -1, y1: 3, hx, hz: 0.1, ux: 1, uz: 0, flags: Blocks.All, surface: Surface.Wood });
@@ -153,5 +154,147 @@ describe('grid search', () => {
       return h.digest();
     };
     expect(fingerprint()).toBe(fingerprint());
+  });
+
+  /**
+   * The search the game runs is written for speed. This holds it to the plain one it
+   * replaced (tests/reference/gridSearchReference.ts) on real ground: the same result, the
+   * same cost and parent in every cell, and the same path, for floods and routes with every
+   * option they take. It's what lets the fast one change without a world or a run moving.
+   */
+  it('does exactly what the plain search does, cell for cell', () => {
+    const rng = new Rng('SEARCH-0002', 'twin');
+    const pick = (list: readonly number[]): number => list[Math.floor(rng.next() * list.length)]!;
+    for (const L of [valley.grid.site, valley.grid.map, doorway.grid.site]) {
+      const fast = new GridSearch(L);
+      const plain = new ReferenceSearch(L);
+      const walkable: number[] = [];
+      for (let c = 0; c < L.flags.length; c++) if (L.flags[c]! & Cell.Walkable) walkable.push(c);
+      const same = (what: string): void => {
+        let differ = -1;
+        for (let c = 0; c < fast.cost.length && differ < 0; c++) if (fast.cost[c] !== plain.cost[c] || fast.parent[c] !== plain.parent[c]) differ = c;
+        expect(differ, `${what}: cell ${differ}`).toBe(-1);
+      };
+      // A toll by where a move lands, and some cells shut: whole numbers, never less than the move's length.
+      // And for floods, which take any cost from nothing up, some moves that are free.
+      const toll = (_from: number, to: number, length: number): number => (to % 13 === 0 ? -1 : to % 7 === 0 ? length + ((to * 31) % 400) : length);
+      const free = (from: number, to: number, length: number): number => (to % 11 === 0 ? 0 : toll(from, to, length));
+      for (let k = 0; k < 10; k++) {
+        const sources = [pick(walkable), pick(walkable), pick(walkable)].slice(0, 1 + (k % 3));
+        for (const opts of [
+          { maxExpansions: ALL },
+          { maxExpansions: ALL, neighbours: 4 as const },
+          { maxExpansions: ALL, maxCost: 40 * COST_PER_METRE },
+          { maxExpansions: 700 },
+          { maxExpansions: ALL, cost: toll },
+          // Moves that cost nothing, and dear ones: the queue's ring has to grow, and equal costs pile up.
+          { maxExpansions: 5000, cost: free, maxCost: 90 * COST_PER_METRE },
+        ]) {
+          expect(fast.flood(sources, opts), JSON.stringify(opts)).toEqual(plain.flood(sources, opts));
+          same(`flood ${k} ${JSON.stringify(opts)}`);
+        }
+        const start = pick(walkable);
+        const goal = pick(walkable);
+        for (const opts of [{ maxExpansions: ALL }, { maxExpansions: ALL, neighbours: 4 as const }, { maxExpansions: 300 }, { maxExpansions: ALL, cost: toll }]) {
+          const a: number[] = [];
+          const b: number[] = [];
+          expect(fast.path(start, goal, opts, a), JSON.stringify(opts)).toEqual(plain.path(start, goal, opts, b));
+          expect(a).toEqual(b);
+          same(`path ${k} ${JSON.stringify(opts)}`);
+        }
+      }
+    }
+  }, 120_000);
+});
+
+describe('landmarks', () => {
+  /** A yard walled on three sides, open to the south: 3 m across a wall is 40 m round it. */
+  const yard = testWorld({ colliders: [wall(0, 15), { ...wall(0, 15), x: -15, z: 10, hx: 0.1, hz: 10 }, { ...wall(0, 15), x: 15, z: 10, hx: 0.1, hz: 10 }], spawn: { x: 0, z: -10 } });
+
+  it('labels ground by what can be walked to from what', () => {
+    // A room with no door: its floor is ground of its own.
+    const room = [wall(0, 3), { ...wall(0, 3), z: 6 }, { ...wall(0, 3), x: -3, z: 3, hx: 0.1, hz: 3 }, { ...wall(0, 3), x: 3, z: 3, hx: 0.1, hz: 3 }];
+    const sealed = testWorld({ colliders: room, spawn: { x: 0, z: -10 } });
+    const L = sealed.grid.site;
+    const s = new GridSearch(L);
+    const ground = components(s);
+    const inside = at(L, 0, 3);
+    const outside = at(L, 0, -5);
+    expect(ground.label[inside]).toBeGreaterThanOrEqual(0);
+    expect(ground.label[outside]).toBeGreaterThanOrEqual(0);
+    expect(ground.label[inside]).not.toBe(ground.label[outside]);
+    // Inside a wall no move leads anywhere: it's nobody's ground.
+    expect(ground.label[at(L, 0, 0)]).toBe(-1);
+    // The label is the truth a search would reach: reachable exactly when the labels match.
+    s.flood([outside], { maxExpansions: ALL });
+    for (let c = 0; c < s.cost.length; c += 7) expect(s.cost[c]! >= 0, `cell ${c}`).toBe(ground.label[c] === ground.label[outside]);
+    expect(ground.sizes.reduce((a, b) => a + b, 0)).toBe(Array.from(ground.label).filter((l) => l >= 0).length);
+  });
+
+  it('finds a path of the same cost, looking at far fewer cells round a wall', () => {
+    const L = yard.grid.site;
+    const s = new GridSearch(L);
+    const bounds = landmarkTables(new GridSearch(L), at(L, 0, -10), 8);
+    expect(bounds.count).toBe(8);
+    expect(bounds.table.length).toBe(L.nx * L.nz * 8);
+    // 1.5 m either side of the north wall: the way is out of the yard's mouth and round.
+    const start = at(L, 0, 1.5);
+    const goal = at(L, 0, -1.5);
+    const plain: number[] = [];
+    const aimed: number[] = [];
+    const a = s.path(start, goal, { maxExpansions: ALL }, plain);
+    const b = s.path(start, goal, { maxExpansions: ALL, bounds }, aimed);
+    expect(a.found && b.found).toBe(true);
+    expect(b.cost).toBe(a.cost);
+    expect(a.cost / COST_PER_METRE).toBeGreaterThan(40);
+    expect(b.expanded).toBeLessThan(a.expanded / 4);
+    for (let q = 1; q < aimed.length; q++) expect(moveOpen(L, aimed[q - 1]!, aimed[q]!)).toBe(true);
+    expect(aimed[0]).toBe(start);
+    expect(aimed.at(-1)).toBe(goal);
+  });
+
+  it('never costs a path more than the plain search finds, on real ground, with tolls and without', () => {
+    const rng = new Rng('SEARCH-0003', 'landmarks');
+    for (const L of [valley.grid.site, doorway.grid.site]) {
+      const s = new GridSearch(L);
+      const ground = components(new GridSearch(L));
+      const walkable: number[] = [];
+      for (let c = 0; c < L.flags.length; c++) if (ground.label[c] === 0) walkable.push(c);
+      const bounds = landmarkTables(new GridSearch(L), walkable[0]!, 6);
+      const toll = (_from: number, to: number, length: number): number => (to % 13 === 0 ? -1 : to % 7 === 0 ? length + ((to * 31) % 400) : length);
+      let plainWork = 0;
+      let aimedWork = 0;
+      for (let k = 0; k < 40; k++) {
+        const start = walkable[Math.floor(rng.next() * walkable.length)]!;
+        const goal = walkable[Math.floor(rng.next() * walkable.length)]!;
+        for (const cost of [undefined, toll]) {
+          const a = s.path(start, goal, { maxExpansions: ALL, cost });
+          const b = s.path(start, goal, { maxExpansions: ALL, cost, bounds });
+          expect(b.found, `${start} to ${goal}`).toBe(a.found);
+          expect(b.cost, `${start} to ${goal}`).toBe(a.cost);
+          // A sharper estimate never makes A* look at more than it did, ties aside.
+          plainWork += a.expanded;
+          aimedWork += b.expanded;
+        }
+      }
+      expect(aimedWork).toBeLessThan(plainWork);
+    }
+  });
+
+  it('chooses the same cells every time, each as far from the others as the ground allows', () => {
+    const L = yard.grid.site;
+    const seed = at(L, 0, -10);
+    const one = landmarkTables(new GridSearch(L), seed, 4);
+    const two = landmarkTables(new GridSearch(L), seed, 4);
+    expect(Array.from(one.table)).toEqual(Array.from(two.table));
+    // A landmark is the one cell its own table has at no cost: four of them, all different.
+    const marks: number[] = [];
+    for (let t = 0; t < one.count; t++) for (let c = 0; c < L.nx * L.nz; c++) if (one.table[c * one.count + t] === 0) marks.push(c);
+    expect(new Set(marks).size).toBe(4);
+    // The first is the cell farthest from where the choosing began.
+    const from = distanceTable(new GridSearch(L), seed);
+    expect(from[marks[0]!]).toBe(from.reduce((most, v) => Math.max(most, v), 0));
+    // Ground with fewer cells than landmarks asked for gives what it has.
+    expect(landmarkTables(new GridSearch(L), seed, 0).count).toBe(0);
   });
 });
