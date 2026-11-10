@@ -65,7 +65,7 @@ export interface GuardMind {
   /** Whether his camp fights back (Lab F): a fact about the camp, like its alarm boxes. */
   readonly fights: boolean;
   /** Where his camp's hard room is, if it protects its target (protect.ts): another fact about the camp, and null if it doesn't. */
-  readonly protects: Readonly<{ x: number; z: number }> | null;
+  readonly protects: Readonly<{ x: number; z: number; y?: number }> | null;
   /** Where the camp's escape vehicle stands, if it has one (static, like the alarm boxes): the target's way out at lockdown. */
   readonly escape: Readonly<{ x: number; z: number }> | null;
   /** A number in [0, 1) from his own stream: the only way a brain rolls dice (rule 3). */

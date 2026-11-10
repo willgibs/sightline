@@ -45,7 +45,7 @@ export interface CampFacts {
   alarms: readonly { x: number; z: number }[];
   escape: Readonly<{ x: number; z: number }> | null;
   fights?: boolean;
-  protects?: Readonly<{ x: number; z: number }> | null;
+  protects?: Readonly<{ x: number; z: number; y?: number }> | null;
 }
 const NO_FACTS: CampFacts = { alarms: NO_ALARMS, escape: null };
 /** The awareness of a guard without senses: unaware, attending to nothing. */

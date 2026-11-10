@@ -80,7 +80,7 @@ export interface CampState {
    * of trouble he goes there, and he leaves only when someone comes for him. Absent for a
    * camp that runs him to his vehicle the moment the siren sounds.
    */
-  protects?: { x: number; z: number };
+  protects?: { x: number; z: number; y?: number };
   /** The tick the relief got down at the gate, and how many times, and when last, men have been sent for the target since. */
   relief?: { at: number; fetches: number; last: number };
   /** The tick of the last blast on the whistle. */

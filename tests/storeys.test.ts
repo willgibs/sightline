@@ -4,6 +4,8 @@ import { emptyRoute, navigatorOf } from '../src/sim/brain';
 import { InvariantWatch } from '../src/sim/body/invariants';
 import { stimulus } from '../src/sim/game/drops';
 import { compound } from '../src/sim/game/scenes/compound';
+import { commanderOf } from '../src/sim/game/comms';
+import { hardRoom } from '../src/sim/game/protection';
 import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
 import { campMission, COMPOUND_TYPES, generateWorld, type CompoundType, type CruxKind } from '../src/sim/generation';
@@ -156,6 +158,25 @@ describe('a two-storey building', () => {
     }
     expect(sim.fault).toBeFalsy();
     expect(climbed).toBe(true);
+  }, 120_000);
+
+  it('a target who keeps upstairs has his hard room upstairs, and stays on that floor when the alarm goes up', () => {
+    const target = world.camp.guards.find((g) => g.role === 'target')!;
+    const room = hardRoom(world, target);
+    expect(room.y).toBeCloseTo(target.y, 5);
+    const scene = { ...(compound('seed=LAS-1274&attack=sniper&ready=alert') as Scene<Simulation>), world: () => world };
+    const sim = startScene(scene, T, world);
+    const driver = scene.driver!();
+    const raw = scene.game.still(sim);
+    const him = sim.guards.find((g) => g.id === commanderOf(sim)!.camp.objective!.target)!;
+    const up = world.grid.storeys[world.grid.stairs[0]!.storey]!;
+    let lowest = Infinity;
+    for (let t = 0; t < 60 * T.sim.tickHz; t++) {
+      sim.step(driver.next(sim, raw));
+      lowest = Math.min(lowest, him.body.y);
+    }
+    expect(sim.fault).toBeFalsy();
+    expect(lowest).toBeGreaterThan(up.y - 0.5);
   }, 120_000);
 
   it('a sound upstairs goes round by the stairs to a listener below, and reaches a listener on its own floor directly', () => {

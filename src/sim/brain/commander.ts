@@ -228,7 +228,7 @@ export function plan(m: CampMind, out: CampOrder[]): void {
   const relief = camp.relief;
   const going = camp.objective?.status === 'escaping' || camp.objective?.status === 'escaped';
   if (camp.protects && camp.devices.escape && relief && !going && relief.fetches < P.fetches && (relief.fetches === 0 || (m.tick - relief.last) / hz >= P.fetchEvery) && !camp.tasks.some((t) => t.kind === 'fetch')) {
-    addTask(camp, 'fetch', camp.protects.x, camp.protects.z, 4, P.fetchers, m.tick);
+    addTask(camp, 'fetch', camp.protects.x, camp.protects.z, 4, P.fetchers, m.tick, camp.protects.y);
     relief.fetches++;
     relief.last = m.tick;
   }
