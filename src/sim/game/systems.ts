@@ -215,7 +215,7 @@ const guardBrains: System = {
 
 /** What the tick's guards may spend on routes (rule 18): a fresh allowance every tick, shared in id order. */
 function navAllowance(ctx: TickContext): NavAllowance {
-  return ctx.channel('nav', () => ({ work: ctx.work, searches: { left: ctx.tuning.brain.nav.searchesPerTick }, nodesAtStart: ctx.work.nodes }));
+  return ctx.channel('nav', () => ({ work: ctx.work, searches: { left: ctx.tuning.brain.nav.searchesPerTick }, nodesAtStart: ctx.work.nodes, raysAtStart: ctx.work.rays }));
 }
 
 /** What the schedule's handlers touch beyond the schedule (kernel/systems.ts, scheduleSystem). */

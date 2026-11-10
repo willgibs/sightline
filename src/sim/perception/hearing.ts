@@ -95,6 +95,13 @@ export class Acoustics {
   private steady: Array<{ s: SoundSource; costs: Map<number, number>; start: number; offset: number; hum: boolean }> | null = null;
   /** Whether the camp's generators are running: set from the state before each use, so a stopped one stops masking (E7). */
   humming = true;
+  /**
+   * Each listener's masked threshold where he last stood (thresholdOf). It depends on where
+   * his ears are, on the steady sources and on whether the generators run, and on nothing
+   * about the sound he's hearing: a man at his post has the same one for every sound of a
+   * fight, and it costs a dozen rays to work out.
+   */
+  private readonly thresholds = new Map<number, { x: number; y: number; z: number; humming: boolean; value: number }>();
 
   constructor(
     readonly world: World,
@@ -109,6 +116,7 @@ export class Acoustics {
   /** Hears through a run's solids (the world's colliders and entities' shapes: a closed gate) from now on. */
   setSolids(solids: Solids): void {
     this.solids = solids;
+    this.thresholds.clear();
   }
 
   /** Swaps in new tuning (hot reload): the steady sources' radii may have changed. */
@@ -116,6 +124,7 @@ export class Acoustics {
     if (tuning === this.tuning) return;
     this.tuning = tuning;
     this.steady = null;
+    this.thresholds.clear();
   }
 
   /** Floods one sound over the site grid, for `hear` to read at every listener's cell. */
@@ -132,12 +141,15 @@ export class Acoustics {
     this.search.flood([at], { maxExpansions: H.maxExpansions, maxCost: Math.ceil(Math.min(s.radius, H.floodReach) * COST_PER_METRE), work });
   }
 
-  /** What a listener with ears at (x, y, z) hears of the last sound spread, written to `out`. */
-  hear(x: number, y: number, z: number, out: Heard): Heard {
+  /**
+   * What a listener with ears at (x, y, z) hears of the last sound spread, written to `out`.
+   * `listener` names him, so that his threshold is worked out once for where he stands.
+   */
+  hear(x: number, y: number, z: number, out: Heard, listener?: number): Heard {
     const s = this.source;
     const H = this.tuning.perception.hearing;
     this.listen(s, this.start, this.offset, (cell) => this.search.cost[cell]!, x, y, z, out);
-    out.threshold = this.threshold(x, y, z);
+    out.threshold = listener === undefined ? this.threshold(x, y, z) : this.thresholdOf(listener, x, y, z);
     out.clarity = out.level / out.threshold;
     // Where it seems to come from: through a wall, from where it was; around, from the last
     // cell of its route the listener can see.
@@ -191,8 +203,54 @@ export class Acoustics {
   /** The masked threshold at a point: 1, or `maskDb` below the steady sound there. */
   threshold(x: number, y: number, z: number): number {
     const H = this.tuning.perception.hearing;
-    const masked = this.ambientLevel(x, y, z) * dpow(10, -H.maskDb / 20);
+    const factor = dpow(10, -H.maskDb / 20);
+    // Most places are too far from anything steady for it to mask a thing, and that can be
+    // known without a ray: no route makes a source louder than its straight line through
+    // open air would. Where even that much, from all of them, stays under the threshold of
+    // hearing, the answer is 1 exactly, as the full sum would have found.
+    if (this.loudestAmbient(x, y, z) * factor <= 1) return 1;
+    const masked = this.ambientLevel(x, y, z) * factor;
     return masked > 1 ? masked : 1;
+  }
+
+  /**
+   * The most the steady sources could come to at a point: each at its level over the
+   * straight distance with nothing in the way, summed as power in the order `ambientLevel`
+   * sums them. Never less than `ambientLevel` there, term by term: a wall or the ground
+   * only takes level off, and the way round is never shorter than the straight line.
+   */
+  private loudestAmbient(x: number, y: number, z: number): number {
+    const lift = this.tuning.perception.hearing.lift;
+    let power = 0;
+    for (const a of this.steadySources()) {
+      if (a.hum && !this.humming) continue;
+      const dx = x - a.s.x;
+      const dy = y - (a.s.y + lift);
+      const dz = z - a.s.z;
+      const level = audibility(a.s.radius, Math.sqrt(dx * dx + dy * dy + dz * dz));
+      power += level * level;
+    }
+    return Math.sqrt(power);
+  }
+
+  /**
+   * `threshold` for a named listener, kept for as long as he stays where he is. Only where
+   * what stops sound never moves (the world's own colliders): with entities' shapes in play
+   * a door between him and a generator may have shut, so it's worked out every time.
+   */
+  private thresholdOf(listener: number, x: number, y: number, z: number): number {
+    if (this.solids.count > 0) return this.threshold(x, y, z);
+    const kept = this.thresholds.get(listener);
+    if (kept && kept.x === x && kept.y === y && kept.z === z && kept.humming === this.humming) return kept.value;
+    const value = this.threshold(x, y, z);
+    if (kept) {
+      kept.x = x;
+      kept.y = y;
+      kept.z = z;
+      kept.humming = this.humming;
+      kept.value = value;
+    } else this.thresholds.set(listener, { x, y, z, humming: this.humming, value });
+    return value;
   }
 
   /**

@@ -189,7 +189,7 @@ function probeRun(world: World, place: { x: number; z: number }, extra: System[]
     run(ctx) {
       const tick = new Map<number, { mind: string; decision: string }>();
       for (const g of ctx.index.of('guard')) {
-        const m = guardMind(g, ctx.world, ctx.tuning, ctx.tick + 1, mind, () => 0, { work: undefined, searches: { left: 0 }, nodesAtStart: 0 });
+        const m = guardMind(g, ctx.world, ctx.tuning, ctx.tick + 1, mind, () => 0, { work: undefined, searches: { left: 0 }, nodesAtStart: 0, raysAtStart: 0 });
         const o = g.guard.order;
         const d = new Hasher().str(o.kind).u32(o.tick).f64(o.wishX).f64(o.wishZ).str(o.gait).f64(o.yaw).f64(o.pitch).f64(o.headYaw);
         tick.set(g.id, { mind: hashMind(m, ctx.state.rng[`${g.id}.brain`]), decision: d.digest() });

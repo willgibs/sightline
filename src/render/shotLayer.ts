@@ -18,6 +18,11 @@ import { palette } from './palette';
  *     bullet is at the frame's instant (ballistics lane, flightAt);
  *   - dust where a bullet strikes the ground, a splash on water, a flash on steel, shown
  *     from the instant of the strike: the miss a spotter reads to correct the next shot.
+ *
+ * Nothing here is made or thrown away while a fight is on. A material thrown away takes its
+ * shader program with it when it was the last to use it, and the next strike then waits
+ * for the program to be built again: most of a second on some machines, at the moment of
+ * every shot. The puffs are a fixed set, made with the layer and kept until it goes.
  */
 
 interface Fallen {
@@ -33,7 +38,12 @@ interface Puff {
   at: number;
   life: number;
   size: number;
+  /** In use: struck, and not yet gone. */
+  live: boolean;
 }
+
+/** Puffs on show at once: one more strike than that takes over the oldest. */
+const PUFFS = 32;
 
 const TRACE_SECONDS = 0.012;
 const TRACE_POINTS = 6;
@@ -49,6 +59,7 @@ export class ShotLayer {
   private readonly traces: THREE.LineSegments;
   private readonly tracePositions: Float32Array;
   private readonly puffs: Puff[] = [];
+  private readonly puffGroup = new THREE.Group();
   private readonly puffGeometry = new THREE.IcosahedronGeometry(1, 1);
   private readonly p = vec3();
   private readonly q = vec3();
@@ -73,6 +84,18 @@ export class ShotLayer {
     this.traces.frustumCulled = false;
     this.traces.name = 'traces';
     this.group.add(this.traces);
+    this.puffGroup.name = 'puffs';
+    for (let k = 0; k < PUFFS; k++) {
+      const mesh = new THREE.Mesh(this.puffGeometry, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.8, depthWrite: false, fog: true }));
+      mesh.visible = false;
+      this.puffGroup.add(mesh);
+      this.puffs.push({ mesh, at: 0, life: 0, size: 0, live: false });
+    }
+    // A body on the ground and a thrown stone are drawn with this material, and neither is there until a fight is on.
+    const first = new THREE.Mesh(this.sphere, this.material);
+    first.visible = false;
+    first.name = 'first-use';
+    this.group.add(this.puffGroup, first);
   }
 
   setTuning(t: Tuning): void {
@@ -87,12 +110,22 @@ export class ShotLayer {
       const steel = e.surface === Surface.Metal && e.what !== 'body';
       // Darker than the ground it rises from, so it reads against it at 500 m; steel flashes.
       const color = e.what === 'body' ? '#4a403a' : water ? '#f4f7f9' : steel ? '#fffbe0' : e.surface === Surface.Rock ? '#8d8a82' : e.surface === Surface.Grass ? '#7b7558' : '#8a7154';
-      const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8, depthWrite: false, fog: true });
-      const mesh = new THREE.Mesh(this.puffGeometry, material);
-      mesh.position.set(e.x, e.y, e.z);
-      mesh.visible = false;
-      this.group.add(mesh);
-      this.puffs.push({ mesh, at: e.t, life: steel ? 0.3 : e.what === 'body' ? 0.6 : 2.2, size: steel ? 0.45 : e.what === 'body' ? 0.25 : water ? 1.1 : 1.2 });
+      // One that's free, or else the one that has been up longest.
+      let p = this.puffs[0]!;
+      for (const q of this.puffs) {
+        if (!q.live) {
+          p = q;
+          break;
+        }
+        if (q.at < p.at) p = q;
+      }
+      (p.mesh.material as THREE.MeshBasicMaterial).color.set(color);
+      p.mesh.position.set(e.x, e.y, e.z);
+      p.mesh.visible = false;
+      p.live = true;
+      p.at = e.t;
+      p.life = steel ? 0.3 : e.what === 'body' ? 0.6 : 2.2;
+      p.size = steel ? 0.45 : e.what === 'body' ? 0.25 : water ? 1.1 : 1.2;
     }
   }
 
@@ -199,13 +232,12 @@ export class ShotLayer {
   }
 
   private updatePuffs(t: number): void {
-    for (let k = this.puffs.length - 1; k >= 0; k--) {
-      const p = this.puffs[k]!;
+    for (const p of this.puffs) {
+      if (!p.live) continue;
       const age = t - p.at;
       if (age > p.life || age < -2) {
-        this.group.remove(p.mesh);
-        (p.mesh.material as THREE.Material).dispose();
-        this.puffs.splice(k, 1);
+        p.live = false;
+        p.mesh.visible = false;
         continue;
       }
       p.mesh.visible = age >= 0;

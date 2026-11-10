@@ -115,6 +115,20 @@ const at = vec3();
  * the angle is small (well under 0.1 rad).
  */
 export function zeroFor(range: number, b: Pick<Ballistic, 'v0' | 'k' | 'g'>, maxFlight: number): Zero {
+  // The same question, asked again: every frame the scope is drawn, and at every shot. It
+  // has one answer for a range, a load and an air, and finding it is sixty flights.
+  for (const z of zeros) if (z.range === range && z.v0 === b.v0 && z.k === b.k && z.g === b.g && z.maxFlight === maxFlight) return z.zero;
+  const zero = Object.freeze(solveZero(range, b, maxFlight));
+  if (zeros.length >= ZEROS_KEPT) zeros.shift();
+  zeros.push({ range, v0: b.v0, k: b.k, g: b.g, maxFlight, zero });
+  return zero;
+}
+
+/** The last few zeros found, with what each was found for: answers to a pure question, never state. */
+const zeros: Array<{ range: number; v0: number; k: number; g: number; maxFlight: number; zero: Zero }> = [];
+const ZEROS_KEPT = 16;
+
+function solveZero(range: number, b: Pick<Ballistic, 'v0' | 'k' | 'g'>, maxFlight: number): Zero {
   const f = zeroFlight;
   f.v0 = b.v0;
   f.k = b.k;

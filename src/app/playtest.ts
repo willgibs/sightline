@@ -30,9 +30,29 @@ export interface TelemetryReport {
   frames: { count: number; meanMs: number; p50Ms: number; p95Ms: number; p99Ms: number; maxMs: number; over33: number; over50: number; over100: number };
   cpu: { meanMs: number; p95Ms: number };
   simUsPerTick: number;
+  /**
+   * The slowest frames, worst first: when each was (seconds of play), how long it took, how
+   * much of that was this page's own work, and how much of the work was the simulation's
+   * ticks. A long frame with little work in it waited on something else: the GPU, the
+   * browser. Absent from reports made before it was kept.
+   */
+  slow?: SlowFrame[];
   machine: Record<string, unknown>;
   settings: Record<string, unknown>;
 }
+
+export interface SlowFrame {
+  at: number;
+  frameMs: number;
+  cpuMs: number;
+  simMs: number;
+  ticks: number;
+}
+
+/** A frame this long is kept among a run's slowest: two frames of a 60 Hz screen, and then some. */
+const SLOW_MS = 34;
+/** How many of a run's slowest frames are kept. */
+const SLOW_KEPT = 16;
 
 /** Where saved runs go. */
 export interface PlaytestStore {
@@ -153,6 +173,8 @@ interface Run {
   recorder: Recorder;
   frames: FrameHistogram;
   cpu: FrameHistogram;
+  /** The slowest frames so far, worst first. */
+  slow: SlowFrame[];
   simMs: number;
   simTicks: number;
   pausedMs: number;
@@ -201,6 +223,7 @@ export class PlaytestCapture {
       recorder,
       frames: new FrameHistogram(),
       cpu: new FrameHistogram(),
+      slow: [],
       simMs: 0,
       simTicks: 0,
       pausedMs: 0,
@@ -218,6 +241,13 @@ export class PlaytestCapture {
     r.cpu.push(cpuMs);
     r.simMs += simMs;
     r.simTicks += ticks;
+    if (frameMs >= SLOW_MS && (r.slow.length < SLOW_KEPT || frameMs > r.slow[r.slow.length - 1]!.frameMs)) {
+      const slow = { at: round(r.recorder.ticks / r.sim.tuning.sim.tickHz), frameMs: round(frameMs), cpuMs: round(cpuMs), simMs: round(simMs), ticks };
+      let k = r.slow.length;
+      while (k > 0 && r.slow[k - 1]!.frameMs < frameMs) k--;
+      r.slow.splice(k, 0, slow);
+      if (r.slow.length > SLOW_KEPT) r.slow.length = SLOW_KEPT;
+    }
     if ((r.recorder.ticks - r.triedTick) / r.sim.tuning.sim.tickHz >= EVERY_SECONDS) this.save('minute');
   }
 
@@ -309,6 +339,7 @@ export class PlaytestCapture {
       },
       cpu: { meanMs: round(r.cpu.mean), p95Ms: r.cpu.percentile(0.95) },
       simUsPerTick: r.simTicks ? round((r.simMs / r.simTicks) * 1000) : 0,
+      slow: r.slow.map((s) => ({ ...s })),
       machine: this.context.machine(),
       settings: this.context.settings(),
     };

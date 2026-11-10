@@ -190,6 +190,11 @@ function summarize(file: string): boolean {
     console.log(
       `  frames    ${fps} fps · p50 ${f.p50Ms} ms · p95 ${f.p95Ms} ms · p99 ${f.p99Ms} ms · ${f.over50} over 50 ms · cpu ${telemetry.cpu.meanMs} ms · sim ${telemetry.simUsPerTick} µs/tick`,
     );
+    // The slowest frames, and whose they were: the page's own work, and the simulation's share of it.
+    const slow = telemetry.slow ?? [];
+    if (slow.length > 0) {
+      console.log(`  slowest   ${slow.slice(0, 8).map((s) => `${Math.round(s.frameMs)} ms at ${fmt.clock(s.at)} (${s.cpuMs >= s.frameMs * 0.5 ? `ours ${Math.round(s.cpuMs)} ms, sim ${Math.round(s.simMs)}` : `waiting: ours ${Math.round(s.cpuMs)} ms`})`).join(' · ')}`);
+    }
     const m = telemetry.machine ?? {};
     console.log(`  machine   ${browserName(String(m.userAgent ?? ''))} · ${m.gpu ?? '?'} · ${m.viewport ?? '?'} at ×${m.pixelRatio ?? '?'} · saved on ${telemetry.reason}`);
   }
@@ -202,6 +207,7 @@ interface Telemetry {
   frames: { meanMs: number; p50Ms: number; p95Ms: number; p99Ms: number; over50: number };
   cpu: { meanMs: number };
   simUsPerTick: number;
+  slow?: Array<{ at: number; frameMs: number; cpuMs: number; simMs: number; ticks: number }>;
   machine: Record<string, unknown>;
 }
 

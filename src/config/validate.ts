@@ -69,6 +69,8 @@ const BOUNDS: ReadonlyArray<readonly [path: string, min: number, max: number, in
   // Budgets that size searches inside a tick (rule 18), so a hostile recording can't hang a guard's brain.
   ['brain.nav.siteExpansions', 1, 500000, true],
   ['brain.nav.mapExpansions', 1, 500000, true],
+  ['brain.nav.landmarks', 0, 64, true],
+  ['brain.nav.landmarkCells', 0, 4000000, true],
   ['brain.nav.searchesPerTick', 1, 64, true],
   ['brain.nav.pullAhead', 1, 4000, true],
   ['brain.nav.snapRadius', 0, 64],

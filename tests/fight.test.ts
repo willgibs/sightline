@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { defaultTuning as T } from '../src/config/tuning';
+import { defaultTuning as T, type Tuning } from '../src/config/tuning';
 import { attackRun } from '../src/lab/experiments/flaws';
 import { compound } from '../src/sim/game/scenes/compound';
 import { bestOverview } from '../src/sim/game/scenes/overlook';
@@ -16,7 +16,7 @@ import { giveSenses } from '../src/sim/game/perception';
 import { Simulation } from '../src/sim/game/sim';
 import { SYSTEMS } from '../src/sim/game/systems';
 import { withSystem, type System } from '../src/sim/kernel/systems';
-import { testGuard, testWorld } from './fixtures';
+import { testGuard, testWorld, tuningCopy } from './fixtures';
 import { campMission, generateWorld } from '../src/sim/generation';
 import type { SimEvent } from '../src/sim/kernel/events';
 import { neutralInput } from '../src/sim/kernel/input';
@@ -147,6 +147,53 @@ describe('a camp that fights back', () => {
     }
     expect(found).toBeGreaterThan(0);
   }, 60_000);
+});
+
+describe('what a tick of a fight may cost', () => {
+  /** The rays the brains cast in each tick of a sniper's first minute on the camp. */
+  function raysByTick(tuning: Tuning): number[] {
+    const scene = { ...(compound('seed=LEB-2534&attack=sniper') as Scene<Simulation>), world: () => world };
+    const sim = startScene(scene, tuning, world);
+    const driver = scene.driver!();
+    const raw = scene.game.still(sim);
+    const out: number[] = [];
+    let before = 0;
+    for (let i = 0; i < 60 * 30; i++) {
+      sim.step(driver.next(sim, raw));
+      const now = sim.work().find((w) => w.system === 'guard-brains')!.rays;
+      out.push(now - before);
+      before = now;
+    }
+    return out;
+  }
+
+  it('counts the rays a look for dead ground casts, and stops at its budget', () => {
+    const p = bestOverview(world);
+    const g = world.camp.guards.find((x) => !x.elevated)!;
+    const work = { rays: 0, nodes: 0, bodies: 0 };
+    groundSpot(world, T, g.x, g.z, p.x, p.z, false, work);
+    expect(work.rays).toBeGreaterThan(0);
+    // One candidate past the budget at most: every listed perch toward the threat, at two heights.
+    expect(work.rays).toBeLessThanOrEqual(T.brain.fight.drill.rays + 2 * world.report.camp!.perches.length);
+  });
+
+  it('starts no look for dead ground once the tick’s looks have had their share of rays', () => {
+    const D = T.brain.fight.drill;
+    const usual = raysByTick(T);
+    expect(Math.max(...usual)).toBeGreaterThan(0);
+    // Whatever started before the share ran out finishes: a tick's worst is the share and one search.
+    expect(Math.max(...usual)).toBeLessThan(D.raysPerTick + D.rays + 2 * world.report.camp!.perches.length);
+    // With no share at all, every man who wants to look still gets to, one a tick.
+    const tight = tuningCopy();
+    tight.brain.fight.drill.raysPerTick = 1;
+    const one = raysByTick(tight);
+    const loose = tuningCopy();
+    loose.brain.fight.drill.raysPerTick = 1_000_000;
+    const all = raysByTick(loose);
+    expect(one.filter((r) => r > 0).length).toBeGreaterThanOrEqual(all.filter((r) => r > 0).length);
+    expect(Math.max(...one)).toBeLessThanOrEqual(Math.max(...all));
+    expect(one.reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
+  }, 240_000);
 });
 
 describe('a near miss', () => {

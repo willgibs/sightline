@@ -34,6 +34,7 @@ import { GameSound } from './sound';
 import { BrowserStore, DevInbox, PlaytestCapture, type StoredRun } from './playtest';
 import { DROP_KEYS, LabPanel, SHOOTER_VIEW_KEY } from './labPanel';
 import { CampGauges } from '../lab/gauges';
+import { rehearse } from '../sim/game/rehearsal';
 import { commanderOf } from '../sim/game/comms';
 import { stimulus, type StimulusName } from '../sim/game/drops';
 import type { Command } from '../sim/kernel/commands';
@@ -518,6 +519,8 @@ export class Game {
       this.sound.setWorld(world);
       this.hud.map.setWorld(world);
       if (!this.trial) this.overlay.setKey('minimap', this.hud.map.applies);
+      // The camp's fight, once, out of sight: the first shot of the real one then costs what the tenth does.
+      if (!this.opts.bench) rehearse(world, this.tuning);
       this.restartRun();
       const url = new URL(window.location.href);
       url.searchParams.delete('replay');

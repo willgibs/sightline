@@ -115,6 +115,78 @@ describe('navigation', () => {
     expect(r.points.length).toBe(0);
   });
 
+  it('knows at once that ground can’t be reached, where a search would look at everything first', () => {
+    // A sealed room in a field: the field is forty thousand cells of somewhere else to look.
+    const world = testWorld({
+      size: 120,
+      colliders: [wall(0, -5, 5.25, 0.25), wall(0, 5, 5.25, 0.25), wall(-5, 0, 0.25, 5.25), wall(5, 0, 0.25, 5.25)],
+      spawn: { x: -30, z: 30 },
+    });
+    const r = emptyRoute();
+    const aimed = { rays: 0, nodes: 0, bodies: 0 };
+    expect(navigatorOf(world, T).find(25, 25, 0, 0, { work: aimed }, r)).toBe('no-route');
+    expect(aimed.nodes).toBe(0);
+    expect(r.points.length).toBe(0);
+    // The straight-line estimate alone has to look: it's what the labels save.
+    const plain = structuredClone(T);
+    plain.brain.nav.landmarks = 0;
+    const looked = { rays: 0, nodes: 0, bodies: 0 };
+    expect(navigatorOf(world, plain).find(25, 25, 0, 0, { work: looked }, r)).not.toBe('found');
+    expect(looked.nodes).toBeGreaterThan(10_000);
+  });
+
+  it('goes round a camp’s walls on a fraction of the cells, by a route no longer', () => {
+    const world = generateWorld(campMission('LEB-2534'), T);
+    const plain = structuredClone(T);
+    plain.brain.nav.landmarks = 0;
+    // Two tunings share a world's navigator, so each asks all its routes in turn.
+    const L = world.grid.site;
+    const posts = world.camp.guards.map((g) => ({ x: g.x, z: g.z })).filter((p) => p.x > L.x0 && p.z > L.z0 && p.x < L.x0 + L.nx * L.cell && p.z < L.z0 + L.nz * L.cell);
+    const pairs: Array<[number, number]> = [];
+    for (let a = 0; a < posts.length; a++) for (let b = 0; b < posts.length; b++) if (a !== b) pairs.push([a, b]);
+    const ask = (tuning: typeof T): { nodes: number; worst: number; metres: number; found: number } => {
+      const nav = navigatorOf(world, tuning);
+      const total = { nodes: 0, worst: 0, metres: 0, found: 0 };
+      for (const [a, b] of pairs) {
+        const work = { rays: 0, nodes: 0, bodies: 0 };
+        const r = emptyRoute();
+        if (nav.find(posts[a]!.x, posts[a]!.z, posts[b]!.x, posts[b]!.z, { work }, r) === 'found') {
+          total.found++;
+          total.metres += routeLength(r, posts[a]!.x, posts[a]!.z);
+        }
+        total.nodes += work.nodes;
+        total.worst = Math.max(total.worst, work.nodes);
+      }
+      return total;
+    };
+    const before = ask(plain);
+    const after = ask(T);
+    expect(pairs.length).toBeGreaterThan(20);
+    // Every pair of posts has a route, and none of them is found by giving up on the fine layer.
+    expect(after.found).toBe(pairs.length);
+    // Post to post is mostly open yard, where a straight aim is already good: half the cells.
+    expect(after.nodes).toBeLessThan(before.nodes * 0.6);
+    expect(after.worst).toBeLessThan(before.worst);
+    // The same cost on the grid; the pulled waypoints may differ by a cell here and there.
+    expect(after.metres).toBeLessThan(before.metres * 1.01);
+    // The routes a fight really asked for and choked on (a sniper on this camp, four minutes):
+    // a man three metres from where he's going with a wall between, and two across the camp.
+    // Each ran the fine search out of its budget, fell back on the coarse layer and searched twice more.
+    for (const [ax, az, bx, bz] of [
+      [58.7, -38.7, 57.2, -36.1],
+      [-9.2, -17.3, 42.5, -42.5],
+      [52.0, -52.3, -33.2, -9.5],
+    ] as const) {
+      const was = { rays: 0, nodes: 0, bodies: 0 };
+      const now = { rays: 0, nodes: 0, bodies: 0 };
+      const r = emptyRoute();
+      navigatorOf(world, plain).find(ax, az, bx, bz, { work: was }, r);
+      expect(navigatorOf(world, T).find(ax, az, bx, bz, { work: now }, r), `${ax}, ${az}`).toBe('found');
+      expect(was.nodes, `${ax}, ${az}`).toBeGreaterThanOrEqual(plain.brain.nav.siteExpansions);
+      expect(now.nodes, `${ax}, ${az}`).toBeLessThan(T.brain.nav.nodesPerTick);
+    }
+  }, 120_000);
+
   it('finds the same route every time, cell for cell', () => {
     const world = room();
     const a = emptyRoute();

@@ -64,6 +64,12 @@ export class GuardMeshes {
   /** One point a little in front of the head, shared by every guard's scope flash. */
   private readonly flashGeo = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, 0, -0.16], 3));
   private readonly prevIndex = new Map<number, number>();
+  /**
+   * The flashes of guards who are gone, kept until the layer goes. Throwing one away as its
+   * guard falls can take the flash's shader program with it, and the next glint anywhere
+   * then waits for the program to be built again.
+   */
+  private readonly spent: THREE.Material[] = [];
   private debugTint = false;
   /** How near the body's axis, and its height, within which the camera is inside it. */
   private readonly reach: number;
@@ -272,7 +278,7 @@ export class GuardMeshes {
       for (const [id, g] of this.guards) {
         if (curr.guardIds.includes(id)) continue;
         this.group.remove(g.root);
-        (g.flash.material as THREE.Material).dispose();
+        this.spent.push(g.flash.material as THREE.Material);
         this.guards.delete(id);
       }
     }
@@ -304,6 +310,8 @@ export class GuardMeshes {
     for (const m of Object.values(this.roleShaded)) m.dispose();
     this.flashGeo.dispose();
     for (const g of this.guards.values()) (g.flash.material as THREE.Material).dispose();
+    for (const m of this.spent) m.dispose();
+    this.spent.length = 0;
     this.guards.clear();
     void this.look;
   }

@@ -26,6 +26,30 @@ export interface SearchMap {
 /** Scratch: last step's cells, rewritten by every spread: nothing is kept between calls. */
 const scratch: number[] = [];
 
+/** Which of a map's cells a body can stand in, for a world: a fact about its ground, worked out once for a map laid where this one is. */
+interface Openness {
+  x0: number;
+  z0: number;
+  cell: number;
+  n: number;
+  open: Uint8Array;
+}
+
+const opens = new WeakMap<Ground, Openness>();
+
+function openness(m: SearchMap, world: Ground): Uint8Array {
+  let o = opens.get(world);
+  if (!o || o.x0 !== m.x0 || o.z0 !== m.z0 || o.cell !== m.cell || o.n !== m.n) {
+    const open = new Uint8Array(m.n * m.n);
+    for (let j = 0; j < m.n; j++) {
+      for (let i = 0; i < m.n; i++) open[j * m.n + i] = walkable(world, m.x0 + (i + 0.5) * m.cell, m.z0 + (j + 0.5) * m.cell) ? 1 : 0;
+    }
+    o = { x0: m.x0, z0: m.z0, cell: m.cell, n: m.n, open };
+    opens.set(world, o);
+  }
+  return o.open;
+}
+
 /** An empty map: a window centred on (cx, cz), `n` cells across. */
 export function createSearchMap(cx: number, cz: number, n: number, cell: number): SearchMap {
   const half = (n * cell) / 2;
@@ -82,6 +106,7 @@ export function injectBelief(m: SearchMap, x: number, z: number, radius: number,
  */
 export function spreadBelief(m: SearchMap, rate: number, world: Ground): void {
   const { n, p } = m;
+  const open = openness(m, world);
   const out = scratch;
   out.length = p.length;
   out.fill(0);
@@ -91,21 +116,23 @@ export function spreadBelief(m: SearchMap, rate: number, world: Ground): void {
       const v = p[k]!;
       if (v === 0) continue;
       // Neighbours to bleed into: the open ones around, in a fixed order.
-      let opens = 0;
+      let count = 0;
       for (let d = 0; d < DIRS.length; d += 2) {
-        const c = neighbour(m, i + DIRS[d]!, j + DIRS[d + 1]!, world);
-        if (c >= 0) opens++;
+        const ni = i + DIRS[d]!;
+        const nj = j + DIRS[d + 1]!;
+        if (ni >= 0 && nj >= 0 && ni < n && nj < n && open[nj * n + ni] !== 0) count++;
       }
-      if (opens === 0) {
+      if (count === 0) {
         out[k] = out[k]! + v;
         continue;
       }
       const give = v * rate;
       out[k] = out[k]! + v - give;
-      const each = give / opens;
+      const each = give / count;
       for (let d = 0; d < DIRS.length; d += 2) {
-        const c = neighbour(m, i + DIRS[d]!, j + DIRS[d + 1]!, world);
-        if (c >= 0) out[c] = out[c]! + each;
+        const ni = i + DIRS[d]!;
+        const nj = j + DIRS[d + 1]!;
+        if (ni >= 0 && nj >= 0 && ni < n && nj < n && open[nj * n + ni] !== 0) out[nj * n + ni] = out[nj * n + ni]! + each;
       }
     }
   }
@@ -113,14 +140,6 @@ export function spreadBelief(m: SearchMap, rate: number, world: Ground): void {
 }
 
 const DIRS = [1, 0, 0, 1, -1, 0, 0, -1, 1, 1, -1, 1, -1, -1, 1, -1];
-
-function neighbour(m: SearchMap, i: number, j: number, world: Ground): number {
-  if (i < 0 || j < 0 || i >= m.n || j >= m.n) return -1;
-  const x = m.x0 + (i + 0.5) * m.cell;
-  const z = m.z0 + (j + 0.5) * m.cell;
-  if (!walkable(world, x, z)) return -1;
-  return j * m.n + i;
-}
 
 function walkable(world: Ground, x: number, z: number): boolean {
   const s = cellIndex(world.grid.site, x, z);

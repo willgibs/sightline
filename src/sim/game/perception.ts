@@ -200,7 +200,7 @@ export function deliverSound(ctx: TickContext, e: Extract<SimEvent, SoundFields>
       // A siren is the one thing every man in the camp is meant to hear, indoors or not.
       acoustics.spread(e.type === 'siren' ? { x: e.x, y: e.y, z: e.z, radius: e.radius, wallLossDb: H.sirenWallLossDb } : e, ctx.work);
     }
-    acoustics.hear(ear.x, ear.y, ear.z, heard);
+    acoustics.hear(ear.x, ear.y, ear.z, heard, g.id);
     if (heard.clarity < 1) continue;
     // A guess, not a fix: blurred by its distance, and more by how far round it came.
     const radius = H.blur.min + H.blur.distance * heard.straight + H.blur.detour * (heard.length - heard.straight);

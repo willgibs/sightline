@@ -55,6 +55,24 @@ export interface SearchOptions {
   maxCost?: number;
   /** Where to count the cells expanded: a system passes its tick's (TickContext.work). */
   work?: WorkCounts;
+  /**
+   * For a path: distance tables over this layer (`landmarkTables`). They sharpen A*'s
+   * estimate (remaining), so it expands far fewer cells round a wall: the path it finds
+   * costs the same, and may be a different one of the equally cheap. A cost function may
+   * only add to a move's length, as A* already asks, so the tables stay true.
+   */
+  bounds?: Bounds;
+}
+
+/**
+ * Distance tables for A* to aim by: for each of `count` fixed cells (landmarks), every
+ * cell's cost from it by the layer's own moves, −1 where it can't be reached. A row a
+ * cell, the landmarks side by side, so that reading a cell's bounds is one place in memory.
+ */
+export interface Bounds {
+  readonly count: number;
+  /** cells × count numbers: cell c's cost from landmark t is at c × count + t. */
+  readonly table: Int32Array;
 }
 
 export interface SearchResult {
@@ -72,10 +90,24 @@ export interface PathResult extends SearchResult {
 
 const NOT_REACHED = -1;
 
+/** Each neighbour's bit in a cell's open moves, in NEIGHBOURS order: the four sides, then the four corners. */
+const EAST = 1;
+const NORTH = 2;
+const WEST = 4;
+const SOUTH = 8;
+const SIDES = 4;
+
 /**
  * Searches one layer. It holds the scratch every search on the layer rewrites, so keep one
  * for the world's life: nothing carries over from one search to the next. Results (costs
  * and parents) are valid until the next search on the same GridSearch.
+ *
+ * Written for speed, since a fight asks for a dozen routes and floods a tick: typed arrays
+ * throughout, no closure or array made per cell, and a cell's open moves read from the
+ * layer's edges once as eight bits. What it does is the plain search's, cell for cell
+ * (tests/reference/gridSearchReference.ts, which tests/search.test.ts holds it to): the
+ * order cells expand in is fixed by their costs and the tie-breaks, never by how the queue
+ * is laid out.
  */
 export class GridSearch {
   /** Each cell's cost from the nearest source, after a search; −1 where it wasn't reached. */
@@ -88,7 +120,13 @@ export class GridSearch {
   private readonly closed: Uint8Array;
   private readonly buckets = new BucketQueue();
   private readonly heap = new MinHeap();
-  private readonly touched: number[] = [];
+  /** The cells the last search reached: all it has to undo. */
+  private touched = new Int32Array(1024);
+  private touchedCount = 0;
+  /** Each neighbour's offset in cell indices, and in columns and rows, in NEIGHBOURS order. */
+  private readonly offset: Int32Array;
+  /** The goal's row of a search's bounds, read once. */
+  private goalBounds = new Int32Array(8);
 
   constructor(readonly layer: GridLayer) {
     const n = layer.nx * layer.nz;
@@ -97,6 +135,7 @@ export class GridSearch {
     this.closed = new Uint8Array(n);
     this.side = Math.round(layer.cell * COST_PER_METRE);
     this.corner = Math.round(layer.cell * COST_PER_METRE * Math.SQRT2);
+    this.offset = Int32Array.from(NEIGHBOURS, ([di, dj]) => dj * layer.nx + di);
   }
 
   /** The cell index of (i, j). */
@@ -107,7 +146,7 @@ export class GridSearch {
   /**
    * Dijkstra from every source at once, with a bucket queue: every cell's cost from its
    * nearest source and its parent toward it, up to maxCost. Cells at equal cost expand in
-   * the order they were reached.
+   * the order they were reached, last first.
    */
   flood(sources: readonly number[], opts: SearchOptions): SearchResult {
     const r = this.runFlood(sources, opts);
@@ -119,36 +158,63 @@ export class GridSearch {
     this.clear();
     const q = this.buckets;
     q.clear();
+    const cost = this.cost;
+    const parent = this.parent;
+    const closed = this.closed;
     for (const s of sources) {
       this.check(s);
-      if (this.cost[s] === 0) continue;
-      this.reach(s, 0, NOT_REACHED);
+      if (cost[s] === 0) continue;
+      this.touch(s);
+      cost[s] = 0;
+      parent[s] = NOT_REACHED;
       q.push(s, 0);
     }
     const limit = opts.maxCost ?? Infinity;
+    const max = opts.maxExpansions;
+    const nx = this.layer.nx;
+    const corners = (opts.neighbours ?? 8) === 8;
+    const count = corners ? 8 : SIDES;
+    const price = opts.cost;
+    const side = this.side;
+    const diagonal = this.corner;
+    const offset = this.offset;
     let expanded = 0;
     for (let c = q.pop(); c >= 0; c = q.pop()) {
       const g = q.popped;
-      if (this.closed[c] || g !== this.cost[c]) continue;
-      if (expanded >= opts.maxExpansions) return { expanded, exhausted: true };
-      this.closed[c] = 1;
+      if (closed[c] !== 0 || g !== cost[c]) continue;
+      if (expanded >= max) return { expanded, exhausted: true };
+      closed[c] = 1;
       expanded++;
-      this.visit(c, opts, (to, cost) => {
-        const ng = g + cost;
-        if (ng > limit) return;
-        const old = this.cost[to]!;
-        if (old !== NOT_REACHED && old <= ng) return;
-        this.reach(to, ng, c);
+      const i = c % nx;
+      const open = this.openMoves(c, i, (c - i) / nx, corners);
+      for (let k = 0; k < count; k++) {
+        if ((open & (1 << k)) === 0) continue;
+        const to = c + offset[k]!;
+        const length = k < SIDES ? side : diagonal;
+        let move = length;
+        if (price) {
+          move = price(c, to, length);
+          if (move === -1) continue;
+          if (!Number.isInteger(move) || move < 0) throw new Error(`A grid move costs ${move}: costs are whole numbers, or −1 for no move`);
+        }
+        const ng = g + move;
+        if (ng > limit) continue;
+        const old = cost[to]!;
+        if (old !== NOT_REACHED) {
+          if (old <= ng) continue;
+        } else this.touch(to);
+        cost[to] = ng;
+        parent[to] = c;
         q.push(to, ng);
-      });
+      }
     }
     return { expanded, exhausted: false };
   }
 
   /**
-   * A* from `start` to `goal`, with the octile distance as its estimate. Ties break by the
-   * lower estimate of what remains, then by the lower cell index. Writes the path, start
-   * to goal, to `out`.
+   * A* from `start` to `goal`, with the octile distance as its estimate, or the better of
+   * that and the layer's distance tables (`bounds`). Ties break by the lower estimate of
+   * what remains, then by the lower cell index. Writes the path, start to goal, to `out`.
    */
   path(start: number, goal: number, opts: SearchOptions, out: number[] = []): PathResult {
     const r = this.runPath(start, goal, opts, out);
@@ -163,32 +229,68 @@ export class GridSearch {
     this.clear();
     const heap = this.heap;
     heap.clear();
+    const cost = this.cost;
+    const parent = this.parent;
+    const closed = this.closed;
+    const nx = this.layer.nx;
     const corners = (opts.neighbours ?? 8) === 8;
-    const estimate = (c: number): number => this.estimate(c, goal, corners);
-    this.reach(start, 0, NOT_REACHED);
-    heap.push(estimate(start), estimate(start), start);
+    const count = corners ? 8 : SIDES;
+    const price = opts.cost;
+    const side = this.side;
+    const diagonal = this.corner;
+    const offset = this.offset;
+    const max = opts.maxExpansions;
+    const bounds = opts.bounds;
+    const tables = bounds ? bounds.count : 0;
+    if (bounds) {
+      if (this.goalBounds.length < tables) this.goalBounds = new Int32Array(tables);
+      for (let t = 0; t < tables; t++) this.goalBounds[t] = bounds.table[goal * tables + t]!;
+    }
+    const gi = goal % nx;
+    const gj = (goal - gi) / nx;
+    this.touch(start);
+    cost[start] = 0;
+    parent[start] = NOT_REACHED;
+    const h0 = this.remaining(start, start % nx, (start - (start % nx)) / nx, gi, gj, corners, bounds, tables);
+    heap.push(h0, h0, start);
     let expanded = 0;
     while (heap.size > 0) {
       const c = heap.pop();
-      if (this.closed[c]) continue;
+      if (closed[c] !== 0) continue;
       if (c === goal) {
-        for (let k = goal; k !== NOT_REACHED; k = this.parent[k]!) out.push(k);
+        for (let k = goal; k !== NOT_REACHED; k = parent[k]!) out.push(k);
         out.reverse();
-        return { expanded, exhausted: false, found: true, cost: this.cost[goal]! };
+        return { expanded, exhausted: false, found: true, cost: cost[goal]! };
       }
-      if (expanded >= opts.maxExpansions) return { expanded, exhausted: true, found: false, cost: -1 };
-      this.closed[c] = 1;
+      if (expanded >= max) return { expanded, exhausted: true, found: false, cost: -1 };
+      closed[c] = 1;
       expanded++;
-      const g = this.cost[c]!;
-      this.visit(c, opts, (to, cost) => {
-        if (this.closed[to]) return;
-        const ng = g + cost;
-        const old = this.cost[to]!;
-        if (old !== NOT_REACHED && old <= ng) return;
-        this.reach(to, ng, c);
-        const h = estimate(to);
+      const g = cost[c]!;
+      const i = c % nx;
+      const j = (c - i) / nx;
+      const open = this.openMoves(c, i, j, corners);
+      for (let k = 0; k < count; k++) {
+        if ((open & (1 << k)) === 0) continue;
+        const to = c + offset[k]!;
+        const length = k < SIDES ? side : diagonal;
+        let move = length;
+        if (price) {
+          move = price(c, to, length);
+          if (move === -1) continue;
+          if (!Number.isInteger(move) || move < 0) throw new Error(`A grid move costs ${move}: costs are whole numbers, or −1 for no move`);
+        }
+        if (closed[to] !== 0) continue;
+        const ng = g + move;
+        const old = cost[to]!;
+        if (old !== NOT_REACHED) {
+          if (old <= ng) continue;
+        } else this.touch(to);
+        cost[to] = ng;
+        parent[to] = c;
+        const ti = to % nx;
+        const h = this.remaining(to, ti, (to - ti) / nx, gi, gj, corners, bounds, tables);
         heap.push(ng + h, h, to);
-      });
+      }
     }
     return { expanded, exhausted: false, found: false, cost: -1 };
   }
@@ -203,58 +305,92 @@ export class GridSearch {
     return (di + dj - 2 * lo) * this.side + lo * this.corner;
   }
 
-  /** Calls `relax` for every open move out of `c`, in NEIGHBOURS order, with its cost. */
-  private visit(c: number, opts: SearchOptions, relax: (to: number, cost: number) => void): void {
+  /**
+   * What A* takes the rest of the way from cell `c` at (i, j) to the goal at (gi, gj) to
+   * cost, at least: the octile distance, or more where a distance table says so. A table
+   * gives every cell's cost from one fixed cell over the layer's own moves, so by the
+   * triangle inequality the difference of two cells' entries is the least any path between
+   * them can cost.
+   */
+  private remaining(c: number, i: number, j: number, gi: number, gj: number, corners: boolean, bounds: Bounds | undefined, tables: number): number {
+    const di = i > gi ? i - gi : gi - i;
+    const dj = j > gj ? j - gj : gj - j;
+    let h: number;
+    if (corners) {
+      const lo = di < dj ? di : dj;
+      h = (di + dj - 2 * lo) * this.side + lo * this.corner;
+    } else h = (di + dj) * this.side;
+    if (tables > 0) {
+      const table = bounds!.table;
+      const row = c * tables;
+      const goal = this.goalBounds;
+      for (let t = 0; t < tables; t++) {
+        const a = table[row + t]!;
+        const b = goal[t]!;
+        // A cell the landmark can't reach says nothing about this pair.
+        if (a < 0 || b < 0) continue;
+        const d = a > b ? a - b : b - a;
+        if (d > h) h = d;
+      }
+    }
+    return h;
+  }
+
+  /**
+   * The open moves out of cell `c` at (i, j), as bits in NEIGHBOURS order. A side is open
+   * where the walk edge between the two cells is; a corner, only where both two-step paths
+   * around it are, so no path cuts one.
+   */
+  private openMoves(c: number, i: number, j: number, corners: boolean): number {
     const L = this.layer;
     const nx = L.nx;
-    const i = c % nx;
-    const j = (c - i) / nx;
-    const count = (opts.neighbours ?? 8) === 8 ? 8 : 4;
-    const price = opts.cost;
-    for (let k = 0; k < count; k++) {
-      const [di, dj] = NEIGHBOURS[k]!;
-      const ti = i + di;
-      const tj = j + dj;
-      if (ti < 0 || tj < 0 || ti >= nx || tj >= L.nz) continue;
-      const to = tj * nx + ti;
-      const corner = di !== 0 && dj !== 0;
-      if (corner ? !this.cornerOpen(i, j, di, dj) : !this.sideOpen(i, j, di, dj)) continue;
-      const length = corner ? this.corner : this.side;
-      const cost = price ? price(c, to, length) : length;
-      if (cost === -1) continue;
-      if (!Number.isInteger(cost) || cost < 0) throw new Error(`A grid move costs ${cost}: costs are whole numbers, or −1 for no move`);
-      relax(to, cost);
+    const e = L.edges;
+    const here = e[c]!;
+    let open = 0;
+    if (i + 1 < nx && (here & Edge.East) !== 0) open |= EAST;
+    if (j + 1 < L.nz && (here & Edge.North) !== 0) open |= NORTH;
+    if (i > 0 && (e[c - 1]! & Edge.East) !== 0) open |= WEST;
+    if (j > 0 && (e[c - nx]! & Edge.North) !== 0) open |= SOUTH;
+    if (!corners) return open;
+    if ((open & (EAST | NORTH)) === (EAST | NORTH) && (e[c + 1]! & Edge.North) !== 0 && (e[c + nx]! & Edge.East) !== 0) open |= 16;
+    if ((open & (WEST | NORTH)) === (WEST | NORTH) && (e[c - 1]! & Edge.North) !== 0 && (e[c + nx - 1]! & Edge.East) !== 0) open |= 32;
+    if ((open & (WEST | SOUTH)) === (WEST | SOUTH) && (e[c - nx - 1]! & Edge.North) !== 0 && (e[c - nx - 1]! & Edge.East) !== 0) open |= 64;
+    if ((open & (EAST | SOUTH)) === (EAST | SOUTH) && (e[c - nx + 1]! & Edge.North) !== 0 && (e[c - nx]! & Edge.East) !== 0) open |= 128;
+    return open;
+  }
+
+  /** Writes `value` into `into` at every cell the last search reached. */
+  mark(into: Int32Array, value: number): number {
+    for (let k = 0; k < this.touchedCount; k++) into[this.touched[k]!] = value;
+    return this.touchedCount;
+  }
+
+  /** True if any move leads out of cell `c`. */
+  connected(c: number): boolean {
+    const i = c % this.layer.nx;
+    return this.openMoves(c, i, (c - i) / this.layer.nx, false) !== 0;
+  }
+
+  /** Notes a cell the search has reached for the first time. */
+  private touch(c: number): void {
+    if (this.touchedCount === this.touched.length) {
+      const wider = new Int32Array(this.touched.length * 2);
+      wider.set(this.touched);
+      this.touched = wider;
     }
-  }
-
-  /** The walk edge between (i, j) and its side neighbour (i + di, j + dj). */
-  private sideOpen(i: number, j: number, di: number, dj: number): boolean {
-    const L = this.layer;
-    if (di === 1) return (L.edges[j * L.nx + i]! & Edge.East) !== 0;
-    if (di === -1) return (L.edges[j * L.nx + i - 1]! & Edge.East) !== 0;
-    if (dj === 1) return (L.edges[j * L.nx + i]! & Edge.North) !== 0;
-    return (L.edges[(j - 1) * L.nx + i]! & Edge.North) !== 0;
-  }
-
-  /** A diagonal is open only if both two-step paths around it are. */
-  private cornerOpen(i: number, j: number, di: number, dj: number): boolean {
-    return this.sideOpen(i, j, di, 0) && this.sideOpen(i + di, j, 0, dj) && this.sideOpen(i, j, 0, dj) && this.sideOpen(i, j + dj, di, 0);
-  }
-
-  private reach(c: number, cost: number, from: number): void {
-    if (this.cost[c] === NOT_REACHED) this.touched.push(c);
-    this.cost[c] = cost;
-    this.parent[c] = from;
+    this.touched[this.touchedCount++] = c;
   }
 
   /** Undoes the last search's marks: only the cells it touched. */
   private clear(): void {
-    for (const c of this.touched) {
-      this.cost[c] = NOT_REACHED;
-      this.parent[c] = NOT_REACHED;
-      this.closed[c] = 0;
+    const { touched, cost, parent, closed } = this;
+    for (let k = 0; k < this.touchedCount; k++) {
+      const c = touched[k]!;
+      cost[c] = NOT_REACHED;
+      parent[c] = NOT_REACHED;
+      closed[c] = 0;
     }
-    this.touched.length = 0;
+    this.touchedCount = 0;
   }
 
   private check(c: number): void {
@@ -262,138 +398,247 @@ export class GridSearch {
   }
 }
 
+/** Every cell's cost from `from` by the layer's own moves, −1 where it can't be reached. */
+export function distanceTable(search: GridSearch, from: number): Int32Array {
+  search.flood([from], { maxExpansions: search.cost.length });
+  return search.cost.slice();
+}
+
+/** A layer's ground, by what can be walked to from what. */
+export interface Components {
+  /** Each cell's piece of ground, numbered from 0 in the order of their lowest cells; −1 for a cell no move leads out of. */
+  label: Int32Array;
+  /** How many cells each piece has. */
+  sizes: number[];
+}
+
 /**
- * A bucket queue for whole-number costs (Dial's): a ring of buckets, one per cost, long
+ * Which cells can reach which, by the layer's own moves: moves are open both ways, so two
+ * cells have a path between them exactly when they share a label. A search between two that
+ * don't would expand everything the start can reach before it could say so.
+ */
+export function components(search: GridSearch): Components {
+  const n = search.cost.length;
+  const label = new Int32Array(n).fill(-1);
+  const sizes: number[] = [];
+  for (let c = 0; c < n; c++) {
+    if (label[c] !== -1 || !search.connected(c)) continue;
+    search.flood([c], { maxExpansions: n });
+    sizes.push(search.mark(label, sizes.length));
+  }
+  return { label, sizes };
+}
+
+/**
+ * Distance tables from `count` cells of one piece of ground, spread as far apart as it
+ * allows (ALT: A*, landmarks and the triangle inequality; Goldberg and Harrelson, 2005).
+ * The first is the cell farthest from `seed`, and each one after is the cell farthest from
+ * all those chosen so far, the lowest cell winning a tie: far-apart cells give the sharpest
+ * bounds, since a path that runs toward one or away from it is measured exactly. Fewer than
+ * `count` where the ground runs out of cells.
+ */
+export function landmarkTables(search: GridSearch, seed: number, count: number): Bounds {
+  const tables: Int32Array[] = [];
+  if (count > 0) chooseLandmarks(search, seed, count, tables);
+  // A row a cell: a search reads all of a cell's bounds together.
+  const cells = search.cost.length;
+  const table = new Int32Array(cells * tables.length);
+  for (let t = 0; t < tables.length; t++) {
+    const from = tables[t]!;
+    for (let c = 0; c < cells; c++) table[c * tables.length + t] = from[c]!;
+  }
+  return { count: tables.length, table };
+}
+
+function chooseLandmarks(search: GridSearch, seed: number, count: number, tables: Int32Array[]): void {
+  // The least cost to each cell from any cell chosen so far: to begin with, from the seed.
+  const nearest = distanceTable(search, seed);
+  for (let k = 0; k < count; k++) {
+    let far = -1;
+    let most = 0;
+    for (let c = 0; c < nearest.length; c++) {
+      if (nearest[c]! > most) {
+        most = nearest[c]!;
+        far = c;
+      }
+    }
+    if (far < 0) break;
+    const table = distanceTable(search, far);
+    tables.push(table);
+    // The seed was only somewhere to start from: once a real one is chosen, it stops counting.
+    if (k === 0) nearest.set(table);
+    else for (let c = 0; c < nearest.length; c++) if (table[c]! >= 0 && table[c]! < nearest[c]!) nearest[c] = table[c]!;
+  }
+}
+
+/**
+ * A bucket queue for whole-number costs (Dial's): a ring of stacks, one per cost, long
  * enough for the dearest move, which doubles when a dearer one arrives. Pops the cheapest;
- * within a bucket, the last pushed. Costs never decrease below the last popped.
+ * within a cost, the last pushed. Costs never decrease below the last popped.
+ *
+ * Every cost still queued lies within one turn of the ring from the cheapest, so a stack
+ * holds one cost only. The stacks are linked through one pool of entries.
  */
 class BucketQueue {
-  private ring: number[][] = [[]];
-  private costs: number[][] = [[]];
+  /** The top entry of each stack, or −1. */
+  private head = new Int32Array(1).fill(-1);
   private mask = 0;
   private base = 0;
   private count = 0;
+  /** The pool: each entry's cell, its cost, and the entry beneath it in its stack. */
+  private cells = new Int32Array(1024);
+  private costs = new Int32Array(1024);
+  private below = new Int32Array(1024);
+  private used = 0;
   /** The cost of the cell the last pop returned. */
   popped = 0;
 
   clear(): void {
-    for (const b of this.ring) b.length = 0;
-    for (const b of this.costs) b.length = 0;
+    this.head.fill(-1);
     this.base = 0;
     this.count = 0;
+    this.used = 0;
   }
 
   push(cell: number, cost: number): void {
     if (cost < this.base) throw new Error(`A bucket queue can't take cost ${cost} after ${this.base}`);
     while (cost - this.base > this.mask) this.grow();
+    if (this.used === this.cells.length) this.widen();
     const k = cost & this.mask;
-    this.ring[k]!.push(cell);
-    this.costs[k]!.push(cost);
+    const e = this.used++;
+    this.cells[e] = cell;
+    this.costs[e] = cost;
+    this.below[e] = this.head[k]!;
+    this.head[k] = e;
     this.count++;
   }
 
   /** The cheapest cell, or −1 when empty. */
   pop(): number {
     if (this.count === 0) return -1;
+    const head = this.head;
+    const mask = this.mask;
     for (;;) {
-      const k = this.base & this.mask;
-      const b = this.ring[k]!;
-      if (b.length > 0) {
+      const k = this.base & mask;
+      const e = head[k]!;
+      if (e >= 0) {
+        head[k] = this.below[e]!;
         this.count--;
-        this.popped = this.costs[k]!.pop()!;
-        return b.pop()!;
+        this.popped = this.costs[e]!;
+        return this.cells[e]!;
       }
       this.base++;
     }
   }
 
-  /** Doubles the ring, putting every queued cell back in its bucket. */
+  /** Doubles the ring: each stack moves whole to its cost's new place, so growing never changes what pops first. */
   private grow(): void {
     const size = (this.mask + 1) * 2;
-    const ring: number[][] = Array.from({ length: size }, () => []);
-    const costs: number[][] = Array.from({ length: size }, () => []);
-    // Re-queue in cost order, keeping each bucket's order, so growing never changes what pops first.
-    for (let c = this.base; c <= this.base + this.mask; c++) {
-      const from = c & this.mask;
-      const cells = this.ring[from]!;
-      const cs = this.costs[from]!;
-      for (let k = 0; k < cells.length; k++) {
-        if (cs[k] !== c) continue;
-        ring[c & (size - 1)]!.push(cells[k]!);
-        costs[c & (size - 1)]!.push(c);
-      }
+    const head = new Int32Array(size).fill(-1);
+    for (let k = 0; k <= this.mask; k++) {
+      const e = this.head[k]!;
+      if (e >= 0) head[this.costs[e]! & (size - 1)] = e;
     }
-    this.ring = ring;
-    this.costs = costs;
+    this.head = head;
     this.mask = size - 1;
+  }
+
+  /** Doubles the pool. */
+  private widen(): void {
+    const n = this.cells.length * 2;
+    const cells = new Int32Array(n);
+    const costs = new Int32Array(n);
+    const below = new Int32Array(n);
+    cells.set(this.cells);
+    costs.set(this.costs);
+    below.set(this.below);
+    this.cells = cells;
+    this.costs = costs;
+    this.below = below;
   }
 }
 
-/** A binary min-heap of (f, h, cell), ordered by f, then h, then cell: every tie broken the same way. */
+/**
+ * A binary min-heap of (f, h, cell), ordered by f, then h, then cell. No two entries are
+ * equal in all three (a cell is pushed again only at a lower cost), so the order they come
+ * off in is the order of their keys, whatever the heap's shape.
+ */
 class MinHeap {
-  private readonly items: number[] = [];
-
-  get size(): number {
-    return this.items.length / 3;
-  }
+  private f = new Float64Array(1024);
+  private h = new Int32Array(1024);
+  private cell = new Int32Array(1024);
+  size = 0;
 
   clear(): void {
-    this.items.length = 0;
+    this.size = 0;
   }
 
   push(f: number, h: number, cell: number): void {
-    const a = this.items;
-    a.push(f, h, cell);
-    let i = a.length / 3 - 1;
+    if (this.size === this.cell.length) this.widen();
+    const F = this.f;
+    const H = this.h;
+    const C = this.cell;
+    let i = this.size++;
+    // Up from the last place, moving each greater parent down into the gap.
     while (i > 0) {
       const p = (i - 1) >> 1;
-      if (!this.less(i, p)) break;
-      this.swap(i, p);
+      const pf = F[p]!;
+      if (pf < f || (pf === f && (H[p]! < h || (H[p]! === h && C[p]! < cell)))) break;
+      F[i] = pf;
+      H[i] = H[p]!;
+      C[i] = C[p]!;
       i = p;
     }
+    F[i] = f;
+    H[i] = h;
+    C[i] = cell;
   }
 
   /** Removes the least item, returning its cell. */
   pop(): number {
-    const a = this.items;
-    const cell = a[2]!;
-    const n = a.length / 3 - 1;
-    if (n > 0) {
-      a[0] = a[n * 3]!;
-      a[1] = a[n * 3 + 1]!;
-      a[2] = a[n * 3 + 2]!;
-    }
-    a.length = n * 3;
+    const F = this.f;
+    const H = this.h;
+    const C = this.cell;
+    const top = C[0]!;
+    const n = --this.size;
+    if (n === 0) return top;
+    // The last item goes down from the top, each lesser child moving up into the gap.
+    const f = F[n]!;
+    const h = H[n]!;
+    const cell = C[n]!;
     let i = 0;
     for (;;) {
-      const l = 2 * i + 1;
+      let l = 2 * i + 1;
       if (l >= n) break;
       const r = l + 1;
-      const c = r < n && this.less(r, l) ? r : l;
-      if (!this.less(c, i)) break;
-      this.swap(c, i);
-      i = c;
+      if (r < n) {
+        const lf = F[l]!;
+        const rf = F[r]!;
+        if (rf < lf || (rf === lf && (H[r]! < H[l]! || (H[r]! === H[l]! && C[r]! < C[l]!)))) l = r;
+      }
+      const lf = F[l]!;
+      if (!(lf < f || (lf === f && (H[l]! < h || (H[l]! === h && C[l]! < cell))))) break;
+      F[i] = lf;
+      H[i] = H[l]!;
+      C[i] = C[l]!;
+      i = l;
     }
-    return cell;
+    F[i] = f;
+    H[i] = h;
+    C[i] = cell;
+    return top;
   }
 
-  private less(x: number, y: number): boolean {
-    const a = this.items;
-    const fx = a[x * 3]!;
-    const fy = a[y * 3]!;
-    if (fx !== fy) return fx < fy;
-    const hx = a[x * 3 + 1]!;
-    const hy = a[y * 3 + 1]!;
-    if (hx !== hy) return hx < hy;
-    return a[x * 3 + 2]! < a[y * 3 + 2]!;
-  }
-
-  private swap(x: number, y: number): void {
-    const a = this.items;
-    for (let k = 0; k < 3; k++) {
-      const t = a[x * 3 + k]!;
-      a[x * 3 + k] = a[y * 3 + k]!;
-      a[y * 3 + k] = t;
-    }
+  private widen(): void {
+    const n = this.cell.length * 2;
+    const f = new Float64Array(n);
+    const h = new Int32Array(n);
+    const cell = new Int32Array(n);
+    f.set(this.f);
+    h.set(this.h);
+    cell.set(this.cell);
+    this.f = f;
+    this.h = h;
+    this.cell = cell;
   }
 }

@@ -2,6 +2,32 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-10 · A fight's slow ticks: landmarks for routes, and nothing made in play
+
+**Why.** The owner's first go at the takedown: "it freezes and jumps a few frames", "sometimes the whole experience gets laggy". A tick takes a tenth of a millisecond on average and has 33, so the average said nothing. The one tick in a thousand did: under a sniper on LEB-2534, 22 ticks in four minutes took over 4 ms, and 4 took over 33 ms, the worst 59 ms. `docs/performance.md` has the whole account and the numbers; this is what was decided.
+
+**What the slow ticks were.** Route searches inside the camp. A guard three metres from where he's going with a wall between: A* aiming straight at him looks at every cell nearer than the gate first. One such search spent its 40,000 cells, fell back on the coarse layer, and searched the fine layer twice more: 124,000 cells in a tick. Across 16 camps, 27% of routes a fight asks for cost more than a whole tick's share of cells.
+
+**Changed, and it changes what the game does** (`SIM_VERSION` 16; no pinned run moved):
+- **Routes inside a camp aim by landmarks** (`kernel/world/search.ts`, `landmarkTables`; ALT, Goldberg and Harrelson 2005): 16 cells spread across the camp, each with a table of every cell's distance from it, made once when the camp's routes are prepared. A search's estimate is the better of the straight line and what the tables say. Paths cost the same; of equally short ones a different one may be taken; a route that used to run out of budget is now found. `brain.nav.landmarks`, 0 for the old estimate. Only a fine layer the size of a camp's gets them (`brain.nav.landmarkCells`): a hand-built scene's covers its whole map, 2.3 million cells, where the tables took 2.7 s to make and 148 MB to hold, and those scenes route as they did.
+- **A place that can't be reached is known at once** (`components`): ground is labelled by what can be walked to from what, so a search for somewhere on other ground returns "no route" with no cells looked at, where it used to look at everything first and then guess from the coarse layer.
+- **A tick's looks for dead ground share a budget of rays** (`brain.fight.drill.raysPerTick`, 300): once the tick's looks have cast that many, the rest wait for the next tick, as route searches already did. Their rays are now counted in the work.
+
+**Changed, with nothing moving** (30 four-minute fights give the same state hash and event count as before, with the two switches above off):
+- **The grid search does exactly what it did, about three times faster**: typed arrays, no closure or array made per cell, a cell's open moves read once as eight bits. The search it replaced is kept beside the tests (`tests/reference/gridSearchReference.ts`) and the new one is held to it cell for cell.
+- **A listener's masked threshold** is worked out once for where he stands, and not at all where nothing steady could mask anything: no route makes a source louder than its straight line through open air, so where even that stays under the threshold of hearing the answer is 1, with no rays. A camp's river is 60 steady sources; every sound used to cast a ray at each for each listener.
+- **The belief map** asks which of its cells a body can stand in once for a world, not sixteen times a cell at every spread. It was 17% of the simulation's time.
+- **The escape vehicle's way across the yard** is found once for a camp, at setup, not in the tick the target gets in.
+- **A rifle's zero** is kept once solved: the scope asked for it every frame, sixty flights each time.
+
+**Nothing made in play** (the renderer and the app; no simulation state):
+- **A strike's dust is drawn from a fixed set of puffs.** Each used to be a new material, thrown away when it faded, and a thrown-away material takes its shader program with it when it was the last to use one: the next strike then waits for the program to be built again.
+- **Everything the scene can need is made ready while the valley loads**: every shader program, hidden things included, and every mesh's vertices, by drawing the whole world once from overhead into one pixel.
+- **The camp's fight is rehearsed once at load** (`game/rehearsal.ts`): a throwaway run on the same world, 50 s of a sniper on the best overview with the relief brought in early, so the later stages are rehearsed too. The first shot of the real run then costs what the tenth does: 3 ms where it was 22. It adds about 0.3 s to loading.
+- **The GPU is asked its name once.** A play session is saved every minute with it, and the answer waits on the GPU's own process.
+
+**Tools.** `npm run hitches` times scenes' ticks in a process of their own, built as the game's code is built, and names the slow ones with the work they did. `npm run experiment -- route-cost` is what each number of landmarks buys. The brain lane's bench pins a fight's worst tick as work (grid cells, rays), which is the same on every machine. A play session's telemetry now keeps its slowest frames and whose work each was.
+
 ## 2026-11-10 · The honest view's corner: what you carry, and the picture you were given
 
 **Why.** The owner, after playing: he couldn't tell whether the suppressor was on without scoping in, which stance he was in without toggling it, which load he had without changing it, or how many rounds were left. And a camp with fair defenses owes the attacker what he'd have had from scouting imagery, without the gear that hands either side too much (heartbeat sensors, UAVs). The design doc's *UI and HUD* says ammo only when you reload, and a tactical map of only what you've observed; this is his later word on the first, and the observed map is still to come.
