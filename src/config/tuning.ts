@@ -208,7 +208,7 @@ export const defaultTuning = {
           breachWidth: 4,
           breachSides: ['back', 'left', 'right'],
           barbican: 12,
-          towers: [1, 3],
+          towers: [1, 2],
           vehicleDoorGap: 3,
           storeys: { hq: 2, barracks: 2, mess: 1, storage: 1 },
           windowPost: 2, // marksmen at the upper windows of its two-storey buildings, the target's first
@@ -284,7 +284,7 @@ export const defaultTuning = {
       storey: 3,
       floorThickness: 0.2,
       stairs: { rise: 0.25, tread: 0.3, width: 1.1 }, // a rise inside the motor's stepHeight
-      window: { sill: 0.95, head: 2.15, width: 1.2, every: 4 }, // metres above the floor, wide, and how far apart along a wall
+      window: { sill: 0.95, head: 2.15, width: 1.2, every: 12 }, // metres above the floor, wide, and how far apart along a wall
       rail: 1, // round the stairwell upstairs
       fieldWall: 1.1, // a farm's low field walls: to see over, and to crawl behind
       fieldWallHigh: 2.4, // and its high ones, which nobody sees over

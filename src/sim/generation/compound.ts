@@ -876,7 +876,8 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
       }
       return top;
     };
-    const twoFloors = buildings.map((b, index) => ({ b, index })).filter(({ b }) => b.storeys >= 2).sort((p, q) => (p.index === hqIndex ? -1 : q.index === hqIndex ? 1 : p.index - q.index));
+    // On a camp where someone has to get to him, his own floor stays clear of them: a way up has to exist.
+    const twoFloors = buildings.map((b, index) => ({ b, index })).filter(({ b, index }) => b.storeys >= 2 && (index !== hqIndex || !needsWayIn(crux))).sort((p, q) => (p.index === hqIndex ? -1 : q.index === hqIndex ? 1 : p.index - q.index));
     let left = type.windowPost;
     for (const { b, index } of twoFloors) {
       if (left <= 0) break;
