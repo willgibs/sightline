@@ -75,6 +75,7 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 - `npm run explain` (or `-- --base <ref>`): for every pinned run that moved since `origin/main`, the first divergent tick, the state paths that differ there, and each lane's work and metrics before and after. CI prints it for every pull request and push. `npm run trace -- --run <name>` is the per-tick trace it compares.
 - `npm run playtest`: every session in `playtests/` (the dev build saves each run there as it goes), re-simulated, checked and summarized with its telemetry. `-- <file|dir>` for others.
 - `npm run experiment` (or `-- <name>`, `--camps N`, `--dice N`, `--jobs N`): the lab bench (`src/lab`): the same camps run several ways and compared seed by seed, with intervals. The numbers behind a decision should be one command away, so an experiment that informs a call goes here, not in a throwaway script.
+- `npm run hitches` (or `-- <scene> '<params>'`): which ticks of a fight a player would feel. Each scene runs in a process of its own, built as the game's code is built: the first run as a fresh tab finds it, the warm runs, each system's worst tick with the work it did there (grid cells, rays), and every tick over 4 ms. `docs/performance.md` says what the numbers were and are. The brain lane's bench pins a fight's worst tick as work, which is the same on every machine.
 - `npm run flaws -- <seed> <attack>`: the compound simulator's flaw report for one camp: each moment the camp did something a defender plainly wouldn't, with the address to watch it. `npm run experiment -- flaws` runs every attack against many camps.
 - `npm run whatif -- <recording or scene> ...`: a run forked at one moment with one change made, by re-simulation (`src/lab/fork.ts`): what would have happened if he'd moved, or that guard were gone. The header of `src/headless/whatif.ts` has the options.
 - `npm run scene` (or `-- <name>`, `-- --list`): every scene in `src/sim/game/scenes` headless, by its own driver, checking its expectations and re-simulating its recording. `?scene=<name>` plays one in the browser. A regression test that needs more than one tick belongs in a scene.
@@ -83,9 +84,9 @@ Art stays out until the core passes Concept proven (end of Phase 2). Feel is in 
 - `npm run look`: the honest and debug views as pictures in `shots/`, from a headless browser. `-- --scene <name>`, `--seed`, `--look`, `--walk` and `--fly` choose what to look at (the header of `src/headless/look.ts`).
 - `window.sightline` exposes automation hooks for scripted screenshots and playtests. The full list is `automation()` in `src/app/game.ts`:
   - **Running:** `play()`, `pause()`.
-  - **Views:** `debug(on)`, `colliders(on)`, `grid(on)`, `overwatch(on)`.
+  - **Views:** `debug(on)`, `colliders(on)`, `grid(on)`, `overwatch(on)`, `minimap(mode)`.
   - **Camera:** `look(headingDeg, pitchDeg)`, `fly(x, y, z, headingDeg, pitchDeg)`, `body()`.
-  - **Input:** `hold([codes])`, `tap('KeyC' | 'KeyZ')`, `click()`, `zoom(on)`, `noise()` and `dropBody()` (drop a noise or a body where the view points: the sandbox, A10 and A9).
+  - **Input:** `hold([codes])`, `tap('KeyC' | 'KeyZ' | 'KeyT' | 'KeyY')` (stance, the suppressor, the load), `click()`, `zoom(on)`, `noise()` and `dropBody()` (drop a noise or a body where the view points: the sandbox, A10 and A9).
   - **Time:** `timeScale(x)` (the debug view's, 0.25× to 8×).
   - **World:** `generate(seed)`, `fog(density)`.
   - **Reading:** `state()`, `dump()`, `recording()`, `sound()`, `insides()`, `playtest()`, `perception()` (each perceiving guard's state, meter and belief), `explain(id)` (an event back to its causes, in words).

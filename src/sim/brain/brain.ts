@@ -887,13 +887,14 @@ function performCover(m: GuardMind, out: Order): void {
         return;
       }
       if (from) threat = from;
-      // One man's look around costs rays: it waits its turn with the tick's route searches.
-      if (m.nav.searches.left <= 0) {
+      // One man's look around costs rays: it waits its turn with the tick's route searches, and
+      // once the tick's looks have cast their share of rays the rest wait for the next.
+      if (m.nav.searches.left <= 0 || (m.nav.work?.rays ?? 0) - m.nav.raysAtStart >= m.tuning.brain.fight.drill.raysPerTick) {
         stand(m, out, false);
         return;
       }
       m.nav.searches.left--;
-      const found = groundSpot(m.world, m.tuning, m.self.x, m.self.z, threat.x, threat.z, !from);
+      const found = groundSpot(m.world, m.tuning, m.self.x, m.self.z, threat.x, threat.z, !from, m.nav.work);
       if (found) {
         spot = found;
         b.coverStance = found.stance;

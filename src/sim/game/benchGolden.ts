@@ -178,7 +178,13 @@ export const BENCH_GOLDEN: PinnedBench = {
       "overlook: guards down from one perch, of 34": 19,
       "overlook: camps cleared (of 3)": 0,
       "overlook: the target got away (of 3)": 2,
-      "timed shot on an escort's camp: target down (of 3)": 2
+      "timed shot on an escort's camp: target down (of 3)": 2,
+      "a fight’s worst tick: grid cells the brains expand": 6501,
+      "a fight’s worst tick: rays the brains cast": 297,
+      "a fight’s worst tick: grid cells sounds flood": 16238,
+      "routes between a camp’s posts: found (of 90)": 90,
+      "routes between a camp’s posts: grid cells a search looks at, on average": 351,
+      "routes between a camp’s posts: the most one search looks at": 1757
     },
     "runs": {
       "camp-fight": {
@@ -188,7 +194,7 @@ export const BENCH_GOLDEN: PinnedBench = {
           "perception-hearing": { "rays": 61, "nodes": 13609, "bodies": 0 },
           "perception-spotting": { "rays": 2288, "nodes": 0, "bodies": 0 },
           "perception-awareness": { "rays": 0, "nodes": 89031, "bodies": 0 },
-          "guard-brains": { "rays": 0, "nodes": 19329, "bodies": 0 }
+          "guard-brains": { "rays": 1148, "nodes": 17318, "bodies": 0 }
         }
       }
     }

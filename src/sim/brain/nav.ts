@@ -4,7 +4,7 @@ import { Blocks, footprintContains, type Collider } from '../kernel/world/collid
 import { Cell, cellIndex, storeyAt, type GridLayer } from '../kernel/world/grid';
 import { sightLine, type QueryView } from '../kernel/world/query';
 import { Solids } from '../kernel/world/solids';
-import { COST_PER_METRE, GridSearch, type MoveCost, type SearchOptions } from '../kernel/world/search';
+import { COST_PER_METRE, GridSearch, components, landmarkTables, type Bounds, type MoveCost, type SearchOptions } from '../kernel/world/search';
 import type { Ground } from './mind';
 
 /**
@@ -19,7 +19,9 @@ import type { Ground } from './mind';
  * one search can afford. A route with neither end inside is coarse.
  *
  * A route is found by A* with the search's fixed tie-breaks and an iteration budget (rule
- * 18): it says when it ran out, and finding no route is an answer, never a stall. The
+ * 18): it says when it ran out, and finding no route is an answer, never a stall. Inside
+ * the site it aims by landmarks (below): a camp is walls with a few ways through them, where
+ * the straight-line estimate sends a search into every corner of the wrong side first. The
  * cells are string-pulled into a few waypoints, checked against the same clearance the
  * grid was built with, and the motor walks them (followRoute): no second authority over
  * where bodies go, and no state outside the guard who walks.
@@ -65,6 +67,8 @@ export interface FindOptions {
 /** The navigator for a world: the two layers' searches, kept for the world's life. Nothing carries over between calls. */
 export class Navigator {
   private readonly site: GridSearch;
+  /** The site layer and the storeys above it, one index space: a route that has an end upstairs. The site's own search where there are no storeys. */
+  private readonly stacked: GridSearch;
   private readonly map: GridSearch;
   /** The way to the site's rim from anywhere on the map, and the way out to each side of it from anywhere in the site: flooded the first time something asks. */
   private rim: GridSearch | null = null;
@@ -75,6 +79,8 @@ export class Navigator {
   private readonly mapCells: number[] = [];
   private readonly raw: number[] = [];
   private readonly ids: number[] = [];
+  /** What the fine layer's searches aim by (siteAid): made once for the world, or again if the tuning asks for more or fewer. */
+  private aid: SiteAid | null = null;
   /** The static world, as a view for sight lines: no bodies, no entities' shapes. */
   private readonly view: QueryView;
 
@@ -82,7 +88,8 @@ export class Navigator {
     private readonly world: Ground,
     private tuning: Tuning,
   ) {
-    this.site = new GridSearch(world.grid.site, world.grid.storeys, world.grid.stairs);
+    this.site = new GridSearch(world.grid.site);
+    this.stacked = world.grid.storeys.length > 0 ? new GridSearch(world.grid.site, world.grid.storeys, world.grid.stairs) : this.site;
     this.map = new GridSearch(world.grid.map);
     // The kernel's queries read the terrain and the tree crowns of a world and nothing more, which is ground.
     this.view = { world: world as QueryView['world'], solids: new Solids(world.colliders), bodies: [] };
@@ -176,7 +183,7 @@ export class Navigator {
     const goal = this.cellOn(bLevel, bx, bz);
     if (start < 0 || goal < 0) return 'no-route';
     const N = this.tuning.brain.nav;
-    const r = this.site.path(start, goal, { maxExpansions: N.siteExpansions, work: opts.work, cost: this.siteCost(opts.cost) }, this.siteCells);
+    const r = this.stacked.path(start, goal, { maxExpansions: N.siteExpansions, work: opts.work, cost: this.siteCost(opts.cost) }, this.siteCells);
     if (!r.found) return r.exhausted ? 'out-of-budget' : 'no-route';
     this.pullLevels(ax, az, bx, bz, out);
     return 'found';
@@ -184,15 +191,15 @@ export class Navigator {
 
   /** A cost function for the site search: one written for the site's cells prices only moves on the ground. */
   private siteCost(cost: MoveCost | undefined): MoveCost | undefined {
-    if (!cost || this.site.levels.length === 0) return cost;
-    const n = this.site.layer.nx * this.site.layer.nz;
+    if (!cost || this.stacked.levels.length === 0) return cost;
+    const n = this.stacked.layer.nx * this.stacked.layer.nz;
     return (from, to, length) => (from >= n || to >= n ? length : cost(from, to, length));
   }
 
   /** The walkable cell nearest a point on a level: −1 is the site layer, in this search's index space. */
   private cellOn(level: number, x: number, z: number): number {
     if (level < 0) return this.nearestWalkable(this.world.grid.site, x, z);
-    const lv = this.site.levels[level]!;
+    const lv = this.stacked.levels[level]!;
     const c = this.nearestWalkable(lv.layer, x, z);
     return c < 0 ? -1 : lv.base + c;
   }
@@ -207,9 +214,9 @@ export class Navigator {
     const pts = out.points;
     pts.length = 0;
     const raw: Array<{ x: number; z: number; level: number }> = cells.map((c) => {
-      const lv = this.site.levelOf(c);
+      const lv = this.stacked.levelOf(c);
       const local = c - lv.base;
-      const level = lv.base === 0 ? -1 : this.site.levels.indexOf(lv);
+      const level = lv.base === 0 ? -1 : this.stacked.levels.indexOf(lv);
       return { x: cellX(lv.layer, local), z: cellZ(lv.layer, local), level };
     });
     const N = this.tuning.brain.nav;
@@ -270,6 +277,7 @@ export class Navigator {
    * Where the fine layer covers the whole map (a camp built by hand) no route has an end outside it.
    */
   prepare(): void {
+    this.siteAid();
     const s = this.site.layer;
     const m = this.map.layer;
     if (s.x0 <= m.x0 && s.z0 <= m.z0 && s.x0 + s.nx * s.cell >= m.x0 + m.nx * m.cell && s.z0 + s.nz * s.cell >= m.z0 + m.nz * m.cell) return;
@@ -366,13 +374,45 @@ export class Navigator {
     return this.exits;
   }
 
+  /**
+   * What a search of the fine layer aims by, made once: which ground each cell stands on,
+   * and distance tables from a few cells spread across the largest piece of it (the camp
+   * and the ground around it). Null with `landmarks` at 0, and for a fine layer too large to
+   * be a camp's (a hand-built scene's covers its whole map: tables for millions of cells
+   * would cost more to make and to hold than they save): the straight-line estimate alone.
+   *
+   * Without them the commonest route in a fight is the dearest: a man a few metres from
+   * where he's going with a wall between, and the way round through the gate. A search
+   * aiming straight at him looks at every cell nearer than the gate first, tens of
+   * thousands of them, and at a place that can't be reached at all it looks at everything.
+   */
+  private siteAid(): SiteAid | null {
+    const N = this.tuning.brain.nav;
+    const count = N.landmarks;
+    if (count <= 0 || this.site.layer.nx * this.site.layer.nz > N.landmarkCells) return null;
+    if (this.aid && this.aid.count === count) return this.aid;
+    // A search of its own: the tables are flooded while the layer's search may be holding a route.
+    const search = new GridSearch(this.site.layer);
+    const ground = components(search);
+    let largest = -1;
+    for (let k = 0; k < ground.sizes.length; k++) if (largest < 0 || ground.sizes[k]! > ground.sizes[largest]!) largest = k;
+    this.aid = { count, label: ground.label, bounds: largest < 0 ? null : landmarkTables(search, ground.label.indexOf(largest), count) };
+    return this.aid;
+  }
+
   /** Searches one layer between the nearest walkable cells to two points. */
   private searchLayer(search: GridSearch, ax: number, az: number, bx: number, bz: number, maxExpansions: number, opts: FindOptions, out: number[]): RouteResult {
     const L = search.layer;
     const start = this.nearestWalkable(L, ax, az);
     const goal = this.nearestWalkable(L, bx, bz);
     if (start < 0 || goal < 0) return 'no-route';
-    const r = search.path(start, goal, { maxExpansions, work: opts.work, cost: search === this.site ? this.siteCost(opts.cost) : undefined }, out);
+    const aid = search === this.site ? this.siteAid() : null;
+    // Different ground: there is no way, and a search would look at all of his before saying so.
+    if (aid && start !== goal && (aid.label[start]! < 0 || aid.label[start] !== aid.label[goal])) {
+      out.length = 0;
+      return 'no-route';
+    }
+    const r = search.path(start, goal, { maxExpansions, work: opts.work, cost: search === this.site ? opts.cost : undefined, bounds: aid?.bounds ?? undefined }, out);
     if (r.found) return 'found';
     return r.exhausted ? 'out-of-budget' : 'no-route';
   }
@@ -561,6 +601,14 @@ export class Navigator {
     }
     return true;
   }
+}
+
+/** What the fine layer's searches aim by: the ground each cell stands on, and its landmarks' distance tables (kernel/world/search.ts). */
+interface SiteAid {
+  /** How many landmarks were asked for. */
+  count: number;
+  label: Int32Array;
+  bounds: Bounds | null;
 }
 
 /** How many sides of the site a route can leave by. */

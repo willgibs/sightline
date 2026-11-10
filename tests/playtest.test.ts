@@ -84,6 +84,31 @@ describe('playtest capture', () => {
     expect(report.machine).toEqual({ gpu: 'none' });
   });
 
+  it('keeps a run’s slowest frames, worst first, with whose work each was', async () => {
+    const store = new MemoryStore();
+    const capture = new PlaytestCapture(store, context);
+    const r = run(0);
+    capture.startRun(r.sim, r.recorder, 'TEST-0000', null);
+    r.play(10, capture);
+    // A hitch that was the simulation's, one that was the page's, and one that was neither's; then a crowd of lesser ones.
+    capture.frame(66, 61, 58, 2);
+    capture.frame(120, 110, 3, 1);
+    capture.frame(250, 4, 1, 1);
+    for (let k = 0; k < 40; k++) capture.frame(35 + k * 0.1, 30, 5, 1);
+    capture.save('pause');
+    await capture.settled();
+    const slow = store.saved[0]!.report.slow!;
+    expect(slow).toHaveLength(16);
+    expect(slow.slice(0, 3)).toEqual([
+      { at: 10, frameMs: 250, cpuMs: 4, simMs: 1, ticks: 1 },
+      { at: 10, frameMs: 120, cpuMs: 110, simMs: 3, ticks: 1 },
+      { at: 10, frameMs: 66, cpuMs: 61, simMs: 58, ticks: 2 },
+    ]);
+    expect(slow.every((f, k) => k === 0 || f.frameMs <= slow[k - 1]!.frameMs)).toBe(true);
+    // The frames of a steady 30 a second aren't slow, and aren't kept.
+    expect(slow.at(-1)!.frameMs).toBeGreaterThan(35);
+  });
+
   it("doesn't keep a run of a few seconds, and keeps the last one when a new run starts", async () => {
     const store = new MemoryStore();
     const capture = new PlaytestCapture(store, context);

@@ -18,9 +18,10 @@ import { datan2, dcos, dexp, dlog, dsin } from '../kernel/core/detmath';
 import { air, defaultEnv } from '../kernel/env';
 import { Rng } from '../kernel/core/rng';
 import { runScene, sceneOver, sceneTicks, startScene, type Scene as KernelScene } from '../kernel/scene';
-import { emptyEstimate, fuseBearings, inEllipse, type Bearing, type FuseGrid } from '../brain';
+import { emptyEstimate, emptyRoute, fuseBearings, inEllipse, navigatorOf, type Bearing, type FuseGrid } from '../brain';
 import { POLICIES, pursuit } from './baselines';
 import { campScenario } from './scenes/campScenario';
+import { compound } from './scenes/compound';
 import { overlook } from './scenes/overlook';
 import type { Tuning } from '../../config/tuning';
 import { withSystem, type System } from '../kernel/systems';
@@ -581,8 +582,71 @@ function brainMetrics(): Record<string, number> {
   m[`overlook: camps cleared (of ${OVERLOOK_SEEDS.length})`] = cleared;
   m[`overlook: the target got away (of ${OVERLOOK_SEEDS.length})`] = away;
   m[`timed shot on an escort's camp: target down (of ${TIMED_SEEDS.length})`] = timed;
+  Object.assign(m, fightCost());
   return m;
 }
+
+/**
+ * What a fight's worst tick costs, as work (docs/performance.md): a sniper's two minutes on
+ * a generated camp, and for each of the systems that search, the most it did in any one
+ * tick. A tick's time follows its work, and the work is the same on every machine, so this
+ * is where a hitch is caught before anyone feels it. Then the routes a fight asks for, each
+ * asked alone: between every two posts on the ground.
+ */
+function fightCost(): Record<string, number> {
+  const T = defaultTuning;
+  const m: Record<string, number> = {};
+  const scene = compound(`seed=${FIGHT_SEED}&attack=sniper`) as KernelScene<Simulation>;
+  const sim = startScene(scene, T);
+  const driver = scene.driver!();
+  const raw = scene.game.still(sim);
+  const most = { brainCells: 0, brainRays: 0, hearingCells: 0 };
+  const was = new Map<string, WorkCounts>();
+  for (let i = 0; i < 120 * T.sim.tickHz; i++) {
+    sim.step(driver.next(sim, raw));
+    let hearing = 0;
+    for (const w of sim.work()) {
+      const before = was.get(w.system) ?? { rays: 0, nodes: 0, bodies: 0 };
+      const nodes = w.nodes - before.nodes;
+      const rays = w.rays - before.rays;
+      was.set(w.system, { rays: w.rays, nodes: w.nodes, bodies: w.bodies });
+      if (w.system === 'guard-brains') {
+        most.brainCells = Math.max(most.brainCells, nodes);
+        most.brainRays = Math.max(most.brainRays, rays);
+      } else if (w.system === 'perception-hearing' || w.system === 'perception-awareness') hearing += nodes;
+    }
+    most.hearingCells = Math.max(most.hearingCells, hearing);
+  }
+  m['a fight’s worst tick: grid cells the brains expand'] = most.brainCells;
+  m['a fight’s worst tick: rays the brains cast'] = most.brainRays;
+  m['a fight’s worst tick: grid cells sounds flood'] = most.hearingCells;
+  const world = sim.world;
+  const L = world.grid.site;
+  const posts = world.camp.guards.filter((g) => !g.elevated && g.x > L.x0 && g.z > L.z0 && g.x < L.x0 + L.nx * L.cell && g.z < L.z0 + L.nz * L.cell);
+  const nav = navigatorOf(world, T);
+  const route = emptyRoute();
+  let cells = 0;
+  let worst = 0;
+  let asked = 0;
+  let found = 0;
+  for (const a of posts) {
+    for (const b of posts) {
+      if (a === b) continue;
+      const work = { rays: 0, nodes: 0, bodies: 0 };
+      if (nav.find(a.x, a.z, b.x, b.z, { work }, route) === 'found') found++;
+      asked++;
+      cells += work.nodes;
+      worst = Math.max(worst, work.nodes);
+    }
+  }
+  m[`routes between a camp’s posts: found (of ${asked})`] = found;
+  m['routes between a camp’s posts: grid cells a search looks at, on average'] = asked > 0 ? Math.round(cells / asked) : 0;
+  m['routes between a camp’s posts: the most one search looks at'] = worst;
+  return m;
+}
+
+/** The camp the fight's cost is measured on: the one the owner's first fights were on, with walls that sent a plain search the long way. */
+const FIGHT_SEED = 'LEB-2534';
 
 /**
  * The ellipse in the world (E8's exit metric): scripted shots from random perches around the

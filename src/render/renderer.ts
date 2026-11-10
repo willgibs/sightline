@@ -49,6 +49,9 @@ export interface RenderStats {
 /** The sun until a world says where it is (the simulation owns it: sim/kernel/env.ts). */
 const NO_WORLD_SUN = new THREE.Vector3(-0.579, 0.574, 0.579).normalize();
 
+/** How high the camera that sees the whole world stands, metres: any valley fits under it. */
+const OVERHEAD = 4000;
+
 export class GameRenderer {
   readonly gl: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -71,9 +74,14 @@ export class GameRenderer {
   private debug: DebugLayer | null = null;
   private debugOn = false;
   private collidersOn = false;
-  private shooterMark: THREE.Mesh | null = null;
+  /** Made with the renderer and hidden until it's wanted, so that its first showing builds nothing. */
+  private readonly shooterMark = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.28, 1.75), new THREE.MeshBasicMaterial({ color: palette.debug.tones.bad }));
   private perchesOn = false;
   private gridOn = false;
+  private gpu: string | null = null;
+  /** A camera that sees the whole world at once, for `prepare`. */
+  private readonly overhead = new THREE.PerspectiveCamera(60, 1, 10, OVERHEAD * 4);
+  private readonly scratchSize = new THREE.Vector2();
 
   constructor(canvas: HTMLCanvasElement, tuning: Tuning, pixelRatio: number) {
     this.gl = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -86,7 +94,9 @@ export class GameRenderer {
     this.scene.fog = new THREE.FogExp2(palette.fog, tuning.view.fogDensity);
     this.scene.background = new THREE.Color(palette.fog);
     this.sky = createSky(NO_WORLD_SUN);
-    this.scene.add(this.sky, this.worldGroup);
+    this.shooterMark.visible = false;
+    this.scene.add(this.sky, this.worldGroup, this.shooterMark);
+    this.gpuName();
   }
 
   /** Lights the scene and the sky from the simulation's sun (sim/kernel/env.ts). */
@@ -125,6 +135,32 @@ export class GameRenderer {
     this.debug.setGridVisible(this.gridOn);
     this.worldGroup.add(this.debug.group);
     this.guards.setDebugTint(this.debugOn);
+    this.prepare();
+  }
+
+  /**
+   * Has everything the scene can need ready now, while the valley is still loading, so that
+   * none of it is made ready in play, where the picture stands still while it is:
+   * - every shader program, hidden things included: a strike's dust, a body on the ground,
+   *   the debug view;
+   * - every mesh's vertices on the GPU. A mesh is sent the first time it's drawn, and until
+   *   the player first turns that way it hasn't been. So the whole world is drawn once from
+   *   high overhead, into a single pixel: it costs its vertices and no more.
+   */
+  private prepare(): void {
+    this.gl.compile(this.scene, this.camera);
+    const above = this.overhead;
+    above.position.set(0, OVERHEAD, 0);
+    above.lookAt(0, 0, 0);
+    above.updateMatrixWorld();
+    const size = this.gl.getSize(this.scratchSize);
+    this.gl.setViewport(0, 0, 1, 1);
+    this.gl.setScissor(0, 0, 1, 1);
+    this.gl.setScissorTest(true);
+    this.gl.render(this.scene, above);
+    this.gl.setScissorTest(false);
+    this.gl.setViewport(0, 0, size.x, size.y);
+    this.gl.setScissor(0, 0, size.x, size.y);
   }
 
   private clearWorld(): void {
@@ -168,12 +204,8 @@ export class GameRenderer {
   /** A figure lying where the compound simulator's shooter last fired from; null clears it. A dev mark, in both views. */
   setShooterMark(s: { x: number; y: number; z: number; dx: number; dz: number } | null): void {
     if (!s) {
-      if (this.shooterMark) this.shooterMark.visible = false;
+      this.shooterMark.visible = false;
       return;
-    }
-    if (!this.shooterMark) {
-      this.shooterMark = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.28, 1.75), new THREE.MeshBasicMaterial({ color: palette.debug.tones.bad }));
-      this.scene.add(this.shooterMark);
     }
     this.shooterMark.visible = true;
     this.shooterMark.position.set(s.x, s.y - 0.15, s.z);
@@ -258,11 +290,18 @@ export class GameRenderer {
     return { calls: r.calls, triangles: r.triangles, lines: r.lines };
   }
 
-  /** The GPU's name, when the browser exposes it. */
+  /**
+   * The GPU's name, when the browser exposes it. Asked once: the answer waits on the GPU's
+   * own process, which in the middle of play can be half a second away, and a play session
+   * is saved with it every minute.
+   */
   gpuName(): string {
-    const ctx = this.gl.getContext();
-    const ext = ctx.getExtension('WEBGL_debug_renderer_info');
-    return ext ? String(ctx.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : 'unknown GPU';
+    if (this.gpu === null) {
+      const ctx = this.gl.getContext();
+      const ext = ctx.getExtension('WEBGL_debug_renderer_info');
+      this.gpu = ext ? String(ctx.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : 'unknown GPU';
+    }
+    return this.gpu;
   }
 
   dispose(): void {

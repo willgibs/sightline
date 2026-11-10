@@ -25,13 +25,16 @@ import { GameRenderer, type CameraPose } from '../render/renderer';
 import type { Action } from './actions';
 import { loadSettings, saveSettings, type Settings } from './settings';
 import { palette } from '../render/palette';
-import { Hud } from './hud';
+import { Hud, showsPlayerHud } from './hud';
+import { kitFields } from './kit';
+import type { MapMode } from './minimap';
 import { InputController } from './input';
 import { Overlay } from './overlay';
 import { GameSound } from './sound';
 import { BrowserStore, DevInbox, PlaytestCapture, type StoredRun } from './playtest';
 import { DROP_KEYS, LabPanel, SHOOTER_VIEW_KEY } from './labPanel';
 import { CampGauges } from '../lab/gauges';
+import { rehearse } from '../sim/game/rehearsal';
 import { commanderOf } from '../sim/game/comms';
 import { stimulus, type StimulusName } from '../sim/game/drops';
 import type { Command } from '../sim/kernel/commands';
@@ -297,6 +300,8 @@ export class Game {
     }, this.input.map);
     this.overlay.showSettings(this.settings, this.tuning.view.fov);
     this.applySettings(this.settings);
+    // A sitting is as it always was: nothing new on screen, and no key for it (the exit test's rule).
+    if (opts.trials) this.overlay.setKey('minimap', false);
     this.input.onAction = (code) => this.action(code);
     this.input.onLockChange = (locked) => (locked ? this.onLocked() : this.onUnlocked());
     this.input.onLockRefused = () => {
@@ -512,6 +517,10 @@ export class Game {
       this.world = world;
       this.renderer.setWorld(world, this.tuning);
       this.sound.setWorld(world);
+      this.hud.map.setWorld(world);
+      if (!this.trial) this.overlay.setKey('minimap', this.hud.map.applies);
+      // The camp's fight, once, out of sight: the first shot of the real one then costs what the tenth does.
+      if (!this.opts.bench) rehearse(world, this.tuning);
       this.restartRun();
       const url = new URL(window.location.href);
       url.searchParams.delete('replay');
@@ -810,6 +819,9 @@ export class Game {
         this.hud.toast(`Instruments: ${ASSIST_NAMES[next]}`);
         break;
       }
+      case 'minimap':
+        if (this.playerHud() && this.hud.map.applies) this.hud.map.cycle();
+        break;
       case 'mark': {
         // A marker in the recording: "look at this moment" for a playtest or a bug report.
         if (!this.recorder) break;
@@ -864,6 +876,11 @@ export class Game {
       this.timeScaleIndex = 2;
     }
     this.hud.toast(on ? 'Debug view · everything the simulation knows' : 'Honest view · only what the game will show');
+  }
+
+  /** Whether the kit and the map belong on screen now: this is someone playing, in their own eyes. */
+  private playerHud(): boolean {
+    return showsPlayerHud({ replay: this.replay !== null, trial: this.trial !== null, bench: this.bench !== null, detached: this.detached, scene: this.scene?.name ?? null });
   }
 
   private setDetached(on: boolean): void {
@@ -1024,6 +1041,11 @@ export class Game {
     this.hud.setPrompt(this.detached || this.replay ? null : this.curr.use ? `${this.input.map.describe('use')} · ${USE_LINES[this.curr.use]}${this.curr.useProgress > 0 ? ` ${Math.round(this.curr.useProgress * 100)}%` : ''}` : this.curr.climb ? `${this.input.map.describe('climb')} · ${this.curr.climb === 'ladder' ? 'climb' : 'mantle'}` : null);
     this.cues.draw(this.curr, view, this.time);
     this.hud.setRange(this.debug ? this.aimText : null);
+    const yours = this.playerHud();
+    const opticUp = Math.max(scoped, optic === Optic.Binoculars && rifle ? eased : 0) > 0.5;
+    this.hud.setOptic(yours && opticUp);
+    this.hud.kit.show(yours ? kitFields(this.curr.stance, this.prev.eye !== this.curr.eye, this.curr.rifle) : null);
+    this.hud.map.update(yours ? { x: this.curr.px, z: this.curr.pz, yaw: view.yaw } : null, opticUp);
 
     if (!this.paused) this.tickWindow += dt;
     if (this.tickWindow >= 1 && this.tickCount > 0) {
@@ -1849,6 +1871,12 @@ export class Game {
       overwatch: (on: boolean) => {
         this.perches = on;
         this.renderer.setPerches(on);
+      },
+      /** The map's size, as its key cycles it; the one to show if given ('small', 'large' or 'hidden'). */
+      minimap: (mode?: MapMode): MapMode => {
+        if (mode !== undefined && !['small', 'large', 'hidden'].includes(mode)) throw new TypeError(`sightline.minimap() takes 'small', 'large' or 'hidden', not ${String(mode)}`);
+        while (mode !== undefined && this.hud.map.mode !== mode) this.hud.map.cycle();
+        return this.hud.map.mode;
       },
       look: (headingDeg: number, pitchDeg = 0) => {
         finite('look', headingDeg, pitchDeg);

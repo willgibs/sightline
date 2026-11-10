@@ -46,6 +46,27 @@ describe('the escape vehicle', () => {
     }
   });
 
+  it('finds its way across the yard once for a camp, and hands out a copy', () => {
+    const w = worlds.get('LEB-2534')!;
+    const v = w.camp.vehicles!.find((x) => x.escape)!;
+    const first = yardRoute(w, T, v)!;
+    const work = { rays: 0, nodes: 0, bodies: 0 };
+    const again = yardRoute(w, T, v, work)!;
+    // Asked again, it searches nothing, and nobody's changes to their copy reach anyone else's.
+    expect(work.nodes).toBe(0);
+    expect(again).toEqual(first);
+    expect(again).not.toBe(first);
+    again[0]!.x += 100;
+    again.push({ x: 0, z: 0 });
+    expect(yardRoute(w, T, v)).toEqual(first);
+    // Other numbers are another question: a wider berth is searched for afresh.
+    const wide = structuredClone(T);
+    wide.brain.alarm.flee.clearance = T.brain.alarm.flee.clearance + 0.5;
+    const other = { rays: 0, nodes: 0, bodies: 0 };
+    yardRoute(w, wide, v, other);
+    expect(other.nodes).toBeGreaterThan(0);
+  });
+
   it('follows the road out, not a line off the gate', () => {
     for (const [, w] of worlds) {
       const route = escapeRoute(w, T);

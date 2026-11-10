@@ -186,7 +186,10 @@ describe('a two-storey building', () => {
     const up = G.storeys[st.storey]!;
     const target = world.camp.guards.find((g) => g.role === 'target')!;
     a.spread({ x: target.x, y: up.y, z: target.z, radius: 60 });
-    const same = a.hear(target.x + 2, up.y + 1.65, target.z, emptyHeard());
+    // On his own floor, two steps toward the middle of the building: nothing between them.
+    const hq = world.camp.layout!.buildings.find((b) => b.module === 'hq')!;
+    const toMiddle = Math.hypot(hq.x - target.x, hq.z - target.z) || 1;
+    const same = a.hear(target.x + ((hq.x - target.x) / toMiddle) * 2, up.y + 1.65, target.z + ((hq.z - target.z) / toMiddle) * 2, emptyHeard());
     expect(same.route).not.toBe('none');
     // A listener right under him on the ground floor: heard, and no louder than the one beside him upstairs.
     const below = a.hear(target.x, 1.65 + world.terrain.heightAt(target.x, target.z), target.z, emptyHeard());

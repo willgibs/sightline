@@ -61,6 +61,7 @@ That's the typecheck and every test. The tests that need a real browser run with
 | G | Pick up or put down a body (a prompt says when). Crouch to drag it; put it down in foliage or by a container to hide it |
 | Right mouse or F (hold) | Zoom |
 | Left mouse | Fire the rifle on the shooting range. In the valley, a test shot drawn in the debug view (the rifle reaches the valley in Phase 2) |
+| 1 | The map: enlarge it, hide it, bring it back |
 | M | Mark this moment (it shows on the replay's timeline) |
 | F3 or \` | Switch between the honest view and the debug view |
 | Esc | Pause; the pause screen holds the settings |

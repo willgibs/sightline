@@ -1,6 +1,7 @@
 import type { Tuning } from '../../config/tuning';
 import { dcos } from '../kernel/core/detmath';
 import { Cell, Edge, cellIndex, type GridLayer } from '../kernel/world/grid';
+import type { SearchOptions } from '../kernel/world/search';
 import { navigatorOf } from './nav';
 import type { Ground } from './mind';
 
@@ -50,8 +51,9 @@ function visited(L: GridLayer): { seen: Uint32Array; now: number } {
 /**
  * The spot to go to, or null if there's none within reach: he's outside the fine layer, or
  * nothing hides him. `wide`: he only has a crack or a strike to go on, so the bearing is rough.
+ * The rays it casts are counted into `work`.
  */
-export function groundSpot(world: Ground, tuning: Tuning, x: number, z: number, threatX: number, threatZ: number, wide = false): GroundSpot | null {
+export function groundSpot(world: Ground, tuning: Tuning, x: number, z: number, threatX: number, threatZ: number, wide = false, work?: SearchOptions['work']): GroundSpot | null {
   const F = tuning.brain.fight.drill;
   const L = world.grid.site;
   const start = cellIndex(L, x, z);
@@ -64,6 +66,7 @@ export function groundSpot(world: Ground, tuning: Tuning, x: number, z: number, 
   const hidden = (px: number, py: number, pz: number): boolean => {
     for (const e of eyes) {
       rays++;
+      if (work) work.rays++;
       if (nav.seesPoint(e.x, e.y, e.z, px, py, pz)) return false;
     }
     return true;

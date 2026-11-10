@@ -3,11 +3,13 @@ import { defaultTuning as T, type Tuning } from '../src/config/tuning';
 import { fromOutside } from '../src/lab/experiments/circling';
 import { yardOnly } from '../src/lab/experiments/variety';
 import { campMission, COMPOUND_TYPES, compoundTypeOf, CRUX_KINDS, cruxOf, generateWorld, siteKindOf, worldFingerprint, SITE_KINDS, type CompoundType, type CruxKind } from '../src/sim/generation';
+import { compound } from '../src/sim/game/scenes/compound';
 import { Simulation } from '../src/sim/game/sim';
 import { Blocks } from '../src/sim/kernel/world/colliders';
 import { Cell, cellIndex } from '../src/sim/kernel/world/grid';
 import { sightLine } from '../src/sim/kernel/world/query';
 import { Solids } from '../src/sim/kernel/world/solids';
+import { startScene, type Scene } from '../src/sim/kernel/scene';
 import type { World } from '../src/sim/kernel/world/world';
 
 /**
@@ -183,6 +185,20 @@ describe('what its shape shows from outside (the owner: walking the outside shou
       }
     }
   });
+
+  it('still answers a sniper on every kind of place: the siren sounds', () => {
+    for (const name of ['walled', 'depot', 'farm', 'keep']) {
+      const w = worlds.get(`${SEEDS[0]!}/${name}`)!;
+      const scene = { ...(compound(`seed=${SEEDS[0]!}&attack=sniper&ready=alert`) as Scene<Simulation>), world: () => w };
+      const sim = startScene(scene, T, w);
+      const driver = scene.driver!();
+      const raw = scene.game.still(sim);
+      let siren = false;
+      for (let t = 0; t < 60 * T.sim.tickHz && !siren; t++) siren = sim.step(driver.next(sim, raw)).some((e) => e.type === 'siren');
+      expect(sim.fault, name).toBeFalsy();
+      expect(siren, `no siren on the ${name}`).toBe(true);
+    }
+  }, 120_000);
 
   it('a windowed wall is a wall, with no more chain link than its windows', () => {
     const C = T.gen.compound;
