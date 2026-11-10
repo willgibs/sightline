@@ -27,6 +27,7 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 - **The GPU is asked its name once.** A play session is saved every minute with it, and the answer waits on the GPU's own process.
 
 **Tools.** `npm run hitches` times scenes' ticks in a process of their own, built as the game's code is built, and names the slow ones with the work they did. `npm run experiment -- route-cost` is what each number of landmarks buys. The brain lane's bench pins a fight's worst tick as work (grid cells, rays), which is the same on every machine. A play session's telemetry now keeps its slowest frames and whose work each was.
+
 ## 2026-11-10 · The honest view's corner: what you carry, and the picture you were given
 
 **Why.** The owner, after playing: he couldn't tell whether the suppressor was on without scoping in, which stance he was in without toggling it, which load he had without changing it, or how many rounds were left. And a camp with fair defenses owes the attacker what he'd have had from scouting imagery, without the gear that hands either side too much (heartbeat sensors, UAVs). The design doc's *UI and HUD* says ammo only when you reload, and a tactical map of only what you've observed; this is his later word on the first, and the observed map is still to come.
