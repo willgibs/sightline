@@ -109,6 +109,11 @@ body {
   display: none;
 }
 
+/* The right-hand panels stop short of the corner (hud.ts, settleCorner). */
+.dev-dock-right {
+  max-height: min(calc(100vh - 56px), calc(100vh - 16px - var(--floor, 10px) - var(--corner, 0px)));
+}
+
 /* The dock's own keys, where the key legend doesn't show: a lab panel in the honest view. */
 .dev-hint {
   display: none;
@@ -179,6 +184,248 @@ body {
     top: 50px;
     max-height: calc(100vh - 100px);
   }
+  .dev-dock-right {
+    max-height: min(calc(100vh - 100px), calc(100vh - 56px - var(--floor, 10px) - var(--corner, 0px)));
+  }
+}
+
+/* The corner: the picture of the ground above what you carry (kit.ts, minimap.ts). */
+.corner {
+  position: absolute;
+  right: 10px;
+  bottom: var(--floor, 10px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* Quiet and in the world's own hand: ink, a thin rule round it, and the haze's own colour under it so it reads on anything. */
+.kit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 4px;
+  border: 1px solid rgba(29, 34, 39, 0.6);
+  background: rgba(228, 231, 234, 0.74);
+  color: var(--ink);
+  font: 600 10.5px/1.35 var(--mono);
+  white-space: nowrap;
+  transition: color 0.12s, border-color 0.12s, background-color 0.12s;
+}
+
+.kit[hidden],
+.minimap[hidden] {
+  display: none;
+}
+
+.kit-figure {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: opacity 0.12s;
+}
+
+.kit-ground {
+  stroke-width: 0.8;
+  opacity: 0.55;
+}
+
+.kit-figure g {
+  display: none;
+}
+
+.kit[data-stance='stand'] .pose-stand,
+.kit[data-stance='crouch'] .pose-crouch,
+.kit[data-stance='prone'] .pose-prone {
+  display: inline;
+}
+
+.kit.is-settling .kit-figure {
+  opacity: 0.45;
+}
+
+/* Wide enough for the longest load: every field stays where it is, and the whole card is as wide as the map. */
+.kit-lines {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  width: 140px;
+}
+
+.kit:not(.has-rifle) .kit-lines {
+  width: auto;
+}
+
+.kit-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+}
+
+/* Fixed columns: a longer word for the stance doesn't shift the rounds beside it. */
+.kit.has-rifle .kit-line:first-child {
+  display: grid;
+  grid-template-columns: 6ch 6ch 8ch;
+  justify-content: space-between;
+  gap: 0;
+}
+
+.kit-rounds,
+.kit-zero {
+  text-align: right;
+}
+
+/* Without a rifle, only the body. */
+.kit:not(.has-rifle) .kit-rifle {
+  display: none;
+}
+
+.kit-suppressor i {
+  font-style: normal;
+  font-weight: 400;
+}
+
+.kit-suppressor[data-state='off'] b {
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+/* On is the state that changes what a shot does: it reads across the room. */
+.kit-suppressor[data-state='on'] b {
+  padding: 0 3px;
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.kit-suppressor[data-state='fitting'] b,
+.kit-suppressor[data-state='removing'] b,
+.kit-load.is-busy {
+  color: #a4471a;
+}
+
+.kit-rounds.is-out {
+  color: #c92a2a;
+}
+
+/* What's left of the job in hand: no shooting until it's run out. */
+.kit-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+/* Up against the dark round the glass: the scope's own colours, and nothing to set them on. */
+#hud.is-optic .kit {
+  border-color: rgba(201, 209, 217, 0.22);
+  background: transparent;
+  color: #c9d1d9;
+}
+
+#hud.is-optic .kit-suppressor[data-state='on'] b {
+  background: #c9d1d9;
+  color: #0b0d0f;
+}
+
+#hud.is-optic .kit-suppressor[data-state='fitting'] b,
+#hud.is-optic .kit-suppressor[data-state='removing'] b,
+#hud.is-optic .kit-load.is-busy {
+  color: #f2b441;
+}
+
+/* In a narrow window the scope's own line of readouts (scope.ts) reaches the corner: it says the same, so the card gives way to it. */
+@media (max-width: 780px) {
+  #hud.is-optic .kit-rifle,
+  #hud.is-optic .kit-bar {
+    display: none;
+  }
+  #hud.is-optic .kit-lines {
+    width: auto;
+  }
+  #hud.is-optic .kit.has-rifle .kit-line:first-child {
+    display: block;
+  }
+}
+
+.minimap {
+  position: relative;
+  width: calc(var(--map-side, 184px) + 2px);
+  transition: opacity 0.12s;
+}
+
+.minimap[data-mode='hidden'] {
+  width: auto;
+}
+
+/* The glass is what you're looking at. */
+.minimap.is-down {
+  opacity: 0;
+}
+
+.minimap-picture {
+  box-sizing: content-box;
+  width: var(--map-side, 184px);
+  height: var(--map-side, 184px);
+  border: 1px solid rgba(29, 34, 39, 0.6);
+  background: var(--paper);
+  opacity: 0.94;
+}
+
+.minimap-picture canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.minimap-you {
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 18px;
+  height: 18px;
+  fill: #d9480f;
+  stroke: #fff;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  will-change: transform;
+}
+
+.minimap-key {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  padding: 0 4px;
+  background: rgba(228, 231, 234, 0.82);
+  color: var(--ink-soft);
+  font: 9.5px/1.45 var(--mono);
+  border-radius: 2px;
+}
+
+.minimap-key kbd {
+  margin-right: 4px;
+  font: 600 9.5px/1 var(--mono);
+  color: var(--ink);
+}
+
+/* Put away, only the key stays, to say how to bring it back. */
+.minimap[data-mode='hidden'] .minimap-picture,
+.minimap[data-mode='hidden'] .minimap-you {
+  display: none;
+}
+
+.minimap[data-mode='hidden'] .minimap-key {
+  position: static;
+  border: 1px solid rgba(29, 34, 39, 0.35);
 }
 
 .legend {
