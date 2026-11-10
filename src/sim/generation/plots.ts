@@ -28,7 +28,7 @@ import { pickWeighted } from './weights';
  * (crux.ts does the same). A shape that scatters draws only from its own fork (rule 3).
  */
 
-export const COMPOUND_TYPES = ['yard', 'keep', 'depot', 'farm'] as const;
+export const COMPOUND_TYPES = ['yard', 'keep', 'depot', 'farm', 'walled'] as const;
 export type CompoundType = (typeof COMPOUND_TYPES)[number];
 export type CompoundTypeSpec = GenTuning['compound']['types'][CompoundType];
 
@@ -36,7 +36,7 @@ export type CompoundTypeSpec = GenTuning['compound']['types'][CompoundType];
 export function compoundTypeOf(seed: string, crux: CruxKind, kind: SiteKind, gen: GenTuning): CompoundType {
   const T = gen.compound.types;
   const fit = (t: CompoundType): number => T[t].cruxes[crux] * T[t].sites[kind];
-  return pickWeighted(new Rng(seed, 'compound-type'), { yard: fit('yard'), keep: fit('keep'), depot: fit('depot'), farm: fit('farm') }, COMPOUND_TYPES);
+  return pickWeighted(new Rng(seed, 'compound-type'), { yard: fit('yard'), keep: fit('keep'), depot: fit('depot'), farm: fit('farm'), walled: fit('walled') }, COMPOUND_TYPES);
 }
 
 export interface Rect {
@@ -231,7 +231,8 @@ function spinePlot(x: PlotInput): Plot {
 /** A court of three big buildings round a small farmyard off the plot's middle, the rest scattered beyond. */
 function steadingPlot(x: PlotInput): Plot {
   const { C, HA, HB, Y, L, gateB, roadB0, roadB1, rng } = x;
-  const lane = C.lane / 2;
+  // Its men keep well in from the boundary: a patrol right along the field walls would pass every gap in them.
+  const lane = C.fieldInset;
   const p = (a: number, b: number): Point2 => ({ x: a, z: b });
   // The farmyard: nearer the road than not, and to one side.
   const fa = rng.range(-6, 8);

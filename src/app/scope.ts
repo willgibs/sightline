@@ -63,6 +63,11 @@ export interface InstrumentState {
   readout: { hold: number; wind: number; windFrom: string } | null;
 }
 
+/** How many numbers say what's on the overlay (Instruments.changed). */
+const SHOWN_FIELDS = 13;
+/** The breath bar's width, CSS pixels. */
+const BREATH_BAR = 54;
+
 export class Instruments {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
@@ -70,12 +75,21 @@ export class Instruments {
   private height = 0;
   private dpr = 1;
   private drawn = false;
+  /** What's on the canvas now, for `changed`. */
+  private readonly shown = new Float64Array(SHOWN_FIELDS);
+  private readonly wanted = new Float64Array(SHOWN_FIELDS);
+  private shownDope: readonly DopeRow[] | null = null;
+  private shownAssists: Assists | null = null;
+  private shownWindFrom: string | null = null;
+  private shownLoad: string | null = null;
 
   constructor(root: HTMLElement) {
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'instruments';
     root.prepend(this.canvas);
     this.ctx = this.canvas.getContext('2d')!;
+    // A browser that drops the canvas's memory hands it back blank.
+    this.canvas.addEventListener('contextrestored', () => this.forget());
   }
 
   /** Draws the scope or the binoculars, or clears them. */
@@ -90,6 +104,7 @@ export class Instruments {
       this.canvas.width = Math.round(w * dpr);
       this.canvas.height = Math.round(h * dpr);
       this.drawn = true;
+      this.forget();
     }
     const ctx = this.ctx;
     if (s.scope <= 0.001 && s.binoculars <= 0.001) {
@@ -97,14 +112,62 @@ export class Instruments {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.drawn = false;
+        this.forget();
       }
       return;
     }
+    // A full-window canvas is millions of pixels, and through a steady scope nothing on it
+    // moves: the world sways behind it. Drawn only when something on it has changed.
+    if (!this.changed(s)) return;
     this.drawn = true;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
     if (s.binoculars > s.scope) this.binoculars(s, w, h);
     else this.scope(s, w, h);
+  }
+
+  /** Forgets what's on the canvas, so the next `draw` draws it. */
+  private forget(): void {
+    this.shown.fill(NaN);
+    this.shownDope = null;
+    this.shownAssists = null;
+    this.shownWindFrom = null;
+    this.shownLoad = null;
+  }
+
+  /**
+   * Whether anything the overlay shows differs from what it shows now, and if so, remembers
+   * the new state. Readouts count as far as they can be seen: the breath bar by the pixel,
+   * the flare and the arcade dot by a step too small to notice.
+   */
+  private changed(s: InstrumentState): boolean {
+    const r = s.rifle;
+    const n = this.wanted;
+    n[0] = s.scope;
+    n[1] = s.binoculars;
+    n[2] = s.fovDeg;
+    n[3] = r ? r.zero : -1;
+    n[4] = r ? r.rounds : -1;
+    n[5] = r ? (r.suppressed ? 1 : 0) + (r.fitting > 0 ? 2 : 0) + (r.bolt > 0 ? 4 : 0) + (r.rest > 0.95 ? 8 : 0) + (r.held > 0 ? 16 : 0) + (r.swapping ? 32 : 0) : -1;
+    n[6] = r ? Math.round(Math.max(0, Math.min(1, r.air)) * BREATH_BAR) : -1;
+    n[7] = r && r.glint > 0.01 ? Math.round(r.glint * 50) : 0;
+    n[8] = s.ranged ? s.ranged.range : -2;
+    n[9] = s.dot ? Math.round(s.dot.up * 40) : 1e9;
+    n[10] = s.dot ? Math.round(s.dot.right * 40) : 1e9;
+    n[11] = s.readout ? Math.round(s.readout.hold * 10) : 1e9;
+    n[12] = s.readout ? Math.round(s.readout.wind * 10) : 1e9;
+    const windFrom = s.readout ? s.readout.windFrom : null;
+    const load = r ? r.load : null;
+    // The table is the same table, or there's none: the game hands over a new empty one each frame.
+    let same = (this.shownDope === s.dope || (s.dope.length === 0 && this.shownDope?.length === 0)) && this.shownAssists === s.assists && this.shownWindFrom === windFrom && this.shownLoad === load;
+    for (let k = 0; same && k < SHOWN_FIELDS; k++) same = n[k] === this.shown[k];
+    if (same) return false;
+    this.shown.set(n);
+    this.shownDope = s.dope;
+    this.shownAssists = s.assists;
+    this.shownWindFrom = windFrom;
+    this.shownLoad = load;
+    return true;
   }
 
   private scope(s: InstrumentState, w: number, h: number): void {
@@ -165,8 +228,9 @@ export class Instruments {
     ctx.fillStyle = '#c9d1d9';
     if (rifle) {
       const parts = [`ZERO ${rifle.zero} m`, `${rifle.rounds} RD${rifle.rounds === 1 ? '' : 'S'}`];
+      if (rifle.load !== 'match') parts.push(rifle.load.toUpperCase());
       if (rifle.suppressed) parts.push('SUPPRESSED');
-      if (rifle.fitting > 0) parts.push(rifle.suppressed ? 'FITTING…' : 'REMOVING…');
+      if (rifle.fitting > 0) parts.push(rifle.swapping ? 'LOADING…' : rifle.suppressed ? 'FITTING…' : 'REMOVING…');
       else if (rifle.bolt > 0) parts.push('BOLT');
       const y = Math.min(h - 22, cy + r + 8);
       ctx.fillText(parts.join('   '), cx, y);
@@ -243,7 +307,7 @@ export class Instruments {
   /** The breath: a short bar that empties while it's held. */
   private breath(x: number, y: number, rifle: RifleView): void {
     const ctx = this.ctx;
-    const w = 54;
+    const w = BREATH_BAR;
     ctx.fillStyle = 'rgba(201,209,217,0.18)';
     ctx.fillRect(x, y - 2, w, 4);
     ctx.fillStyle = rifle.held > 0 ? '#c9d1d9' : 'rgba(201,209,217,0.6)';

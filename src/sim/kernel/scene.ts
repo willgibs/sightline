@@ -62,6 +62,14 @@ export interface Scene<S extends Simulation = Simulation> extends Omit<SceneId, 
   /** The world: generated from a mission spec, or built by hand. Same tuning, same world. */
   world(tuning: Tuning): World;
   /**
+   * A mode's numbers: the tuning this scene runs on, made from the game's (a patch over the
+   * base, as docs/foundation-shape.md has modes). It must set values and not scale them, so
+   * that applying it to a tuning it has already made changes nothing: a recording stores the
+   * tuning its run used, and re-simulating it starts the scene with that. It never touches
+   * what generation reads, so the scene's world is the same world with or without it.
+   */
+  tune?(tuning: Tuning): Tuning;
+  /**
    * Systems the scene adds to the game's own, each in its phase: a lab's, a scripted
    * mover's, and its rules (a system in the 'mission' phase that calls `decide`).
    */
@@ -87,6 +95,11 @@ export function sceneTicks(scene: Pick<Scene, 'seconds'>, tuning: Tuning, second
   return Math.round((seconds ?? scene.seconds ?? 10) * tuning.sim.tickHz);
 }
 
+/** The tuning a scene's run uses: the game's, with the scene's own numbers over it if it has any. */
+export function sceneTuning(scene: Pick<Scene, 'tune'>, tuning: Tuning): Tuning {
+  return scene.tune ? scene.tune(tuning) : tuning;
+}
+
 /** The game's systems with the scene's added, each in its phase. */
 export function sceneSystems<S extends Simulation>(scene: Scene<S>): readonly System[] {
   let systems: readonly System[] = scene.game.systems;
@@ -96,7 +109,7 @@ export function sceneSystems<S extends Simulation>(scene: Scene<S>): readonly Sy
 
 /** A simulation of the scene at its first tick: world, systems and setup. Pass the world if it is already built. */
 export function startScene<S extends Simulation>(scene: Scene<S>, tuning: Tuning, world: World = scene.world(tuning)): S {
-  const sim = scene.game.simulation(world, tuning, sceneSystems(scene));
+  const sim = scene.game.simulation(world, sceneTuning(scene, tuning), sceneSystems(scene));
   sim.scene = { name: scene.name, version: scene.version, params: scene.params ?? '' };
   scene.setup?.(sim);
   return sim;

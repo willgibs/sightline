@@ -1,3 +1,4 @@
+import { flightAt, flightEnd, vec3, type Flight } from '../sim/ballistics';
 import { bodyShape, eyeOf } from '../sim/body';
 import { commanderOf } from '../sim/game/comms';
 import type { Simulation } from '../sim/game/sim';
@@ -47,6 +48,23 @@ interface Point {
   z: number;
 }
 
+/** Seconds between samples of a round's path, each a straight piece of it. */
+const PASS_STEP = 1 / 60;
+/** How near a round must come to the muzzle to have struck someone lying behind it, metres. */
+const LYING_REACH = 0.4;
+const a = vec3();
+const b = vec3();
+
+/** How far a point is from a straight piece of path. */
+function toSegment(p: Point, a: Point, b: Point): number {
+  const vx = b.x - a.x;
+  const vy = b.y - a.y;
+  const vz = b.z - a.z;
+  const len2 = vx * vx + vy * vy + vz * vz;
+  const s = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy + (p.z - a.z) * vz) / len2)) : 0;
+  return Math.sqrt((a.x + vx * s - p.x) * (a.x + vx * s - p.x) + (a.y + vy * s - p.y) * (a.y + vy * s - p.y) + (a.z + vz * s - p.z) * (a.z + vz * s - p.z));
+}
+
 /** A shot as it left the muzzle: where from, and which way. */
 export interface ShotFrom extends Point {
   dx: number;
@@ -62,6 +80,10 @@ export interface Readings {
   guardsStanding: number;
   /** Where the shots really come from: the last muzzle. In the compound simulator that's a script or your hand, and nothing to do with the parked player. */
   shooter: ShotFrom | null;
+  /** Seconds since the last of those shots; NaN before the first. */
+  sinceLastShot: number;
+  /** The camp's rounds at wherever the shooter last fired from: how many, the closest any came, and how many would have struck someone lying there. */
+  returnFire: { rounds: number; closest: number; struck: number };
   /** Guards in a clear line from the shooter now. */
   inLine: number;
   roundsAtYou: number;
@@ -78,6 +100,8 @@ export interface Readings {
   level: string;
   siren: boolean;
   targetStatus: string;
+  /** Where a camp that protects its target has got to with it, in words; '' for a camp that doesn't (brain/protect.ts). */
+  protection: string;
 }
 
 const distance = (ax: number, az: number, bx: number, bz: number): number => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
@@ -92,6 +116,8 @@ export class CampGauges {
   private nearestEver = Infinity;
   private readonly started: ReadonlySet<number>;
   private shooter: ShotFrom | null = null;
+  private lastShot_ = -1;
+  private readonly returnFire = { rounds: 0, closest: Infinity, struck: 0 };
 
   constructor(sim: Simulation) {
     this.started = new Set(sim.guards.map((g) => g.id));
@@ -105,7 +131,11 @@ export class CampGauges {
           if (this.firstShot < 0) this.firstShot = sim.tick;
           this.shotsFired++;
           this.shooter = { x: e.x, y: e.y, z: e.z, dx: e.dx, dy: e.dy, dz: e.dz };
-        } else this.roundsAtYou++;
+          this.lastShot_ = sim.tick;
+        } else {
+          this.roundsAtYou++;
+          if (this.shooter && sim.index.get(e.source)?.kind === 'guard') this.measureReturnFire(sim, e, this.shooter);
+        }
       } else if (e.type === 'detected' && e.target === sim.playerId) this.detected = true;
       else if (e.type === 'siren') this.siren = true;
       else if (e.type === 'passed') this.nearMisses++;
@@ -113,6 +143,26 @@ export class CampGauges {
     if (this.firstShot < 0) return;
     const from = this.shooter ?? sim.player;
     for (const g of sim.guards) this.nearestEver = Math.min(this.nearestEver, distance(g.body.x, g.body.z, from.x, from.z));
+  }
+
+  /** How near a guard's round came to where the shooter last fired from, along the path it really flew. */
+  private measureReturnFire(sim: Simulation, e: Extract<SimEvent, { type: 'shot' }>, at: Point): void {
+    const T = sim.tuning;
+    const flight: Flight = { x: e.x, y: e.y, z: e.z, dx: e.dx, dy: e.dy, dz: e.dz, t: e.t, v0: e.speed, k: e.drag, g: T.sim.gravity, wx: e.wx, wz: e.wz };
+    const until = flightEnd(flight, e.t + T.ballistics.maxFlight, 1 / T.sim.tickHz, sim.queryView());
+    let closest = Infinity;
+    flightAt(flight, e.t, a);
+    for (let t = e.t + PASS_STEP; ; t += PASS_STEP) {
+      flightAt(flight, t < until ? t : until, b);
+      closest = Math.min(closest, toSegment(at, a, b));
+      if (t >= until) break;
+      a.x = b.x;
+      a.y = b.y;
+      a.z = b.z;
+    }
+    this.returnFire.rounds++;
+    this.returnFire.closest = Math.min(this.returnFire.closest, closest);
+    if (closest <= LYING_REACH) this.returnFire.struck++;
   }
 
   /** The last shot as it left the muzzle, or null before the first. */
@@ -133,6 +183,8 @@ export class CampGauges {
       guardsDown: this.started.size - sim.guards.filter((g) => this.started.has(g.id)).length,
       guardsStanding: sim.guards.length,
       shooter: this.shooter,
+      sinceLastShot: this.lastShot_ < 0 ? NaN : (sim.tick - this.lastShot_) / sim.tuning.sim.tickHz,
+      returnFire: { ...this.returnFire },
       inLine: inClearLine(sim, this.shooter ?? undefined),
       roundsAtYou: this.roundsAtYou,
       nearMisses: this.nearMisses,
@@ -143,6 +195,32 @@ export class CampGauges {
       level: c?.camp.level ?? 'none',
       siren: this.siren,
       targetStatus: c?.camp.objective?.status ?? 'none',
+      protection: protectionOf(sim),
     };
   }
+}
+
+/** The stage a protecting camp has reached, as the lab panel says it: the truth, read off the state. */
+export function protectionOf(sim: Simulation): string {
+  const camp = commanderOf(sim)?.camp;
+  if (!camp?.protects || !camp.objective) return '';
+  if (camp.objective.status === 'escaped') return 'he is gone';
+  if (camp.objective.status === 'escaping') return 'in his vehicle, on the way out';
+  const him = sim.index.get(camp.objective.target);
+  if (!him || him.kind !== 'guard' || !him.brain) return 'he is down';
+  const b = him.brain;
+  const hz = sim.tuning.sim.tickHz;
+  const near = sim.tuning.brain.protect.near;
+  const inRoom = distance(him.body.x, him.body.z, camp.protects.x, camp.protects.z) <= near;
+  const where = b.act === 'flee' ? 'running for his vehicle' : inRoom ? 'in his room' : b.act === 'shelter' ? 'going to his room' : 'about his day';
+  if (b.sirenAt < 0) return (b.standToUntil ?? -1) > sim.tick ? `stand-to · ${where}` : where;
+  const relief = camp.relief
+    ? `relief at the gate ${((sim.tick - camp.relief.at) / hz).toFixed(0)} s ago, sent for him ${camp.relief.fetches}×`
+    : camp.reinforceCalled >= 0
+      ? `relief called ${((sim.tick - camp.reinforceCalled) / hz).toFixed(0)} s ago`
+      : 'no relief called';
+  const left = sim.tuning.brain.protect.giveUp - (sim.tick - b.sirenAt) / hz;
+  const word = b.releasedAt !== undefined ? (b.told.some((t) => t.kind === 'escort') ? 'told to come' : 'gave up waiting') : `waits ${Math.max(0, left).toFixed(0)} s more`;
+  const way = camp.devices.escape ? '' : ' · no vehicle';
+  return `${where} · ${relief} · ${word}${way}`;
 }

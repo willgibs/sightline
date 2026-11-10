@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { bodyShape, createBody } from '../src/sim/body';
 import { emptyStrike, fly, type BulletState, type Flight } from '../src/sim/ballistics';
+import { yardOnly } from '../src/lab/experiments/variety';
 import { stimulus } from '../src/sim/game/drops';
 import { compound } from '../src/sim/game/scenes/compound';
 import { labWorld } from '../src/sim/game/scenes/perceptionLab';
@@ -172,7 +173,7 @@ describe('a guard looking through a crown', () => {
 describe('the trees of a generated camp', () => {
   let world: World;
   beforeAll(() => {
-    world = generateWorld(campMission('LEB-2534'), T);
+    world = generateWorld(campMission('LEB-2534'), yardOnly(T)); // the camp this was written against: a plain yard, with a line only the crowns hide
   }, 60_000);
 
   it('have crowns where they are drawn, inside its flat sides, and a limit', () => {

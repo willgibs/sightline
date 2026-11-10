@@ -212,7 +212,7 @@ export interface CampPlan {
   /** The shape of its plot: as first built, long along the gate's axis, wide across it, or small and tight. */
   plot: 'yard' | 'long' | 'wide' | 'tight';
   /** What stands round it: chain link, a wall on the sides facing the ridges, a wall all round, low field walls. */
-  perimeter: 'chain' | 'screen' | 'fort' | 'fields';
+  perimeter: 'chain' | 'screen' | 'fort' | 'fields' | 'windowed';
   /** How full the yard is: scattered cover, or packed with containers. */
   fill: 'open' | 'packed';
 }
@@ -227,7 +227,7 @@ function choosePlan(rng: Rng, type: CompoundTypeSpec, kind: SiteKind | undefined
     if (kind === 'gorge' && plot === 'wide') plot = 'long';
     if (kind === 'scarp' && plot === 'long') plot = 'wide';
   }
-  return { plot, perimeter: pickWeighted(rng, type.perimeters, ['chain', 'screen', 'fort', 'fields'] as const), fill: pickWeighted(rng, type.fills, ['open', 'packed'] as const) };
+  return { plot, perimeter: pickWeighted(rng, type.perimeters, ['chain', 'screen', 'fort', 'fields', 'windowed'] as const), fill: pickWeighted(rng, type.fills, ['open', 'packed'] as const) };
 }
 
 export interface CampLayout {
@@ -357,7 +357,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   // --- The perimeter: chain link blocks movement, not sight or bullets. A wall blocks
   // everything: which sides have one is the plan's, a screen putting them where the ridges are. -
   const solid = new Set<Side>();
-  if (plan.perimeter === 'fort') for (const s of ['front', 'back', 'left', 'right'] as const) solid.add(s);
+  if (plan.perimeter === 'fort' || plan.perimeter === 'windowed') for (const s of ['front', 'back', 'left', 'right'] as const) solid.add(s);
   else if (plan.perimeter === 'screen') {
     let square: Side = 'back';
     let most = -Infinity;
@@ -376,6 +376,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   }
   // Low walls in runs with gaps between them (a farm's field walls): what a body gets over at a gap, or crawls behind.
   const frng0 = rng.fork('field-walls');
+  const hrng = rng.fork('field-wall-heights');
   const fieldWalls = (a0: number, b0: number, a1: number, b1: number) => {
     const len = Math.abs(a1 - a0) + Math.abs(b1 - b0);
     const alongA = Math.abs(a1 - a0) > 0;
@@ -383,7 +384,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     for (let at = frng0.range(0, 5); at < len - 2; ) {
       const runLen = Math.min(frng0.between(C.fieldRun), len - at);
       const f = (at + runLen / 2) / len;
-      ids.push(box(a0 + (a1 - a0) * f, b0 + (b1 - b0) * f, alongA ? runLen : 0.5, alongA ? 0.5 : runLen, C.fieldWall, Blocks.All, Surface.Rock));
+      ids.push(box(a0 + (a1 - a0) * f, b0 + (b1 - b0) * f, alongA ? runLen : 0.5, alongA ? 0.5 : runLen, hrng.chance(C.fieldHighShare) ? C.fieldWallHigh : C.fieldWall, Blocks.All, Surface.Rock));
       at += runLen + frng0.between(C.fieldGap);
     }
     if (ids.length > 0) add('block', ids);
@@ -415,18 +416,43 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     }
     add('post', posts);
   };
+  // The windows of a windowed wall: stretches left in chain link, each its own place to see in from.
+  const wrng = rng.fork('perimeter-windows');
+  const windowsOn = (half: number, gaps: ReadonlyArray<[number, number]>): Array<[number, number]> => {
+    const out: Array<[number, number]> = [];
+    const n = wrng.int(C.windows[0]!, C.windows[1]!);
+    for (let k = 0; k < n; k++) {
+      const w = wrng.between(C.windowWidth);
+      const mid = wrng.range(-half + C.windowMargin + w / 2, half - C.windowMargin - w / 2);
+      if ([...gaps, ...out].some(([x0, x1]) => mid + w / 2 + C.windowMargin > x0 && mid - w / 2 - C.windowMargin < x1)) continue;
+      out.push([mid - w / 2, mid + w / 2]);
+    }
+    return out.sort((x, y) => x[0] - y[0]); // unique: windows never overlap
+  };
   const side = (s: Side): void => {
     // Each side from corner to corner, with its openings cut out.
     const gaps = openings.filter((o) => o.side === s).map((o) => (s === 'front' || s === 'back' ? [o.b - o.width / 2, o.b + o.width / 2] : [o.a - o.width / 2, o.a + o.width / 2])).sort((x, y) => x[0]! - y[0]!); // unique: openings never overlap
     const half = sideHalf(s);
     let from = -half;
     const wall = solid.has(s);
-    const lay = plan.perimeter === 'fields' ? (a0: number, b0: number, a1: number, b1: number) => fieldWalls(a0, b0, a1, b1) : (a0: number, b0: number, a1: number, b1: number) => fenceRun(a0, b0, a1, b1, wall);
+    const lay = plan.perimeter === 'fields' ? (a0: number, b0: number, a1: number, b1: number) => fieldWalls(a0, b0, a1, b1) : (a0: number, b0: number, a1: number, b1: number, solidHere: boolean) => fenceRun(a0, b0, a1, b1, solidHere);
+    const piece = (p: number, q: number, solidHere: boolean) => {
+      if (s === 'front') lay(HA, p, HA, q, solidHere);
+      else if (s === 'back') lay(-HA, p, -HA, q, solidHere);
+      else if (s === 'left') lay(p, -HB, q, -HB, solidHere);
+      else lay(p, HB, q, HB, solidHere);
+    };
+    const windows = plan.perimeter === 'windowed' ? windowsOn(half, gaps as Array<[number, number]>) : [];
+    // A stretch of the side between its openings, wall with its windows of chain link where it has them.
     const run = (p: number, q: number) => {
-      if (s === 'front') lay(HA, p, HA, q);
-      else if (s === 'back') lay(-HA, p, -HA, q);
-      else if (s === 'left') lay(p, -HB, q, -HB);
-      else lay(p, HB, q, HB);
+      let at = p;
+      for (const [w0, w1] of windows) {
+        if (w1 <= at || w0 >= q) continue;
+        piece(at, Math.max(at, w0), wall);
+        piece(Math.max(at, w0), Math.min(q, w1), false);
+        at = Math.min(q, w1);
+      }
+      piece(at, q, wall);
     };
     for (const [g0, g1] of gaps) {
       run(from, g0!);
@@ -435,6 +461,46 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     run(from, half);
   };
   for (const s of ['front', 'back', 'left', 'right'] as const) side(s);
+
+  // A gate that can be seen into from straight in front of it and nowhere else: two walls run
+  // out from its sides, along the way the road leaves it, and the road goes between them.
+  if (type.barbican > 0) {
+    const road = features.road.points;
+    const u0 = along(1, 0);
+    const v0 = along(0, 1);
+    for (const g of openings) {
+      if (g.kind !== 'gate') continue;
+      let da = g.side === 'front' ? 1 : -1;
+      let db = 0;
+      if (g.side === 'front') {
+        const here = at(g.a, g.b);
+        let first = 0;
+        road.forEach((p, k) => {
+          if ((p.x - here.x) * (p.x - here.x) + (p.z - here.z) * (p.z - here.z) < (road[first]!.x - here.x) * (road[first]!.x - here.x) + (road[first]!.z - here.z) * (road[first]!.z - here.z)) first = k;
+        });
+        const out = road.slice(first + 1).find((p) => (p.x - here.x) * (p.x - here.x) + (p.z - here.z) * (p.z - here.z) >= type.barbican * type.barbican);
+        if (out) {
+          const dx = out.x - here.x;
+          const dz = out.z - here.z;
+          const len = Math.sqrt(dx * dx + dz * dz);
+          const a1 = (dx * u0.x + dz * u0.z) / len;
+          const b1 = (dx * v0.x + dz * v0.z) / len;
+          if (a1 > 0.5) {
+            da = a1;
+            db = b1;
+          }
+        }
+      }
+      const h = g.width / 2 + 0.3;
+      // Each from its gatepost, so there's no slit between the wall and the post to see through.
+      const ids = [-1, 1].map((s) => {
+        const a = g.a + (da * type.barbican) / 2;
+        const b = g.b + s * h + (db * type.barbican) / 2;
+        return box(a, b, type.barbican, 0.6, C.wallHeight + 0.25, Blocks.All, Surface.Rock, ground(a, b) - 0.25, { a: da, b: db });
+      });
+      add('block', ids);
+    }
+  }
 
   // --- Watchtowers at the corners, with ladders on their camp side. -------------------
   const trng = rng.fork('towers');

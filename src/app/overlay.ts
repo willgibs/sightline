@@ -35,6 +35,12 @@ export class Overlay {
   /** The start screen's title: the phase, or the scene being played. */
   private startTitle = 'Phase 0 · Foundations';
 
+  /** Shows or hides one line of the key legend: a key that does nothing in this run isn't offered. */
+  setKey(action: Action, shown: boolean): void {
+    const line = this.root.querySelector<HTMLElement>(`.keys [data-key="${action}"]`);
+    if (line) line.style.display = shown ? '' : 'none';
+  }
+
   constructor(
     private readonly root: HTMLElement,
     handlers: OverlayHandlers,
@@ -49,16 +55,17 @@ export class Overlay {
       [['climb'], 'mantle'],
       [['use'], 'carry a body'],
       [['fire'], 'fire'],
-      [['zoom'], 'scope'],
+      [['zoom'], 'scope: tap to stay in, hold to peek'],
       [['scopeToggle'], 'scope on or off'],
       [['binoculars'], 'binoculars'],
       [['zeroUp', 'zeroDown'], 'zero'],
       [['suppressor'], 'suppressor'],
+      [['load'], 'load: match or subsonic'],
       [['throw'], 'throw a stone'],
       [['assists'], 'instruments'],
       [['debugView'], 'debug view'],
     ];
-    const keys = legend.map(([actions, text]) => `<span>${keysHtml(map, actions)} ${text}</span>`).join('\n          ');
+    const keys = legend.map(([actions, text]) => `<span data-key="${actions[0]}">${keysHtml(map, actions)} ${text}</span>`).join('\n          ');
     root.innerHTML = `
       <div class="overlay-panel">
         <div class="wordmark">SIGHTLINE</div>
@@ -218,7 +225,7 @@ export class Overlay {
    * Runs kept in this browser (the deployed game's autosaves, playtest.ts), newest first,
    * each with a way to save it as a file. Empty hides the line.
    */
-  setKept(runs: ReadonlyArray<{ text: string; save: () => void; watch: () => void }>): void {
+  setKept(runs: ReadonlyArray<{ text: string; save: () => void; watch: () => void; forget: () => void }>, forgetAll: () => void = () => undefined): void {
     const el = this.root.querySelector<HTMLElement>('.kept')!;
     el.hidden = runs.length === 0;
     el.replaceChildren();
@@ -239,8 +246,23 @@ export class Overlay {
       save.textContent = 'save';
       save.title = 'Save this run as a recording file';
       save.addEventListener('click', run.save);
-      item.append(watch, save);
+      const forget = document.createElement('button');
+      forget.type = 'button';
+      forget.className = 'link';
+      forget.textContent = 'delete';
+      forget.title = 'Delete this run from this browser';
+      forget.addEventListener('click', run.forget);
+      item.append(watch, save, forget);
       el.append(item);
+    }
+    if (runs.length > 1) {
+      const all = document.createElement('button');
+      all.type = 'button';
+      all.className = 'link';
+      all.textContent = 'delete all';
+      all.title = 'Delete every run kept in this browser';
+      all.addEventListener('click', forgetAll);
+      el.append(all);
     }
   }
 }

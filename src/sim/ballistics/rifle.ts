@@ -31,8 +31,10 @@ export interface RifleState {
   suppressed: boolean;
   /** Seconds left of being knocked off a rest by a near miss (Lab F): absent otherwise. */
   shaken?: number;
-  /** Seconds left fitting or taking off the suppressor; no shooting until it's done. */
+  /** Seconds left fitting or taking off the suppressor, or changing the load; no shooting until it's done. */
   fitting: number;
+  /** What `fitting` is counting down, when it's a change of load: absent otherwise. */
+  swap?: 'load';
   /** How far the scope is up, 0 to 1. */
   raise: number;
   /** How settled on a rest the rifle is, 0 to 1. */

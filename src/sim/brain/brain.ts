@@ -1,14 +1,13 @@
-import type { Tuning } from '../../config/tuning';
-import { DEG, dcos, dlog, dsin } from '../kernel/core/detmath';
-import { turnTowards, wrapAngle, yawFromDirection } from '../kernel/core/math';
+import { dcos, dlog, dsin } from '../kernel/core/detmath';
 import type { AwarenessName } from '../kernel/events';
 import { routinePose, type RoutinePose } from '../generation';
-import type { Gait } from '../body';
 import type { TaskKind } from './camp';
 import { groundSpot } from './ground';
 import type { GuardMind } from './mind';
-import { emptyRoute, emptySteering, followRoute, navigatorOf, type Route, type Steering } from './nav';
+import { focusOf, lookAround, sameGoal, stand, standToward, walk } from './moves';
+import { emptyRoute, navigatorOf, type Route } from './nav';
 import type { Order } from './orders';
+import { noteProtection, offerProtection, performFetch, performShelter, performStandTo, standingTo } from './protect';
 import { keepRoutine } from './routine';
 import type { Percept } from '../perception';
 import type { Report, ReportKind, Told } from './reports';
@@ -30,7 +29,7 @@ import { choose, response, type Option } from './utility';
  * percept, an awareness, a belief.
  */
 
-export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee', 'suppress'] as const;
+export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee', 'suppress', 'shelter', 'stand-to'] as const;
 export type ActName = (typeof ACTS)[number];
 
 /** Why a guard changed what he's doing: A's reasons for a change of state, and the brain's own. */
@@ -122,6 +121,11 @@ export interface BrainState {
   calling: Report | null;
   /** The tick he first heard the siren, or −1: he knows the alarm is up (E7). */
   sirenAt: number;
+  /** In a camp that protects its target (protect.ts): the whistle he last took note of, and how long it has him standing to. Absent until he hears one. */
+  whistledAt?: number;
+  standToUntil?: number;
+  /** The target, in such a camp: the tick he was told to come out, or lost his nerve waiting. */
+  releasedAt?: number;
 }
 
 /** An order as it reached a guard: what to do, where, when it was given, and the event behind it. */
@@ -175,7 +179,6 @@ export function createBrain(): BrainState {
   };
 }
 
-const steer: Steering = emptySteering();
 const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
 const options: Array<Option<ActName>> = [];
 
@@ -191,6 +194,7 @@ export function decide(m: GuardMind, out: Order): ActChange | null {
   let change: ActChange | null = null;
   const newest = Math.max(newestPercept(m), newestTold(b));
   if (b.sirenAt < 0 && heardSiren(m)) b.sirenAt = m.tick;
+  noteProtection(m);
   if (b.done || m.tick >= b.thinkAt || a.state !== b.state || newest !== b.percept) {
     b.state = a.state;
     b.percept = newest;
@@ -277,7 +281,7 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
   // Why: what his senses gave him, while something drives him; calm or nothing when it doesn't.
   const reacting = act !== 'routine' && act !== 'return';
   const ordered = act === 'task' && b.task !== null;
-  const reason: ActWhy = ordered ? 'ordered' : act === 'flee' ? 'siren' : reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
+  const reason: ActWhy = ordered ? 'ordered' : act === 'flee' || (act === 'shelter' && b.sirenAt >= 0) ? 'siren' : reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
   // A reaction traces to what he sensed; if that memory is gone, to the act that led here.
   const cause = ordered ? b.task!.cause : reacting ? perceptCause(m) || b.event : b.event;
   b.cause = cause;
@@ -327,15 +331,6 @@ function perceptCause(m: GuardMind): number {
   return cause;
 }
 
-/** Where his attention is: his focus, or where he believes the intruder is. */
-function focusOf(m: GuardMind): { x: number; z: number } {
-  const a = m.awareness;
-  if (a.state === 'combat' && m.belief) return m.belief;
-  if (a.focus) return { x: a.fx, z: a.fz };
-  if (m.belief) return m.belief;
-  return { x: m.self.x, z: m.self.z };
-}
-
 /**
  * The options his state offers, in a fixed order, each with its rank and its weight: the
  * multiplied considerations. A state with nothing to do falls back on rank 0, the routine.
@@ -365,30 +360,37 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   };
   // Worth calling in: something to report, a radio in his hands, and he hasn't just called it in.
   const task = b.task;
+  const fetching = task !== null && (task.kind === 'fetch' || task.kind === 'escort');
   const order =
-    task && (!elevated || task.kind === 'sweep') && (b.act === 'task' || (m.tick - task.issued) / hz < T.camp.keepOrder) ? (task.kind === 'sweep' || task.kind === 'cover' ? 1 : task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
+    task && (!elevated || task.kind === 'sweep') && (b.act === 'task' || (m.tick - task.issued) / hz < T.camp.keepOrder) ? (task.kind === 'sweep' || task.kind === 'cover' || fetching ? 1 : task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
+  // At a whistle, in a camp that protects its target, a man with nothing better to do gets down and watches (protect.ts).
+  const standing = standingTo(m) && !elevated && m.post.role !== 'target';
   // Worth calling in: something he sensed himself (what he was only told is already on the
   // net), a radio in his hands, and he hasn't just called it in.
   // (Once he's on his way, he finishes: a percept lapsing doesn't call him back mid-walk.)
   const own = ownEvidence(m) || b.act === 'investigate' || b.act === 'search';
   const callable = own ? role.report * cool('report') : 0;
   out.push({ act: 'routine', rank: 0, weight: 1 });
-  // The target, at lockdown: for the vehicle, ahead of everything (design doc: he flees first).
-  if (m.post.role === 'target' && m.escape && b.sirenAt >= 0) out.push({ act: 'flee', rank: 7, weight: 1 });
+  // The target, at lockdown: for the vehicle, ahead of everything (design doc: he flees first),
+  // unless his camp protects him: then to his room, and out of it when he's sent for.
+  if (!offerProtection(m, out) && m.post.role === 'target' && m.escape && b.sirenAt >= 0) out.push({ act: 'flee', rank: 7, weight: 1 });
+  // Sent to bring him out: ahead of anything but a fight in front of him.
+  if (order && fetching && state !== 'combat') out.push({ act: 'task', rank: 4.8, weight: 1 });
   const off = offRoutine(m);
   switch (state) {
     case 'unaware':
       if (off && !elevated) out.push({ act: 'return', rank: 1, weight: 1 });
+      if (standing) out.push({ act: 'stand-to', rank: 1.5, weight: 1 });
       if (order) out.push({ act: 'task', rank: 2, weight: order });
       break;
     case 'curious':
-      out.push({ act: 'look', rank: 2, weight: 1 });
+      out.push({ act: standing ? 'stand-to' : 'look', rank: 2, weight: 1 });
       if (order) out.push({ act: 'task', rank: 2, weight: order * W.orderCurious });
       break;
     case 'suspicious':
       if (order) out.push({ act: 'task', rank: 3, weight: order });
       out.push({ act: 'report', rank: 3, weight: callable * W.reportSuspicious });
-      out.push({ act: 'look', rank: 3, weight: T.lookWeight });
+      out.push({ act: standing ? 'stand-to' : 'look', rank: 3, weight: T.lookWeight });
       if (!elevated && own) out.push({ act: 'investigate', rank: 3, weight: role.investigate * near * fresh * cool('investigate') * claimed(m, focus) });
       break;
     case 'searching': {
@@ -582,90 +584,13 @@ function perform(m: GuardMind, out: Order): void {
     case 'flee':
       performFlee(m, out);
       break;
+    case 'shelter':
+      performShelter(m, out);
+      break;
+    case 'stand-to':
+      performStandTo(m, out);
+      break;
   }
-}
-
-/** Stands where he is and faces his focus: the head first, then the body, looking around if `scan`. */
-function stand(m: GuardMind, out: Order, scan: boolean): void {
-  const A = m.tuning.perception.awareness;
-  const dt = 1 / m.tuning.sim.tickHz;
-  const focus = focusOf(m);
-  const self = m.self;
-  const dx = focus.x - self.x;
-  const dz = focus.z - self.z;
-  const dist = Math.sqrt(dx * dx + dz * dz);
-  const toward = dist > 1e-6 ? yawFromDirection(dx, dz) : self.yaw;
-  const limit = A.headLimitDeg * DEG;
-  const combat = m.awareness.state === 'combat';
-  let yaw = self.yaw;
-  if (Math.abs(wrapAngle(toward - self.yaw)) > limit || combat) yaw = turnTowards(self.yaw, toward, A.turnRate * dt);
-  let head = combat ? 0 : clamp(wrapAngle(toward - yaw), limit);
-  if (scan) {
-    const t = (m.tick - m.brain!.since) / m.tuning.sim.tickHz;
-    head = clamp(head + A.scanDeg * DEG * dsin((2 * Math.PI * t) / A.scanPeriod), limit);
-  }
-  writeOrder(m, out, 0, 0, 'idle', yaw, head);
-}
-
-/** Stands where he is and faces a place: the sweep of a far marksman. */
-function standToward(m: GuardMind, out: Order, tx: number, tz: number, scan: boolean): void {
-  const A = m.tuning.perception.awareness;
-  const dt = 1 / m.tuning.sim.tickHz;
-  const self = m.self;
-  const dx = tx - self.x;
-  const dz = tz - self.z;
-  const toward = dx * dx + dz * dz > 1e-6 ? yawFromDirection(dx, dz) : self.yaw;
-  const yaw = turnTowards(self.yaw, toward, A.turnRate * dt);
-  let head = 0;
-  if (scan) head = m.tuning.brain.sniper.sweepHeadDeg * DEG * dsin((2 * Math.PI * (m.tick / m.tuning.sim.tickHz)) / A.scanPeriod);
-  writeOrder(m, out, 0, 0, 'idle', yaw, head);
-}
-
-/** Stands where he is and looks around, while he lingers at a spot. */
-function lookAround(m: GuardMind, out: Order): void {
-  stand(m, out, true);
-}
-
-/** Walks toward a goal by the navigator, then says whether he's there. */
-function walk(m: GuardMind, out: Order, x: number, z: number, pace: number, gait: Gait, lookX: number, lookZ: number, goalY?: number): 'walking' | 'arrived' | 'stuck' {
-  const b = m.brain!;
-  const T = m.tuning.brain;
-  const hz = m.tuning.sim.tickHz;
-  const moved = (x - b.goalX) * (x - b.goalX) + (z - b.goalZ) * (z - b.goalZ) > T.goalMoved * T.goalMoved;
-  const retry = b.routed >= 0 && (m.tick - b.routed) / hz >= (b.routeOk ? T.routeEvery : T.routeRetry);
-  if (b.routed < 0 || (moved && retry) || (!b.routeOk && retry)) {
-    if (m.nav.searches.left <= 0 || (m.nav.work?.nodes ?? 0) - m.nav.nodesAtStart >= T.nav.nodesPerTick) {
-      stand(m, out, false);
-      return 'walking';
-    }
-    m.nav.searches.left--;
-    const r = navigatorOf(m.world, m.tuning).find(m.self.x, m.self.z, x, z, { work: m.nav.work }, b.route, m.self.y, goalY);
-    b.routed = m.tick;
-    b.routeOk = r === 'found';
-    b.goalX = x;
-    b.goalZ = z;
-    if (!b.routeOk) return 'stuck';
-  }
-  if (!b.routeOk) return 'stuck';
-  const w = followRoute(b.route, m.self.x, m.self.z, pace, m.id, m.tick, m.tuning, steer);
-  if (w === 'arrived') return 'arrived';
-  if (w === 'stalled') {
-    // Something the grid doesn't know is in the way, and sidestepping hasn't cleared it.
-    // He gives up on this route, and may look for another after routeRetry: never every tick.
-    b.routed = m.tick;
-    b.routeOk = false;
-    return 'stuck';
-  }
-  const A = m.tuning.perception.awareness;
-  const dt = 1 / hz;
-  const toward = yawFromDirection(steer.dirX, steer.dirZ);
-  const yaw = turnTowards(m.self.yaw, toward, A.turnRate * dt);
-  const lx = lookX - m.self.x;
-  const lz = lookZ - m.self.z;
-  const see = lx * lx + lz * lz > 1e-6 ? yawFromDirection(lx, lz) : yaw;
-  const head = clamp(wrapAngle(see - yaw), A.headLimitDeg * DEG);
-  writeOrder(m, out, steer.wishX, steer.wishZ, gait, yaw, head);
-  return 'walking';
 }
 
 function performReturn(m: GuardMind, out: Order): void {
@@ -782,6 +707,7 @@ function performTask(m: GuardMind, out: Order): void {
     stand(m, out, false);
     return;
   }
+  if (performFetch(m, out, task)) return;
   if (b.linger >= 0) {
     lookAround(m, out);
     if (m.tick >= b.linger) {
@@ -1134,27 +1060,3 @@ function nextSearchPoint(m: GuardMind): void {
   b.z = focus.z + r * dsin(b.angle);
 }
 
-function sameGoal(ax: number, az: number, bx: number, bz: number, within: number): boolean {
-  return (ax - bx) * (ax - bx) + (az - bz) * (az - bz) <= within * within;
-}
-
-function writeOrder(m: GuardMind, out: Order, wishX: number, wishZ: number, gait: Gait, yaw: number, head: number): void {
-  const A: Tuning['perception']['awareness'] = m.tuning.perception.awareness;
-  const dt = 1 / m.tuning.sim.tickHz;
-  out.kind = 'move';
-  out.tick = m.tick;
-  out.wishX = wishX;
-  out.wishZ = wishZ;
-  out.gait = gait;
-  out.yaw = yaw;
-  out.pitch = 0;
-  out.headYaw = turnTowards(m.head, head, A.headRate * dt);
-  // Down only while he's staying put: an order or a new route can send him off with `down` still set.
-  // Absent standing, so a state that has never known a guard to get down doesn't change shape.
-  if (m.brain?.down && wishX === 0 && wishZ === 0) out.stance = m.brain.down;
-  else delete out.stance;
-}
-
-function clamp(v: number, limit: number): number {
-  return v > limit ? limit : v < -limit ? -limit : v;
-}

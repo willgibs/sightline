@@ -2,38 +2,189 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
-## 2026-11-09 · Compound types: a keep on a hilltop, a depot along a road, a farm and its outbuildings
+## 2026-11-09 · The takedown: a camp that protects its target, as a mode
 
-**The owner's call** (on the desk, Nov 9): compound types are the next thing the generator learns, on their own branch, alongside the camp work, and two-storey buildings come with them. `docs/compound-types.md` is the design, with the honest list of what a second storey asks of each system. This lands its first step: the types, on one storey. The second storey is its own pull request, after the owner's answer on the desk. `GEN_VERSION` 8.
+**Why.** A camp had one answer to everything: at the siren the target ran for his vehicle, and a median 27 s after the first loud moment the mission was lost, whatever anyone did next. The owner's first fight said the same from the other side: only two plans are worth trying, and both skip the camp. No number fixes that, because the shape is wrong (`docs/foundation-review.md`, section 3).
 
-**What a type is.** A record in `gen.compound.types` (`generation/plots.ts`): how well it suits each crux and each kind of ground, its plan, the size of its plot, its modules, and a `shape`, one function per plot family. A shape produces parcels, corners, lanes, lights and door-facing, and everything downstream (modules, fixtures, cover, staffing, validation) reads those and never asks which type it is. A new type on an old shape is data alone. A seed's type comes from a root stream of its own (`compoundTypeOf`), weighted by crux × ground, so a valley re-rolled or a camp rebuilt keeps it. With every other type weighted to nothing the generator draws exactly what it did: `tests/types.test.ts` pins a yard-only TAL-4471 to the fingerprint it had before there were types, and the yard-only arm of the experiments is that generator.
+**Built** (`brain/protect.ts`, `game/protection.ts`, `game/scenes/takedown.ts`). A camp with `protects` set answers in stages, each of which someone can see or hear, and each carried by something in the world:
+- **Stand-to.** The whistle. Men with nothing of their own to go on get down where they are and watch; the target goes to his hard room (the first roofed place his day already takes him). With no more trouble it ends.
+- **Lockdown.** The siren. He stays in his room. The radio, if it works, calls the relief.
+- **Fetch.** The relief gets down at the gate, and two of them go to his door and tell him aloud that it's time (a new report kind, `escort`, heard like any other speech). More are sent after 45 s if his vehicle hasn't moved, three times in all.
+- **Extraction.** Released, he runs for his vehicle, and they see him to it.
 
-**Four shapes.** A *yard* (as first built). A *bailey* (the yard's ring with a keep in the middle, its door toward the gate, walled all round, on high ground if it can be). A *spine* (a long plot with the road running through it, gate to gate, sheds down both banks with their doors on the road). A *steading* (no fence: a farmhouse, barn and byre round a small farmyard, huts beyond, field walls in runs with gaps, a silo). The fence, the towers, patrol loops, gates, the breach and lights all come from the shape; `yard` keeps today's numbers.
+Take a link away and the next stage doesn't happen. No radio: no relief, and nobody at his door. Nobody at his door: he doesn't know it's time, and waits 240 s before his nerve goes and he runs alone. A vehicle that won't start: he gets to it, is stranded, and goes back to his room. No vehicle at all: nobody is sent, and he stays. Nothing here knows more than a mind holds (rule 13): the target acts on the whistle and siren he heard and on what was said at his door.
 
-**Measured** (100 held-out seeds, series `lab-world-variety`, as Lab D's survey was; `npm run experiment -- variety-compound`, `variety-families`, `variety-types`; the arm "yard only" is the generator before this change):
+**A mode, and nothing else moves.** `?scene=takedown` is the live camp with `ready=alert` and numbers of its own. A scene can now carry those (`Scene.tune`, `kernel/scene.ts`): a patch over the game's tuning that only sets values, so applying it twice changes nothing, and a recording embeds the result. The takedown's are in tuning with every other number (`modes.takedown`): each sound of a shot counts for what it tells a listener by how clearly it reached him, the whistle raises a man to curious and brings on the stand-to where it handed him the alarm of someone who heard the shot, and the kit carries the subsonic load. A live camp and the valley are as they were: every pinned run's `behaviour` fingerprint is the same.
+
+**Measured** (`npm run experiment -- takedown`, 24 camps, a scripted sniper on the best overview firing every 8 s; the siren sounded on 21, and nobody shot the target):
+
+| | Siren after | Relief at the gate | Told to come | Left his room | Gone |
+| --- | --- | --- | --- | --- | --- |
+| Relaxed: he runs at the siren | 5.8 s | – | – | 6.0 s | 21 of 21, at 27 s |
+| Alert: he shelters, and is sent for | 6.6 s | 97 s | 18 of 21 | 126 s | 21 of 21, at 156 s |
+| Alert, no radio | 6.6 s | never | 0 of 21 | 247 s | 21 of 21, at 267 s |
+| Alert, no vehicle | 6.6 s | 97 s | 0 of 21 | never | 0 of 21 |
+
+Times are medians from the sniper's first shot. On most camps the target is already under his roof when it starts. On the 3 camps of 21 where he wasn't told, the sniper's first round had taken the radio operator: nobody could call the relief, and he ran alone when his nerve went.
+
+**Not settled, so not pinned.** The seconds are to be found by a person playing. `tests/takedown.test.ts` holds the order of the stages and what each link does, not when (the owner's rule: test what's settled, measure what's still moving). The lab panel has a `protection` line that says where the camp has got to.
+
+**Versions.** `SIM_VERSION` 15, for the two things below that change a camp outside the mode. `STATE_SCHEMA` 10: a vehicle on its way out keeps who is in its cab. Every pinned `state` value moved with the schema, and no `behaviour` value.
+
+## 2026-11-09 · A vehicle that's held up doesn't wait for ever
+
+**Why.** The target was removed from the world when he got into his vehicle, and the vehicle waited for as long as anything stood in its way. A guard in the yard, or you in the road, left a mission that could neither be won nor lost: the target nowhere, the vehicle not moving. An early eight-camp run of the takedown met it.
+
+**Changed** (`game/escape.ts`, in every camp).
+- **The camp's own men step out of its way.** Whoever is in front of it is moved off its line, to the side he's already on, below his brain as a shove would move him (`guard.aside`, carried out with his orders).
+- **Anyone else who holds it up for 12 s ends the escape.** The man in the cab gets out on the nearest free ground beside it, as the guard he was and knowing about the siren; the objective is open again; the vehicle stays where it stopped and the camp has no other. The vehicle keeps who is in its cab (`vehicle.rider`) so that he can.
+
+`tests/equipment.test.ts`'s truck is now held up by the player, since a guard would step aside. Running a person down is Phase 3's, with shooting the driver.
+
+## 2026-11-09 · The rifle's kit says which loads it carries
+
+**Why.** The quiet tool the design doc names, the subsonic load, existed as data and could only be chosen before a run. The takedown needs it in the hand.
+
+**Changed.** `ballistics.rifle.carries` says which loads are in the kit, and a `load` command (Y) changes to the next one, taking `loadTime` (2.5 s) with no shooting meanwhile, as the suppressor does. The game's kit carries the match load alone, so there the key does nothing and isn't offered: bringing the subsonic load forward from Phase 3 is the owner's call, and only the takedown's kit has it. The scope's readout names a load that isn't the match one, and a line says which went in.
+
+## 2026-11-09 · The first act out of the one file
+
+**Why.** `brain/brain.ts` held every act, its memory and its priorities in one place (the review, section 5). The takedown's acts were the first new ones since that was written down, so they went in the way the rebuild lays out, as a proof of the pattern.
+
+**Changed.** What every act uses to move a man (`walk`, `stand`, `lookAround`, `writeOrder` and the rest) is `brain/moves.ts`. Sheltering, standing to and fetching are `brain/protect.ts`: what they remember, when they're on offer, and how they're carried out. `brain.ts` asks the module what it offers and hands it the act. Nothing a player could see changed with the move: the pinned runs say so. The other fourteen acts are still where they were.
+
+## 2026-11-09 · A mind is handed its camp's ground, and no more of the world
+
+**Why.** Rule 13 says a brain decides from its mind alone. The mind held the whole static world, which is more than a defender knows: it carries where the player came into the valley, the mission it was built for, and everything the generator worked out about how the camp can be taken (its certified ways in, who it found unwatched). No brain read any of that. Nothing stopped one, and the test that catches omniscience moves the player, not the world, so it wouldn't have caught it.
+
+**Changed, by type alone.** A mind's world is a `Ground` (`brain/mind.ts`): the terrain, what's solid, the grid, the camp's layout and posts, and the range card as places only. A world is one of these, so nothing is copied and nothing runs differently. The brain lane names no wider type, and `tests/architecture.test.ts` holds it to that.
+
+## 2026-11-09 · An experiment builds each camp once
+
+**Why.** An experiment runs the same camps several ways, and every run built its camp again: seconds of generation for a fraction of a second of play. `quiet-kill` has ten arms, so it built each camp ten times.
+
+**Changed.** The runner hands a process all of one camp's runs together, and an experiment may keep the world it last built for its next run (`src/lab/worlds.ts`, one world a process). A world is only read once it's built, and depends on nothing but its mission and the generation half of the tuning, so arms and rolls of the dice can share it. `ladder`, `flaws` and `quiet-kill` do. The overlook experiments don't, because their scene keeps a plan from the building.
+
+**Measured,** the same command before and after, on six camps and six processes: `quiet-kill` 135 s to 40 s, `ladder` 22 s to 14 s. The reports are the same to the character. All 24 camps and ten arms of `quiet-kill` took 351 s before and 63 s after.
+
+## 2026-11-09 · The way-in search, a fifth quicker, bit for bit
+
+**Why.** Generation spends about two fifths of its time in the search that certifies a way in (`generation/infiltrate.ts`): 41% over five camps profiled, more than anything else.
+
+**Changed, with no answer moving.** Two things inside the search, neither of which changes which state it expands next:
+- **Beaten labels leave their lists.** A label another has beaten used to stay in its cell's list and be walked past on every later push and pop. It's now taken out when it's beaten and skipped when the heap reaches it. Beating carries over (if one label beats a second and the second beat a third, the first beats the third), so anything a removed label would have turned away is turned away by the one that removed it: the lists are true Pareto fronts, and the search expands exactly the states it did, in the same order.
+- **The heap holds label numbers** and reads its keys from the pool, where it held six numbers a label in a plain array. No two open labels share all five keys, so the order they come off in is the order of the keys, whatever the heap's shape. Neighbours come from a table built once.
+
+**Measured.** By sampling profile over the same five camps (four whose search runs out its budget, one repaired nine times), with the exposure field as the reference that shouldn't move (5,420 ms before, 5,423 ms after): the search 14.2 s to 11.5 s, 19% less, and a world 8% less. Every world's fingerprint is the same for 24 seeds, and a fingerprint covers each search's count of states expanded, so the order is the same and not only the answers. `tests/world.test.ts` pins one of them.
+
+**What's left is the larger part, and it isn't this file's.** On a camp whose target has to be flushed out, the search runs its whole budget of 400,000 states and reports that it doesn't know, for a way in that camp's rules never ask for. Skipping it changes what a world's report holds, so it needs a new `GEN_VERSION` and belongs with the generator's next change. `docs/foundation-review.md`, Generation.
+
+## 2026-11-09 · A shot's sounds are data, and the quiet kill is measured
+
+**Why.** One suppressed kill from a ridge had nearly the whole camp searching within 5 s. The design doc's ladder asks searching of "a close shot"; the code raised a guard to searching for any sound of a shot heard at all, at any clarity: the report, the crack, the strike (which carries 650 m, so that you hear your hit) and the bolt.
+
+**Changed, with nothing moving.** What each of a shot's four sounds raises a listener to is now data (`perception.awareness.shots`): a faint level, a clear level and the clarity that counts as clear, read like any other sound. The defaults are the old behaviour exactly (0.8 at any clarity), so no fingerprint moves; the golden recording is rewritten because the tuning grew. One law still says what a guard hears; this says what he can tell from it. The compound simulator's shot also takes a subsonic load's quieter report, as the rifle's own always did.
+
+**Measured** (`npm run experiment -- quiet-kill`, 24 camps): the same guard taken through the head, silently, by a suppressed round from the best overview, by a loud one, and by a suppressed subsonic round from 90 m, each under the old reading and a graded one (a crack is a shot within about 40 m of the bullet's path and a snap beyond; a strike is a thud that makes a man look).
+
+| | Of the rest, searching at +5 s | At +20 s | Siren within 150 s | Target gone |
+| --- | --- | --- | --- | --- |
+| Silent | 38% | 60% | 2 of 24 | 2 of 24 |
+| Suppressed, any shot is a shot | 99% | 91% | 10 of 24 | 10 of 24 |
+| Suppressed, by how clearly | 95% | 89% | 10 of 24 | 10 of 24 |
+| Loud, any shot is a shot | 99% | 91% | 10 of 24 | 10 of 24 |
+| Loud, by how clearly | 95% | 91% | 9 of 24 | 9 of 24 |
+| Subsonic at 90 m, any shot is a shot | 98% | 87% | 8 of 23 | 8 of 23 |
+| Subsonic at 90 m, by how clearly | 85% | 84% | 7 of 23 | 7 of 23 |
+| Suppressed, by how clearly, and a whistle only turns heads | 84% | 84% | 9 of 24 | 9 of 24 |
+| Subsonic at 90 m, by how clearly, and a whistle only turns heads | 67% | 75% | 7 of 23 | 7 of 23 |
+
+**What it says.** Grading what a guard hears barely moves the camp: 99% to 95%, and 98% to 85% for the quietest rifle shot there is. So the law of sound isn't what makes a camp all-or-nothing. What does is how news spreads once one man has it: he shouts, the radio carries it, and in a camp that fights someone blows a whistle that carries 600 m and raises everyone who hears it to searching. Making that whistle a call to look up, and no more, takes the quietest shot to 67%. Even a silent kill, with no whistle blown at all, has 60% of the camp searching 20 s later. Where the siren sounds, it sounds a median 7 s after the man falls, and the target is gone a median 27 s after he fell. The defaults stay as they were: the graded reading is a taste call, and by itself it doesn't buy a quiet kill. `docs/foundation-review.md` says what would.
+
+## 2026-11-09 · The foot of a low ledge is no way up it, and a watch that measures where height is gained
+
+Two sessions took up the long bot runs' broken promise the same afternoon. The one that landed first is the entry *What the long bot runs found in the motor*, below: a body on steep ground could end a tick higher on a gentler triangle across a seam, and the motor now refuses any rise from steep ground. This entry is what the second found on top of it.
+
+**Where the height was gained.** In the five failing runs traced here, every millimetre was gained on the walkable triangle: the body slid down or across the steep one, crossed the seam, and its speed carried it up the far side. By the letter of rule 10 that isn't height gained on steep ground. The fix below reads the rule more strictly, that a body on steep ground ends no higher wherever it ends, and that's the better promise: it's simple, and the motor can keep it exactly. A body that slides into a gully now stops rising for that tick and walks up from the next.
+
+**The watch measures the gain where it happens** (`Heightfield.gainOnSteep`): along the line the body moved, triangle by triangle, counting what the terrain rises on the triangles too steep to stand on. It holds a body that walks to three things:
+- from steep ground it ends the tick no higher, wherever it ends;
+- onto steep ground it ends no higher either, wherever it began (the check only ever looked at bodies that began on steep ground);
+- it gains nothing on the steep triangle it began the tick on.
+
+**A real hole that the stricter rule would have turned into a stuck body.** A body sliding down the last of a near-vertical face was carried 1.2 m sideways and 0.43 m up onto the ledge above it in one tick (ROK-8470, tick 286, about one run in fifty). Terrain rising more than a step inside a body's rim backs it off "downhill", by the ground at the rim point. Where a scarp is narrower than the body, that ground is the top of the ledge, not its face, and if the top falls away from its edge, downhill pointed onto it. With the rise refused and the push still pointing the wrong way, the body is held where it is. Backing off now never goes toward the high ground: where the rim point's own downhill would, the body backs off toward its own centre. `SIM_VERSION` 14. `tests/steep.test.ts` holds a handmade ledge to it: without the change the body is lifted or held, and with it the body slides clear.
+
+**A known inexactness, reported and left.** The motor judges a move by where it begins and ends, so between two pieces of ground it can stand on, a body can cross a corner of a steep triangle uphill: up to 68 mm in a tick over 34 hours of bot play, never faster than a walkable grade over the move, and nothing it can climb by. The watch reports the most it sees (`seamGain`, and on the body lane's bench) and holds it to no limit. Making it exact means cutting a move at the first steep triangle that rises and sliding along that triangle's contour. That moves every pinned run near steep ground, for something no player can see, so it's written down in the motor's header and left until there's a reason.
+
+**Checked,** on the merged code: 40 fresh valleys with both bots for 15 minutes each, the movement scenes, 200 ladder towers, and ROK-8470 again. 3.7 million ticks, 34 hours of play, and every promise held (`npm run fuzz -- --seeds 40 --minutes 15`). The worst rise from or onto steep ground was 2.0 mm, the motor's own allowance.
+
+## 2026-11-10 · Compound types: a walled compound, a keep, a depot and a farm, and why walking their outside no longer pays
+
+**The owner's call** (on the desk, Nov 9): compound types are the next thing the generator learns, on their own branch, and two-storey buildings come with them. `docs/compound-types.md` is the design, with the honest list of what a second storey asks of each system. This lands its first step: the types, on one storey. The second storey is its own pull request. `GEN_VERSION` 8.
+
+**Then the bar moved** (the owner's takedown sitting, Nov 10): "a few perch shots, then just circling the base taking out each new enemy as they came into view, never really being seen, even in the flat field just outside the compound, felt too easy. Largely the bland, simple base design." So a shape is held to this now: it makes you scout and work for an angle, and walking its outside doesn't hand you each man in turn. The first three types were built to differ and two were more open than the yard (a depot showed 3.1 men at a stop on the walk, a farm 3.9, the yard 2.6), so this reworked them.
+
+**What a type is.** A record in `gen.compound.types` (`generation/plots.ts`): how well it suits each crux and each kind of ground, its plan, the size of its plot, its modules, and a `shape`, one function per plot family. A shape produces parcels, corners, lanes, lights and door-facing, and everything downstream (modules, fixtures, cover, staffing, validation) reads those and never asks which type it is. A new type on an old shape is data alone, which is how the walled compound arrived. A seed's type comes from a root stream of its own (`compoundTypeOf`), weighted by crux × ground, so a valley re-rolled or a camp rebuilt keeps it. With every other type weighted to nothing the generator draws exactly what it did before there were types (`tests/types.test.ts`).
+
+**Four places, on four shapes.** A *walled compound* (the first plot, behind a wall). A *keep* (a bailey: a keep in the middle of a walled ring). A *depot* (a spine: the road through a long plot, gate to gate, sheds down both banks with their doors on the road). A *farm* (a steading: a court of three buildings, huts beyond, long field walls). The chain-link *yard* is out of the mix and stays in the tuning as the bench's baseline.
+
+**How walking the outside was measured** (`npm run experiment -- circling`, `lab/experiments/circling.ts`, 24 camps, the same seeds in every arm). A bot limited to what a person can do (`ShootAndCircle`, `bots/person.ts`) fires three rounds from the best overview, walks a lap of the plot 25 m out, crouched, stopping every 15 m to look in, and shoots whoever is there, against the takedown's alert camp. With nobody firing, the same walk is read for what the shape shows.
+
+| | yard (as the owner played it) | walled | keep | depot | farm | as built |
+| --- | --- | --- | --- | --- | --- | --- |
+| Men down from the walk | 4.8 ±0.8 | 2.9 ±0.7 | 2.2 ±0.6 | 2.8 ±0.6 | 3.9 ±1.0 | 2.9 ±0.7 |
+| Men in view at a stop | 2.5 ±0.4 | 1.3 ±0.1 | 1.2 ±0.1 | 1.3 ±0.1 | 1.1 ±0.1 | 1.2 ±0.1 |
+| Share of the walk a man is visible from | 32% | 15% | 13% | 15% | 17% | 15% |
+| Men no stop ever shows | 23% | 36% | 52% | 33% | 26% | 35% |
+| Men in view from the best overview | 5.3 | 5.1 | 5.2 | 5.5 | 6.2 | 5.4 |
+
+Against the yard, seed by seed, as built: 1.9 fewer men down from the walk and 1.3 fewer in view at a stop, both clear of the camps' own spread. Taken apart (a scratch tally, the same 24 camps): of the men who fall on the walk, 2.2 of 3.1 came out to look for him or came with the relief, the camp's answer and the next piece of its engine. What the shape itself hands over, through a wall line, a gate, the breach or from a tower, fell from 2.7 a lap to 0.9.
+
+**What changed to get there.** Chain link was the cause: a patrol on it is visible from 95% of the walk. (1) *A wall with windows*, the `windowed` perimeter: solid all round but for up to one stretch of chain link a side, 6 to 10 m, a place to find that shows a wedge of the camp. (2) *A gate that shows you the camp only from straight in front of it*: the walls-only compound still handed over five men from one spot beside the gate, so two walls now run out from each gatepost along the line the road takes (`barbican`, 10 to 12 m). (3) *Long, high field walls on a farm*, few gaps, a low run here and there, and its patrols 14 m in from them: along a wall with gaps a patrol passes every gap. (4) The plain yard out of the mix.
+
+**Not changed: the view from the ridges.** The best overview still shows about five men at a moment, and two firing points still show everyone a perch can. Walls hide the yard from the ground, not from a ridge. The owner's note calls a bad shot from a perch getting you killed "good"; if scouting from the ridges should cost more it is a further step (overhead cover, or more of the men indoors more of the time).
+
+**Variety** (100 held-out seeds, series `lab-world-variety`; `npm run experiment -- variety-compound`, `variety-families`, `variety-types`; the arm "yard only" is the generator before this change):
 
 | | yard only | as built |
 | --- | --- | --- |
-| Type (yard / keep / depot / farm) | 100 / 0 / 0 / 0 | 19 / 25 / 27 / 29 |
-| Plot (yard / long / wide / tight) | 37 / 15 / 26 / 22 | 12 / 28 / 31 / 29 |
-| Perimeter (chain / screen / fort / fields) | 47 / 38 / 15 / 0 | 19 / 24 / 28 / 29 |
-| Openings in the perimeter, 3 or more | 0 | 27 |
-| Nearest opening 25 m or nearer his building | 22 | 16 |
-| Best family of plan (shot / flush / take apart / way in) | 7 / 37 / 9 / 47 | 7 / 39 / 12 / 42 |
+| Type (walled / keep / depot / farm) | 0 / 0 / 0 / 0 (all yard) | 19 / 27 / 22 / 32 |
+| Plot (yard / long / wide / tight) | 36 / 17 / 26 / 21 | 9 / 25 / 36 / 30 |
+| Perimeter (chain / screen / fort / windowed / fields) | 47 / 39 / 14 / 0 / 0 | 0 / 0 / 35 / 33 / 32 |
+| Openings in the perimeter, 3 or more | 0 | 22 |
+| His door within 25 m of an opening | 21 | 10 |
+| Best family of plan (shot / flush / take apart / way in) | 7 / 42 / 8 / 43 | 5 / 31 / 20 / 44 |
 
-The mix of plans is level with yard-only overall; what the types change is which plan each kind of place calls for, which is the point: `variety-types` has a keep answered only by a flush (12) or a way in (13) with no ridge shot at all, a depot the only place a shot from a perch is the best plan (5 of the 7 where any is) alongside take-apart (6) and flush (10), and a farm with a flush (12) and a way in (11). A yard has shots 2, flush 5, way in 12. No family dominates a type by construction, and a keep isn't solved the way a depot is. Layout descriptors alone would have called the yard-only camps varied (Beukman's trap), so the plan families are the claim.
+Which plan is best depends on the place (`variety-types`): a keep is answered by a way in (19) or a flush (8), never a ridge shot; a depot by taking it apart (10) with shots (4) and a flush (6) beside it; a farm by a way in (12), a flush (11) or taking it apart (9); a walled compound by a way in (11) or a flush (6).
 
-**Lab D's bar.** 93 of 100 valid at the first attempt on a new held-out series, on the generator with tree crowns in (`npm run seeds -- --count 100 --from compound-types-exit-2`), 7 repaired, none invalid; `perch witnessed` broke 6 of those first attempts and `alarms in fire` 1. Before the crowns landed it was 98 of 100 on `compound-types-exit`. A keep's escort crux is weighted to nothing: walled in the middle of a walled plot, no perch ever has him long enough for that crux to be a crux, and validation says so.
+**Lab D's bar.** 96 of 100 valid at the first attempt, 4 repaired, none invalid on the settled generator (`npm run seeds -- --count 100 --from compound-types-exit-5`). Along the way: 89 of 100 on `compound-types-exit-3`, the first series with walls, where `perch witnessed` broke 8 first attempts, most of them on places that had two men in view for a moment now and then behind a wall. Such a place isn't a perch that sees them, so that rule now asks only of a perch that sees 5% of guard time (`witnessedFrom`); 93 of 100 on `compound-types-exit-4`, and two more changes (the gate's walls start at the gateposts) took it to the final 96. Generation: mean 2.7 s, p95 4.5 s.
 
-**What the pictures say** (`npm run look`, fly camera and honest view from the best perch): the keep is a walled plot on a hill with its towers and a tall building in the middle; the depot a long strip with sheds down a road and a gate each end; the farm has no fence, and field walls show as low broken lines round a court of three buildings.
+**What the pictures say** (`npm run look`, from above and at eye height): a walled compound reads as a walled compound, and at eye level you see down the road from straight ahead and from the side only wall, a tower and the light poles; a farm is a court of three behind long stone walls with gaps.
 
-**A bug the keep found.** Three searches walk from the site's centre on the coarse map layer (`findPerches`, spawn, `counter-perch`); a keep's centre is inside the keep, whose map cells are a sealed pocket, so nothing could reach any perch and a keep came out with no perches at all. `campWalkStart` starts those walks just inside the gate wherever a building stands on the centre.
+**Bugs found on the way.** A keep's centre is inside the keep, so a search from the site's centre finds nothing: `campWalkStart`, the walk's start, is just inside the gate wherever a building covers the centre. A vehicle parked across a door strands whoever is behind it: types keep it off doors (`vehicleDoorGap`). Main's `yardRoute` found no way out of the yard on 3 of 40 camps, two of them depots: its start was the open cell nearest the vehicle, which can be a pocket of a few cells between it and a fence. It now takes the nearest cell the gate can really be reached from: 0 of 60 boxed in, and none of those routes crosses anything solid.
 
-**Reported, not fixed:** on a yard or any camp the escape vehicle can be parked across a door (his `escapeRun` search checks ground and corridor, not doors); on farms that dropped a worker's chore route in 1 of 5 seeds, so farms, keeps and depots keep it off doors (`vehicleDoorGap`, 3 m), and the yard keeps its zero so its old camps stay identical.
+**Tests.** `tests/types.test.ts`: the pick is by weight and from its own stream; a yard-only camp matches the old generator's fingerprint; each type is what it says; a place behind walls shows fewer men from the walk than the open yard, on the same seeds; a windowed wall is a wall; a gate can be seen into from straight ahead and not from the side. `tests/person.test.ts`: the bot goes all the way round.
 
-**Tests.** `tests/types.test.ts`: the pick is by weight and from its own stream; a yard-only camp matches the old generator's fingerprint; each type is what it says (a keep with him in the middle behind a wall, a depot with a road gate to gate and every shed's door on it, a farm with low field walls and a court). `tests/compound.test.ts` and `sites.test.ts` follow the moved tuning. Routes off the camp and the variety tests stand on the plain yard or say which type they want, since the seed list now holds other types.
+**What moved.** `GEN_VERSION` 8, `GOLDEN_TAL_4471`, and the pinned runs standing on generated camps (`TAL-4471 wander`, `MUD-9031 wander`, `TAL-4471 chaos`, `camp-systems`, `camp-fight`); none of the movement, perception, shooting or kernel runs. The bench pins and the golden recording are rewritten.
 
-**What moved.** `GEN_VERSION` 8, `GOLDEN_TAL_4471` (TAL-4471 is a farm now), and the pinned runs standing on generated camps (`TAL-4471 wander`, `MUD-9031 wander`, `TAL-4471 chaos`, `camp-systems`, `camp-fight`); none of the movement, perception, shooting or kernel runs. The bench pins and the golden recording are rewritten.
+## 2026-11-09 · The owner's first fight: what it found
+
+**The escape really was broken.** The owner's reading: the box "seems to run into a building, get stuck, the target gets in, marked as escaped." On LEB-2534, the camp they played, that's exactly it. The vehicle's way out was a straight line to the gate, and on 21 of 24 camps that line went through something solid. It was held up 12 m along, and four seconds later the camp counted it as away, because giving up in the road ended the same way as reaching the end of it.
+
+**Changed.** The vehicle finds a way across the yard on the site grid with room for its width (`yardRoute`), then follows the road itself, and is away only at the end of it. A vehicle with no way out of the yard counts as disabled, and that's 1 camp in 40.
+
+**The target can be found.** The debug view marks him TARGET, and TARGET aboard once he's in the vehicle.
+
+**The camp's return fire can be read.** The simulated shooter is a stand-in, so it stays small: a figure where the shots come from, and the panel measures each of the camp's rounds along the path it really flew against that spot (`fired back`: how many, the closest, how many would have struck). It can't be hurt. Being hunted is for a person to feel, from a perch (the owner, Nov 9: use whichever method really answers the question).
+
+**Input.** A tap of the scope button now leaves the scope up, so a trackpad can scope and then click to fire; holding it still peeks. Runs kept in the browser can be deleted one at a time or all together.
+
+**What this didn't fix.** On 19 of 24 camps the target is gone a median of 29 s after the first shot (fastest 21 s), which is the owner's larger point: it leaves one long shot or an ambush on the road, and neither takes the base. It's on their desk as a decision.
+## 2026-11-09 · What the long bot runs found in the motor
+
+The weekly run on main, and the same runs on the tree crown branch, broke a body's promise in about one run in five: "gained N m on ground too steep to stand on" (rule 10). Most of it was real: a body on steep ground could step up across a triangle seam onto a higher, gentler one, by up to 45 mm, because only the destination's slope was asked about. The motor now also refuses a rise when the body starts on steep ground. The rest wasn't a broken promise at all: a mantle from steep ground rises as a mantle should, and the check now applies to bodies that stay on the ground. Six of the seven failing valleys pass an hour of play.
+
+**Still open:** one failing run (RAK-4743, the fuzzing bot) ends with a torso 1.3 mm inside a rock as a body starts to lie down beside it on a slope. It's in the lying-down chain and is small and rare, but it is a broken promise, and the weekly run will keep saying so until it's fixed.
 
 ## 2026-11-09 · What you can't see through, you can't shoot through
 

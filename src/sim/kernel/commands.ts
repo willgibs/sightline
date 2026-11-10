@@ -109,8 +109,12 @@ export interface ZeroDownCommand {
 export interface SuppressorCommand {
   kind: 'suppressor';
 }
+/** Change the load in the rifle for the next one it carries. */
+export interface LoadCommand {
+  kind: 'load';
+}
 
-export type Command = StimulusCommand | FireCommand | NoiseCommand | BodyDropCommand | RangeCommand | ThrowCommand | ZeroUpCommand | ZeroDownCommand | SuppressorCommand | ShotDropCommand | ClimbCommand | UseCommand;
+export type Command = StimulusCommand | FireCommand | NoiseCommand | BodyDropCommand | RangeCommand | ThrowCommand | ZeroUpCommand | ZeroDownCommand | SuppressorCommand | LoadCommand | ShotDropCommand | ClimbCommand | UseCommand;
 export type CommandKind = Command['kind'];
 
 /** How a command field is stored and quantized. */
@@ -134,6 +138,7 @@ export const COMMANDS: { readonly [K in CommandKind]: CommandSpec<Extract<Comman
   zeroDown: { code: 33, range: 'ballistics', fields: {} },
   suppressor: { code: 34, range: 'ballistics', fields: {} },
   shotDrop: { code: 35, range: 'ballistics', fields: { lag: 'lag', yaw: 'yaw', pitch: 'pitch' } },
+  load: { code: 36, range: 'ballistics', fields: {} },
   stimulus: { code: 90, range: 'brain', fields: { what: 'number', x: 'number', y: 'number', z: 'number', fromX: 'number', fromY: 'number', fromZ: 'number' } },
   climb: { code: 50, range: 'body', fields: {} },
   use: { code: 51, range: 'body', fields: {} },

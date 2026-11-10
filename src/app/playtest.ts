@@ -86,6 +86,14 @@ export class BrowserStore implements PlaytestStore {
     await done(tx);
   }
 
+  /** Forgets one kept run. */
+  async remove(name: string): Promise<void> {
+    const db = await this.open();
+    const tx = db.transaction('runs', 'readwrite');
+    tx.objectStore('runs').delete(name);
+    await done(tx);
+  }
+
   /** Every kept run, newest first. */
   async list(): Promise<StoredRun[]> {
     const db = await this.open();

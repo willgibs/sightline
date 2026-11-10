@@ -92,7 +92,7 @@ for (const seed of [...seeds, ...scenes.map((s) => `scene:${s}`), ...towers]) {
     totalTicks += r.ticks;
     const line =
       `${seed} ${name.padEnd(6)} ${fmt.clock(r.ticks / tuning.sim.tickHz).padStart(6)} · ${fmt.int(r.checks)} body-ticks · ` +
-      `rise ≤ ${(r.worstRise * 1000).toFixed(1)} mm · overlap ≤ ${(r.worstOverlap * 1000).toFixed(3)} mm · steep gain ≤ ${(r.steepGain * 1000).toFixed(2)} mm · ` +
+      `rise ≤ ${(r.worstRise * 1000).toFixed(1)} mm · overlap ≤ ${(r.worstOverlap * 1000).toFixed(3)} mm · steep gain ≤ ${(r.steepGain * 1000).toFixed(2)} mm (at seams ≤ ${(r.seamGain * 1000).toFixed(1)}) · ` +
       (sync ? `${fmt.int(sync.report.saves)} restores, ${fmt.int(sync.report.ticks)} ticks re-stepped · ` : '') +
       fmt.ms(performance.now() - start);
     const syncFailure = sync?.report.failure ?? null;

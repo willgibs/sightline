@@ -44,7 +44,8 @@ export interface Task {
   issued: number;
 }
 
-export type TaskKind = 'investigate' | 'search' | 'check' | 'sweep' | 'cover';
+/** `fetch` and `escort` are the two halves of bringing the target out (protect.ts): to his door, then to his vehicle. */
+export type TaskKind = 'investigate' | 'search' | 'check' | 'sweep' | 'cover' | 'fetch' | 'escort';
 
 /** A search under way: the camp's last known position of the intruder, and how it's going. */
 export interface SearchState {
@@ -70,6 +71,14 @@ export interface CampState {
   /** `getOut`: the mission isn't won when the target falls, but when the player then reaches this place (Lab F). */
   /** A camp that fights back (Lab F): absent for a camp that doesn't. */
   fights?: true;
+  /**
+   * A camp that protects its target (protect.ts): where his hard room is. At the first sign
+   * of trouble he goes there, and he leaves only when someone comes for him. Absent for a
+   * camp that runs him to his vehicle the moment the siren sounds.
+   */
+  protects?: { x: number; z: number };
+  /** The tick the relief got down at the gate, and how many times, and when last, men have been sent for the target since. */
+  relief?: { at: number; fetches: number; last: number };
   /** The tick of the last blast on the whistle. */
   whistled?: number;
   objective: { target: number; status: 'open' | 'done' | 'escaping' | 'escaped'; getOut?: { x: number; z: number } } | null;

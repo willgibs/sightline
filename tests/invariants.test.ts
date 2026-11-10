@@ -39,6 +39,30 @@ function expectSound(r: InvariantReport): void {
   expect(r.checks).toBeGreaterThan(r.ticks);
 }
 
+/** Fuzz finds, kept: each of these once broke a promise, and each is only as long as it took. */
+describe('the long bot runs', () => {
+  const run = (seed: string, Bot: typeof WanderBot | typeof ChaosBot, ticks: number) => {
+    const sim = new Simulation(generateWorld(missionSpec(seed), T), T);
+    const watch = new InvariantWatch(sim);
+    const bot = new Bot(seed);
+    const raw = neutralInput();
+    for (let i = 0; i < ticks && !watch.report.first; i++) {
+      watch.beforeTick();
+      sim.step(bot.next(sim, raw));
+      watch.afterTick();
+    }
+    return watch.report.first;
+  };
+
+  it('does not climb out of ground too steep to stand on, across a seam to a higher, gentler triangle', () => {
+    expect(run('FAP-4838', WanderBot, 25100)).toBeNull();
+  }, 120_000);
+
+  it('may mantle a rock from steep ground: that promise is about walking', () => {
+    expect(run('GEL-3229', ChaosBot, 61000)).toBeNull();
+  }, 120_000);
+});
+
 describe('motor invariants on generated valleys', () => {
   it('hold for a bot that plays like a person', () => {
     for (const seed of ['TAL-4471', 'MUD-9031']) expectSound(run(seed, new WanderBot(seed), 4));

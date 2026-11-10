@@ -15,6 +15,8 @@ import type { DevDock } from './devDock';
 
 const seconds = (s: number): string => (Number.isNaN(s) ? 'not yet' : `${s.toFixed(0)} s ago`);
 const metres = (m: number): string => (Number.isFinite(m) ? `${m.toFixed(0)} m` : '–');
+/** Metres, finely when it's close: half a metre from your head is not "0 m". */
+const miss = (m: number): string => (Number.isFinite(m) ? `${m.toFixed(m < 10 ? 1 : 0)} m` : '–');
 
 /** The scene's parameters with this list of switches off. */
 export function paramsWithOff(params: string, off: readonly string[]): string {
@@ -79,16 +81,17 @@ export class LabPanel {
     this.brief = `${r.level}, ${r.guardsDown} down`;
     this.lines = [
       `first shot  ${seconds(r.sinceFirstShot)}`,
-      `shots       ${r.shotsFired}`,
+      `shots       ${r.shotsFired}${Number.isNaN(r.sinceLastShot) ? '' : ` · last ${seconds(r.sinceLastShot)}`}`,
       `down        ${r.guardsDown}  standing ${r.guardsStanding}`,
       `shooter at  ${r.shooter ? `${r.shooter.x.toFixed(0)}, ${r.shooter.z.toFixed(0)}` : 'none yet'}`,
       `nearest     ${metres(r.nearest)}`,
       `in line     ${r.inLine}`,
-      `fired back  ${r.roundsAtYou}  near ${r.nearMisses}`,
+      `fired back  ${r.returnFire.rounds}${r.returnFire.rounds > 0 ? ` · closest ${miss(r.returnFire.closest)} · struck ${r.returnFire.struck}` : ''}`,
       `spotted     ${r.detected ? 'yes' : 'no'}`,
       `their guess ${Number.isNaN(r.estimateOff) ? 'none' : `${metres(r.estimateOff)} off`}`,
       `camp        ${r.level}${r.siren ? ', siren' : ''}`,
       `target      ${r.targetStatus}`,
+      ...(r.protection ? [`protection  ${r.protection}`] : []),
     ].join('\n');
     // In the honest view nothing else brings the dock up to date.
     this.dock.refresh();

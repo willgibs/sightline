@@ -31,5 +31,11 @@ export const GEN_VERSION = 9;
  * longer search; a route with one end in the camp is found through fields (Lab F).
  * 11: a siren is heard through walls, so a man deep indoors still hears it.
  * 12: a tree's crown stops sight and bullets once a line has been through enough of it.
+ * 13: the escape vehicle drives round the yard and down the road, and is away only at the end of it.
+ * 14: terrain inside a body's rim backs it off toward its own centre where the ground there
+ * would have carried it onto the high ground: the foot of a low ledge is no way up it.
+ * 15: the camp's own men step out of the way of its vehicles, and an escape held up by
+ * anyone else ends with the target getting out again; a camp can protect its target
+ * (brain/protect.ts). No pinned run meets any of these, so no fingerprint moved.
  */
-export const SIM_VERSION = 12;
+export const SIM_VERSION = 15;

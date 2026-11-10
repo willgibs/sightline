@@ -19,12 +19,12 @@ export const GOLDEN = {
   /** Bits of every deterministic math function over 4,000 inputs each. */
   detmath: '8d55144e8e74968f',
   /** Everything generation decides for TAL-4471 (also pinned in tests/world.test.ts). */
-  world: '3f741d796333d706',
+  world: 'f6f346913137d617',
   /** 60 s of play: the person-like bot in two valleys, the fuzzing bot in one. */
   play: {
-    'TAL-4471 wander': { behaviour: 'c3bd69d7d32c467d', state: '105493801a4cea76' },
-    'MUD-9031 wander': { behaviour: '8cb0ba46b3443be8', state: 'd6733e489842ba1d' },
-    'TAL-4471 chaos': { behaviour: 'f95fd840c1f3c22e', state: '04e6e58c10934acf' },
+    'TAL-4471 wander': { behaviour: 'c20b1c1f47f068d0', state: '9e7affdc07a603fb' },
+    'MUD-9031 wander': { behaviour: 'cbd802616078d245', state: 'fae6471eb8e7165d' },
+    'TAL-4471 chaos': { behaviour: '289f960866273037', state: '719cda8b629fc982' },
   },
   /**
    * Scenes run by their own drivers, each pinning its lane (benches.ts): the movement
@@ -37,14 +37,14 @@ export const GOLDEN = {
    * a camp fight, the first 45 s of a shooter on an overlook with the whole brain awake (lab F).
    */
   scenes: {
-    'movement-course': { behaviour: '0f2551d99837a6bc', state: '549efd1a98bc727c' },
-    'perception-crowd': { behaviour: '8a0406d39b05cc58', state: '838930f20ad18c54' },
-    'perception-lab': { behaviour: '0aad2727a0cf9bbb', state: 'a7c651e821e7b293' },
-    'shooting-range': { behaviour: '8cc3e0f7a274c3c5', state: '5c849d1f738b28d5' },
-    'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '30be7b87da76f7de' },
-    'kernel-alone': { behaviour: '0698e581024f5b35', state: '045b6f0f6879675a' },
-    'camp-systems': { behaviour: 'ef4d9c66f5466891', state: '08d6e0f33012593d' },
-    'camp-fight': { behaviour: 'e69179964acaf228', state: '05fb66a51507d98a' },
+    'movement-course': { behaviour: '0f2551d99837a6bc', state: '09b7c0b38f93fb85' },
+    'perception-crowd': { behaviour: '8a0406d39b05cc58', state: 'c3b170c93e439d42' },
+    'perception-lab': { behaviour: '0aad2727a0cf9bbb', state: 'f50f679a066c2aa2' },
+    'shooting-range': { behaviour: '8cc3e0f7a274c3c5', state: '96aaf03fb351723a' },
+    'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '8d4c75a6b711d511' },
+    'kernel-alone': { behaviour: '0698e581024f5b35', state: '0bb32cdd438c309a' },
+    'camp-systems': { behaviour: '96c9a2242ca4b1ae', state: 'ad706259cd48e4b1' },
+    'camp-fight': { behaviour: '2bba409a31191ce0', state: '5e85ca29a7598a37' },
   },
 } as const;
 

@@ -24,6 +24,19 @@ import type { BrainState } from './brain';
 
 export type EntityId = number;
 
+/**
+ * What a mind may know of the world: its camp's own ground. The terrain, what's solid, the
+ * grid a body walks, the camp's layout and posts, and its range card: where the firing
+ * points that overlook it are, which a prepared defender knows. Not where anyone came into
+ * the valley, not the mission it was built for, and nothing else the generator worked out
+ * about how the camp can be taken (its certified ways in, who it found unwatched). A world
+ * is one of these, so a mind is handed the world itself and can read only this much of it:
+ * the brain lane names no wider type (tests/architecture.test.ts).
+ */
+export type Ground = Pick<World, 'terrain' | 'colliders' | 'grid' | 'camp' | 'playHalf' | 'crowns' | 'crownStop'> & {
+  readonly report: { readonly camp?: { readonly perches: ReadonlyArray<Readonly<{ x: number; z: number }>> } };
+};
+
 export interface GuardMind {
   /** Who he is. */
   readonly id: EntityId;
@@ -31,8 +44,8 @@ export interface GuardMind {
   readonly self: Readonly<Pick<BodyState, 'x' | 'y' | 'z' | 'yaw' | 'pitch' | 'stance' | 'speed' | 'motor'>>;
   /** His post: where he spawned, his route and his routine (from the camp, static). */
   readonly post: GuardSpawn;
-  /** The static world: terrain, colliders, grid, the camp's layout. */
-  readonly world: World;
+  /** The static world, as much of it as a mind may know: its camp's own ground. */
+  readonly world: Ground;
   readonly tuning: Tuning;
   /** The tick being decided (the one after this), and its end in mission seconds. */
   readonly tick: number;
@@ -51,6 +64,8 @@ export interface GuardMind {
   readonly alarms: readonly { x: number; z: number }[];
   /** Whether his camp fights back (Lab F): a fact about the camp, like its alarm boxes. */
   readonly fights: boolean;
+  /** Where his camp's hard room is, if it protects its target (protect.ts): another fact about the camp, and null if it doesn't. */
+  readonly protects: Readonly<{ x: number; z: number }> | null;
   /** Where the camp's escape vehicle stands, if it has one (static, like the alarm boxes): the target's way out at lockdown. */
   readonly escape: Readonly<{ x: number; z: number }> | null;
   /** A number in [0, 1) from his own stream: the only way a brain rolls dice (rule 3). */

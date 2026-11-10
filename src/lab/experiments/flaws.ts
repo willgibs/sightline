@@ -4,6 +4,7 @@ import type { Simulation } from '../../sim/game/sim';
 import { sceneOver, sceneTicks, startScene, type Scene } from '../../sim/kernel/scene';
 import type { Experiment } from '../experiment';
 import { FLAW_KINDS, FlawWatch, type Flaw } from '../flaws';
+import { keptWorld } from '../worlds';
 
 /**
  * Every attack script against the same camps, with no player: how many times does the camp
@@ -13,7 +14,7 @@ import { FLAW_KINDS, FlawWatch, type Flaw } from '../flaws';
 /** One camp under one attack: the flaws found, each with its moment. */
 export function attackRun(seed: string, attack: string, tuning: Parameters<Experiment['run']>[2], off = ''): { flaws: Flaw[]; watch: FlawWatch; sim: Simulation } {
   const scene = compound(`seed=${seed}&attack=${attack}${off ? `&off=${off}` : ''}`) as Scene<Simulation>;
-  const sim = startScene(scene, tuning);
+  const sim = startScene(scene, tuning, keptWorld(`live-camp:${seed}`, tuning, scene.world));
   const driver = scene.driver!() as AttackDriver;
   const raw = scene.game.still(sim);
   const ticks = sceneTicks(scene, tuning);

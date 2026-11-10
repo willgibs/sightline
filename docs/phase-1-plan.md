@@ -309,6 +309,7 @@ The [Sightline Desk](https://claude.ai/artifact/RB4pjU2qNsYE3zCuBYYb7f), which o
   | A few days later | A and C, second sittings | `?trials=OWNER-A2` and `?trials=OWNER-C2&lab=movement` | 25 min |
   | Once E7 and E8 are on `main` | E, and D's three camps | `?scene=live-camp&params=seed=LEB-2534`, then `KUV-9210` and `HUM-0755` | 25 min |
   | Any time | F, the first fight | `?scene=compound&params=seed=LEB-2534%26attack=sniper`, then `?scene=live-camp&params=seed=LEB-2534%26perch=1&lab`. What did the camp do, why did you move, what would you do next? | 15 min |
+  | Any time | F, the takedown | `?scene=takedown&params=seed=LEB-2534%26perch=1&lab`, and without `perch=1` to walk in. Is this the contest? Do the stages read as a camp thinking? | 20 min |
 
   What each sitting asks is in its lab's section. Lab A's questions wait until after its first sitting.
 
@@ -842,7 +843,7 @@ The core mission's archetype is a **compound** (owner, Nov 7). It's built as dat
     - Running the ways in through the real simulation (`npm run plans -- --simulate`) corrected four things in D7's model: the crouched pace (a step takes 5/9 s), towers (open under the roof), how the raster stamps thin things (by cell centres, so a certificate of stealth errs the safe way), and a margin (a certified way may fill the meter only to 85%). With them, every way in tried held in the simulation.
 - [x] D9 · The valley switches to the generator, and the test camp retires. It lands alone. (Lab D held this for the owner's go-ahead. It isn't a taste call, so it went ahead without one: `docs/decisions.md`, After the labs.)
   - **Built.** A mission that names no camp gets the default compound, and its spec says so, so a recording names its camp. Phase 0's terrain, camp and analysis are gone, with the tuning only they read. `GEN_VERSION` 5.
-- [x] Compound types, on one storey (after the world pillar; the owner's call, Nov 9). Different kinds of place as data, picked to suit a seed's crux and ground: a keep on a hilltop, a depot strung along a road, a farm and its outbuildings, and the yard as first built. `docs/compound-types.md` is the design, and what a second storey asks of the engine; `docs/decisions.md` has the numbers. 93 of 100 valid at the first attempt on a held-out series, 7 repaired, none invalid.
+- [x] Compound types, on one storey (after the world pillar; the owner's call, Nov 9, and the bar they're held to, Nov 10). Different kinds of place as data, picked to suit a seed's crux and ground: a walled compound, a keep on a hilltop, a depot strung along a road, a farm and its outbuildings; the first chain-link yard stays in the tuning as the bench's baseline. `docs/compound-types.md` is the design, and what a second storey asks of the engine. Walking the outside hands you 1.9 fewer men than the yard did (`npm run experiment -- circling`), 96 of 100 valid at the first attempt on a held-out series; `docs/decisions.md` has the numbers.
 - [ ] Two-storey buildings (the second step of the same design): levels in the grid, navigation and hearing that cross stairs, an analysis that certifies the way in upstairs. On its own pull request, after the owner's answer on the desk.
 - [x] World variety and cruxes (after D9; Nov 8). Measured first: 100 held-out seeds were one picture, rotated, and every camp promised a shot at the target from a ridge. `docs/decisions.md` (The world pillar) has the numbers and the owner's ruling.
   - **Built.** Six kinds of site, each with its own ground, water and ridges or walls (`generation/landform.ts`, `features.kind`): hollow, spur, bend, scarp, gorge, col. Plans for the compound (`layout.plan`: its plot's shape, a chain or solid perimeter, how full its yard is), and a road that can swing off the gate's axis. Every choice has its own stream, so with every new weight at zero the generator draws what it did. `GEN_VERSION` 6.
@@ -1020,6 +1021,8 @@ Added on Nov 8, the owner's call. *Labs pass* requires it. Design and reasoning:
   - [x] Men get out of the line from up to 40 m away and get down when they arrive, crouched or flat by what hides them. Standing in the line fell from 5.5 to 0.9 men per run against a sniper.
   - [x] Reinforcements have a place of their own, so a squad no longer stands in a heap.
   - [ ] Drive the rest of the flaws down: about one man a run in the line, mostly caught by a shot he couldn't place. Nobody stuck, no pile-ups, no silent camps.
+  - [x] The takedown (`?scene=takedown`; `docs/decisions.md`, Nov 9): a camp that protects its target in stages you can see and break. It's a mode, built by the Fable 5.2 advisor (`docs/foundation-review.md`), and its seconds are to be found by playing.
+  - [ ] Bases that can't be beaten by circling (the owner's first go at the takedown, Nov 10: "Shoot, circle, shoot, circle makes the whole base defense redundant"). Compound types answer for the ground, and F2 for the pressure.
   - [ ] The owner's sitting.
 - [ ] F2 · The camp hunts. Picture and Command, sections that sweep, cut-offs on the road, fallbacks.
   - [x] Stance for guards.

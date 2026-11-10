@@ -361,7 +361,7 @@ export function plainTuning(t: Tuning): Tuning {
   L.sites.hollow = 1;
   const C = out.gen.compound.types.yard;
   C.plots = { yard: 1, long: 0, wide: 0, tight: 0 };
-  C.perimeters = { chain: 1, screen: 0, fort: 0, fields: 0 };
+  C.perimeters = { chain: 1, screen: 0, fort: 0, fields: 0, windowed: 0 };
   C.fills = { open: 1, packed: 0 };
   L.roads = { straight: 1, dogleg: 0 };
   out.gen.crux.kinds = { walk: 1, inside: 0, flush: 0, escort: 0 };
@@ -371,7 +371,7 @@ export function plainTuning(t: Tuning): Tuning {
 /** The generator with its compound types switched off: every camp the plain yard. */
 export function yardOnly(t: Tuning): Tuning {
   const out = structuredClone(t);
-  for (const k of ['keep', 'depot', 'farm'] as const) out.gen.compound.types[k].cruxes = { walk: 0, inside: 0, flush: 0, escort: 0 };
+  for (const k of COMPOUND_TYPES) out.gen.compound.types[k].cruxes = k === 'yard' ? { walk: 1, inside: 1, flush: 1, escort: 1 } : { walk: 0, inside: 0, flush: 0, escort: 0 };
   return out;
 }
 
@@ -471,7 +471,7 @@ export const varietyCompound = table('variety-compound', 'the compound, and how 
   ['road off axis', bands('roadOff', '°', [15, 45])],
   ['type', kinds('type', COMPOUND_TYPES)],
   ['plot', kinds('plot', ['yard', 'long', 'wide', 'tight'])],
-  ['perimeter', kinds('perimeter', ['chain', 'screen', 'fort', 'fields'])],
+  ['perimeter', kinds('perimeter', ['chain', 'screen', 'fort', 'fields', 'windowed'])],
   ['yard', kinds('fill', ['open', 'packed'])],
   ['gates', bands('openings', '', [2.5])],
   ['deep', bands('targetDepth', 'm', [25, 45])],
