@@ -163,6 +163,7 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
         'worst overlap (m)': 0,
         'worst rise in a tick (m)': 0,
         'worst gain on steep ground (m)': 0,
+        'most a move crossed uphill on steep triangles with no promise broken (m)': 0,
       };
       for (const seed of BODY_RUNS) {
         const world = generateWorld(missionSpec(seed), defaultTuning);
@@ -183,6 +184,7 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
           m['worst overlap (m)'] = Math.max(m['worst overlap (m)'], r.worstOverlap);
           m['worst rise in a tick (m)'] = Math.max(m['worst rise in a tick (m)'], r.worstRise);
           m['worst gain on steep ground (m)'] = Math.max(m['worst gain on steep ground (m)'], r.steepGain);
+          m['most a move crossed uphill on steep triangles with no promise broken (m)'] = Math.max(m['most a move crossed uphill on steep triangles with no promise broken (m)'], r.seamGain);
         }
       }
       return { ...m, ...eyeToHead(), ...mantleMeetsWalker(), ...proneBench() };

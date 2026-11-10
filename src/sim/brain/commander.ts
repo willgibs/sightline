@@ -1,10 +1,10 @@
 import type { Tuning } from '../../config/tuning';
-import type { World } from '../kernel/world/world';
 import { routinePose } from '../generation';
 import { ALERT_LEVELS, alertRung, type AlertLevel, type CampState, type RosterEntry, type Task, type TaskKind } from './camp';
 import { clearSeen, hottestCell, injectBelief, mapMass, mapSpread, spreadBelief } from './searchMap';
 import { fuseBearings, emptyEstimate } from './triangulate';
 import type { Report } from './reports';
+import type { Ground } from './mind';
 
 /**
  * The camp commander (E5): Halo 3's declarative Objectives over guards. It lists the
@@ -27,7 +27,7 @@ import type { Report } from './reports';
 export interface CampMind {
   /** Its own memory: everything the camp believes. */
   readonly camp: CampState;
-  readonly world: World;
+  readonly world: Ground;
   readonly tuning: Tuning;
   readonly tick: number;
   readonly time: number;
@@ -45,7 +45,7 @@ export interface CampOrder {
  * Digests one report that reached the camp: raises the level and the search map, and
  * remembers when anything suspicious was last heard of.
  */
-export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning, world: World): void {
+export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning, world: Ground): void {
   const M = tuning.brain.searchMap;
   if (r.kind === 'clear') {
     clearSeen(camp.map, r.x, r.z, tuning.brain.comms.clearRadius, world, tuning, tuning.bodies.guard.eyeHeight.stand);
@@ -318,7 +318,7 @@ function whereIs(m: CampMind, g: RosterEntry): { x: number; z: number } {
 }
 
 /** One tick's upkeep of the search map: its spread, at a fixed rate. */
-export function spreadCamp(camp: CampState, tick: number, tuning: Tuning, world: World): void {
+export function spreadCamp(camp: CampState, tick: number, tuning: Tuning, world: Ground): void {
   const M = tuning.brain.searchMap;
   const every = Math.max(1, Math.round(tuning.sim.tickHz / M.updateHz));
   if (tick % every === 0) spreadBelief(camp.map, M.spreadRate * (every / tuning.sim.tickHz), world);

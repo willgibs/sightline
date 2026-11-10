@@ -1,8 +1,8 @@
 import type { Tuning } from '../../config/tuning';
 import { dcos } from '../kernel/core/detmath';
 import { Cell, Edge, cellIndex, type GridLayer } from '../kernel/world/grid';
-import type { World } from '../kernel/world/world';
 import { navigatorOf } from './nav';
+import type { Ground } from './mind';
 
 /**
  * Getting out of the line of fire (Lab F, docs/camp-engine.md): the nearest place, on foot,
@@ -51,7 +51,7 @@ function visited(L: GridLayer): { seen: Uint32Array; now: number } {
  * The spot to go to, or null if there's none within reach: he's outside the fine layer, or
  * nothing hides him. `wide`: he only has a crack or a strike to go on, so the bearing is rough.
  */
-export function groundSpot(world: World, tuning: Tuning, x: number, z: number, threatX: number, threatZ: number, wide = false): GroundSpot | null {
+export function groundSpot(world: Ground, tuning: Tuning, x: number, z: number, threatX: number, threatZ: number, wide = false): GroundSpot | null {
   const F = tuning.brain.fight.drill;
   const L = world.grid.site;
   const start = cellIndex(L, x, z);
@@ -113,7 +113,7 @@ export function groundSpot(world: World, tuning: Tuning, x: number, z: number, t
 }
 
 /** The listed perches near the bearing he believes it came from, or the believed point itself if there are none. */
-function perchesToward(world: World, tuning: Tuning, x: number, z: number, threatX: number, threatZ: number, wide: boolean): Point[] {
+function perchesToward(world: Ground, tuning: Tuning, x: number, z: number, threatX: number, threatZ: number, wide: boolean): Point[] {
   const dx = threatX - x;
   const dz = threatZ - z;
   const len = Math.sqrt(dx * dx + dz * dz) || 1;

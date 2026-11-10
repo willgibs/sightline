@@ -9,7 +9,8 @@
  *   npm run experiment -- <name> --jobs 4           on this many processes
  *
  * Each run is independent, so the work is shared among processes and the results are the
- * same however it's divided.
+ * same however it's divided. A process is handed all of one camp's runs together, so an
+ * experiment that keeps its world between runs (src/lab/worlds.ts) builds each camp once.
  */
 import { fork, type ChildProcess } from 'node:child_process';
 import { availableParallelism } from 'node:os';
@@ -59,25 +60,35 @@ async function main(): Promise<void> {
   if (!Number.isInteger(rolls) || rolls < 1) throw new Error(`--dice takes how many rolls, not '${args.get('dice')}'`);
   const seeds = seedsOf(exp.series, count);
   const dice = Array.from({ length: rolls }, (_, k) => k);
-  const jobs: Job[] = exp.arms.flatMap((_, arm) => seeds.flatMap((seed) => dice.map((d) => ({ experiment: name, seed, arm, dice: d })))).map((j, id) => ({ ...j, id }));
-  const size = Math.max(1, Math.min(Number(args.get('jobs') ?? Math.max(1, availableParallelism() - 2)), jobs.length));
+  // Camp by camp: each camp's runs are one block, which one process takes whole.
+  const jobs: Job[] = seeds.flatMap((seed) => exp.arms.flatMap((_, arm) => dice.map((d) => ({ experiment: name, seed, arm, dice: d })))).map((j, id) => ({ ...j, id }));
+  const blocks = seeds.map((seed) => jobs.filter((j) => j.seed === seed));
+  const size = Math.max(1, Math.min(Number(args.get('jobs') ?? Math.max(1, availableParallelism() - 2)), blocks.length));
   const started = performance.now();
   const results = new Array<RunResult>(jobs.length);
-  await share(jobs, size, results);
+  await share(blocks, size, results);
   // Back to arms, each in the order of the seeds and their rolls, whichever process finished what first.
   const byArm = new Map(exp.arms.map((arm, a) => [arm.name, jobs.filter((j) => j.arm === a).map((j) => results[j.id]!)]));
   console.log(`\n${formatReport(exp, report(exp, byArm, rolls), count, rolls, tournament(exp, byArm, rolls))}`);
   console.log(`${jobs.length} runs on ${size} processes, in ${((performance.now() - started) / 1000).toFixed(0)} s.\n`);
 }
 
-/** Hands the jobs out to `size` processes, each taking the next as it finishes. */
-function share(jobs: readonly Job[], size: number, results: RunResult[]): Promise<void> {
+/** Hands the blocks of jobs out to `size` processes: each works through a block a job at a time, then takes the next block. */
+function share(blocks: ReadonlyArray<readonly Job[]>, size: number, results: RunResult[]): Promise<void> {
+  const total = blocks.reduce((n, b) => n + b.length, 0);
   return new Promise((resolve, reject) => {
     let next = 0;
     let finished = 0;
     const children: ChildProcess[] = [];
+    const mine = new Map<ChildProcess, Job[]>();
     const give = (child: ChildProcess): void => {
-      if (next < jobs.length) child.send(jobs[next++]!);
+      let queue = mine.get(child);
+      if (!queue || queue.length === 0) {
+        if (next >= blocks.length) return;
+        queue = [...blocks[next++]!];
+        mine.set(child, queue);
+      }
+      child.send(queue.shift()!);
     };
     for (let k = 0; k < size; k++) {
       const child = fork(fileURLToPath(import.meta.url), [], { env: { ...process.env, LAB_WORKER: '1' } });
@@ -85,7 +96,7 @@ function share(jobs: readonly Job[], size: number, results: RunResult[]): Promis
       child.on('message', (d: Done) => {
         results[d.id] = d.result;
         process.stdout.write('.');
-        if (++finished === jobs.length) {
+        if (++finished === total) {
           for (const c of children) c.kill();
           process.stdout.write('\n');
           resolve();
@@ -93,7 +104,7 @@ function share(jobs: readonly Job[], size: number, results: RunResult[]): Promis
       });
       child.on('error', reject);
       child.on('exit', (code) => {
-        if (code && finished < jobs.length) reject(new Error(`A worker stopped with code ${code}`));
+        if (code && finished < total) reject(new Error(`A worker stopped with code ${code}`));
       });
       give(child);
     }

@@ -567,7 +567,17 @@ export const defaultTuning = {
       repeat: 0.2, // how much a repeated stimulus adds
       // What one heard sound raises him to, at the edge of hearing and when clear (clarity 4).
       sound: { faint: 0.3, clear: 0.62 },
-      shot: 0.8, // a shot heard: searching
+      // A shot heard, by which of its sounds it was: the muzzle's report, the crack of the bullet
+      // passing, its strike, the bolt. Each is read as any sound is, from the edge of hearing
+      // (clarity 1) to clear (its own `clearAt`, since a strike is a far duller thing than a
+      // report). The design doc's searching takes "a close shot": with every pair at 0.8, any
+      // shot heard at all is one, which is how this began.
+      shots: {
+        report: { faint: 0.8, clear: 0.8, clearAt: 4 },
+        crack: { faint: 0.8, clear: 0.8, clearAt: 4 },
+        impact: { faint: 0.8, clear: 0.8, clearAt: 4 },
+        bolt: { faint: 0.8, clear: 0.8, clearAt: 4 },
+      },
       glimpse: 0.8, // having seen you at 100%: searching, once he loses you
       cry: 0.8, // a comrade's cry heard: searching
       body: 0.8, // a body seen: searching (design doc: the strongest stimulus)

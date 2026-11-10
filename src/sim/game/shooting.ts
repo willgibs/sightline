@@ -392,7 +392,8 @@ export function fireFrom(ctx: TickContext, p: PlayerEntity, from: { x: number; y
   solveAim(eye, at, 0, 0, zero, b, B.maxFlight, aim);
   const flight = launch({ x: 0, y: 0, z: 0, dx: 0, dy: 0, dz: 0, t: 0, v0: 0, k: 0, g: 0, wx: 0, wz: 0 }, eye, aim, zero, b, t);
   const shotId = ctx.emit({ type: 'shot', source: p.id, t, x: eye.x, y: eye.y, z: eye.z, dx: flight.dx, dy: flight.dy, dz: flight.dz, speed: b.v0, drag: b.k, wx: b.wx, wz: b.wz });
-  const radius = suppressed ? B.sound.suppressedReport : B.sound.report;
+  // As the rifle's own report is (shoot, above): a subsonic load's is quieter still.
+  const radius = (suppressed ? B.sound.suppressedReport : B.sound.report) * (b.v0 < a.speedOfSound ? B.sound.subsonicReport : 1);
   ctx.emit({ type: 'report', source: p.id, t, cause: shotId, x: eye.x, y: eye.y, z: eye.z, surface: Surface.Dirt, loudness: radius / T.noise.radiusPerUnit, radius, suppressed: suppressed ? 1 : 0 });
   const bullet = ctx.spawn((id): BulletEntity => ({ id, kind: 'bullet', faction: p.faction, bullet: { shooter: p.id, shot: shotId, flight, swept: t } }));
   flyAndStrike(ctx, bullet, (ctx.tick - 1) / T.sim.tickHz);

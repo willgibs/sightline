@@ -30,5 +30,7 @@ export const GEN_VERSION = 7;
  * 11: a siren is heard through walls, so a man deep indoors still hears it.
  * 12: a tree's crown stops sight and bullets once a line has been through enough of it.
  * 13: the escape vehicle drives round the yard and down the road, and is away only at the end of it.
+ * 14: terrain inside a body's rim backs it off toward its own centre where the ground there
+ * would have carried it onto the high ground: the foot of a low ledge is no way up it.
  */
-export const SIM_VERSION = 13;
+export const SIM_VERSION = 14;

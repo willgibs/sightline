@@ -53,6 +53,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       "worst overlap (m)": 0.00009984929554629485,
       "worst rise in a tick (m)": 0.10279701222943771,
       "worst gain on steep ground (m)": 0,
+      "most a move crossed uphill on steep triangles with no promise broken (m)": 0,
       "lean: eye-to-head lines that differ by direction (of 2000)": 0,
       "lean: pairs in view (of 2000)": 1496,
       "seed · lean: pairs where the camera sees a guard who has no line to the head (of 2000)": 18,

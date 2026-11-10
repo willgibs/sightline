@@ -2,6 +2,71 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-09 · A mind is handed its camp's ground, and no more of the world
+
+**Why.** Rule 13 says a brain decides from its mind alone. The mind held the whole static world, which is more than a defender knows: it carries where the player came into the valley, the mission it was built for, and everything the generator worked out about how the camp can be taken (its certified ways in, who it found unwatched). No brain read any of that. Nothing stopped one, and the test that catches omniscience moves the player, not the world, so it wouldn't have caught it.
+
+**Changed, by type alone.** A mind's world is a `Ground` (`brain/mind.ts`): the terrain, what's solid, the grid, the camp's layout and posts, and the range card as places only. A world is one of these, so nothing is copied and nothing runs differently. The brain lane names no wider type, and `tests/architecture.test.ts` holds it to that.
+
+## 2026-11-09 · An experiment builds each camp once
+
+**Why.** An experiment runs the same camps several ways, and every run built its camp again: seconds of generation for a fraction of a second of play. `quiet-kill` has ten arms, so it built each camp ten times.
+
+**Changed.** The runner hands a process all of one camp's runs together, and an experiment may keep the world it last built for its next run (`src/lab/worlds.ts`, one world a process). A world is only read once it's built, and depends on nothing but its mission and the generation half of the tuning, so arms and rolls of the dice can share it. `ladder`, `flaws` and `quiet-kill` do. The overlook experiments don't, because their scene keeps a plan from the building.
+
+**Measured,** the same command before and after, on six camps and six processes: `quiet-kill` 135 s to 40 s, `ladder` 22 s to 14 s. The reports are the same to the character. All 24 camps and ten arms of `quiet-kill` took 351 s before and 63 s after.
+
+## 2026-11-09 · The way-in search, a fifth quicker, bit for bit
+
+**Why.** Generation spends about two fifths of its time in the search that certifies a way in (`generation/infiltrate.ts`): 41% over five camps profiled, more than anything else.
+
+**Changed, with no answer moving.** Two things inside the search, neither of which changes which state it expands next:
+- **Beaten labels leave their lists.** A label another has beaten used to stay in its cell's list and be walked past on every later push and pop. It's now taken out when it's beaten and skipped when the heap reaches it. Beating carries over (if one label beats a second and the second beat a third, the first beats the third), so anything a removed label would have turned away is turned away by the one that removed it: the lists are true Pareto fronts, and the search expands exactly the states it did, in the same order.
+- **The heap holds label numbers** and reads its keys from the pool, where it held six numbers a label in a plain array. No two open labels share all five keys, so the order they come off in is the order of the keys, whatever the heap's shape. Neighbours come from a table built once.
+
+**Measured.** By sampling profile over the same five camps (four whose search runs out its budget, one repaired nine times), with the exposure field as the reference that shouldn't move (5,420 ms before, 5,423 ms after): the search 14.2 s to 11.5 s, 19% less, and a world 8% less. Every world's fingerprint is the same for 24 seeds, and a fingerprint covers each search's count of states expanded, so the order is the same and not only the answers. `tests/world.test.ts` pins one of them.
+
+**What's left is the larger part, and it isn't this file's.** On a camp whose target has to be flushed out, the search runs its whole budget of 400,000 states and reports that it doesn't know, for a way in that camp's rules never ask for. Skipping it changes what a world's report holds, so it needs a new `GEN_VERSION` and belongs with the generator's next change. `docs/foundation-review.md`, Generation.
+
+## 2026-11-09 · A shot's sounds are data, and the quiet kill is measured
+
+**Why.** One suppressed kill from a ridge had nearly the whole camp searching within 5 s. The design doc's ladder asks searching of "a close shot"; the code raised a guard to searching for any sound of a shot heard at all, at any clarity: the report, the crack, the strike (which carries 650 m, so that you hear your hit) and the bolt.
+
+**Changed, with nothing moving.** What each of a shot's four sounds raises a listener to is now data (`perception.awareness.shots`): a faint level, a clear level and the clarity that counts as clear, read like any other sound. The defaults are the old behaviour exactly (0.8 at any clarity), so no fingerprint moves; the golden recording is rewritten because the tuning grew. One law still says what a guard hears; this says what he can tell from it. The compound simulator's shot also takes a subsonic load's quieter report, as the rifle's own always did.
+
+**Measured** (`npm run experiment -- quiet-kill`, 24 camps): the same guard taken through the head, silently, by a suppressed round from the best overview, by a loud one, and by a suppressed subsonic round from 90 m, each under the old reading and a graded one (a crack is a shot within about 40 m of the bullet's path and a snap beyond; a strike is a thud that makes a man look).
+
+| | Of the rest, searching at +5 s | At +20 s | Siren within 150 s | Target gone |
+| --- | --- | --- | --- | --- |
+| Silent | 38% | 60% | 2 of 24 | 2 of 24 |
+| Suppressed, any shot is a shot | 99% | 91% | 10 of 24 | 10 of 24 |
+| Suppressed, by how clearly | 95% | 89% | 10 of 24 | 10 of 24 |
+| Loud, any shot is a shot | 99% | 91% | 10 of 24 | 10 of 24 |
+| Loud, by how clearly | 95% | 91% | 9 of 24 | 9 of 24 |
+| Subsonic at 90 m, any shot is a shot | 98% | 87% | 8 of 23 | 8 of 23 |
+| Subsonic at 90 m, by how clearly | 85% | 84% | 7 of 23 | 7 of 23 |
+| Suppressed, by how clearly, and a whistle only turns heads | 84% | 84% | 9 of 24 | 9 of 24 |
+| Subsonic at 90 m, by how clearly, and a whistle only turns heads | 67% | 75% | 7 of 23 | 7 of 23 |
+
+**What it says.** Grading what a guard hears barely moves the camp: 99% to 95%, and 98% to 85% for the quietest rifle shot there is. So the law of sound isn't what makes a camp all-or-nothing. What does is how news spreads once one man has it: he shouts, the radio carries it, and in a camp that fights someone blows a whistle that carries 600 m and raises everyone who hears it to searching. Making that whistle a call to look up, and no more, takes the quietest shot to 67%. Even a silent kill, with no whistle blown at all, has 60% of the camp searching 20 s later. Where the siren sounds, it sounds a median 7 s after the man falls, and the target is gone a median 27 s after he fell. The defaults stay as they were: the graded reading is a taste call, and by itself it doesn't buy a quiet kill. `docs/foundation-review.md` says what would.
+
+## 2026-11-09 · The foot of a low ledge is no way up it, and a watch that measures where height is gained
+
+Two sessions took up the long bot runs' broken promise the same afternoon. The one that landed first is the entry *What the long bot runs found in the motor*, below: a body on steep ground could end a tick higher on a gentler triangle across a seam, and the motor now refuses any rise from steep ground. This entry is what the second found on top of it.
+
+**Where the height was gained.** In the five failing runs traced here, every millimetre was gained on the walkable triangle: the body slid down or across the steep one, crossed the seam, and its speed carried it up the far side. By the letter of rule 10 that isn't height gained on steep ground. The fix below reads the rule more strictly, that a body on steep ground ends no higher wherever it ends, and that's the better promise: it's simple, and the motor can keep it exactly. A body that slides into a gully now stops rising for that tick and walks up from the next.
+
+**The watch measures the gain where it happens** (`Heightfield.gainOnSteep`): along the line the body moved, triangle by triangle, counting what the terrain rises on the triangles too steep to stand on. It holds a body that walks to three things:
+- from steep ground it ends the tick no higher, wherever it ends;
+- onto steep ground it ends no higher either, wherever it began (the check only ever looked at bodies that began on steep ground);
+- it gains nothing on the steep triangle it began the tick on.
+
+**A real hole that the stricter rule would have turned into a stuck body.** A body sliding down the last of a near-vertical face was carried 1.2 m sideways and 0.43 m up onto the ledge above it in one tick (ROK-8470, tick 286, about one run in fifty). Terrain rising more than a step inside a body's rim backs it off "downhill", by the ground at the rim point. Where a scarp is narrower than the body, that ground is the top of the ledge, not its face, and if the top falls away from its edge, downhill pointed onto it. With the rise refused and the push still pointing the wrong way, the body is held where it is. Backing off now never goes toward the high ground: where the rim point's own downhill would, the body backs off toward its own centre. `SIM_VERSION` 14. `tests/steep.test.ts` holds a handmade ledge to it: without the change the body is lifted or held, and with it the body slides clear.
+
+**A known inexactness, reported and left.** The motor judges a move by where it begins and ends, so between two pieces of ground it can stand on, a body can cross a corner of a steep triangle uphill: up to 68 mm in a tick over 34 hours of bot play, never faster than a walkable grade over the move, and nothing it can climb by. The watch reports the most it sees (`seamGain`, and on the body lane's bench) and holds it to no limit. Making it exact means cutting a move at the first steep triangle that rises and sliding along that triangle's contour. That moves every pinned run near steep ground, for something no player can see, so it's written down in the motor's header and left until there's a reason.
+
+**Checked,** on the merged code: 40 fresh valleys with both bots for 15 minutes each, the movement scenes, 200 ladder towers, and ROK-8470 again. 3.7 million ticks, 34 hours of play, and every promise held (`npm run fuzz -- --seeds 40 --minutes 15`). The worst rise from or onto steep ground was 2.0 mm, the motor's own allowance.
+
 ## 2026-11-09 · The owner's first fight: what it found
 
 **The escape really was broken.** The owner's reading: the box "seems to run into a building, get stuck, the target gets in, marked as escaped." On LEB-2534, the camp they played, that's exactly it. The vehicle's way out was a straight line to the gate, and on 21 of 24 camps that line went through something solid. It was held up 12 m along, and four seconds later the camp counted it as away, because giving up in the road ended the same way as reaching the end of it.
