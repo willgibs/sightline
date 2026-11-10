@@ -8,7 +8,7 @@ Nov 9, 2026. Written for the owner by an advisor session on `claude-fable-5-2`, 
 
 **Rebuild one engine's structure: the guard's brain.** It works, but it was shaped for a guard who reacts alone. The camp work ahead is all about men acting together, and there's nowhere for that to live. Rebuild it in place before the camp learns to hunt, proving at each step that nothing a player could see has changed.
 
-**Change one rule of the game: what an alarm costs.** This is the weakest thing in the project, and it isn't in any engine. Today the first loud moment starts a fuse of about 25 seconds, and when it runs out the mission is lost. Nothing the player or the camp does after that can matter. Section 3 is my answer to your question about the core challenge.
+**Change one rule of the game: what an alarm costs.** This is the weakest thing in the project, and it isn't in any engine. Today the first loud moment starts a fuse of about 27 seconds, and when it runs out the mission is lost. Nothing the player or the camp does after that can matter. Section 3 is my answer to your question about the core challenge.
 
 **Play a whole mission before building more of the camp.** Nobody has finished one. The largest risk here is not technical.
 
@@ -16,8 +16,8 @@ Nov 9, 2026. Written for the owner by an advisor session on `claude-fable-5-2`, 
 
 | Change | Measured |
 | --- | --- |
-| The motor's "broken promise" in long bot runs | Explained, and it was the instrument: 5 of 24 runs failed before, 0 of 284 after (34 hours of bot play) |
-| A real hole the better instrument then found | A body could be carried 0.43 m up a low ledge in one tick. Fixed, with a test that fails without the fix |
+| The motor's broken promise in long bot runs | Another session's fix landed on `main` while I worked: a body on steep ground now ends no higher. This branch adds a watch that measures where height is gained, and fixes what that fix left behind |
+| A body held for good at the foot of a low ledge | On `main` today, a body that slides to the foot of a low ledge of one shape can't move again, whatever is pressed. Fixed, with a test that fails without the fix. On the merged code, 285 long bot runs hold every promise (34 hours of play) |
 | What a shot's sounds tell a guard | Now data. The game's behaviour is unchanged until you choose otherwise |
 | The quiet kill, measured | `npm run experiment -- quiet-kill`. It shows the law of sound isn't the problem: how news spreads is |
 | The camp generator's way-in search | The same answers bit for bit, 19% quicker, which takes 8% off building a world |
@@ -53,11 +53,11 @@ You played the first fight and said a target who runs early forces one or two st
 | Subsonic from 90 m, with each sound read by how clearly it was heard | 85% | 84% | 7 of 23 | 7 of 23 |
 | Subsonic from 90 m, read that way, and the camp's whistle only turns heads | 67% | 75% | 7 of 23 | 7 of 23 |
 
-The man taken is the first one standing still in view of the best overview, so he's often in other men's view too: that's why even the silent row starts at 38%. Where the siren sounds, it sounds a median 7 s after the man falls, and the target is gone a median 25 s after he fell. The overviews stand 240 to 460 m from the camp: 45 to 85 s at a sprint. So once anything loud has happened, nobody on a ridge can reach anything that matters before the mission is decided.
+The man taken is the first one standing still in view of the best overview, so he's often in other men's view too: that's why even the silent row starts at 38%. Where the siren sounds, it sounds a median 7 s after the man falls, and the target is gone a median 27 s after he fell. (The first-fight notes on `main` measure the same thing from a first shot: gone a median 29 s later, on 19 of 24 camps.) The overviews stand 240 to 460 m from the camp: 45 to 85 s at a sprint. So once anything loud has happened, nobody on a ridge can reach anything that matters before the mission is decided.
 
 **Why it happens.** Three things multiply.
 
-1. **One way to lose, on a short fuse nothing can lengthen.** The design doc's second idea is right: "an alarm doesn't kill you; it costs you the objective." But its fourth anti-goal is "not instant-fail stealth", and 25 seconds from the first loud sound to a lost mission is instant-fail stealth with a short delay.
+1. **One way to lose, on a short fuse nothing can lengthen.** The design doc's second idea is right: "an alarm doesn't kill you; it costs you the objective." But its fourth anti-goal is "not instant-fail stealth", and 27 seconds from the first loud sound to a lost mission is instant-fail stealth with a short delay.
 2. **News saturates.** One man's evidence becomes every man's alarm within seconds. I tested the obvious suspect first, the law of sound, by letting each of a shot's sounds count for less when it's fainter. For a suppressed shot from a ridge it barely moved anything: 99% became 95%. For the quietest rifle shot there is, 98% became 85%, and taking the whistle away as well made it 67%. What saturates the camp is what happens after the first man knows. He shouts "Man down!", which raises everyone in earshot as far as seeing the body would. The radio carries it. In a camp that fights, someone blows a whistle that carries 600 m. Each of those channels tells whoever hears it to go to the same high state, whatever they themselves know. Even a silent kill, with no whistle at all, has 60% of the camp searching 20 seconds later. So "who can see whom", the design's first idea, stops mattering at the first casualty, however quietly it's done.
 3. **Nothing the mission needs is inside the wire**, except on the camps built around going in.
 
@@ -93,15 +93,15 @@ I recommend A with B. C doesn't change the shape of the problem, and D is worth 
 
 One tree of plain data for all state, systems that declare what they read and write, recordings that re-simulate bit for bit, save and restore, and a compile check that the kernel stands alone. This is better than most shipped games have, and it's what makes every other number in this review cheap to get.
 
-- **Evidence.** 762 of 763 tests passed on `main` when I started; the one failure was a 120-second timeout on a machine that was heavily loaded, and it passed on the next run. On the branch all 770 pass (`npm run check`). A ten-minute bot run re-simulates to the same hash. A tick costs 256 µs on that loaded machine, under 1% of the 33 ms it has. All eleven pinned runs gave the same fingerprints after every change I made.
+- **Evidence.** 762 of 763 tests passed on `main` when I started; the one failure was a 120-second timeout on a machine that was heavily loaded, and it passed on the next run. On the merged branch all 777 pass (`npm run check`). A ten-minute bot run re-simulates to the same hash. A tick costs 256 µs on that loaded machine, under 1% of the 33 ms it has. All eleven pinned runs gave the same fingerprints after every change I made.
 - **Limits, none urgent.** Spawning or removing an entity rebuilds the whole index. Entities are found by kind only. Both are fine for a camp and would need work for a horde or an open world: a contained change when the time comes.
 - **One thing tightened here.** A guard's mind was handed the whole static world, which includes where the player came into the valley and everything the generator worked out about how to take the camp. No brain read either, but nothing stopped one, and the test that catches omniscience wouldn't have caught it. A mind is now handed its camp's own ground and no more, by type, and a test keeps it so.
 
 ### Body and motor: keep
 
-The most intricate code in the project, and the best tested. The "about one run in five" was the instrument, not the motor (section 7). After my two commits, 40 fresh valleys with both bots for 15 minutes each, the movement scenes and 200 ladder towers hold every promise.
+The most intricate code in the project, and the best tested. Section 7 has the story of the "about one run in five". On the merged code, 40 fresh valleys with both bots for 15 minutes each, the movement scenes and 200 ladder towers hold every promise: 3.7 million ticks.
 
-- **One known inexactness, written down.** The motor judges a move by where it ends, so on the way to ground it can stand on, a body can clip a corner of a steep triangle uphill: up to 58 mm in a tick, never faster than a walkable grade, and nothing it can climb by. Making it exact changes every pinned run near steep ground for something no player can see. It's in the motor's header and on the bench, and I'd leave it until there's a reason.
+- **One known inexactness, written down.** The motor judges a move by where it begins and ends, so between two pieces of ground it can stand on, a body can clip a corner of a steep triangle uphill: up to 68 mm in a tick, never faster than a walkable grade, and nothing it can climb by. Making it exact changes every pinned run near steep ground for something no player can see. It's in the motor's header and on the bench, and I'd leave it until there's a reason.
 - **Cost.** The motor is 69% of a tick: 16 µs a body. That's nothing for 16 guards and would be the first thing to matter for hundreds.
 - **For the futures.** Modes exist (ground, air, mantle, ladder), so a parachute or a swim is a new mode. A vehicle you drive is not a mode: it's a lane of its own. Today's trucks are shapes moved along a road by a script.
 
@@ -190,7 +190,7 @@ Two items carry most of that table: people as one kind, and the brain rebuilt. B
 
 ## 6. Rules I'd change
 
-- **Rule 10, the motor's promise about steep ground.** As written ("never gains height on ground steeper than the limit, from any angle") it isn't quite what the motor does, and the check for it was wrong in a way that hid for a day. Say what's kept exactly: *a body never ends a tick higher on ground too steep to stand on, and gains nothing on the steep ground it began the tick on.* The motor's header says this now. I left `CLAUDE.md` for you.
+- **Rule 10, the motor's promise about steep ground.** As written ("never gains height on ground steeper than the limit, from any angle") it could be read two ways, and two sessions read it differently on the same afternoon. Say what's kept exactly: *from ground too steep to stand on a body ends a tick no higher, onto such ground it ends no higher either, and it gains nothing on the steep ground it began the tick on.* The motor's header says this now. I left `CLAUDE.md` for you.
 - **Rule 11, pinned behaviour.** Two problems. First, the camp's fight is pinned in every engine, though by your own rule its outcomes should be pinned "once a person has played the step and it has settled". Pin its invariants and its work budgets, and leave its fingerprint out of the build's digest until then. Second, one digest covers every pinned run, so any change to the camp's brain makes every kept recording unplayable, including a movement sitting that has no camp in it. Carry a digest per lane a scene uses. Your sittings' evidence would then survive most updates.
 - **Rule 13, brains see only their minds.** Right, and the mind was wider than the rule: fixed here (section 4, The kernel). The rule could say so: *a mind's world is its camp's own ground.*
 - **Rule 6, generation's fingerprint.** It should cover the world, not the proofs about it (section 4, Generation).
@@ -200,22 +200,28 @@ Two items carry most of that table: people as one kind, and the brain rebuilt. B
 
 ## 7. What's on the branch
 
-Branch `claude/fable-advisor-f47b5c`, from `main` at `d66b7b1`. Small commits, each with the tests it touches passing, and `npm run check` green on the whole: 86 files, 770 tests.
+Branch `claude/fable-advisor-f47b5c`, from `main` at `d66b7b1`, with `main` merged in at `567abdd` (the motor's steep-ground rule and the first-fight fixes). Small commits, each with the tests it touches passing, and `npm run check` green on the merged whole: 87 files, 777 tests.
 
 | Commit | What | Moves |
 | --- | --- | --- |
 | The steep-ground promise, measured where it's kept | The watch charges height gained on steep ground to where it was gained (`Heightfield.gainOnSteep`). Tests for both directions | Nothing a player sees. One new bench number |
-| The foot of a low ledge is no way up it | The motor fix for the hole the watch found | `SIM_VERSION` 13. No pinned run or bench number |
+| The foot of a low ledge is no way up it | The motor backs off the right way at a ledge narrower than a body | `SIM_VERSION` 14 after the merge. No pinned run or bench number |
+| Merge of `main` | Takes `main`'s rule that a body on steep ground ends no higher, and holds the watch and the tests to it | |
 | A shot's sounds are data, and the quiet kill is measured | `perception.awareness.shots`, the experiment, a subsonic report for the simulator's shot | The tuning grew, so the golden recording is rewritten. No fingerprint |
 | The way-in search, a fifth quicker, bit for bit | Beaten labels leave their lists; the heap holds label numbers | Nothing: 24 worlds' fingerprints are the same |
 | An experiment builds each camp once | The runner hands a process a camp's runs together; `src/lab/worlds.ts` | Nothing: the reports are the same |
 | A mind is handed its camp's ground | `Ground` in `brain/mind.ts`, and a test | Nothing: types only |
 | This review | | |
 
-**The motor, in full.** In all five failing runs the body had slid off a steep triangle onto a walkable one that rose the way it was going. Every millimetre was gained on the walkable one, and the watch charged the tick's whole rise to where the tick began. Measuring properly then found two things the old check couldn't see: the ledge hole, about one run in fifty, now fixed; and the corner clipping described above, reported and left.
+**The motor, in full.** Two sessions took this up on the same afternoon. In the five failing runs I traced, the body had slid off a steep triangle onto a walkable one that rose the way it was going, and every millimetre was gained on the walkable one. I read that as the check being wrong and rewrote the check. The other session read the rule more strictly, that a body on steep ground should end no higher wherever it ends, and changed the motor to keep it. Theirs landed first, and it's the better promise: simple, and exactly kept. The merge takes it.
 
-**To merge.** Nothing here touches the generator's output, the escape vehicle, `camp.ts` or `comms.ts`. Three places will conflict with other branches, all mechanically:
-- `SIM_VERSION`: take the higher number plus one.
+What this branch adds on top:
+- **The watch measures where height is gained,** so it can tell a climb from a slide, and it also checks bodies that arrive on steep ground from walkable ground, which nothing looked at before.
+- **A stuck body, fixed.** With the rise refused, a body at the foot of a low ledge of one shape is pushed toward the ledge every tick and refused every tick: it can't move again, by walking or sprinting in any direction. I measured that on `main`'s motor: 0.000 m in five seconds, five ways. Before `main`'s change the same body was lifted 0.43 m onto the ledge, which was wrong but let it go. The bots meet that shape about once in fifty 12-minute runs, and the long runs can't see a body that's merely stuck. The fix backs the body off toward its own centre, and it slides clear.
+- **The corner clipping described above,** measured and reported, and left.
+
+**To merge.** The branch is up to date with `main` as of `567abdd`, so it merges cleanly today. Nothing of mine touches the generator's output, the escape vehicle, `camp.ts` or `comms.ts`. If `main` moves again, three places will conflict, all mechanically:
+- `SIM_VERSION`: this takes 14. Take the next number.
 - `tests/golden/TAL-4471-wander.slrec`: run `npm run golden` after merging.
 - `docs/decisions.md`: both sides add entries at the top.
 The way-in search commit changes `src/sim/generation/infiltrate.ts` only, and no world: the compound-types session can take it at any point. The mind's type touches signatures in the brain lane (`World` became `Ground` in five files), which the camp's next step will also edit: take it before that step starts.
@@ -226,7 +232,7 @@ The way-in search commit changes `src/sim/generation/infiltrate.ts` only, and no
 - **Pictures.** `npm run look` timed out in the headless browser on a loaded machine. I looked at one older picture of the honest view from a ridge, which reads cleanly and confirms how small a camp is from there.
 - **The browser tests** (`npm run test:browser`) and the other engines: not run. CI will.
 - **Timings.** The machine was busy with other sessions throughout. Every time here is CPU time, a sampling profile, or a before-and-after pair run back to back. None is a clean wall-clock figure, and generation's "about 3 s" took 7 s here.
-- **The first-fight branch.** I didn't read it. My view of the escape comes from `main`.
+- **The first-fight fixes.** They landed on `main` while I worked and are merged in. I re-ran `quiet-kill` on the merged code, and read their notes, but not their code.
 
 ## 9. Decisions for you
 
