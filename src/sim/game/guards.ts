@@ -104,7 +104,7 @@ export function emptyMind(): Writable<GuardMind> {
 const noDraw = (): number => {
   throw new Error('This mind has no stream to draw from');
 };
-const noNav: NavAllowance = { work: undefined, searches: { left: 0 }, nodesAtStart: 0 };
+const noNav: NavAllowance = { work: undefined, searches: { left: 0 }, nodesAtStart: 0, raysAtStart: 0 };
 
 /** Scratch: the mind a guard's brain decides from, rewritten for each decision. */
 const mind = emptyMind();

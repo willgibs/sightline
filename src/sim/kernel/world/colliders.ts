@@ -208,7 +208,11 @@ export function rayCollider(c: Collider, ox: number, oy: number, oz: number, dx:
   } else {
     let ta = (c.y0 - oy) / dy;
     let tb = (c.y1 - oy) / dy;
-    if (ta > tb) [ta, tb] = [tb, ta];
+    if (ta > tb) {
+      const t = ta;
+      ta = tb;
+      tb = t;
+    }
     tIn = ta;
     tOut = tb;
   }
@@ -240,7 +244,11 @@ export function rayCollider(c: Collider, ox: number, oy: number, oz: number, dx:
     } else {
       let ta = (-c.hx - lx) / ldx;
       let tb = (c.hx - lx) / ldx;
-      if (ta > tb) [ta, tb] = [tb, ta];
+      if (ta > tb) {
+        const t = ta;
+        ta = tb;
+        tb = t;
+      }
       if (ta > tIn) tIn = ta;
       if (tb < tOut) tOut = tb;
     }
@@ -249,7 +257,11 @@ export function rayCollider(c: Collider, ox: number, oy: number, oz: number, dx:
     } else {
       let ta = (-c.hz - lz) / ldz;
       let tb = (c.hz - lz) / ldz;
-      if (ta > tb) [ta, tb] = [tb, ta];
+      if (ta > tb) {
+        const t = ta;
+        ta = tb;
+        tb = t;
+      }
       if (ta > tIn) tIn = ta;
       if (tb < tOut) tOut = tb;
     }

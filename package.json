@@ -31,6 +31,7 @@
     "experiment": "tsx src/headless/experiment.ts",
     "whatif": "tsx src/headless/whatif.ts",
     "flaws": "tsx src/headless/flaws.ts",
+    "hitches": "tsx src/headless/hitches.ts",
     "fuzz": "tsx src/headless/fuzz.ts",
     "playtest": "tsx src/headless/playtest.ts",
     "look": "tsx src/headless/look.ts",

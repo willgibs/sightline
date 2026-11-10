@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
+import { dpow } from '../src/sim/kernel/core/detmath';
 import { audibility } from '../src/sim/kernel/sound';
 import { Blocks, type ColliderInput } from '../src/sim/kernel/world/colliders';
 import { Surface } from '../src/sim/kernel/world/surfaces';
@@ -96,6 +97,49 @@ describe('hearing', () => {
     expect(near.clarity).toBeLessThan(1);
     // The generator's own level there is its law's: 70 m radius, about 3 m away.
     expect(acoustics.ambientLevel(G.x + 3, 1.7, G.z + 2)).toBeGreaterThan(15);
+  });
+
+  it('finds the masked threshold without a ray wherever nothing steady could mask, and the same everywhere', () => {
+    const lab = labWorld(T);
+    const acoustics = new Acoustics(lab, T);
+    const G = LAB.generator;
+    const factor = dpow(10, -T.perception.hearing.maskDb / 20);
+    let masked = 0;
+    let open = 0;
+    // A line of listeners from beside the generator out into the field.
+    for (let d = 1; d <= 60; d += 1.5) {
+      const x = G.x + d * 0.6;
+      const z = G.z + d * 0.8;
+      const full = Math.max(1, acoustics.ambientLevel(x, 1.7, z) * factor);
+      expect(acoustics.threshold(x, 1.7, z), `${d} m`).toBe(full);
+      if (full > 1) masked++;
+      else open++;
+    }
+    expect(masked).toBeGreaterThan(2);
+    expect(open).toBeGreaterThan(10);
+  });
+
+  it('hears the same whether or not it is told who is listening, wherever he then goes', () => {
+    const lab = labWorld(T);
+    const named = new Acoustics(lab, T);
+    const plain = new Acoustics(lab, T);
+    const G = LAB.generator;
+    const spots: Array<[number, number]> = [
+      [G.x + 3, G.z + 2],
+      [G.x + 3, G.z + 2],
+      [0, 40],
+      [G.x + 9, G.z - 4],
+      [G.x + 3, G.z + 2],
+    ];
+    for (const humming of [true, false, true]) {
+      named.humming = humming;
+      plain.humming = humming;
+      for (const [x, z] of spots) {
+        named.spread({ x: x + 6, y: 0, z: z + 6, radius: 10 });
+        plain.spread({ x: x + 6, y: 0, z: z + 6, radius: 10 });
+        expect(named.hear(x, 1.7, z, emptyHeard(), 7)).toEqual(plain.hear(x, 1.7, z, emptyHeard()));
+      }
+    }
   });
 
   it('gives the same answer, bit for bit, whoever asks: two listeners at one cell, two acoustics of one world', () => {

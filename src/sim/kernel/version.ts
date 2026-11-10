@@ -36,5 +36,9 @@ export const GEN_VERSION = 8;
  * 15: the camp's own men step out of the way of its vehicles, and an escape held up by
  * anyone else ends with the target getting out again; a camp can protect its target
  * (brain/protect.ts). No pinned run meets any of these, so no fingerprint moved.
+ * 16: a route inside a camp is found by landmarks, so one that ran a search out of its
+ * budget is now found, and of equally short routes a different one may be taken; a place
+ * that can't be reached is known at once; a tick's looks for dead ground share a budget of
+ * rays. No pinned run moved.
  */
-export const SIM_VERSION = 15;
+export const SIM_VERSION = 16;

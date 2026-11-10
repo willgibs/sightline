@@ -9,6 +9,7 @@ import { SYSTEMS } from '../src/sim/game/systems';
 import { neutralInput } from '../src/sim/kernel/input';
 import type { SimEvent } from '../src/sim/kernel/events';
 import { withSystem, type System } from '../src/sim/kernel/systems';
+import { Cell, cellIndex } from '../src/sim/kernel/world/grid';
 import type { World } from '../src/sim/kernel/world/world';
 import { campWorld } from '../src/sim/game/scenes/campBrain';
 import { testGuard, testWorld } from './fixtures';
@@ -156,6 +157,54 @@ describe('the search map', () => {
     for (let i = 0; i < 40; i++) spreadBelief(m, T.brain.searchMap.spreadRate, world);
     expect(mapMass(m)).toBeCloseTo(1, 6);
     expect(mapSpread(m)).toBeGreaterThan(sharp * 3);
+  });
+
+  it('bleeds only into cells a body can stand in, the same whichever map of the ground asks', () => {
+    // The spread as it's written down: each cell gives `rate` of its belief to its open
+    // neighbours, asking the ground about each. The game asks the ground once and keeps the answer.
+    const m = map();
+    const stands = (i: number, j: number): boolean => {
+      if (i < 0 || j < 0 || i >= m.n || j >= m.n) return false;
+      const x = m.x0 + (i + 0.5) * m.cell;
+      const z = m.z0 + (j + 0.5) * m.cell;
+      const site = cellIndex(world.grid.site, x, z);
+      const L = site >= 0 ? world.grid.site : world.grid.map;
+      const k = site >= 0 ? site : cellIndex(L, x, z);
+      return k >= 0 && (L.flags[k]! & Cell.Walkable) !== 0;
+    };
+    const DIRS = [1, 0, 0, 1, -1, 0, 0, -1, 1, 1, -1, 1, -1, -1, 1, -1];
+    const plainly = (p: readonly number[], rate: number): number[] => {
+      const out = new Array<number>(p.length).fill(0);
+      for (let j = 0; j < m.n; j++) {
+        for (let i = 0; i < m.n; i++) {
+          const k = j * m.n + i;
+          const v = p[k]!;
+          if (v === 0) continue;
+          let count = 0;
+          for (let d = 0; d < DIRS.length; d += 2) if (stands(i + DIRS[d]!, j + DIRS[d + 1]!)) count++;
+          if (count === 0) {
+            out[k] = out[k]! + v;
+            continue;
+          }
+          const give = v * rate;
+          out[k] = out[k]! + v - give;
+          for (let d = 0; d < DIRS.length; d += 2) if (stands(i + DIRS[d]!, j + DIRS[d + 1]!)) out[(j + DIRS[d + 1]!) * m.n + i + DIRS[d]!] = out[(j + DIRS[d + 1]!) * m.n + i + DIRS[d]!]! + give / count;
+        }
+      }
+      return out;
+    };
+    injectBelief(m, 5, 5, 8, 0.6);
+    injectBelief(m, -20, 12, 14, 0.4);
+    let want = [...m.p];
+    for (let i = 0; i < 25; i++) {
+      want = plainly(want, 0.25);
+      spreadBelief(m, 0.25, world);
+      expect(m.p).toEqual(want);
+    }
+    // Some of this camp's map is under walls, or the test says nothing.
+    let shut = 0;
+    for (let j = 0; j < m.n; j++) for (let i = 0; i < m.n; i++) if (!stands(i, j)) shut++;
+    expect(shut).toBeGreaterThan(0);
   });
 
   it('is cleared by a report that a place has been searched, by what can be seen from there', () => {

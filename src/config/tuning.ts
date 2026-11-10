@@ -719,6 +719,8 @@ export const defaultTuning = {
     nav: {
       siteExpansions: 40000, // site-layer cells one search may expand (rule 18)
       mapExpansions: 20000, // map-layer cells one search may expand (rule 18)
+      landmarks: 16, // cells of the camp whose distances to everywhere a fine search aims by (kernel/world/search.ts, landmarkTables); 0 for the straight-line estimate alone. `npm run experiment -- route-cost` has what each number buys
+      landmarkCells: 400000, // and only for a fine layer of no more cells than this: a camp's has about 150,000, and each landmark is a number for every one of them
       searchesPerTick: 4, // routes searched in one tick, across every guard
       nodesPerTick: 12000, // and once a tick's searches have expanded this many cells, the rest wait for the next (a search under way always finishes)
       snapRadius: 4, // metres: how far a blocked point looks for the nearest walkable cell
@@ -779,6 +781,7 @@ export const defaultTuning = {
         maxRun: 40, // metres of path a man will run to get out of the line
         cells: 14000, // cells one search for a spot may walk (rule 18)
         rays: 900, // rays one search for a spot may cast (rule 18)
+        raysPerTick: 300, // and once a tick's searches have cast this many between them, the rest wait for the next (a search under way always finishes)
         spacing: 1.5, // metres between the spots he considers near him: twice that past nearRun, four times past twice nearRun, because neighbouring spots see the same things and rays are what cost
         nearRun: 10,
         preferUpright: 8, // metres farther he'll go to crouch behind something than to lie flat in a fold of the ground: from there he can fight

@@ -109,6 +109,21 @@ export function escapeRoute(world: World, tuning: Tuning): Array<{ x: number; z:
  * where the yard allows. Null if it's boxed in, or the search runs out (rule 18).
  */
 export function yardRoute(world: World, tuning: Tuning, v: VehicleSpec, work?: WorkCounts): Array<{ x: number; z: number }> | null {
+  // It depends on the camp as it was built, where the vehicle is parked and a few numbers, and
+  // on nothing in a run: found once and kept (a scene's setup asks first, so no tick pays for it).
+  let kept = yards.get(world);
+  if (!kept) yards.set(world, (kept = new Map()));
+  const F = tuning.brain.alarm.flee;
+  const key = [v.x, v.z, v.length, v.width, F.clearance, F.routeReach, F.routeExpansions, tuning.gen.grid.bodyRadius].join(' ');
+  let route = kept.get(key);
+  if (route === undefined) kept.set(key, (route = findYardRoute(world, tuning, v, work)));
+  // A copy: whoever asks may keep it and add the road to it.
+  return route ? route.map((p) => ({ x: p.x, z: p.z })) : null;
+}
+
+const yards = new WeakMap<World, Map<string, Array<{ x: number; z: number }> | null>>();
+
+function findYardRoute(world: World, tuning: Tuning, v: VehicleSpec, work?: WorkCounts): Array<{ x: number; z: number }> | null {
   const gate = world.camp.layout?.skeleton.escape[3];
   if (!gate) return null;
   const L = world.grid.site;
