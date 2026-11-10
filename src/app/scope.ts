@@ -81,6 +81,7 @@ export class Instruments {
   private shownDope: readonly DopeRow[] | null = null;
   private shownAssists: Assists | null = null;
   private shownWindFrom: string | null = null;
+  private shownLoad: string | null = null;
 
   constructor(root: HTMLElement) {
     this.canvas = document.createElement('canvas');
@@ -131,6 +132,7 @@ export class Instruments {
     this.shownDope = null;
     this.shownAssists = null;
     this.shownWindFrom = null;
+    this.shownLoad = null;
   }
 
   /**
@@ -146,7 +148,7 @@ export class Instruments {
     n[2] = s.fovDeg;
     n[3] = r ? r.zero : -1;
     n[4] = r ? r.rounds : -1;
-    n[5] = r ? (r.suppressed ? 1 : 0) + (r.fitting > 0 ? 2 : 0) + (r.bolt > 0 ? 4 : 0) + (r.rest > 0.95 ? 8 : 0) + (r.held > 0 ? 16 : 0) : -1;
+    n[5] = r ? (r.suppressed ? 1 : 0) + (r.fitting > 0 ? 2 : 0) + (r.bolt > 0 ? 4 : 0) + (r.rest > 0.95 ? 8 : 0) + (r.held > 0 ? 16 : 0) + (r.swapping ? 32 : 0) : -1;
     n[6] = r ? Math.round(Math.max(0, Math.min(1, r.air)) * BREATH_BAR) : -1;
     n[7] = r && r.glint > 0.01 ? Math.round(r.glint * 50) : 0;
     n[8] = s.ranged ? s.ranged.range : -2;
@@ -155,14 +157,16 @@ export class Instruments {
     n[11] = s.readout ? Math.round(s.readout.hold * 10) : 1e9;
     n[12] = s.readout ? Math.round(s.readout.wind * 10) : 1e9;
     const windFrom = s.readout ? s.readout.windFrom : null;
+    const load = r ? r.load : null;
     // The table is the same table, or there's none: the game hands over a new empty one each frame.
-    let same = (this.shownDope === s.dope || (s.dope.length === 0 && this.shownDope?.length === 0)) && this.shownAssists === s.assists && this.shownWindFrom === windFrom;
+    let same = (this.shownDope === s.dope || (s.dope.length === 0 && this.shownDope?.length === 0)) && this.shownAssists === s.assists && this.shownWindFrom === windFrom && this.shownLoad === load;
     for (let k = 0; same && k < SHOWN_FIELDS; k++) same = n[k] === this.shown[k];
     if (same) return false;
     this.shown.set(n);
     this.shownDope = s.dope;
     this.shownAssists = s.assists;
     this.shownWindFrom = windFrom;
+    this.shownLoad = load;
     return true;
   }
 
