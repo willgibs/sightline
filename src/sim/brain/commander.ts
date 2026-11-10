@@ -220,6 +220,17 @@ export function plan(m: CampMind, out: CampOrder[]): void {
   if (shot && m.tick - camp.shots.tick < T.keepOrder * m.tuning.sim.tickHz && camp.tasks.filter((t) => t.kind === 'sweep').length === 0) {
     addTask(camp, 'sweep', shot.x, shot.z, 3, m.world.camp.guards.filter((g) => g.role === 'marksman').length, m.tick);
   }
+  // Bringing the target out (protect.ts): once the relief is at the gate, men are sent to
+  // his door, and others after a while if his vehicle still hasn't moved. The camp knows its
+  // own vehicle has gone; it doesn't know why a man hasn't come.
+  const P = m.tuning.brain.protect;
+  const relief = camp.relief;
+  const going = camp.objective?.status === 'escaping' || camp.objective?.status === 'escaped';
+  if (camp.protects && camp.devices.escape && relief && !going && relief.fetches < P.fetches && (relief.fetches === 0 || (m.tick - relief.last) / hz >= P.fetchEvery) && !camp.tasks.some((t) => t.kind === 'fetch')) {
+    addTask(camp, 'fetch', camp.protects.x, camp.protects.z, 4, P.fetchers, m.tick);
+    relief.fetches++;
+    relief.last = m.tick;
+  }
   // Search teams at the hottest cells on the map, spaced apart.
   const taken: number[] = [];
   for (const t of camp.tasks) taken.push(t.x, t.z);
@@ -276,7 +287,7 @@ function assign(m: CampMind, out: CampOrder[]): void {
         const post = m.world.camp.guards[g.post]!;
         if (post.elevated && t.kind !== 'sweep') continue;
         const role = roles[post.role];
-        const suit = t.kind === 'sweep' ? (post.role === 'marksman' ? 1 : 0) : t.kind === 'cover' ? 1 : t.kind === 'search' ? role.search : role.investigate;
+        const suit = t.kind === 'sweep' ? (post.role === 'marksman' ? 1 : 0) : t.kind === 'cover' ? 1 : t.kind === 'fetch' ? (role.fight > 0 ? 1 : 0) : t.kind === 'search' ? role.search : role.investigate;
         if (suit <= 0) continue;
         const pos = whereIs(m, g);
         const dx = pos.x - t.x;

@@ -22,9 +22,9 @@ export const GOLDEN = {
   world: '317ed710bbcc8526',
   /** 60 s of play: the person-like bot in two valleys, the fuzzing bot in one. */
   play: {
-    'TAL-4471 wander': { behaviour: '0844c9d26b801aa0', state: '62a4f9411fa57c59' },
-    'MUD-9031 wander': { behaviour: '5198df1366a18e5a', state: 'b6f8df743ce0b3d7' },
-    'TAL-4471 chaos': { behaviour: '9774463eae30de2c', state: '801fc85becae8c2e' },
+    'TAL-4471 wander': { behaviour: '0844c9d26b801aa0', state: 'e0bebfb99afa73b9' },
+    'MUD-9031 wander': { behaviour: '5198df1366a18e5a', state: 'df3cdd3a6304ab8e' },
+    'TAL-4471 chaos': { behaviour: '9774463eae30de2c', state: '59f6a7b73dc28dc3' },
   },
   /**
    * Scenes run by their own drivers, each pinning its lane (benches.ts): the movement
@@ -37,14 +37,14 @@ export const GOLDEN = {
    * a camp fight, the first 45 s of a shooter on an overlook with the whole brain awake (lab F).
    */
   scenes: {
-    'movement-course': { behaviour: '0f2551d99837a6bc', state: '549efd1a98bc727c' },
-    'perception-crowd': { behaviour: '8a0406d39b05cc58', state: '838930f20ad18c54' },
-    'perception-lab': { behaviour: '0aad2727a0cf9bbb', state: 'a7c651e821e7b293' },
-    'shooting-range': { behaviour: '8cc3e0f7a274c3c5', state: '5c849d1f738b28d5' },
-    'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '30be7b87da76f7de' },
-    'kernel-alone': { behaviour: '0698e581024f5b35', state: '045b6f0f6879675a' },
-    'camp-systems': { behaviour: '5453a463a1fc3f81', state: 'e149d786974a82ad' },
-    'camp-fight': { behaviour: '13c29bc769abab8d', state: 'e25ab77d6a6523dc' },
+    'movement-course': { behaviour: '0f2551d99837a6bc', state: '09b7c0b38f93fb85' },
+    'perception-crowd': { behaviour: '8a0406d39b05cc58', state: 'c3b170c93e439d42' },
+    'perception-lab': { behaviour: '0aad2727a0cf9bbb', state: 'f50f679a066c2aa2' },
+    'shooting-range': { behaviour: '8cc3e0f7a274c3c5', state: '96aaf03fb351723a' },
+    'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '8d4c75a6b711d511' },
+    'kernel-alone': { behaviour: '0698e581024f5b35', state: '0bb32cdd438c309a' },
+    'camp-systems': { behaviour: '5453a463a1fc3f81', state: '4e268816788dc12c' },
+    'camp-fight': { behaviour: '13c29bc769abab8d', state: 'bf18960bf5a6237f' },
   },
 } as const;
 

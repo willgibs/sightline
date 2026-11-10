@@ -100,6 +100,8 @@ export interface Readings {
   level: string;
   siren: boolean;
   targetStatus: string;
+  /** Where a camp that protects its target has got to with it, in words; '' for a camp that doesn't (brain/protect.ts). */
+  protection: string;
 }
 
 const distance = (ax: number, az: number, bx: number, bz: number): number => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
@@ -193,6 +195,32 @@ export class CampGauges {
       level: c?.camp.level ?? 'none',
       siren: this.siren,
       targetStatus: c?.camp.objective?.status ?? 'none',
+      protection: protectionOf(sim),
     };
   }
+}
+
+/** The stage a protecting camp has reached, as the lab panel says it: the truth, read off the state. */
+export function protectionOf(sim: Simulation): string {
+  const camp = commanderOf(sim)?.camp;
+  if (!camp?.protects || !camp.objective) return '';
+  if (camp.objective.status === 'escaped') return 'he is gone';
+  if (camp.objective.status === 'escaping') return 'in his vehicle, on the way out';
+  const him = sim.index.get(camp.objective.target);
+  if (!him || him.kind !== 'guard' || !him.brain) return 'he is down';
+  const b = him.brain;
+  const hz = sim.tuning.sim.tickHz;
+  const near = sim.tuning.brain.protect.near;
+  const inRoom = distance(him.body.x, him.body.z, camp.protects.x, camp.protects.z) <= near;
+  const where = b.act === 'flee' ? 'running for his vehicle' : inRoom ? 'in his room' : b.act === 'shelter' ? 'going to his room' : 'about his day';
+  if (b.sirenAt < 0) return (b.standToUntil ?? -1) > sim.tick ? `stand-to · ${where}` : where;
+  const relief = camp.relief
+    ? `relief at the gate ${((sim.tick - camp.relief.at) / hz).toFixed(0)} s ago, sent for him ${camp.relief.fetches}×`
+    : camp.reinforceCalled >= 0
+      ? `relief called ${((sim.tick - camp.reinforceCalled) / hz).toFixed(0)} s ago`
+      : 'no relief called';
+  const left = sim.tuning.brain.protect.giveUp - (sim.tick - b.sirenAt) / hz;
+  const word = b.releasedAt !== undefined ? (b.told.some((t) => t.kind === 'escort') ? 'told to come' : 'gave up waiting') : `waits ${Math.max(0, left).toFixed(0)} s more`;
+  const way = camp.devices.escape ? '' : ' · no vehicle';
+  return `${where} · ${relief} · ${word}${way}`;
 }
