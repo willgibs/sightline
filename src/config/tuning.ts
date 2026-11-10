@@ -171,21 +171,43 @@ export const defaultTuning = {
       // `half`: the plot's half-sizes along the gate's axis, then across it, 0 for the plan's plot;
       // `heart`: the half-size of its open heart (yard, bailey, farmyard), 0 for the usual yard.
       types: {
-        // The compound as first built: seven slots round an open yard, one gate, one breach.
+        // The compound as first built: seven slots round an open yard, one gate, one breach, mostly
+        // chain link. Walking its outside hands you each man in turn (`npm run experiment -- circling`),
+        // so it's out of the mix and kept as the lab's baseline, drawing exactly what it always did.
         yard: {
           shape: 'yard',
-          cruxes: { walk: 1, inside: 2, flush: 2, escort: 2 },
+          cruxes: { walk: 1, inside: 0, flush: 0, escort: 0 },
           sites: { hollow: 3, spur: 1, bend: 2, scarp: 2, gorge: 1, col: 2 },
           plots: { yard: 3, long: 2, wide: 2, tight: 2 },
-          perimeters: { chain: 3, screen: 2, fort: 1, fields: 0 },
+          perimeters: { chain: 3, screen: 2, fort: 1, fields: 0, windowed: 0 },
           fills: { open: 3, packed: 2 },
           half: [0, 0, 0, 0],
           heart: 0,
           gateWidth: 8,
           breachWidth: 4,
           breachSides: ['back', 'left', 'right'],
+          barbican: 0, // metres of wall running out from each side of a gate, so it can only be seen into from straight ahead
           towers: [2, 4],
           vehicleDoorGap: 0, // metres his vehicle keeps off every door: the plain yard's never needed it
+          modules: { hq: [12, 9, 3.2], barracks: [18, 8, 3], mess: [13, 9, 3], storage: [13, 10, 4.4], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
+        },
+        // The same plot behind a wall: the yard can only be seen into through the gate, the breach,
+        // the stretches of chain link left in the wall, and from high enough up.
+        walled: {
+          shape: 'yard',
+          cruxes: { walk: 0, inside: 2, flush: 2, escort: 2 },
+          sites: { hollow: 3, spur: 1, bend: 2, scarp: 2, gorge: 1, col: 2 },
+          plots: { yard: 3, long: 2, wide: 2, tight: 2 },
+          perimeters: { chain: 0, screen: 0, fort: 1, fields: 0, windowed: 3 },
+          fills: { open: 3, packed: 2 },
+          half: [0, 0, 0, 0],
+          heart: 0,
+          gateWidth: 8,
+          breachWidth: 4,
+          breachSides: ['back', 'left', 'right'],
+          barbican: 12,
+          towers: [2, 4],
+          vehicleDoorGap: 3,
           modules: { hq: [12, 9, 3.2], barracks: [18, 8, 3], mess: [13, 9, 3], storage: [13, 10, 4.4], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
         },
         // A keep on a hilltop: a tight walled plot, one narrow gate, and in the middle of it the
@@ -195,13 +217,14 @@ export const defaultTuning = {
           cruxes: { walk: 0, inside: 5, flush: 2, escort: 0 },
           sites: { hollow: 1, spur: 5, bend: 1, scarp: 2, gorge: 1, col: 3 },
           plots: { yard: 0, long: 0, wide: 0, tight: 1 },
-          perimeters: { chain: 0, screen: 0, fort: 1, fields: 0 },
+          perimeters: { chain: 0, screen: 0, fort: 1, fields: 0, windowed: 0 },
           fills: { open: 3, packed: 1 },
           half: [40, 46, 40, 46],
           heart: 15,
           gateWidth: 5,
           breachWidth: 2.4,
           breachSides: ['back', 'left', 'right'],
+          barbican: 10,
           towers: [2, 4],
           vehicleDoorGap: 3,
           modules: { hq: [16, 12, 6.2], barracks: [16, 8, 3], mess: [12, 8, 3], storage: [12, 9, 3.6], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
@@ -213,39 +236,48 @@ export const defaultTuning = {
           cruxes: { walk: 0, inside: 1, flush: 4, escort: 4 },
           sites: { hollow: 2, spur: 1, bend: 1, scarp: 2, gorge: 4, col: 2 },
           plots: { yard: 0, long: 1, wide: 0, tight: 0 },
-          perimeters: { chain: 3, screen: 2, fort: 0, fields: 0 },
+          perimeters: { chain: 0, screen: 0, fort: 1, fields: 0, windowed: 3 },
           fills: { open: 2, packed: 3 },
           half: [58, 66, 30, 36],
           heart: 10,
           gateWidth: 8,
           breachWidth: 4,
           breachSides: ['left', 'right'],
+          barbican: 12,
           towers: [2, 3],
           vehicleDoorGap: 3,
           modules: { hq: [13, 9, 3.4], barracks: [20, 9, 3], mess: [13, 9, 3], storage: [24, 11, 5], radio: [7, 5, 2.8], shed: [6, 4, 2.6] },
         },
         // A farm and its outbuildings: no fence, a farmhouse, a barn and a byre round a small
-        // farmyard, then huts scattered across the plot, low field walls, a silo a marksman holds.
+        // farmyard, huts scattered across the plot behind long stone field walls (a few low enough
+        // to see over, and gaps to find), a walled lane in, a silo a marksman holds.
         farm: {
           shape: 'steading',
           cruxes: { walk: 0, inside: 3, flush: 3, escort: 3 },
           sites: { hollow: 3, spur: 1, bend: 3, scarp: 1, gorge: 1, col: 1 },
           plots: { yard: 0, long: 0, wide: 1, tight: 0 },
-          perimeters: { chain: 0, screen: 0, fort: 0, fields: 1 },
+          perimeters: { chain: 0, screen: 0, fort: 0, fields: 1, windowed: 0 },
           fills: { open: 1, packed: 0 },
           half: [44, 52, 46, 56],
           heart: 9,
           gateWidth: 6,
-          breachWidth: 6,
+          breachWidth: 4,
           breachSides: ['back', 'left', 'right'],
+          barbican: 10,
           towers: [1, 1],
           vehicleDoorGap: 3,
           modules: { hq: [13, 10, 3.2], barracks: [18, 8, 3.2], mess: [12, 8, 3], storage: [22, 12, 7], radio: [6, 5, 2.8], shed: [6, 5, 2.6] },
         },
       },
-      fieldWall: 1.1, // a farm's field walls: low enough to see over, and to crawl behind
-      fieldRun: [14, 30], // metres of wall between gaps
-      fieldGap: [5, 11], // metres of gap
+      fieldWall: 1.1, // a farm's low field walls: to see over, and to crawl behind
+      fieldWallHigh: 2.4, // and its high ones, which nobody sees over
+      fieldHighShare: 0.95, // how many of a farm's runs of wall are high
+      fieldRun: [45, 90], // metres of wall between gaps
+      fieldGap: [3, 6], // metres of gap
+      fieldInset: 14, // metres a farm's patrols keep in from its boundary
+      windows: [0, 1], // on each side of a windowed wall, stretches of chain link: what can be seen in through, if you find where to stand
+      windowWidth: [6, 10], // metres each
+      windowMargin: 6, // metres a window keeps from a corner, an opening or another window
       plotLong: [58, 66], // half-size along a long plot's length
       plotNarrow: [30, 36], // and across it
       plotTight: [36, 42], // half-sizes of a tight plot
@@ -349,6 +381,7 @@ export const defaultTuning = {
       maxCoverage: 0.6, // no perch sees more than this share of guard time
       maxTarget: 0.25, // nor the target for more than this share of the cycle
       watchedDuty: 0.03, // a guard counts as watched if another would see him drop for this share of the cycle
+      witnessedFrom: 0.05, // a perch only has to have its shots witnessed if it sees this share of guard time
       manyGuards: 0.4, // a perch that sees this share of guard time keeps alarm boxes and the antenna out of its fire
       counterRange: 450, // metres: a marksman post or a counter-perch overlooks a perch within this
       counterRings: [60, 120, 200, 300, 400], // metres round a perch searched for ground the camp can reach that overlooks it

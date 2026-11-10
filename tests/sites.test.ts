@@ -1,11 +1,12 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T, type Tuning } from '../src/config/tuning';
 import { EXPERIMENTS } from '../src/lab/experiments';
-import { describe as describeCamp, plainTuning } from '../src/lab/experiments/variety';
+import { describe as describeCamp, plainTuning, yardOnly } from '../src/lab/experiments/variety';
 import { campMission, generateWorld, siteKindOf, SITE_KINDS, type SiteKind } from '../src/sim/generation';
 import { cruxOf } from '../src/sim/generation/crux';
 import { generateLandform } from '../src/sim/generation/landform';
 import { checkValley } from '../src/sim/generation/overwatch';
+import { campWalkStart } from '../src/sim/generation/site';
 import { pickWeighted } from '../src/sim/generation/weights';
 import type { TerrainResult } from '../src/sim/generation/terrain';
 import { Rng } from '../src/sim/kernel/core/rng';
@@ -23,9 +24,8 @@ import { makeTerrainSample } from '../src/sim/kernel/world/heightfield';
 
 /** A valley of one kind: the seed's own, with the other kinds' weights set to nothing. The compound stays the plain yard, whatever the type weights say. */
 function only(kind: SiteKind): Tuning {
-  const t = structuredClone(T);
+  const t = yardOnly(T);
   for (const k of SITE_KINDS) t.gen.landform.sites[k] = k === kind ? 1 : 0;
-  for (const type of ['keep', 'depot', 'farm'] as const) for (const c of ['walk', 'inside', 'flush', 'escort'] as const) t.gen.compound.types[type].cruxes[c] = 0;
   return t;
 }
 
@@ -252,7 +252,8 @@ describe('the crux a camp is built around', () => {
     // One of the camps that started him on a shelf he could slide off and never get back to.
     const w = generateWorld(campMission('REV-0010'), T);
     const walk = new GridSearch(w.grid.map);
-    walk.flood([cellIndex(w.grid.map, w.camp.site.x, w.camp.site.z)], { maxExpansions: w.grid.map.nx * w.grid.map.nz });
+    const at = campWalkStart(w.camp);
+    walk.flood([cellIndex(w.grid.map, at.x, at.z)], { maxExpansions: w.grid.map.nx * w.grid.map.nz });
     expect(walk.cost[cellIndex(w.grid.map, w.spawn.x, w.spawn.z)]!).toBeGreaterThanOrEqual(0);
   }, 120_000);
 

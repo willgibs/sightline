@@ -4,14 +4,15 @@ import type { Driver } from '../../kernel/scene';
 import type { World } from '../../kernel/world/world';
 import { defaultCampSpec } from '../../generation';
 import { OverlookShooter } from '../bots/overlook';
-import { Careless, ShootAndRelocate, ShootOnceAndLeave } from '../bots/person';
+import { Careless, ShootAndCircle, ShootAndRelocate, ShootOnceAndLeave } from '../bots/person';
 import { ViewDriver } from '../bots/playerView';
 import { placePlayer } from '../setup';
 import { parseSwitches, switchedOff, type CampSwitch } from '../switches';
 import type { Simulation } from '../sim';
 import type { Scene } from '.';
-import { liveCamp } from './liveCamp';
+import { liveCamp, READINESS, type Readiness } from './liveCamp';
 import { bestOverview } from './overlook';
+import { takedownTuning } from './takedown';
 
 /**
  * The bot ladder (Lab F, docs/camp-engine.md, section 4): the same live camp, played by a
@@ -22,6 +23,11 @@ import { bestOverview } from './overlook';
  *   leave      from a perch, takes the clean moment on the target, then walks to the way out
  *   static     the perfect shooter on the best overview, who never moves (bots/overlook.ts): the upper limit of one perch
  *   relocate   shoots from one firing point, moves to the next after each engagement, and leaves once the target's down
+ *   circle     a few rounds from a perch, then round the outside of the base shooting each man as he comes into view
+ *
+ * `circle` isn't a plan to win by: it doesn't leave, so it isn't on the ladder's tally.
+ * It's the owner's complaint from the takedown, for `npm run experiment -- circling` to hold
+ * a camp's shape against. `ready=alert` plays any of them against the takedown's camp.
  *
  * They all start on their firing point. The walk in is a separate question, and someone
  * who has found a perch has had the time to.
@@ -29,21 +35,24 @@ import { bestOverview } from './overlook';
 
 export const LADDER_PLANS = ['careless', 'leave', 'static', 'relocate'] as const;
 export type LadderPlan = (typeof LADDER_PLANS)[number];
+type AnyPlan = LadderPlan | 'circle';
 
 export interface LadderParams {
   seed: string;
-  plan: LadderPlan;
+  plan: AnyPlan;
   off: CampSwitch[];
+  ready: Readiness;
 }
 
 export function parseLadder(text: string | undefined): LadderParams {
-  const p: LadderParams = { seed: 'LEB-2534', plan: 'careless', off: [] };
+  const p: LadderParams = { seed: 'LEB-2534', plan: 'careless', off: [], ready: 'relaxed' };
   for (const part of (text ?? '').split('&')) {
     if (!part) continue;
     const [key, value] = part.split('=');
     if (key === 'seed' && value) p.seed = value;
-    else if (key === 'plan' && (LADDER_PLANS as readonly string[]).includes(value ?? '')) p.plan = value as LadderPlan;
+    else if (key === 'plan' && ([...LADDER_PLANS, 'circle'] as readonly string[]).includes(value ?? '')) p.plan = value as AnyPlan;
     else if (key === 'off') p.off = parseSwitches(value ?? '');
+    else if (key === 'ready' && (READINESS as readonly string[]).includes(value ?? '')) p.ready = value as Readiness;
     else throw new Error(`The ladder doesn't know '${part}'`);
   }
   return p;
@@ -92,15 +101,65 @@ function onTargetPerches(world: World): Array<{ x: number; z: number }> {
 }
 
 /** Where a plan starts. */
-function startOf(plan: LadderPlan, world: World): { x: number; z: number } {
-  return plan === 'static' || plan === 'careless' ? bestOverview(world) : bestOnTarget(world);
+function startOf(plan: AnyPlan, world: World): { x: number; z: number } {
+  return plan === 'static' || plan === 'careless' || plan === 'circle' ? bestOverview(world) : bestOnTarget(world);
+}
+
+/** How far outside the plot's edge the walk round goes, metres: the flat field just outside the compound. */
+const RING_OFF = 25;
+/** How far apart the stops on it are, metres. */
+const RING_EVERY = 15;
+
+/**
+ * The outside of the base as someone on foot would walk it: a loop round the plot, `off`
+ * metres out from its edge, a stop every `every` metres, beginning at the stop nearest `from`.
+ */
+export function ringAround(world: World, from: { x: number; z: number }, off = RING_OFF, every = RING_EVERY): Array<{ x: number; z: number }> {
+  const L = world.camp.layout!;
+  const s = world.camp.site;
+  const A = L.halfA + off;
+  const B = L.halfB + off;
+  const corners = [
+    [A, B],
+    [-A, B],
+    [-A, -B],
+    [A, -B],
+  ] as const;
+  const ring: Array<{ x: number; z: number }> = [];
+  corners.forEach(([a0, b0], k) => {
+    const [a1, b1] = corners[(k + 1) % 4]!;
+    const n = Math.max(1, Math.round((Math.abs(a1 - a0) + Math.abs(b1 - b0)) / every));
+    for (let i = 0; i < n; i++) {
+      const a = a0 + ((a1 - a0) * i) / n;
+      const b = b0 + ((b1 - b0) * i) / n;
+      ring.push({ x: s.x + L.ux * a + L.vx * b, z: s.z + L.uz * a + L.vz * b });
+    }
+  });
+  let first = 0;
+  let nearest = Infinity;
+  ring.forEach((p, k) => {
+    const d = (p.x - from.x) * (p.x - from.x) + (p.z - from.z) * (p.z - from.z);
+    if (d < nearest) {
+      nearest = d;
+      first = k;
+    }
+  });
+  return [...ring.slice(first), ...ring.slice(0, first)];
+}
+
+/** The `circle` plan's bot, for this simulation: built here so an experiment can see when it has been all the way round. */
+export function circleOf(sim: Simulation): ShootAndCircle {
+  const world = sim.world;
+  const site = { x: world.camp.site.x, z: world.camp.site.z };
+  const at = startOf('circle', world);
+  return new ShootAndCircle(new Rng(`${world.seed}/dice${sim.tuning.sim.dice}`, 'person/circle'), site, ringAround(world, at));
 }
 
 /** Makes the plan's bot when the run starts, from the simulation it finds itself in. */
 class PlanDriver implements Driver<Simulation> {
   private inner: Driver<Simulation> | null = null;
 
-  constructor(private readonly plan: LadderPlan) {}
+  constructor(private readonly plan: AnyPlan) {}
 
   next(sim: Simulation, out: InputFrame): InputFrame {
     this.inner ??= this.make(sim);
@@ -112,6 +171,7 @@ class PlanDriver implements Driver<Simulation> {
     const site = { x: world.camp.site.x, z: world.camp.site.z };
     // A bot has its own stream, and another roll of the dice gives it other hands too.
     const rng = new Rng(`${world.seed}/dice${sim.tuning.sim.dice}`, `person/${this.plan}`);
+    if (this.plan === 'circle') return new ViewDriver(circleOf(sim));
     if (this.plan === 'static') return new OverlookShooter(5);
     if (this.plan === 'careless') return new ViewDriver(new Careless(rng, site));
     if (this.plan === 'leave') return new ViewDriver(new ShootOnceAndLeave(rng, site, onTargetPerches(world)));
@@ -121,13 +181,14 @@ class PlanDriver implements Driver<Simulation> {
 
 export function ladder(params?: string): Scene {
   const p = parseLadder(params);
-  const base = liveCamp(`seed=${p.seed}&difficulty=${defaultCampSpec().difficulty}`);
+  const base = liveCamp(`seed=${p.seed}&difficulty=${defaultCampSpec().difficulty}${p.ready !== 'relaxed' ? `&ready=${p.ready}` : ''}`);
   return switchedOff(
     {
       ...base,
       name: 'ladder',
       version: 1,
-      params: `seed=${p.seed}&plan=${p.plan}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}`,
+      params: `seed=${p.seed}&plan=${p.plan}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}${p.ready !== 'relaxed' ? `&ready=${p.ready}` : ''}`,
+      ...(p.ready === 'alert' ? { tune: takedownTuning } : {}),
       title: `The ladder: ${p.plan} (${p.seed})`,
       description: 'A live camp played by one plan of the bot ladder, with the mission\'s own rule: the target down, and you out.',
       setup: (sim) => {

@@ -49,19 +49,19 @@ A compound type is a record in `tuning.gen.compound.types` (rule 16: content is 
 
 A new type that uses an existing shape is data alone. A new shape is one function, and everything else follows. That's the same seam as the kinds of site (`landform.ts`): new ground from new streams, with the old kind unchanged.
 
-**Yard stays**, as one of four, and with its weights at the top it is bit for bit today's generator (new types only ever draw from new streams, rule 3). That's what the variety experiments' arms compare against.
+**The yard stays in the tuning, out of the mix.** With only `yard` weighted it is bit for bit the generator as it was (new types only ever draw from new streams, rule 3), and that's what the variety and circling experiments compare against. It no longer comes up in play: the owner's sitting on Nov 10 found that its chain link hands you the camp (section 4a). **The walled compound** is the same plot behind a wall, and takes the yard's place: data alone, on the old shape.
 
 ## 3. How a seed gets its type
 
 `compoundTypeOf(seed, crux, kind, gen)`, from a root stream of its own (`compound-type`), so a valley re-rolled or a camp rebuilt keeps its type, the same way cruxes and kinds of site already work. The weights multiply a type's fit to the crux and to the ground, so each pair of crux and ground reads as a real place, not a roll of the dice. The starting values below are to be set from `npm run experiment`:
 
-| Crux | yard | keep | depot | farm |
+| Crux | walled | keep | depot | farm |
 | --- | --- | --- | --- | --- |
 | inside: dig him out | 2 | 5 | 1 | 3 |
 | flush: make him run | 2 | 2 | 4 | 3 |
 | escort: he walks with eyes on him | 2 | 0 | 4 | 3 |
 
-| Ground | yard | keep | depot | farm |
+| Ground | walled | keep | depot | farm |
 | --- | --- | --- | --- | --- |
 | hollow | 3 | 1 | 2 | 3 |
 | spur | 1 | 5 | 1 | 1 |
@@ -112,6 +112,21 @@ Each is here because it changes *what a plan has to be*, not only how the camp l
 ```
 
 What each *doesn't* do yet: buildings stay aligned to the camp's axes (the raster, doorways and the way the wall cells are stamped assume it), and the compound still sits on the site's flat pad at the middle of the map (the owner's *pad* call). Neither stops the types.
+
+## 4a. Walking the outside (the owner's bar, Nov 10)
+
+The owner played the takedown on the plain yard and wrote: "a few perch shots, then just circling the base taking out each new enemy as they came into view, never really being seen, even in the flat field just outside the compound, felt too easy. Largely the bland, simple base design: so open I never have to work for a shot or scout." So a compound's shape is held to that now: **it should make you scout and work for an angle, and walking its outside shouldn't hand you each man in turn.** The camp coming after you is the other half of that note, and belongs to the camp's engine, not to its shape.
+
+**The measure is on the bench** (`npm run experiment -- circling`, `lab/experiments/circling.ts`), so this is not a matter of opinion. A bot limited to what a person can do (`ShootAndCircle`, `bots/person.ts`) fires three rounds from the best overview, walks a lap of the plot 25 m out, crouched, stops every 15 m to look in and shoots whoever is there, against the takedown's alert camp. It counts the men who go down from the walk. Then, with nobody firing, from every 10 m of that walk at twelve moments of the routine: how many men are in a clear line, what share of the walk each man can be seen from (how wide an angle you get him from), and how many no stop ever shows. And how many men the best overview shows, and how many firing points it takes to see everyone. Its first arm, `yard only`, is the base the owner played.
+
+**What was wrong, in numbers.** The first three types were built to differ, and two of them were *more* open than the yard: from the walk, a depot showed 3.1 men at a stop and a farm 3.9, against the yard's 2.6. Taking the numbers apart by role said why: on chain link and open fields a patrol is visible from 95% of the walk and a worker from 80%, and the only man a wall doesn't hide is the one on a tower. And once the walls were up, the bot showed the leak that was left: it stood off to one side of the gate and shot five men through it from one place.
+
+**What changed:**
+
+- **A wall, with windows.** The `windowed` perimeter is wall all round with up to one stretch of chain link per side, 6 to 10 m wide: a place to find, which shows a wedge of the camp and nothing else. It's the depot's and the walled compound's usual perimeter; the rest are solid (`fort`).
+- **A gate that shows you the camp only from straight in front of it.** Two walls run out 10 to 12 m from each gate, along the line the road takes, and the road goes between them (`barbican` in a type's record). You have to stand on the road to look up it.
+- **Long, high field walls for the farm**, with gaps to find and an occasional low run. A patrol keeps 14 m in from them: right along a wall with gaps in it, he'd pass every gap.
+- **The chain-link yard is out of the mix**, kept as the bench's baseline.
 
 ## 5. What a second storey asks of everything that assumes one surface per column
 
