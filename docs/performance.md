@@ -18,7 +18,7 @@ Those are the hitches you felt while holding a breath: a guard reacts, asks for 
 
 **The first shot of a run was the worst moment, and that's fixed too.** The first time anything happens in a run it costs many times what it costs after. The tick of the first shot took 36 to 49 ms in a fresh process, which is what a new tab is. It now takes 3 to 4, because the game rehearses the camp's fight once while the valley loads.
 
-**In a real browser the slow frames in play are gone.** Chromium on this Mac's GPU, the same attacked camp for two and a half minutes, one run each: before, frames of 83 and 50 ms in play and two stalls of the page; after, none. Section 5 says what that browser couldn't tell me.
+**In a real browser the slow frames in play are gone.** Chromium on this Mac's GPU, one run each. The attacked camp watched for two and a half minutes: before, frames of 83 and 50 ms in play and two stalls of the page; after, none. The takedown, scoped in and firing: before, the page's longest unbroken stretch of work was 42 ms, with eight of 20 ms or more in 25 seconds; after, the longest is 8 ms. Section 5 says what that browser couldn't tell me.
 
 **Nothing about how the game plays was traded for this**, with one exception worth knowing: guards now find routes that used to defeat them (section 3).
 
@@ -28,7 +28,7 @@ Those are the hitches you felt while holding a breath: a guard reacts, asks for 
 | --- | --- | --- |
 | A freeze of a few frames in a fight, at no particular moment | A guard asking for a route across the camp. With a wall between him and where he's going, the search looked at every cell nearer than the gate first: up to 124,000 of them in one tick, 60 ms | Routes inside a camp now aim by landmarks: the same route for a tenth of the looking. A place that can't be reached is known at once |
 | The same, a moment after a shout or a shot | Every sound was checked against all 61 steady sounds of the valley (the river is 60 of them), with a ray each, for every listener | A listener too far from anything steady to be masked by it is known without a ray. The answer is the same |
-| The first shot of a run hitches | Code run for the first time, and things the world works out on first use | The camp's fight is rehearsed once at load, out of sight |
+| The first shot of a run hitches | Code run for the first time, and things the world works out on first use | The camp's fight is rehearsed once at load, out of sight: about 0.3 s more loading |
 | A stall as he gets into his vehicle | The vehicle's way across the yard was searched for in that tick | Found once, at setup |
 | A hitch when a round strikes | Each strike's dust was a new material, thrown away as it faded. The last one thrown away takes its shader program with it, and the next strike waits for it to be built again | The dust is a fixed set of puffs, made once |
 | A hitch once a minute | Your session is saved every minute, and each save asked the GPU its name, which waits on the GPU's own process | Asked once |
