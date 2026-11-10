@@ -5,6 +5,7 @@ import { showsPlayerHud } from '../src/app/hud';
 import { kitFields, type RifleReadout } from '../src/app/kit';
 import { insideQuad, MAP_LARGE, MAP_SMALL, mapPoint, mapSide, nextMapMode, roofOf, satelliteOf, scaleBarMetres, type MapMode } from '../src/app/minimap';
 import { defaultTuning as T } from '../src/config/tuning';
+import { yardOnly } from '../src/lab/experiments/variety';
 import { SCENES } from '../src/sim/game/scenes';
 import { campMission, defaultCampSpec, generateWorld } from '../src/sim/generation';
 import { Blocks } from '../src/sim/kernel/world/colliders';
@@ -97,8 +98,9 @@ describe('the map key', () => {
 
 describe('what the satellite saw', () => {
   // A chain-link camp, whose only blocks are the screens inside the target's building, and a walled one.
-  const chain = generateWorld(campMission('TAL-4471', defaultCampSpec(), 'overlook'), T);
-  const walled = generateWorld(campMission('MUD-2210', defaultCampSpec(), 'overlook'), T);
+  const yard = yardOnly(T);
+  const chain = generateWorld(campMission('TAL-4471', defaultCampSpec(), 'overlook'), yard);
+  const walled = generateWorld(campMission('MUD-2210', defaultCampSpec(), 'overlook'), yard);
   const count = (w: World, kind: string): number => w.camp.structures.filter((s) => s.kind === kind).length;
 
   it('is the shape of the ground, the fence and the roofs, the road, the creek and the woods', () => {

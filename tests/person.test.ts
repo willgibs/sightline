@@ -5,7 +5,7 @@ import { plainTuning } from '../src/lab/experiments/variety';
 import { Careless, HASTY, PERSON, ShootOnceAndLeave, WalkTo } from '../src/sim/game/bots/person';
 import { LiveView, ViewDriver, type Angles, type PlayerView, type Point3, type SeenMan, type You } from '../src/sim/game/bots/playerView';
 import { commanderOf, giveCommander } from '../src/sim/game/comms';
-import { ladder } from '../src/sim/game/scenes/ladder';
+import { circleOf, ladder } from '../src/sim/game/scenes/ladder';
 import { arm } from '../src/sim/game/shooting';
 import { Simulation } from '../src/sim/game/sim';
 import { Rng } from '../src/sim/kernel/core/rng';
@@ -212,6 +212,35 @@ describe('the ladder', () => {
     expect(Math.hypot(sim.player.x - out.x, sim.player.z - out.z)).toBeLessThanOrEqual(quiet.brain.getOut.radius);
     expect(farthest).toBeGreaterThan(300);
   }, 60_000);
+
+  it('shoot and circle goes down to the base, and goes all the way round it', () => {
+    // Nobody can shoot back, and the target stays: this is about the walk.
+    const quiet = tuningCopy();
+    for (const role of Object.keys(quiet.brain.combat.range) as Array<keyof typeof quiet.brain.combat.range>) quiet.brain.combat.range[role] = 0;
+    const sc = { ...(ladder('seed=HOF-3956&plan=circle&off=truck,alarm,fight') as Scene<Simulation>), playOn: true };
+    const sim = startScene(sc, quiet);
+    const bot = circleOf(sim);
+    const driver = new ViewDriver(bot);
+    const raw = sc.game.still(sim);
+    const ticks = sceneTicks(sc, quiet);
+    const site = sim.world.camp.site;
+    const L = sim.world.camp.layout!;
+    const start = { x: sim.player.x, z: sim.player.z };
+    // Round the plot: every quarter of the way round from where he came down.
+    const quarters = new Set<number>();
+    let leftPerchAt = -1;
+    while (!sceneOver(sc, sim, ticks) && !bot.lapped) {
+      sim.step(driver.next(sim, raw));
+      if (leftPerchAt < 0 && bot.walking) leftPerchAt = sim.tick;
+      if (Math.max(Math.abs((sim.player.x - site.x) * L.ux + (sim.player.z - site.z) * L.uz) - L.halfA, Math.abs((sim.player.x - site.x) * L.vx + (sim.player.z - site.z) * L.vz) - L.halfB) < 50) {
+        quarters.add(Math.floor(((Math.atan2(sim.player.z - site.z, sim.player.x - site.x) + Math.PI) / (2 * Math.PI)) * 4));
+      }
+    }
+    expect(leftPerchAt).toBeGreaterThan(0);
+    expect(Math.hypot(sim.player.x - start.x, sim.player.z - start.z)).toBeGreaterThan(40);
+    expect(bot.lapped).toBe(true);
+    expect(quarters.size).toBe(4);
+  }, 120_000);
 
   it('counts who was best on each camp, and by how far', () => {
     const exp: Experiment = { name: 't', about: '', series: 's', camps: 2, arms: [{ name: 'a' }, { name: 'b' }, { name: 'c' }], score: 'won', measures: [{ key: 'won', label: 'won', kind: 'rate' }], run: () => ({}) };

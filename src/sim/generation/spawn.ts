@@ -31,7 +31,7 @@ export function chooseSpawn(
   report: { perches: Perch[] },
   playHalf: number,
   site: Site,
-  map: GridLayer,
+  map: GridLayer, start: { x: number; z: number } = site,
 ): Spawn {
   const sample = makeTerrainSample();
   // Not somewhere with no way down to the camp: a shelf in a gorge, the top of a scarp.
@@ -39,7 +39,7 @@ export function chooseSpawn(
   const reachable = (x: number, z: number): boolean => {
     if (!walk) {
       walk = new GridSearch(map);
-      walk.flood([cellIndex(map, site.x, site.z)], { maxExpansions: map.nx * map.nz });
+      walk.flood([cellIndex(map, start.x, start.z)], { maxExpansions: map.nx * map.nz });
     }
     const c = cellIndex(map, x, z);
     return c >= 0 && walk.cost[c]! >= 0;

@@ -26,10 +26,10 @@ export const BENCH_GOLDEN: PinnedBench = {
       "lab D least margin under the valley budget": 7,
       "lab D widest overwatched horizon (°)": 157,
       "lab D narrowest open horizon (°)": 152,
-      "lab D camps valid at the first attempt, no repair (of 6)": 5,
-      "lab D camps repaired": 1,
+      "lab D camps valid at the first attempt, no repair (of 6)": 6,
+      "lab D camps repaired": 0,
       "lab D rules still broken": 0,
-      "lab D most re-analyses in a repair (of 12)": 11,
+      "lab D most re-analyses in a repair (of 12)": 0,
       "lab D camps with a way in and out (of 6)": 1,
       "lab D clusters left unsolved": 0,
       "lab D busiest search (of 400000 expansions)": 400000,
@@ -46,12 +46,12 @@ export const BENCH_GOLDEN: PinnedBench = {
   },
   "body": {
     "metrics": {
-      "body-ticks checked": 75600,
+      "body-ticks checked": 82800,
       "runs with a broken promise (of 4)": 0,
       "bodies under the terrain": 0,
       "bodies inside something solid": 0,
-      "worst overlap (m)": 0.00009984929554629485,
-      "worst rise in a tick (m)": 0.10279701222943771,
+      "worst overlap (m)": 0.00009984134594931415,
+      "worst rise in a tick (m)": 0.029554423939202934,
       "worst gain on steep ground (m)": 0,
       "most a move crossed uphill on steep triangles with no promise broken (m)": 0,
       "lean: eye-to-head lines that differ by direction (of 2000)": 0,
@@ -60,12 +60,12 @@ export const BENCH_GOLDEN: PinnedBench = {
       "mantle: ticks inside someone walking across the landing": 0,
       "seed · mantle checked once: ticks inside him": 15,
       "prone: fuzzing bot on the course and in two valleys, lying poses checked": 16573,
-      "prone: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 588,
+      "prone: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 548,
       "seed · single circle: fuzzing bot on the course and in two valleys, lying poses checked": 16573,
-      "seed · single circle: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 4037,
+      "seed · single circle: fuzzing bot on the course and in two valleys, poses with a part inside something solid": 3734,
       "prone: turning between walls a metre apart, poses with a part inside something solid": 0,
       "seed · single circle: turning between walls a metre apart, poses with a part inside something solid": 259,
-      "prone: deepest any part goes into something solid (m)": 0.194506768,
+      "prone: deepest any part goes into something solid (m)": 0.15625,
       "seed · single circle: deepest any part goes into something solid (m)": 0.490337132
     },
     "runs": {
@@ -175,26 +175,26 @@ export const BENCH_GOLDEN: PinnedBench = {
       "re-found within 60 s (of 16): honest, unpaced": 16,
       "reactions (in the scripted scenarios)": 62,
       "reactions unexplained": 0,
-      "overlook: guards down from one perch, of 31": 22,
+      "overlook: guards down from one perch, of 34": 19,
       "overlook: camps cleared (of 3)": 0,
       "overlook: the target got away (of 3)": 2,
-      "timed shot on an escort's camp: target down (of 3)": 3,
-      "a fight’s worst tick: grid cells the brains expand": 6308,
-      "a fight’s worst tick: rays the brains cast": 369,
-      "a fight’s worst tick: grid cells sounds flood": 18475,
-      "routes between a camp’s posts: found (of 56)": 56,
-      "routes between a camp’s posts: grid cells a search looks at, on average": 372,
-      "routes between a camp’s posts: the most one search looks at": 2006
+      "timed shot on an escort's camp: target down (of 3)": 2,
+      "a fight’s worst tick: grid cells the brains expand": 6501,
+      "a fight’s worst tick: rays the brains cast": 297,
+      "a fight’s worst tick: grid cells sounds flood": 16238,
+      "routes between a camp’s posts: found (of 90)": 90,
+      "routes between a camp’s posts: grid cells a search looks at, on average": 351,
+      "routes between a camp’s posts: the most one search looks at": 1757
     },
     "runs": {
       "camp-fight": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 11204 },
-          "bullets": { "rays": 216, "nodes": 0, "bodies": 0 },
-          "perception-hearing": { "rays": 50, "nodes": 12290, "bodies": 0 },
-          "perception-spotting": { "rays": 3100, "nodes": 0, "bodies": 0 },
-          "perception-awareness": { "rays": 0, "nodes": 65303, "bodies": 0 },
-          "guard-brains": { "rays": 454, "nodes": 14863, "bodies": 0 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 14084 },
+          "bullets": { "rays": 133, "nodes": 0, "bodies": 0 },
+          "perception-hearing": { "rays": 61, "nodes": 13609, "bodies": 0 },
+          "perception-spotting": { "rays": 2288, "nodes": 0, "bodies": 0 },
+          "perception-awareness": { "rays": 0, "nodes": 89031, "bodies": 0 },
+          "guard-brains": { "rays": 1148, "nodes": 17318, "bodies": 0 }
         }
       }
     }
@@ -229,7 +229,7 @@ export const BENCH_GOLDEN: PinnedBench = {
     "runs": {
       "TAL-4471 wander": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 18000 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 21600 }
         }
       },
       "MUD-9031 wander": {
@@ -240,7 +240,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       },
       "TAL-4471 chaos": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 18000 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 21600 }
         }
       }
     }

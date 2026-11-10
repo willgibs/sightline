@@ -109,8 +109,11 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
     return c < 0 ? null : { x: layer.x0 + ((c % layer.nx) + 0.5) * layer.cell, z: layer.z0 + (Math.floor(c / layer.nx) + 0.5) * layer.cell };
   };
   /** A loop through the stops, along grid paths; null if a stop or a leg can't be walked. */
-  const route = (wanted: Point2[], looks: number[], scans?: ScanKind[]): { stops: Stop[]; legs: Point2[][] } | null => {
-    const pts = wanted.map(snap);
+  const route = (wanted: Point2[], looks: number[], scans?: ScanKind[], tolerant = false): { stops: Stop[]; legs: Point2[][] } | null => {
+    // A loop may ask for a corner that a building stands on, and keeps the rest; a stop anywhere else must exist.
+    const kept = wanted.map((p, k) => ({ p: snap(p), look: looks[k]!, scan: scans?.[k] })).filter((e) => !tolerant || e.p !== null);
+    if (tolerant && kept.length < 2) return null;
+    const pts = kept.map((e) => e.p);
     if (pts.some((p) => p === null)) return null;
     const legs: Point2[][] = [];
     for (let k = 0; k < pts.length; k++) {
@@ -118,7 +121,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
       if (!leg) return null;
       legs.push(leg);
     }
-    return { stops: pts.map((p, k) => ({ x: p!.x, z: p!.z, scan: scans?.[k] ?? pickScan(srng), look: looks[k]!, dwell: dwell() })), legs };
+    return { stops: pts.map((p, k) => ({ x: p!.x, z: p!.z, scan: kept[k]!.scan ?? pickScan(srng), look: kept[k]!.look, dwell: dwell() })), legs };
   };
 
   // Where the way in matters and the target's building stands away from the breach, the
@@ -155,21 +158,14 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
 
   // Patrol loops on the lanes: the perimeter, the yard, and the alleys around each side.
   const lane = gen.compound.lane / 2;
-  const y = L.yard;
   const HA = L.halfA;
   const HB = L.halfB;
-  const loops: Array<{ name: string; pts: Point2[] }> = [
-    { name: 'perimeter', pts: [at(HA - lane, HB - lane), at(-HA + lane, HB - lane), at(-HA + lane, -HB + lane), at(HA - lane, -HB + lane)] },
-    { name: 'yard', pts: [at(y - 1, y - 1), at(-y + 1, y - 1), at(-y + 1, -y + 1), at(y - 1, -y + 1)] },
-    { name: 'back', pts: [at(-y - 1, HB - lane), at(-HA + lane, HB - lane), at(-HA + lane, -HB + lane), at(-y - 1, -HB + lane)] },
-    // Each loop runs the lanes it shares with the perimeter the same way round, so patrols never meet head on.
-    { name: 'left', pts: [at(-HA + lane, -y - 1), at(-HA + lane, -HB + lane), at(HA - lane, -HB + lane), at(HA - lane, -y - 1)] },
-    { name: 'right', pts: [at(HA - lane, y + 1), at(HA - lane, HB - lane), at(-HA + lane, HB - lane), at(-HA + lane, y + 1)] },
-  ];
+  // The plot's own loops (plots.ts): for a plain yard, the perimeter, the yard and the alleys.
+  const loops = L.loops.map((l) => ({ name: l.name, pts: l.pts.map((p) => at(p.x, p.z)) }));
   const centre = at(0, 0);
   const outward = (p: Point2): number => lookAt(centre, p) + 180 * DEG; // facing out, away from the middle
   const routes = loops
-    .map((l) => ({ name: l.name, r: route(l.pts, l.pts.map((p) => (l.name === 'yard' ? lookAt(p, centre) : outward(p)))) }))
+    .map((l) => ({ name: l.name, r: route(l.pts, l.pts.map((p) => (l.name === 'yard' ? lookAt(p, centre) : outward(p))), undefined, L.type !== 'yard') }))
     .filter((l): l is { name: string; r: { stops: Stop[]; legs: Point2[][] } } => l.r !== null);
 
   // Sentry posts: inside the gate, then the narrowest passages between the camp's zones.
@@ -187,6 +183,11 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
       const post = { x: front.x + d.ux * aside, z: front.z + d.uz * aside };
       sentryPosts.unshift({ at: post, look: lookAt(post, { x: post.x - d.nx * 4, z: post.z - d.nz * 4 }), door: true });
     }
+  }
+  // A gate besides the first has a man inside it, too.
+  for (const g of L.openings.filter((o) => o.kind === 'gate').slice(1)) {
+    const inward = g.side === 'back' ? 4 : -4;
+    sentryPosts.push({ at: at(g.a + inward, g.b + g.width / 2 + 1.5), look: lookAt(at(g.a + inward, g.b), at(g.a - inward * 2.5, g.b)) });
   }
   const zones = [at(0, 0), at(-HA + lane, 0), at(0, -HB + lane), at(0, HB - lane), at(HA - lane - 2, gate.b)];
   for (let i = 0; i < zones.length; i++) {

@@ -1,4 +1,5 @@
 import { defaultTuning as T } from '../src/config/tuning';
+import { yardOnly } from '../src/lab/experiments/variety';
 import { MarksmanDriver, type Step } from '../src/sim/game/bots/marksman';
 import { liveCamp } from '../src/sim/game/scenes/liveCamp';
 import { placePlayer } from '../src/sim/game/setup';
@@ -9,10 +10,13 @@ import type { World } from '../src/sim/kernel/world/world';
 
 const worlds = new Map<string, World>();
 
-/** A generated camp, built once per test file. */
+/**
+ * A generated camp, built once per test file: the plain yard these were written against, so a
+ * test of the camp's brain doesn't move when a seed comes up as another kind of place.
+ */
 export function worldOf(seed: string): World {
   let w = worlds.get(seed);
-  if (!w) worlds.set(seed, (w = generateWorld(campMission(seed), T)));
+  if (!w) worlds.set(seed, (w = generateWorld(campMission(seed), yardOnly(T))));
   return w;
 }
 

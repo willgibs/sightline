@@ -9,6 +9,7 @@ import { infiltrate, rimCells, type Exposure, type Infiltration, type Meter, typ
 import type { Point2 } from './paths';
 import { findPerches, perchSeesDeck, perchViewshed, type PerchSpot } from './perches';
 import { cellOf, centreOf, clearShot, frameOf, type Raster } from './raster';
+import { campWalkStart } from './site';
 
 /**
  * Lab D's analysis of a generated camp (D7): who sees whom over its cycle, what each perch
@@ -114,7 +115,7 @@ export function analyzeCamp(
   const duty = witnessDuty(W);
 
   // --- Perches: what each sees of the guards, the target, the alarms and the escape. ---
-  const spots = findPerches(hf, camp.site, gen, grid.map, R.canopy);
+  const spots = findPerches(hf, camp.site, gen, grid.map, R.canopy, campWalkStart(camp));
   const n = T.guards.length;
   const K = T.samples;
   const seen = new Uint8Array(spots.length * n * K);
