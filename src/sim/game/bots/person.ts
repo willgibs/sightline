@@ -583,3 +583,85 @@ export class ShootAndRelocate extends FromPerches {
     if (this.shotsHere >= this.shotsPerPerch || view.time - this.since > this.dry) this.moveOn();
   }
 }
+
+/**
+ * Shoot, circle, shoot, circle (the owner's takedown sitting, Nov 10): a few rounds from a
+ * firing point, then on foot round the outside of the base, stopping every few metres to
+ * look in and shooting each man who's there. He doesn't stop for the target and he doesn't
+ * leave: the question is what one lap of the outside hands him (lab/experiments/circling.ts).
+ */
+export class ShootAndCircle extends Plan {
+  private readonly fromPerch: Orders = { onlyTarget: false, clean: false, patience: 0, lase: true, reach: 600 };
+  private readonly fromRing: Orders = { onlyTarget: false, clean: false, patience: 0, lase: false, reach: 250 };
+  /** Where he is on the ring: −1 while he's still on the firing point. */
+  private stop = -1;
+  private walker: Walker | null = null;
+  private since = -1;
+  private shotsHere = 0;
+  /** He has been all the way round. */
+  lapped = false;
+  /** He has left the firing point for the base. */
+  get walking(): boolean {
+    return this.stop >= 0;
+  }
+
+  constructor(
+    rng: Rng,
+    camp: { x: number; z: number },
+    /** Where he stops to look in, in the order he walks them. */
+    private readonly ring: ReadonlyArray<{ x: number; z: number }>,
+    /** Rounds from the firing point before he goes down to the base. */
+    private readonly opening = 3,
+    /** Seconds with nothing to shoot on the firing point before he goes anyway. */
+    private readonly dry = 60,
+    /** Seconds at a stop with nobody in view before he walks on. */
+    private readonly look = 5,
+    /** The most he'll stay at one stop, seconds. */
+    private readonly linger = 45,
+    skill: Skill = PERSON,
+  ) {
+    super(skill, rng, camp);
+  }
+
+  /** He came to clear the base, so the target going down doesn't send him home. */
+  override next(view: PlayerView, out: InputFrame): InputFrame {
+    this.hands.begin(view, out);
+    this.act(view, out);
+    return this.hands.end(view, out);
+  }
+
+  private walkOn(): void {
+    if (this.stop + 1 >= this.ring.length) {
+      this.lapped = true;
+      return;
+    }
+    this.stop++;
+    const p = this.ring[this.stop]!;
+    this.walker = new Walker(p.x, p.z, 0, 2.5);
+  }
+
+  protected act(view: PlayerView, out: InputFrame): void {
+    if (this.walker) {
+      if (!this.walker.step(view, this.hands, out, 'crouch', false)) return;
+      this.walker = null;
+      this.since = -1;
+      this.shooter.reset();
+    }
+    const onPerch = this.stop < 0;
+    if (!settle(view, this.hands, out, onPerch ? 'prone' : 'crouch', this.camp)) return;
+    if (this.since < 0) {
+      this.since = view.time;
+      this.shotsHere = 0;
+    }
+    const orders = onPerch ? this.fromPerch : this.fromRing;
+    this.shooter.step(view, this.hands, out, orders);
+    if (this.shooter.finished) this.shotsHere++;
+    const here = view.time - this.since;
+    if (onPerch) {
+      if (this.shotsHere >= this.opening || here > this.dry) this.walkOn();
+      return;
+    }
+    const someone = view.seen.some((m) => m.distance <= orders.reach);
+    if ((!someone && here > this.look) || here > this.linger) this.walkOn();
+  }
+}

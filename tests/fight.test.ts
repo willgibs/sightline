@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T, type Tuning } from '../src/config/tuning';
 import { attackRun } from '../src/lab/experiments/flaws';
+import { yardOnly } from '../src/lab/experiments/variety';
 import { compound } from '../src/sim/game/scenes/compound';
 import { bestOverview } from '../src/sim/game/scenes/overlook';
 import { ATTACKS, type AttackDriver } from '../src/sim/game/attacks';
@@ -125,7 +126,8 @@ describe('a camp that fights back', () => {
   it('gives reinforcements a place of their own, not a shared post', () => {
     // A squad once ended up in a heap at a post that was a single point. These camps call one in.
     for (const seed of ['LEB-2534', 'REV-0010']) {
-      const { sim, watch } = attackRun(seed, 'sniper', T);
+      // Plain yards, as these two camps were when the numbers were set: the reinforcements are what's measured.
+      const { sim, watch } = attackRun(seed, 'sniper', yardOnly(T));
       expect(watch.counts()['pile-up']).toBe(0);
       const reserves = sim.guards.filter((g) => g.guard.reserve);
       expect(reserves.length).toBeGreaterThan(0);

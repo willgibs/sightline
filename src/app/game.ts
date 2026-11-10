@@ -1430,6 +1430,7 @@ export class Game {
       `WORLD`,
       `relief ${w.terrain.minHeight.toFixed(0)} to ${w.terrain.maxHeight.toFixed(0)} m · ${w.features.ridges?.length ?? 0} ridges · generated in ${Math.round(w.genMs)} ms`,
       `overwatch ${w.report.overwatchSectors}/8 directions · ${w.report.perches.length} perches · reachable from ${w.report.accessSectors}/16`,
+      ...(w.camp.layout ? [`compound: ${w.camp.layout.type} · ${w.camp.layout.plan.perimeter} · crux ${w.camp.crux ?? 'none'}`] : []),
       `${w.props.trees.length.toLocaleString('en-US')} trees · ${w.props.rocks.length.toLocaleString('en-US')} rocks · ${w.props.bushes.length.toLocaleString('en-US')} bushes · ${w.camp.guards.length} guards${this.sim.solids.count ? ` · ${this.sim.solids.count} solid entities` : ''}`,
       sizes
         ? `recording ${kb(sizes.inputs)} inputs · ${kb(sizes.states)} states · ${kb(sizes.events)} events`

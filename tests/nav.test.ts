@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { emptyRoute, emptySteering, followRoute, navigatorOf, routeLength, type Route } from '../src/sim/brain/nav';
-import { plainTuning } from '../src/lab/experiments/variety';
+import { plainTuning, yardOnly } from '../src/lab/experiments/variety';
 import { campMission } from '../src/sim/generation';
 import { generateWorld } from '../src/sim/generation/world';
 import { player } from '../src/sim/game/entities';
@@ -136,7 +136,8 @@ describe('navigation', () => {
   });
 
   it('goes round a camp’s walls on a fraction of the cells, by a route no longer', () => {
-    const world = generateWorld(campMission('LEB-2534'), T);
+    // The plain yard's walls and lanes, which is what the cells and routes below were measured on.
+    const world = generateWorld(campMission('LEB-2534'), yardOnly(T));
     const plain = structuredClone(T);
     plain.brain.nav.landmarks = 0;
     // Two tunings share a world's navigator, so each asks all its routes in turn.
@@ -343,7 +344,8 @@ describe('walking a route', () => {
 
 describe('routes off the camp', () => {
   it('reaches the ground that overlooks the camp from every post, and leaves by the side it is going to', () => {
-    const world = generateWorld(campMission('LEB-2534'), T);
+    // A camp with no wall of its own to go round: what this measures is the fields, not the compound.
+    const world = generateWorld(campMission('LEB-2534'), yardOnly(T));
     const nav = navigatorOf(world, T);
     const route = emptyRoute();
     const perches = world.report.camp!.perches as ReadonlyArray<{ x: number; z: number }>;

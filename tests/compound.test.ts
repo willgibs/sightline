@@ -65,7 +65,7 @@ describe('the compound', () => {
       const hq = L.buildings.find((b) => b.module === 'hq')!;
       expect(hq.doors.length).toBe(needsWayIn(w.camp.crux!) ? 2 : 1);
       for (const b of L.buildings) expect(b.doors.length).toBeGreaterThanOrEqual(1);
-      expect(L.towers.length).toBeGreaterThanOrEqual(T.gen.compound.towers[0]!);
+      expect(L.towers.length).toBeGreaterThanOrEqual(T.gen.compound.types[L.type].towers[0]!);
       expect(w.camp.ladders!.length).toBe(L.towers.length);
       expect(w.camp.vehicles!.filter((v) => v.escape).length).toBe(1);
       for (const kind of ['generator', 'mast', 'light', 'alarm', 'tower'] as const) expect(w.camp.structures.some((s) => s.kind === kind)).toBe(true);

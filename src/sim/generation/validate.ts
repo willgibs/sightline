@@ -5,6 +5,7 @@ import type { SpatialGrid } from '../kernel/world/grid';
 import { cellIndex } from '../kernel/world/grid';
 import { GridSearch } from '../kernel/world/search';
 import type { Camp } from './camp';
+import { campWalkStart } from './site';
 import type { AnalysisParts, CampAnalysis } from './campAnalysis';
 import { cruxExcess, needsWayIn } from './crux';
 
@@ -121,13 +122,14 @@ export function validateCamp(camp: Camp, a: CampAnalysis, parts: AnalysisParts, 
   {
     // A perch that sees two guards or more must see one who, for a part of the cycle, would
     // be seen dropping by a guard it can't see at that moment: a shot there is witnessed
-    // unless it's timed.
+    // unless it's timed. A place that has two men in view for a moment now and then, behind a
+    // wall, isn't a perch that sees them: `witnessedFrom` of the guards' time.
     const { witnesses: W, sight: P } = parts;
     const K = W.samples;
     const bad: number[] = [];
     a.perches.forEach((_, i) => {
       const inView = sees[i]!.map((v, g) => (v ? g : -1)).filter((g) => g >= 0);
-      if (inView.length < 2) return;
+      if (inView.length < 2 || a.perches[i]!.coverage < V.witnessedFrom) return;
       const seenAt = (g: number, k: number): boolean => P.seen[(i * n + g) * K + k] === 1;
       const watched = inView.some((v) => {
         for (let u = 0; u < n; u++) {
@@ -187,7 +189,8 @@ function unanswered(camp: Camp, a: CampAnalysis, hf: Heightfield, grid: SpatialG
   const posts = camp.guards.filter((g) => g.role === 'marksman').map((g) => ({ x: g.x, y: (g.elevated ? g.y : hf.heightAt(g.x, g.z)) + S.eye, z: g.z }));
   // Where the camp can walk: a flood over the map's grid from the camp.
   const search = new GridSearch(grid.map);
-  const start = cellIndex(grid.map, camp.site.x, camp.site.z);
+  const from = campWalkStart(camp);
+  const start = cellIndex(grid.map, from.x, from.z);
   const reachable = new Uint8Array(eyes.length);
   if (start >= 0) {
     search.flood([start], { maxExpansions: grid.map.nx * grid.map.nz });

@@ -11,6 +11,7 @@ export { siteAt, type Site } from './site';
 export { ARCHETYPES, campMission, campSpecProblems, defaultCampSpec, type CampArchetype, type CampSpec } from './campSpec';
 export { SITE_KINDS, siteKindOf, type Ford, type Ridge, type SiteKind } from './landform';
 export { CRUX_KINDS, cruxOf, type CruxKind } from './crux';
+export { COMPOUND_TYPES, compoundTypeOf, type CompoundType } from './plots';
 export type { Overwatch } from './overwatch';
 export type { BuildingSpec, CampLayout, DeviceKind, DeviceSpec, DoorSpec, LadderSpec, ModuleName, ObjectiveSpec, Opening, Parcel, Side, Skeleton, SlotName, VehicleSpec } from './compound';
 export { GUARD_ROLES, type Camp, type GuardRole, type GuardSpawn, type Structure, type StructureKind } from './camp';
