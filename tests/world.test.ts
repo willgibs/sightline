@@ -3,6 +3,7 @@ import { defaultTuning } from '../src/config/tuning';
 import { closestOnPolyline, type PathHit } from '../src/sim/generation/paths';
 import { generateWorld, worldFingerprint } from '../src/sim/generation/world';
 import type { World } from '../src/sim/kernel/world/world';
+import { storeyAt } from '../src/sim/kernel/world/grid';
 import { makeTerrainSample } from '../src/sim/kernel/world/heightfield';
 import { missionSpec } from '../src/sim/kernel/mission';
 import { CellStreams } from '../src/sim/generation/scatter';
@@ -120,11 +121,13 @@ describe('world generation', () => {
     expect(toCamp).toBeCloseTo(1, 6);
   });
 
-  it('puts guards on the ground or on their towers', () => {
+  it('puts guards on the ground, on their towers or on an upper floor', () => {
     for (const g of tal.camp.guards) {
       const ground = tal.terrain.heightAt(g.x, g.z);
-      if (g.elevated) expect(g.y).toBeGreaterThan(ground + 5);
-      else expect(g.y).toBeCloseTo(ground, 5);
+      const floor = g.elevated ? storeyAt(tal.grid, g.x, g.y, g.z) : -1;
+      if (!g.elevated) expect(g.y).toBeCloseTo(ground, 5);
+      else if (floor >= 0) expect(g.y).toBeCloseTo(tal.grid.storeys[floor]!.y, 5);
+      else expect(g.y).toBeGreaterThan(ground + 5);
     }
     expect(tal.camp.guards.length).toBeGreaterThanOrEqual(6);
     expect(tal.camp.guards.length).toBeLessThanOrEqual(16);
@@ -143,4 +146,4 @@ describe('world generation', () => {
   });
 });
 
-const GOLDEN_TAL_4471 = 'f6f346913137d617';
+const GOLDEN_TAL_4471 = 'd65c15c8a7a25bb6';

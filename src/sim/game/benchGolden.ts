@@ -175,26 +175,29 @@ export const BENCH_GOLDEN: PinnedBench = {
       "re-found within 60 s (of 16): honest, unpaced": 16,
       "reactions (in the scripted scenarios)": 62,
       "reactions unexplained": 0,
-      "overlook: guards down from one perch, of 34": 19,
+      "overlook: guards down from one perch, of 32": 17,
       "overlook: camps cleared (of 3)": 0,
       "overlook: the target got away (of 3)": 2,
-      "timed shot on an escort's camp: target down (of 3)": 2,
-      "a fight’s worst tick: grid cells the brains expand": 6501,
-      "a fight’s worst tick: rays the brains cast": 297,
-      "a fight’s worst tick: grid cells sounds flood": 16238,
-      "routes between a camp’s posts: found (of 90)": 90,
-      "routes between a camp’s posts: grid cells a search looks at, on average": 351,
-      "routes between a camp’s posts: the most one search looks at": 1757
+      "timed shot on an escort's camp: target down (of 3)": 3,
+      "a fight’s worst tick: grid cells the brains expand": 6503,
+      "a fight’s worst tick: rays the brains cast": 454,
+      "a fight’s worst tick: grid cells sounds flood": 19332,
+      "routes between a camp’s posts: found (of 56)": 56,
+      "routes between a camp’s posts: grid cells a search looks at, on average": 459,
+      "routes between a camp’s posts: the most one search looks at": 2716,
+      "routes to a camp’s upper floors and back: found (of 32)": 32,
+      "routes to a camp’s upper floors and back: grid cells a search looks at, on average": 287,
+      "routes to a camp’s upper floors and back: the most one search looks at": 683
     },
     "runs": {
       "camp-fight": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 14084 },
-          "bullets": { "rays": 133, "nodes": 0, "bodies": 0 },
-          "perception-hearing": { "rays": 61, "nodes": 13609, "bodies": 0 },
-          "perception-spotting": { "rays": 2288, "nodes": 0, "bodies": 0 },
-          "perception-awareness": { "rays": 0, "nodes": 89031, "bodies": 0 },
-          "guard-brains": { "rays": 1151, "nodes": 17318, "bodies": 0 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 12105 },
+          "bullets": { "rays": 53, "nodes": 0, "bodies": 0 },
+          "perception-hearing": { "rays": 51, "nodes": 29269, "bodies": 0 },
+          "perception-spotting": { "rays": 8477, "nodes": 0, "bodies": 0 },
+          "perception-awareness": { "rays": 0, "nodes": 64535, "bodies": 0 },
+          "guard-brains": { "rays": 277, "nodes": 8945, "bodies": 0 }
         }
       }
     }
@@ -234,8 +237,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       },
       "MUD-9031 wander": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 19800 },
-          "perception-sight": { "rays": 302, "nodes": 0, "bodies": 0 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 19800 }
         }
       },
       "TAL-4471 chaos": {

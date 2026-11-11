@@ -57,7 +57,7 @@ Routes come out the same length (80 m on average, every row). Sixteen landmarks 
 
 ## 4. Measuring it
 
-- `npm run hitches`: the standing fights, each in a process of its own, built as the game's code is built. For each: the first run as a fresh tab would find it, the warm runs, each system's worst tick and the most work it did in one, and every tick over 4 ms. `npm run hitches -- takedown` or any scene with its parameters; `--no-rehearsal` shows a cold start without the rehearsal.
+- `npm run hitches`: the standing fights, each in a process of its own, built as the game's code is built. For each: the first run as a fresh tab would find it, the warm runs, each system's worst tick and the most work it did in one, and every tick over 4 ms: those slow in every run, and those slow in the first run only, each with the system that took the time. `npm run hitches -- takedown` or any scene with its parameters; `--no-rehearsal` shows a cold start without the rehearsal.
 - `npm run experiment -- route-cost`: the table above.
 - `npm run bench`: the brain lane now pins a fight's worst tick as work: the most grid cells the brains expand in a tick, the most rays they cast, the most cells sounds flood. Work is the same on every machine, so a hitch shows up there before anyone feels it.
 - `npm run playtest`: a session's telemetry now keeps its slowest frames, when each was, and whose it was: the page's own work, the simulation's share of that, or neither (a frame that was long with little work in it waited on the GPU or the browser). Your next sitting will say what's left in your own browser, on the public build too.
@@ -111,3 +111,26 @@ After the hitches, the owner asked for a sweep for the scope overlay's kind of t
 
 `npm run frames` is the instrument for the page's half of this, and would have shown the scope's overlay as a canvas "cleared whole ×1.0" every frame.
 
+
+## 7. Taller camps (Nov 11)
+
+Upper floors came with slow ticks of their own, and `npm run hitches` is what found them. The standing fights' camps have two storeys now (`docs/compound-types.md`), and three of the four fights had ticks over 4 ms where the one-storey camps have none: 9.9 ms at the worst, twice in two ticks.
+
+| What it was | What was done |
+| --- | --- |
+| A route with an end upstairs was one search over the ground and the floors together. It aims straight at an end that has walls and a floor between, and the landmarks don't cover it: 15,000 cells a route on LEB-2534, and from the relief's 130 m the whole budget of 40,000, with nothing found | Found in legs: a search of the one storey between the end and its flight's foot, and the ground between as any route on the ground. 300 to 1,300 cells, all found (`brain/nav.ts`, `findLevels`) |
+| Pulling such a route taut on a floor asked every shape in the building below about every sample: 2.3 ms for two routes | The shapes at the floor's height are sorted out once a segment: 0.3 ms |
+| The first route upstairs in a fight comes later than the rehearsal runs: with the two fixes above its tick still took 5.6 ms the first time, and 2 after | The rehearsal asks for each floor's far end from every post, there and back (`game/rehearsal.ts`): about 15 ms more at load |
+
+**Now**, the same four fights on this machine, sixteen minutes of fighting on each build:
+
+| | `main`, one storey | Taller |
+| --- | --- | --- |
+| Ticks over 4 ms in a fresh tab's run | 1 | 0 |
+| Its slowest tick | 4.2 ms | 3.6 ms |
+| Ticks over 4 ms once warm | 0 | 0 |
+| The slowest tick once warm | 2.6 ms | 1.9 ms |
+
+Four more fights on other taller camps (VIH-9105, KAT-3755, MUD-8412, LUL-8783) have none over 4 ms either, in the first run or warm. The brain lane's bench pins the routes to a camp's upper floors as work (287 cells on average, 683 at most, against 459 and 2,716 between posts on the ground).
+
+Not measured: a browser on these camps. Nothing on the page's side changed.

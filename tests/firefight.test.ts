@@ -113,6 +113,35 @@ describe('a place to fight from', () => {
     expect(withLine).toBeGreaterThan(0);
   });
 
+  it('is judged from where the intruder is, when he is up on something: a deck or an upper floor sees over what hides a man from the ground', () => {
+    const world = worldOf(SEED);
+    const S = F.spot;
+    // Someone who has taken a raised post: a tower's deck or an upper window. A man's chest there, as a sighting or a flash would give it.
+    const raised = world.camp.guards.filter((g) => g.elevated && g.role !== 'target');
+    expect(raised.length).toBeGreaterThan(0);
+    let found = 0;
+    let fooled = 0;
+    for (const r of raised) {
+      const ty = r.y + 1.2;
+      expect(ty - world.terrain.heightAt(r.x, r.z)).toBeGreaterThan(S.raised);
+      for (const g of world.camp.guards) {
+        if (g.elevated) continue;
+        const ask = { x: g.x, z: g.z, tx: r.x, tz: r.z, maxRun: S.maxRun * 2, needLine: false, gain: 0, dash: 0 };
+        const spot = fightingSpot(world, T, { ...ask, ty });
+        if (spot) {
+          found++;
+          expect(exposedAt(world, T, spot.hx, spot.hz, spot.hs, r.x, r.z, undefined, ty), `the hiding place of post ${g.role}, from ${ty.toFixed(1)} m up`).toBe(false);
+          if (spot.line) expect(lineFrom(world, T, spot.fx, spot.fz, spot.fs, r.x, r.z, undefined, ty), `the firing place of post ${g.role}`).toBe(true);
+        }
+        // The same question asked as if he stood on the ground under it: some of those places are in his view.
+        const low = fightingSpot(world, T, ask);
+        if (low && exposedAt(world, T, low.hx, low.hz, low.hs, r.x, r.z, undefined, ty)) fooled++;
+      }
+    }
+    expect(found).toBeGreaterThan(0);
+    expect(fooled).toBeGreaterThan(0);
+  });
+
   it('is somewhere nearer the intruder, when a bound is asked for, or nowhere', () => {
     const world = worldOf(SEED);
     const from = ringAround(world, bestOverview(world))[0]!;

@@ -37,9 +37,10 @@ export interface SpotAsk {
   /** Where he is. */
   x: number;
   z: number;
-  /** Where he believes the intruder is. */
+  /** Where he believes the intruder is, and how high, if he knows: someone at an upper window or on a deck sees over what hides a man from the ground (eyesAt). */
   tx: number;
   tz: number;
+  ty?: number;
   /** Metres of path he'll go for it. */
   maxRun: number;
   /** Only a place he can see the intruder's from will do. Otherwise one that only hides him will, if nothing better is near. */
@@ -69,6 +70,8 @@ export class Danger {
   private tj = 0;
   private tall = 0;
   private price = 1;
+  /** How far above the ground at his place the intruder's eyes are, in decimetres, when he's up on something; 0 on the ground. */
+  private raised = 0;
 
   constructor(
     private readonly L: GridLayer,
@@ -81,14 +84,15 @@ export class Danger {
     this.value = new Uint8Array(n);
   }
 
-  /** Aims it at where the intruder is believed to be. */
-  aim(tx: number, tz: number, tuning: Tuning): this {
+  /** Aims it at where the intruder is believed to be: `up` is how far above the ground there his eyes are, if he's up on something, and 0 if not. */
+  aim(tx: number, tz: number, tuning: Tuning, up = 0): this {
     const D = tuning.brain.firefight.danger;
     this.now++;
     this.ti = Math.floor((tx - this.L.x0) / this.L.cell);
     this.tj = Math.floor((tz - this.L.z0) / this.L.cell);
     this.tall = Math.round(D.tall * 10);
     this.price = 1 + D.price;
+    this.raised = Math.round(up * 10);
     return this;
   }
 
@@ -112,7 +116,10 @@ export class Danger {
       const j = sj + Math.round((dj * s) / n);
       // Off the fine layer there's nothing recorded to hide behind.
       if (i < 0 || j < 0 || i >= L.nx || j >= L.nz) break;
-      if (L.cover[j * L.nx + i]! >= this.tall) {
+      // From the ground, anything tall enough to hide a man on his feet does, wherever it stands between them. From above, his
+      // line to the man's head climbs toward him, so a thing hides the man only if it reaches that line where it stands.
+      const need = this.raised > this.tall ? this.tall + ((this.raised - this.tall) * s) / n : this.tall;
+      if (L.cover[j * L.nx + i]! >= need) {
         open = 0;
         break;
       }
@@ -127,15 +134,30 @@ export class Danger {
 
 const dangers = new WeakMap<GridLayer, Danger>();
 
-/** The camp's ground as the intruder's place sees it, for a route to keep out of (see Danger). */
-export function dangerOf(world: Ground, tuning: Tuning, tx: number, tz: number): Danger {
+/** The camp's ground as the intruder's place sees it, for a route to keep out of (see Danger). `ty` is how high he's believed to be, if that's known. */
+export function dangerOf(world: Ground, tuning: Tuning, tx: number, tz: number, ty?: number): Danger {
   const L = world.grid.site;
   let d = dangers.get(L);
   if (!d) {
     d = new Danger(L, tuning.brain.firefight.danger.every);
     dangers.set(L, d);
   }
-  return d.aim(tx, tz, tuning);
+  const ground = world.terrain.heightAt(tx, tz);
+  const eyes = eyesAt(world, tuning, tx, tz, ty);
+  return d.aim(tx, tz, tuning, eyes > ground + tuning.brain.firefight.spot.eye ? eyes - ground : 0);
+}
+
+/**
+ * How high the intruder's eyes are taken to be. On the ground, an eye's height above it,
+ * whatever he's doing: a man doesn't stake his cover on the intruder staying flat. Up on
+ * something (an upper floor, a deck, a roof), where he's believed to be: from there he sees
+ * over what would hide a man from the ground, and a line to the ground under him is a line
+ * into a wall.
+ */
+export function eyesAt(world: Ground, tuning: Tuning, tx: number, tz: number, ty?: number): number {
+  const S = tuning.brain.firefight.spot;
+  const ground = world.terrain.heightAt(tx, tz);
+  return ty !== undefined && ty > ground + S.raised ? ty : ground + S.eye;
 }
 
 /** How far each cell's way there has run in the intruder's view without a break, in cells: working memory for a covered search. */
@@ -177,7 +199,7 @@ export function fightingSpot(world: Ground, tuning: Tuning, ask: SpotAsk, work?:
   if (start < 0) return null;
   const nav = navigatorOf(world, tuning);
   const guard = tuning.bodies.guard;
-  const ty = world.terrain.heightAt(ask.tx, ask.tz) + S.eye;
+  const ty = eyesAt(world, tuning, ask.tx, ask.tz, ask.ty);
   let rays = 0;
   const sees = (x: number, y: number, z: number): boolean => {
     rays++;
@@ -191,7 +213,7 @@ export function fightingSpot(world: Ground, tuning: Tuning, ask: SpotAsk, work?:
   const v = visited(L);
   v.seen[start] = v.now;
   // A covered way: ground in his view is crossed only a dash at a time.
-  const danger = ask.dash > 0 ? dangerOf(world, tuning, ask.tx, ask.tz) : null;
+  const danger = ask.dash > 0 ? dangerOf(world, tuning, ask.tx, ask.tz, ask.ty) : null;
   const dash = Math.round(ask.dash / L.cell);
   let runs = exposedRuns.get(L);
   if (danger && !runs) {
@@ -299,18 +321,20 @@ export function fightingSpot(world: Ground, tuning: Tuning, ask: SpotAsk, work?:
   return ask.needLine ? null : hide;
 }
 
-/** Whether someone where the intruder is believed to be could see a man at (x, z) in this stance: the top of him. One ray, counted into `work`. */
-export function exposedAt(world: Ground, tuning: Tuning, x: number, z: number, stance: Stance, tx: number, tz: number, work?: SearchOptions['work']): boolean {
-  const S = tuning.brain.firefight.spot;
+/**
+ * Whether someone where the intruder is believed to be could see a man at (x, z) in this stance: the top of him. One ray, counted
+ * into `work`. `ty` is how high the intruder is believed to be, if that's known (eyesAt), and `feet` the height the man stands at,
+ * if it isn't the ground's: a man on an upper floor.
+ */
+export function exposedAt(world: Ground, tuning: Tuning, x: number, z: number, stance: Stance, tx: number, tz: number, work?: SearchOptions['work'], ty?: number, feet?: number): boolean {
   if (work) work.rays++;
-  const top = world.terrain.heightAt(x, z) + tuning.bodies.guard.height[stance];
-  return navigatorOf(world, tuning).seesPoint(tx, world.terrain.heightAt(tx, tz) + S.eye, tz, x, top, z);
+  const top = (feet ?? world.terrain.heightAt(x, z)) + tuning.bodies.guard.height[stance];
+  return navigatorOf(world, tuning).seesPoint(tx, eyesAt(world, tuning, tx, tz, ty), tz, x, top, z);
 }
 
-/** Whether a man at (x, z) in this stance has a line to where the intruder is believed to be, from his eyes. One ray, counted into `work`. */
-export function lineFrom(world: Ground, tuning: Tuning, x: number, z: number, stance: Stance, tx: number, tz: number, work?: SearchOptions['work']): boolean {
-  const S = tuning.brain.firefight.spot;
+/** Whether a man at (x, z) in this stance has a line to where the intruder is believed to be, from his eyes. One ray, counted into `work`. `ty` as for exposedAt. */
+export function lineFrom(world: Ground, tuning: Tuning, x: number, z: number, stance: Stance, tx: number, tz: number, work?: SearchOptions['work'], ty?: number): boolean {
   if (work) work.rays++;
   const eye = world.terrain.heightAt(x, z) + tuning.bodies.guard.eyeHeight[stance];
-  return navigatorOf(world, tuning).seesPoint(tx, world.terrain.heightAt(tx, tz) + S.eye, tz, x, eye, z);
+  return navigatorOf(world, tuning).seesPoint(tx, eyesAt(world, tuning, tx, tz, ty), tz, x, eye, z);
 }

@@ -58,7 +58,7 @@ interface Row {
 const rows: Row[] = [];
 for (const seed of seeds) {
   const world = generateWorld(campMission(seed), defaultTuning);
-  const raster = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, G, world.props.trees);
+  const raster = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, G, world.props.trees, world.grid);
   const { analysis, parts } = analyzeCamp(world.camp, world.terrain, world.colliders, world.grid, G, raster);
   const { plans, best } = campPlans(world.camp, analysis, parts, G);
   const clusters = analysis.clusters.filter((c) => c.members.length > 1);

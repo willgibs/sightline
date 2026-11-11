@@ -1,5 +1,7 @@
 import type { Tuning } from '../../config/tuning';
+import { emptyRoute, navigatorOf } from '../brain';
 import { startScene } from '../kernel/scene';
+import { Cell } from '../kernel/world/grid';
 import type { World } from '../kernel/world/world';
 import { compound } from './scenes/compound';
 import { firefight, meetingOf } from './scenes/firefight';
@@ -33,7 +35,45 @@ export function rehearse(world: World, tuning: Tuning, seconds = REHEARSAL_SECON
   const raw = scene.game.still(sim);
   const ticks = Math.round(seconds * tuning.sim.tickHz);
   for (let i = 0; i < ticks; i++) sim.step(driver.next(sim, raw));
+  rehearseFloors(world, tuning);
   return ticks;
+}
+
+/**
+ * Routes with an end upstairs come later in a fight than the rehearsal runs: the men sent to a
+ * target's door on an upper floor, his own way down to his vehicle. The tick of the first of
+ * them took 5.6 ms where the same tick takes 2 once that code has run (`npm run hitches`, the
+ * first run only). So the far end of each floor from the head of its flight is asked for from
+ * every post on the ground, there and back. A navigator keeps nothing between calls, so
+ * nothing here reaches a run either.
+ */
+function rehearseFloors(world: World, tuning: Tuning): void {
+  const nav = navigatorOf(world, tuning);
+  const route = emptyRoute();
+  for (const stair of world.grid.stairs) {
+    const { layer, y } = world.grid.storeys[stair.storey]!;
+    let fx = stair.headX;
+    let fz = stair.headZ;
+    let far = -1;
+    for (let c = 0; c < layer.nx * layer.nz; c++) {
+      if ((layer.flags[c]! & Cell.Walkable) === 0) continue;
+      const i = c % layer.nx;
+      const x = layer.x0 + (i + 0.5) * layer.cell;
+      const z = layer.z0 + ((c - i) / layer.nx + 0.5) * layer.cell;
+      const d = (x - stair.headX) * (x - stair.headX) + (z - stair.headZ) * (z - stair.headZ);
+      // The first of the farthest, in cell order.
+      if (d > far) {
+        far = d;
+        fx = x;
+        fz = z;
+      }
+    }
+    for (const g of world.camp.guards) {
+      if (g.elevated) continue;
+      nav.find(g.x, g.z, fx, fz, {}, route, undefined, y);
+      nav.find(fx, fz, g.x, g.z, {}, route, y);
+    }
+  }
 }
 
 /**

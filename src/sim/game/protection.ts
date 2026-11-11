@@ -18,13 +18,15 @@ const REACH = 40;
  * day has him standing indoors; failing that his post, if it's indoors; failing that the
  * nearest floor under a roof. A camp with no roof within reach has him stay at his post.
  */
-export function hardRoom(world: World, post: GuardSpawn): { x: number; z: number } {
+export function hardRoom(world: World, post: GuardSpawn): { x: number; z: number; y?: number } {
   const L = world.grid.site;
   const indoors = (x: number, z: number): boolean => {
     const c = cellIndex(L, x, z);
     return c >= 0 && (L.flags[c]! & Cell.Roofed) !== 0 && (L.flags[c]! & Cell.Walkable) !== 0;
   };
-  for (const leg of post.routine.legs) if (leg.kind === 'hold' && indoors(leg.x, leg.z)) return { x: leg.x, z: leg.z };
+  // Upstairs, if that's where he keeps: the floor he's on is part of the place.
+  const floor = post.elevated ? { y: post.y } : {};
+  for (const leg of post.routine.legs) if (leg.kind === 'hold' && indoors(leg.x, leg.z)) return { x: leg.x, z: leg.z, ...floor };
   if (indoors(post.x, post.z)) return { x: post.x, z: post.z };
   // Outward from his post, a ring of cells at a time, each ring in a fixed order: the nearest floor under a roof.
   const ci = Math.floor((post.x - L.x0) / L.cell);

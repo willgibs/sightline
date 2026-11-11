@@ -114,17 +114,17 @@ function buildCamp(seed: string, attempt: number, terrain: TerrainResult, G: Tun
   const props = scatterProps(fork('props'), terrain.heightfield, terrain.features, colliders, G);
   colliders.build();
   // The fine grid covers the ground the analysis looks at: the camp and its margin.
-  const grid = buildGrid(terrain.heightfield, colliders, siteBounds(camp, colliders, Math.max(G.grid.siteMargin, G.analysis.margin + 2)), G);
+  const grid = buildGrid(terrain.heightfield, colliders, siteBounds(camp, colliders, Math.max(G.grid.siteMargin, G.analysis.margin + 2)), G, camp.storeys, camp.stairs);
   // Staffing searches the grid (its chokepoints, its patrols' paths) and sees through the
   // analysis raster (who would see whom drop), so it shapes the camp's clusters as it goes.
-  let raster = buildRaster(camp, terrain.heightfield, colliders, grid.site, G, props.trees);
+  let raster = buildRaster(camp, terrain.heightfield, colliders, grid.site, G, props.trees, grid);
   let views = perchViews(raster, terrain.heightfield, camp.site, G, grid.map, campWalkStart(camp));
   placeFixtures(camp, colliders, terrain.heightfield, raster, views, G, fork('fixtures'));
   colliders.build();
   blockVehicles(camp, grid, G);
-  raster = buildRaster(camp, terrain.heightfield, colliders, grid.site, G, props.trees);
+  raster = buildRaster(camp, terrain.heightfield, colliders, grid.site, G, props.trees, grid);
   views = perchViews(raster, terrain.heightfield, camp.site, G, grid.map, campWalkStart(camp));
-  staffCamp(camp, terrain.heightfield, grid, raster, views, G, spec, fork('staff'), fork('routines'));
+  staffCamp(camp, terrain.heightfield, colliders, grid, raster, views, G, spec, fork('staff'), fork('routines'));
   const repaired = validateAndRepair(camp, terrain.heightfield, colliders, grid, raster, G, fork('repair'));
   return { attempt, camp, colliders, props, grid, repaired };
 }
