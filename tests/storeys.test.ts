@@ -17,6 +17,7 @@ import { buildRaster, openAt } from '../src/sim/generation/raster';
 import { Cell, cellIndex, storeyAt } from '../src/sim/kernel/world/grid';
 import { neutralInput } from '../src/sim/kernel/input';
 import { startScene, type Scene } from '../src/sim/kernel/scene';
+import { noWork } from '../src/sim/kernel/work';
 import { GridSearch } from '../src/sim/kernel/world/search';
 import type { World } from '../src/sim/kernel/world/world';
 import { yawFromDirection } from '../src/sim/kernel/core/math';
@@ -248,6 +249,101 @@ describe('a two-storey building', () => {
     // Cell lookups stay within the storey's layer.
     expect(cellIndex(up.layer, target.x, target.z)).toBeGreaterThanOrEqual(0);
     void hqStorey;
+  });
+});
+
+describe('a route with an end upstairs', () => {
+  it('costs what its legs cost, from anywhere in a long camp: the ground by landmarks, and one storey', () => {
+    // LEB-2534 is a depot strung along its road, with its target upstairs. The men sent to his door
+    // (the relief, from 130 m away) asked for one search over the ground and the floors together,
+    // aimed straight at him: it spent its 40,000 cells and found nothing, twice in two ticks, each a
+    // tick of 10 ms, and nobody came for him for another fifty seconds.
+    const w = generateWorld(campMission('LEB-2534'), T);
+    const G = w.grid;
+    const nav = navigatorOf(w, T);
+    const target = w.camp.guards.find((g) => g.role === 'target')!;
+    const level = storeyAt(G, target.x, target.y, target.z);
+    expect(level).toBeGreaterThanOrEqual(0);
+    const st = G.stairs.find((s) => s.storey === level)!;
+    const floor = G.storeys[level]!.layer;
+    const storey = floor.nx * floor.nz;
+    // From every post on the ground, and from the ground farthest from his stairs by foot.
+    const from = w.camp.guards.filter((g) => !g.elevated).map((g) => ({ x: g.x, z: g.z }));
+    const ground = new GridSearch(G.site);
+    ground.flood([st.foot], { maxExpansions: ground.cost.length });
+    let farthest = st.foot;
+    for (let c = 0; c < G.site.nx * G.site.nz; c++) if (ground.cost[c]! > ground.cost[farthest]!) farthest = c;
+    const far = { x: G.site.x0 + ((farthest % G.site.nx) + 0.5) * G.site.cell, z: G.site.z0 + (Math.floor(farthest / G.site.nx) + 0.5) * G.site.cell };
+    expect(Math.hypot(far.x - st.footX, far.z - st.footZ)).toBeGreaterThan(100);
+    from.push(far);
+    expect(from.length).toBeGreaterThan(5);
+    let most = 0;
+    for (const p of from) {
+      const toFoot = noWork();
+      const up = noWork();
+      const fromFoot = noWork();
+      const down = noWork();
+      const route = emptyRoute();
+      expect(nav.find(p.x, p.z, st.footX, st.footZ, { work: toFoot }, emptyRoute())).toBe('found');
+      expect(nav.find(p.x, p.z, target.x, target.z, { work: up }, route, undefined, target.y), `up from (${p.x.toFixed(0)}, ${p.z.toFixed(0)})`).toBe('found');
+      expect(up.nodes).toBeLessThanOrEqual(toFoot.nodes + storey);
+      // It ends at him, by the foot of his flight and then its head.
+      const n = route.points.length;
+      expect(Math.hypot(route.points[n - 2]! - target.x, route.points[n - 1]! - target.z)).toBeLessThan(1);
+      const at = (x: number, z: number): number => {
+        for (let i = 0; i < n; i += 2) if (Math.hypot(route.points[i]! - x, route.points[i + 1]! - z) < 1e-6) return i / 2;
+        return -1;
+      };
+      expect(at(st.footX, st.footZ)).toBeGreaterThanOrEqual(0);
+      expect(at(st.headX, st.headZ)).toBe(at(st.footX, st.footZ) + 1);
+      // And the way back down costs the same kind of thing.
+      expect(nav.find(st.footX, st.footZ, p.x, p.z, { work: fromFoot }, emptyRoute())).toBe('found');
+      expect(nav.find(target.x, target.z, p.x, p.z, { work: down }, emptyRoute(), target.y)).toBe('found');
+      expect(down.nodes).toBeLessThanOrEqual(fromFoot.nodes + storey);
+      most = Math.max(most, up.nodes, down.nodes);
+    }
+    // No more than a route on the ground costs: a fight's whole tick has done 6,500 cells at its worst.
+    expect(most).toBeLessThan(8000);
+    // Floor to floor, from his room to the marksman at another building's upper window: down his
+    // flight, over the ground, and up the other.
+    const other = w.camp.guards.find((g) => storeyAt(G, g.x, g.y, g.z) >= 0 && storeyAt(G, g.x, g.y, g.z) !== level)!;
+    expect(other).toBeDefined();
+    const st2 = G.stairs.find((s) => s.storey === storeyAt(G, other.x, other.y, other.z))!;
+    const across = emptyRoute();
+    const work = noWork();
+    expect(nav.find(target.x, target.z, other.x, other.z, { work }, across, target.y, other.y)).toBe('found');
+    const where = (x: number, z: number): number => {
+      for (let i = 0; i < across.points.length; i += 2) if (Math.hypot(across.points[i]! - x, across.points[i + 1]! - z) < 1e-6) return i / 2;
+      return -1;
+    };
+    const order = [where(st.headX, st.headZ), where(st.footX, st.footZ), where(st2.footX, st2.footZ), where(st2.headX, st2.headZ)];
+    expect(order[0]).toBeGreaterThanOrEqual(0);
+    expect(order[1]).toBe(order[0]! + 1);
+    expect(order[2]).toBeGreaterThan(order[1]!);
+    expect(order[3]).toBe(order[2]! + 1);
+    const m = across.points.length;
+    expect(Math.hypot(across.points[m - 2]! - other.x, across.points[m - 1]! - other.z)).toBeLessThan(1);
+    expect(work.nodes).toBeLessThan(8000);
+  }, 60_000);
+
+  it('between two ends on one floor never leaves the floor', () => {
+    const G = world.grid;
+    const nav = navigatorOf(world, T);
+    const st = G.stairs[0]!;
+    const up = G.storeys[st.storey]!;
+    const cells: number[] = [];
+    for (let c = 0; c < up.layer.nx * up.layer.nz; c++) if (up.layer.flags[c]! & Cell.Walkable) cells.push(c);
+    const centre = (c: number): { x: number; z: number } => ({ x: up.layer.x0 + ((c % up.layer.nx) + 0.5) * up.layer.cell, z: up.layer.z0 + (Math.floor(c / up.layer.nx) + 0.5) * up.layer.cell });
+    const a = centre(cells[0]!);
+    const b = centre(cells[cells.length - 1]!);
+    const work = noWork();
+    const route = emptyRoute();
+    expect(nav.find(a.x, a.z, b.x, b.z, { work }, route, up.y, up.y)).toBe('found');
+    expect(work.nodes).toBeLessThanOrEqual(cells.length);
+    const n = route.points.length;
+    expect(Math.hypot(route.points[n - 2]! - b.x, route.points[n - 1]! - b.z)).toBeLessThan(1);
+    // Every waypoint is over the floor.
+    for (let i = 0; i < n; i += 2) expect(cellIndex(up.layer, route.points[i]!, route.points[i + 1]!)).toBeGreaterThanOrEqual(0);
   });
 });
 
