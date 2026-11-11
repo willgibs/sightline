@@ -248,7 +248,8 @@ export interface CampLayout {
   openings: Opening[];
   parcels: Parcel[];
   buildings: BuildingSpec[];
-  towers: Array<{ x: number; z: number; deck: number; corner: string }>;
+  /** Where its marksmen stand: a tower at a corner, or an upper window (`corner` 'window'), which has the way he looks out of it and whose building it is. */
+  towers: Array<{ x: number; z: number; deck: number; corner: string; out?: Point2; building?: number }>;
   breach: Side;
   skeleton: Skeleton;
   /** The loops its patrols walk, in the frame (staffing.ts). */
@@ -614,9 +615,10 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
    * A second storey: the upper walls with their windows (none over a door), a floor with a
    * stairwell, a straight flight up against a wall (the one the doors leave clear, climbing
    * whichever way leaves them clear), a rail round the well, and a roof. Its floor goes on the
-   * grid's list and its flight joins it to the ground (grid.ts).
+   * grid's list and its flight joins it to the ground (grid.ts). `windowsOn` is the walls that
+   * have windows, null for all four.
    */
-  const upperStorey = (a: number, b: number, lenA: number, lenB: number, y0: number, surface: Surface, ids: number[], index: number, cutsOf: Record<Face, number[]>, doorFaces: Face[]): number => {
+  const upperStorey = (a: number, b: number, lenA: number, lenB: number, y0: number, surface: Surface, ids: number[], index: number, cutsOf: Record<Face, number[]>, doorFaces: Face[], windowsOn: readonly Face[] | null): number => {
     const S = C.storey;
     const t = C.wallThickness;
     const floor = y0 + S;
@@ -627,7 +629,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
       const wa = face === 'a+' ? a + lenA / 2 - t / 2 : face === 'a-' ? a - lenA / 2 + t / 2 : a;
       const wb = face === 'b+' ? b + lenB / 2 - t / 2 : face === 'b-' ? b - lenB / 2 + t / 2 : b;
       const span = horizontal ? lenB : lenA;
-      const count = Math.max(1, Math.floor(span / W.every));
+      const count = windowsOn && !windowsOn.includes(face) ? 0 : Math.max(1, Math.floor(span / W.every));
       const cuts: number[] = [];
       for (let k = 0; k < count; k++) {
         const c = ((k + 0.5) / count - 0.5) * span;
@@ -729,7 +731,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     campStairs.push({ storey, footX: footP.x, footZ: footP.z, headX: headP.x, headZ: headP.z, length: run + 1.4 });
     return storey;
   };
-  const building = (module: ModuleName, a: number, b: number, lenA: number, lenB: number, h: number, surface: Surface, faces: Face[], doorRng: Rng, doorWidth = C.doorWidth, storeys = 1): number => {
+  const building = (module: ModuleName, a: number, b: number, lenA: number, lenB: number, h: number, surface: Surface, faces: Face[], doorRng: Rng, doorWidth = C.doorWidth, storeys = 1, windowsOn: readonly Face[] | null = null): number => {
     const t = C.wallThickness;
     const y0 = ground(a, b);
     // A two-storey building: its ground floor's walls are one storey high, and the upper floor stands on them.
@@ -773,7 +775,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     };
     for (const f of ['a+', 'a-', 'b+', 'b-'] as const) wall(f);
     // The roof: over the walls, so the inside is roofed and walkable. Two storeys: the upper floor, stairs and windows first.
-    const storey = two ? upperStorey(a, b, lenA, lenB, y0, surface, ids, index, cutsOf, faces) : -1;
+    const storey = two ? upperStorey(a, b, lenA, lenB, y0, surface, ids, index, cutsOf, faces, windowsOn) : -1;
     if (!two) ids.push(box(a, b, lenA + 0.3, lenB + 0.3, 0.2, Blocks.All, surface, y0 + h));
     const structure = add('building', ids);
     const p = at(a, b);
@@ -813,7 +815,16 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   const yardFace = inwardFace(hqFit.a, hqFit.b);
   const sideFace: Face = yardFace === 'a+' || yardFace === 'a-' ? (openings[1]!.b >= hqFit.b ? 'b+' : 'b-') : openings[1]!.a >= hqFit.a ? 'a+' : 'a-';
   const hqFaces: Face[] = !needsWayIn(crux) ? [yardFace] : [yardFace, buried(crux) && backFace === yardFace ? sideFace : backFace];
-  const hqIndex = building('hq', hqFit.a, hqFit.b, hqFit.lenA, hqFit.lenB, M.hq[2]!, Surface.Wood, hqFaces, hqRng, C.doorWidth, type.storeys.hq);
+  // A buried target keeps on the upper floor where there is one, and a window up there shows him
+  // to whoever finds the line through it: a ridge, or the fields beyond the wire, far enough out
+  // to see over the sill. Measured with windows all round, a firing point had such a line on 8
+  // camps of 20 and the ground beyond the wire on 11 more, and every one of them was the same
+  // mission: find the window. With one window left for a marksman, and the target kept out of
+  // its line, the ground beyond the wire still had him on 2 of 8. So his floor has none: he is
+  // as buried as he was on one storey, and what shows of his building is that it stands tall
+  // and blank where the others have windows.
+  const hqWindows: readonly Face[] | null = buried(crux) ? [] : null;
+  const hqIndex = building('hq', hqFit.a, hqFit.b, hqFit.lenA, hqFit.lenB, M.hq[2]!, Surface.Wood, hqFaces, hqRng, C.doorWidth, type.storeys.hq, hqWindows);
   const hqB = buildings[hqIndex]!;
   // A buried target's doors have screens: a short wall just inside each, so nobody gets a
   // straight line to him through the door from the yard. To reach him you step inside. A
@@ -864,21 +875,24 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   // target's building first, its window toward the gate, then each other, its window toward the wall nearest it.
   {
     const gateAt = at(openings[0]!.a, openings[0]!.b);
-    const best = (b: (typeof buildings)[number], index: number, toward: (w: (typeof windows)[number]) => Point2): { x: number; z: number; score: number } | null => {
-      let top: { x: number; z: number; score: number } | null = null;
+    const best = (b: (typeof buildings)[number], index: number, toward: (w: (typeof windows)[number]) => Point2): { x: number; z: number; nx: number; nz: number; score: number } | null => {
+      let top: { x: number; z: number; nx: number; nz: number; score: number } | null = null;
       for (const w of windows) {
         if (w.building !== index) continue;
-        const ox = w.x - b.x;
-        const oz = w.z - b.z;
-        const ol = Math.sqrt(ox * ox + oz * oz) || 1;
+        // Out of the window: across its wall, away from the middle of the building.
+        const side = (w.x - b.x) * -w.uz + (w.z - b.z) * w.ux >= 0 ? 1 : -1;
+        const nx = -w.uz * side;
+        const nz = w.ux * side;
         const t = toward(w);
         const tl = Math.sqrt(t.x * t.x + t.z * t.z) || 1;
-        const score = (ox / ol) * (t.x / tl) + (oz / ol) * (t.z / tl);
-        if (!top || score > top.score) top = { x: w.x - (ox / ol) * 0.9, z: w.z - (oz / ol) * 0.9, score };
+        const score = nx * (t.x / tl) + nz * (t.z / tl);
+        // A pace back from the sill: he sees out of it, and is seen through it and from nowhere else.
+        if (!top || score > top.score) top = { x: w.x - nx * 0.9, z: w.z - nz * 0.9, nx, nz, score };
       }
       return top;
     };
-    // On a camp where someone has to get to him, his own floor stays clear of them: a way up has to exist.
+    // On a camp where someone has to get to him, his own floor stays clear of them: a way up has to
+    // exist. And a floor he's buried on has no window for anyone to stand at.
     const twoFloors = buildings.map((b, index) => ({ b, index })).filter(({ b, index }) => b.storeys >= 2 && (index !== hqIndex || !needsWayIn(crux))).sort((p, q) => (p.index === hqIndex ? -1 : q.index === hqIndex ? 1 : p.index - q.index)); // unique: building indices
     let left = type.windowPost;
     for (const { b, index } of twoFloors) {
@@ -889,7 +903,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
         return toEdge;
       });
       if (!here) continue;
-      towers.push({ x: here.x, z: here.z, deck: b.floorY, corner: 'window' });
+      towers.push({ x: here.x, z: here.z, deck: b.floorY, corner: 'window', out: { x: here.nx, z: here.nz }, building: index });
       left--;
     }
   }

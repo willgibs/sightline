@@ -1,6 +1,7 @@
 import type { GenTuning } from '../../config/tuning';
 import { DEG, datan2, dcos, dsin } from '../kernel/core/detmath';
 import type { Rng } from '../kernel/core/rng';
+import type { ColliderSet } from '../kernel/world/colliders';
 import type { Heightfield } from '../kernel/world/heightfield';
 import type { SpatialGrid } from '../kernel/world/grid';
 import { GridSearch } from '../kernel/world/search';
@@ -13,8 +14,8 @@ import { segmentDistance, type Point2 } from './paths';
 import { naturalPeriod, nearestWalkable, patrolRoutine, pickScan, postRoutine, walkPath, type ScanKind, type Stop } from './patrols';
 import { dropDuty, seesDrop, trackOf, type GuardTrack } from './field';
 import { cellOf, centreOf, lineOfSight, lineOfSightStrict, openAt, type Raster } from './raster';
-import { overviewPerches, perchSeesDeck, type PerchViews } from './perches';
-import { Cell } from '../kernel/world/grid';
+import { overviewPerches, perchSeesMan, type PerchViews } from './perches';
+import { Cell, cellIndex } from '../kernel/world/grid';
 import { contactRate, reachOf, sightRate } from './sight';
 import { routinePose, type Routine, type RoutinePose } from './routine';
 
@@ -40,7 +41,7 @@ import { routinePose, type Routine, type RoutinePose } from './routine';
  * Every routine is fitted to one cycle of the camp (patrols.ts), so the camp's rhythm
  * repeats exactly and its windows can be learned. Each guard draws from his own fork.
  */
-export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster: Raster, perches: PerchViews, gen: GenTuning, spec: CampSpec, rng: Rng, routines: Rng): void {
+export function staffCamp(camp: Camp, hf: Heightfield, colliders: ColliderSet, grid: SpatialGrid, raster: Raster, perches: PerchViews, gen: GenTuning, spec: CampSpec, rng: Rng, routines: Rng): void {
   const S = gen.staffing;
   // Difficulty's main knob, after the number of guards: how big a sightline cluster may grow (design doc).
   const clusterMax = Math.round(S.clusterMax[0]! + (S.clusterMax[1]! - S.clusterMax[0]!) * spec.difficulty);
@@ -91,7 +92,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
   interface Plan {
     role: GuardRole;
     /** A post: where he holds, and what he watches. */
-    post?: { at: Point2; look: number; scan: ScanKind; elevated?: number; door?: true };
+    post?: { at: Point2; look: number; scan: ScanKind; elevated?: number; door?: true; window?: true };
     /** A route: its stops, the legs between them, and which of the patrols on it he is. */
     stops?: Stop[];
     legs?: Point2[][];
@@ -205,6 +206,38 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
     if (d && offCorridor(step(d, 2)) > 8) sentryPosts.push({ at: step(d, 2), look: lookAt(d, step(d, 6)) });
   }
 
+  // Where the marksmen stand: the towers, then the upper windows. Where a place keeps its posts
+  // under cover the windows come first: a man at one is seen through it and from nowhere else,
+  // where a tower shows him to every ridge, so the height to read isn't only the towers'.
+  const covered = gen.compound.types[L.type].posts === 'covered';
+  /**
+   * A window post under cover: of its building's upper windows, the one the fewest perches can
+   * see a man at, the one the layout gave it if none is better. He's then looking out over
+   * ground the ridges mostly aren't on, and has to be found from down there.
+   */
+  const leastSeen = (t: (typeof L.towers)[number]): (typeof L.towers)[number] => {
+    if (t.building === undefined) return t;
+    const b = L.buildings[t.building]!;
+    const seenAt =(x: number, z: number): number => perches.spots.reduce((n, p) => n + (perchSeesMan(raster, hf, colliders, p, x, t.deck, z, gen.sight) ? 1 : 0), 0);
+    let best = t;
+    let fewest = seenAt(t.x, t.z);
+    for (const w of camp.windows ?? []) {
+      if (w.building !== t.building) continue;
+      // Out of the window: across its wall, away from the middle of the building; he stands a pace back from the sill.
+      const side = (w.x - b.x) * -w.uz + (w.z - b.z) * w.ux >= 0 ? 1 : -1;
+      const out = { x: -w.uz * side, z: w.ux * side };
+      const x = w.x - out.x * 0.9;
+      const z = w.z - out.z * 0.9;
+      const seen = seenAt(x, z);
+      if (seen < fewest) {
+        fewest = seen;
+        best = { ...t, x, z, out };
+      }
+    }
+    return best;
+  };
+  // The layout keeps the list as it's settled here: it says where the marksmen's places are.
+  if (covered) L.towers = [...L.towers.filter((t) => t.corner === 'window').map(leastSeen), ...L.towers.filter((t) => t.corner !== 'window')];
   const towers = [...L.towers];
   let patrolIndex = 0;
   let sentryIndex = 0;
@@ -216,7 +249,8 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
       else plans.push({ role, post: { at: { x: hq.x, z: hq.z }, look: lookAt({ x: hq.x, z: hq.z }, hqDoor), scan: 'glance' } });
     } else if (role === 'marksman') {
       const t = towers.shift();
-      if (t) plans.push({ role, post: { at: { x: t.x, z: t.z }, look: outward({ x: t.x, z: t.z }), scan: 'half', elevated: t.deck } });
+      // A tower looks out from the camp; a window looks out of itself.
+      if (t) plans.push({ role, post: { at: { x: t.x, z: t.z }, look: t.out ? lookAt(t, { x: t.x + t.out.x, z: t.z + t.out.z }) : outward({ x: t.x, z: t.z }), scan: 'half', elevated: t.deck, ...(t.out ? { window: true as const } : {}) } });
     } else if (role === 'radio-operator') {
       const radio = L.buildings.find((b) => b.module === 'radio');
       if (radio) {
@@ -260,7 +294,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
   /** How long each perch has him in view, as validation counts it: a share of the cycle. */
   const perchShares = (t: GuardTrack): number[] =>
     perches.views.map((v, p) => {
-      if (t.onDeck) return perchSeesDeck(raster, hf, perches.spots[p]!, t.x[0]!, t.chest[0]!, t.z[0]!) ? 1 : 0;
+      if (t.onDeck) return perchSeesMan(raster, hf, colliders, perches.spots[p]!, t.x[0]!, t.chest[0]! - gen.sight.chest, t.z[0]!, gen.sight) ? 1 : 0;
       let n = 0;
       for (let k = 0; k < witnessSamples; k++) {
         const c = cellOf(raster, t.x[k]!, t.z[k]!);
@@ -426,9 +460,13 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
   }
 
   /**
-   * His spot on the upper floor of his building: the floor cell the fewest perches can see
-   * him at through a window, then the farthest from the windows and from the head of the
-   * stairs, so getting at him means going up and finding him. He faces away from the stairs.
+   * His spot on the upper floor of his building. A floor he's buried on has no windows
+   * (compound.ts), so nothing outside has a line to him, and his spot is the one farthest from
+   * the head of the stairs. His floor is one room with no corner in it: whoever gets to the head
+   * of the stairs has him in view, and nobody short of that does. He faces away from the stairs.
+   *
+   * Should a kind of place give his floor windows, he keeps where the fewest perches have a line
+   * to him through one, and then as far from them as from the stairs.
    */
   function upstairsSpot(): { at: Point2; look: number } | null {
     const storey = grid.storeys[hq.storey];
@@ -445,10 +483,10 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
         const x = floor.x0 + (i + 0.5) * floor.cell;
         const z = floor.z0 + (j + 0.5) * floor.cell;
         // Out on the floor, where the analysis can see him stand. Against a wall he's inside it as
-        // far as the raster can tell: no perch has him there, and no way in ends in a shot at him.
+        // far as the raster can tell, and no way in ends in a shot at him.
         if (!openAt(raster, x, chest, z) || !openAt(raster, x, hq.floorY + gen.sight.eye, z)) continue;
         let seen = 0;
-        for (const p of perches.spots) if (perchSeesDeck(raster, hf, p, x, chest, z)) seen++;
+        if (windows.length > 0) for (const p of perches.spots) if (perchSeesMan(raster, hf, colliders, p, x, hq.floorY, z, gen.sight)) seen++;
         let apart = Infinity;
         for (const w of windows) apart = Math.min(apart, (w.x - x) * (w.x - x) + (w.z - z) * (w.z - z));
         if (head) apart = Math.min(apart, (head.headX - x) * (head.headX - x) + (head.headZ - z) * (head.headZ - z));
@@ -572,7 +610,8 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
     const deck = post.elevated ?? null;
     let fallback: { routine: Routine; xz: Float64Array | null; sight: GuardTrack; links: Array<[number, number]>; largest: number } | null = null;
     let done = false;
-    for (const turn of [0, 90, -90, 180]) {
+    // A man at a window looks out of it or at a wall: he isn't tried turned.
+    for (const turn of post.window ? [0] : [0, 90, -90, 180]) {
       const routine = turn === 0 ? p.routine : postRoutine(postAt(p.routine), post.look + turn * DEG, post.scan, R, cycle, scanOf(p.routine));
       const xz = deck === null ? track(routine) : null;
       if (xz && placed.some((q) => q.xz && clashes(q.xz, xz))) continue;
@@ -634,13 +673,22 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
   placed.sort((a, b) => a.order - b.order); // unique: each guard's place in the roster
 
   /**
-   * No perch may have more than `maxCoverage` of the guards' time in view (validation): while
-   * one comes within a margin of it, the post it sees most moves to the nearest ground that
-   * perch can't see, within reach, keeping clear of the others (a fixed number of rounds).
+   * No perch may have more than its kind of place's `maxCoverage` of the guards' time in view
+   * (validation): while one has more than `easeTo`, the post it sees most moves to the nearest
+   * ground that perch can't see, within reach, keeping clear of the others (a fixed number of
+   * rounds). A taller place eases a long way under what validation asks, which is how its men
+   * come to be less in the open from any one ridge. Its posts are kept under cover (`posts`):
+   * moved behind something and never into a room, to where the man can still see the place he
+   * was posted to, and turned to watch it; and a man holding a door stays at it.
    */
   function easeCoverage(): void {
     const V = gen.validation;
-    const limit = V.maxCoverage - S.coverageMargin;
+    const limit = gen.compound.types[L.type].easeTo;
+    /** Under a roof, by the grid: a post kept under cover is moved behind things, never into them. */
+    const roofed = (x: number, z: number): boolean => {
+      const c = cellIndex(layer, x, z);
+      return c >= 0 && (layer.flags[c]! & Cell.Roofed) !== 0;
+    };
     const shares = placed.map((q) => perchShares(q.sight));
     const coverage = (p: number): number => shares.reduce((sum, row) => sum + row[p]!, 0) / placed.length;
     const excess = (rows: number[][]): number => perches.views.reduce((sum, _, p) => sum + Math.max(0, rows.reduce((t, row) => t + row[p]!, 0) / placed.length - limit), 0);
@@ -651,31 +699,46 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
       const before = excess(shares);
       const candidates = placed
         .map((q, i) => ({ q, i, share: Math.max(...over.map((p) => shares[i]![p]!)) }))
-        .filter(({ q }) => q.plan.post && q.plan.post.elevated === undefined && q.plan.role !== 'target')
+        // A man who holds a door is the point of his camp's crux: where posts keep under cover he stays at it.
+        .filter(({ q }) => q.plan.post && q.plan.post.elevated === undefined && q.plan.role !== 'target' && !(covered && q.plan.post.door))
         .sort((a, b) => b.share - a.share || a.i - b.i); // unique: guard indices
       let moved = false;
       for (const { q, i } of candidates) {
         const at = postAt(q.routine);
-        let best: { x: number; z: number; seen: number; d: number } | null = null;
+        const post = q.plan.post!;
+        let best: { x: number; z: number; seen: number; watches: boolean; d: number } | null = null;
         for (let c = 0; c < raster.na * raster.nb; c++) {
           if (!raster.walk[c]) continue;
           const m = centreOf(raster, c);
           const d = (m.x - at.x) * (m.x - at.x) + (m.z - at.z) * (m.z - at.z);
           if (d > V.hideReach * V.hideReach) continue;
+          // Under cover is behind something, out of doors: a man put inside a room nobody can see
+          // into is a room somebody has to clear.
+          if (covered && roofed(m.x, m.z)) continue;
           let seen = 0;
-          for (const p of over) if (m.y + gen.sight.chest >= perches.views[p]![c]!) seen++;
-          if (!best || seen < best.seen || (seen === best.seen && d < best.d)) best = { x: m.x, z: m.z, seen, d };
+          // Under cover he's hidden to the top of his head: with his chest behind a crate, a ridge still has him.
+          const top = m.y + (covered ? gen.sight.eye + S.headRoom : gen.sight.chest);
+          for (const p of over) if (top >= perches.views[p]![c]!) seen++;
+          if (best && seen > best.seen) continue;
+          // And, of the ground as well hidden, where he still has the place he was posted to in view.
+          const watches = covered && lineOfSight(raster, m.x, m.y + gen.sight.eye, m.z, at.x, hf.heightAt(at.x, at.z) + gen.sight.crouchChest, at.z);
+          if (!best || seen < best.seen || (watches && !best.watches) || (watches === best.watches && d < best.d)) best = { x: m.x, z: m.z, seen, watches, d };
         }
         if (!best || best.seen >= over.length) continue;
         const where = snap(best);
         if (!where) continue;
-        const routine: Routine = { ...q.routine, legs: q.routine.legs.map((l) => (l.kind === 'hold' ? { ...l, x: where.x, z: where.z } : l)) };
+        // From there he watches the place he left, if he can see it; if not he faces as he did.
+        const look = best.watches && best.d > 1e-6 ? lookAt(where, at) : null;
+        const routine: Routine = look !== null ? postRoutine(where, look, post.scan, R, cycle, scanOf(q.routine)) : { ...q.routine, legs: q.routine.legs.map((l) => (l.kind === 'hold' ? { ...l, x: where.x, z: where.z } : l)) };
         const xz = track(routine);
         if (placed.some((o) => o !== q && o.xz && clashes(o.xz, xz))) continue;
         const sight = sightOf(routine, null, q.plan.role);
+        // Turned, he mustn't have taken to watching the way in.
+        if (look !== null && corridorWatch(sight) > S.corridorWatch) continue;
         const next = perchShares(sight);
         const trial = shares.map((row, g) => (g === i ? next : row));
         if (excess(trial) >= before - 1e-9) continue;
+        if (look !== null) q.plan = { ...q.plan, post: { ...post, look } };
         q.routine = routine;
         q.xz = xz;
         q.sight = sight;
@@ -703,7 +766,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
       const t = placed[g]!.sight;
       perches.views.forEach((v, p) => {
         const row = seenAt[p]![g]!;
-        if (t.onDeck) row.fill(perchSeesDeck(raster, hf, perches.spots[p]!, t.x[0]!, t.chest[0]!, t.z[0]!) ? 1 : 0);
+        if (t.onDeck) row.fill(perchSeesMan(raster, hf, colliders, perches.spots[p]!, t.x[0]!, t.chest[0]! - gen.sight.chest, t.z[0]!, gen.sight) ? 1 : 0);
         else for (let k = 0; k < K; k++) {
           const c = cellOf(raster, t.x[k]!, t.z[k]!);
           row[k] = c >= 0 && t.chest[k]! >= v[c]! ? 1 : 0;
@@ -950,4 +1013,3 @@ function componentSizes(n: number, edge: (a: number, b: number) => boolean): num
   }
   return sizes;
 }
-

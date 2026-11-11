@@ -39,6 +39,37 @@ type CirclingArm = Arm & { type?: CompoundType };
 
 const ARMS: readonly CirclingArm[] = [{ name: 'yard only' }, { name: 'walled', type: 'walled' }, { name: 'keep', type: 'keep' }, { name: 'depot', type: 'depot' }, { name: 'farm', type: 'farm' }, { name: 'as built' }];
 
+/** What each kind of place was on one storey (Step 1 of docs/compound-types.md), where taller camps changed it: its towers, and how high its target's building stood. */
+const ON_ONE_STOREY: Readonly<Record<Exclude<CompoundType, 'yard'>, { towers: [number, number]; hq: number }>> = {
+  walled: { towers: [2, 4], hq: 3.2 },
+  keep: { towers: [2, 4], hq: 6.2 },
+  depot: { towers: [2, 3], hq: 3.4 },
+  farm: { towers: [1, 1], hq: 3.2 },
+};
+
+/**
+ * The kinds of place as they stood on one storey: every building one floor, marksmen on the
+ * towers and as many towers as there were, and posts left where the yard would leave them.
+ * What taller camps are measured against, on the same seeds. tests/storeys.test.ts holds it to
+ * what one storey generated.
+ */
+export function oneStorey(t: Tuning): Tuning {
+  const out = structuredClone(t);
+  const yard = out.gen.compound.types.yard;
+  for (const k of COMPOUND_TYPES) {
+    if (k === 'yard') continue;
+    const type = out.gen.compound.types[k];
+    type.storeys = { hq: 1, barracks: 1, mess: 1, storage: 1 };
+    type.windowPost = 0;
+    type.towers = [...ON_ONE_STOREY[k].towers];
+    type.modules.hq[2] = ON_ONE_STOREY[k].hq;
+    type.maxCoverage = yard.maxCoverage;
+    type.easeTo = yard.easeTo;
+    type.posts = yard.posts;
+  }
+  return out;
+}
+
 /** Every camp this type, whatever its crux and ground would have picked. */
 export function onlyType(t: Tuning, type: CompoundType): Tuning {
   const out = structuredClone(t);
@@ -48,6 +79,7 @@ export function onlyType(t: Tuning, type: CompoundType): Tuning {
 
 function tuned(arm: CirclingArm, t: Tuning): Tuning {
   if (arm.name === 'yard only') return yardOnly(t);
+  if (arm.name === 'one storey') return oneStorey(t);
   return arm.type ? onlyType(t, arm.type) : t;
 }
 
@@ -57,7 +89,7 @@ const EVERY = 10;
 const CHEST = 0.75;
 
 /** What the walk round shows, with nobody firing. */
-export function fromOutside(sim: Simulation): { inView: number; arc: number; hidden: number; overview: number; ground: number; perches: number } {
+export function fromOutside(sim: Simulation): { inView: number; arc: number; hidden: number; overview: number; ground: number; most: number; perches: number } {
   const w = sim.world;
   const T = sim.tuning;
   const ring = ringAround(w, { x: w.camp.site.x, z: w.camp.site.z }, 25, 10);
@@ -91,8 +123,14 @@ export function fromOutside(sim: Simulation): { inView: number; arc: number; hid
   };
 }
 
-/** What scouting has to do: how many men the best overview shows, and how many firing points it takes to see everyone any of them can. */
-function fromPerches(sim: Simulation): { overview: number; ground: number; perches: number } {
+/**
+ * What scouting has to do: how many men the best overview shows, how many the firing point that
+ * shows most does, and how many firing points it takes to see everyone any of them can. The best
+ * overview is the one the camp's analysis names (where `perch=1` puts you), by a man's chest
+ * through its raster; the lines here are to his head or his chest through the world itself, so
+ * another firing point can show more.
+ */
+function fromPerches(sim: Simulation): { overview: number; ground: number; most: number; perches: number } {
   const w = sim.world;
   const T = sim.tuning;
   const view = { world: w, solids: sim.solids, bodies: [] };
@@ -102,6 +140,7 @@ function fromPerches(sim: Simulation): { overview: number; ground: number; perch
   const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
   const perches = w.report.camp!.perches;
   const shows = perches.map(() => new Uint8Array(men.length));
+  const inView = perches.map(() => 0);
   let seen = 0;
   let raised = 0;
   const best = bestOverview(w);
@@ -113,6 +152,7 @@ function fromPerches(sim: Simulation): { overview: number; ground: number; perch
         const ey = w.terrain.heightAt(p.x, p.z) + eye;
         if (!(sightLine(view, p.x, ey, p.z, pose.x, y + head, pose.z, Blocks.Sight) || sightLine(view, p.x, ey, p.z, pose.x, y + head * CHEST, pose.z, Blocks.Sight))) return;
         shows[i]![m] = 1;
+        inView[i] = inView[i]! + 1;
         if (p.x === best.x && p.z === best.z) {
           seen++;
           if (g.elevated) raised++;
@@ -137,7 +177,7 @@ function fromPerches(sim: Simulation): { overview: number; ground: number; perch
     for (const m of [...left]) if (shows[pick]![m] === 1) left.delete(m);
     count++;
   }
-  return { overview: seen / MOMENTS, ground: (seen - raised) / MOMENTS, perches: count };
+  return { overview: seen / MOMENTS, ground: (seen - raised) / MOMENTS, most: Math.max(0, ...inView) / MOMENTS, perches: count };
 }
 
 export const circling: Experiment = {
@@ -162,6 +202,7 @@ export const circling: Experiment = {
     { key: 'hidden', label: 'men no stop ever shows (%)', kind: 'mean' },
     { key: 'overview', label: 'men in view from the best overview', kind: 'mean' },
     { key: 'ground', label: 'of them, on the ground', kind: 'mean' },
+    { key: 'most', label: 'men in view from the firing point that shows most', kind: 'mean' },
     { key: 'perches', label: 'firing points to see everyone', kind: 'mean' },
   ],
   run(seed, arm, tuning) {
@@ -201,4 +242,17 @@ export const circling: Experiment = {
       ...shape,
     };
   },
+};
+
+/**
+ * What a second storey does to the same camps: each kind of place as it stood on one storey
+ * against the same seeds as built, read both ways (the lap, and what the firing points show).
+ * The owner's brief for taller camps (Nov 10): "makes every enemy troop less openly visible from
+ * any given perch".
+ */
+export const taller: Experiment = {
+  ...circling,
+  name: 'taller',
+  about: 'what upper floors do to what a perch and a lap of the outside show: the kinds of place on one storey against the same camps as built',
+  arms: [{ name: 'one storey' }, { name: 'as built' }],
 };

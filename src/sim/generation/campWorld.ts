@@ -124,7 +124,7 @@ function buildCamp(seed: string, attempt: number, terrain: TerrainResult, G: Tun
   blockVehicles(camp, grid, G);
   raster = buildRaster(camp, terrain.heightfield, colliders, grid.site, G, props.trees, grid);
   views = perchViews(raster, terrain.heightfield, camp.site, G, grid.map, campWalkStart(camp));
-  staffCamp(camp, terrain.heightfield, grid, raster, views, G, spec, fork('staff'), fork('routines'));
+  staffCamp(camp, terrain.heightfield, colliders, grid, raster, views, G, spec, fork('staff'), fork('routines'));
   const repaired = validateAndRepair(camp, terrain.heightfield, colliders, grid, raster, G, fork('repair'));
   return { attempt, camp, colliders, props, grid, repaired };
 }

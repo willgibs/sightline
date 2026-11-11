@@ -7,7 +7,7 @@ import { sightlines, takeApart, type Cluster, type PerchSight, type Sightlines }
 import { buildTimeline, exposureField, heatmaps, witnessDuty, witnessEdges, type Field, type Timeline, type Witnesses } from './field';
 import { infiltrate, rimCells, type Exposure, type Infiltration, type Meter, type Search, type Space } from './infiltrate';
 import type { Point2 } from './paths';
-import { findPerches, perchSeesDeck, perchViewshed, type PerchSpot } from './perches';
+import { findPerches, perchSeesMan, perchViewshed, type PerchSpot } from './perches';
 import { cellOf, centreOf, clearShot, frameOf, type Raster } from './raster';
 import { campWalkStart } from './site';
 
@@ -145,7 +145,7 @@ export function analyzeCamp(
       let count = 0;
       if (t.onDeck) {
         // He holds one spot all cycle, under an open-sided roof: one line says it.
-        if (perchSeesDeck(R, hf, spot, t.x[0]!, t.chest[0]!, t.z[0]!)) {
+        if (perchSeesMan(R, hf, colliders, spot, t.x[0]!, t.chest[0]! - gen.sight.chest, t.z[0]!, gen.sight)) {
           count = K;
           seen.fill(1, (p * n + g) * K, (p * n + g) * K + K);
         }

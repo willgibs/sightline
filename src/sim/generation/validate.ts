@@ -96,17 +96,18 @@ export function validateCamp(camp: Camp, a: CampAnalysis, parts: AnalysisParts, 
     const unsolved = a.clusters.filter((c) => c.certified === 'unsolved');
     rule('clusters', unsolved.length, `unsolved: ${unsolved.map((c) => c.members.join('+')).join(', ')}`);
   }
-  // No single perch wins.
+  // No single perch wins: how much of its men's time a perch may have is the kind of place's (a taller one shows less).
   {
+    const most = gen.compound.types[camp.layout!.type].maxCoverage;
     const over: number[] = [];
     let excess = 0;
     a.perches.forEach((p, i) => {
-      if (p.coverage > V.maxCoverage + 1e-9) {
+      if (p.coverage > most + 1e-9) {
         over.push(i);
-        excess += p.coverage - V.maxCoverage;
+        excess += p.coverage - most;
       }
     });
-    rule('perch coverage', excess, `${over.length} perch(es) see more than ${Math.round(V.maxCoverage * 100)}% of guard time (most ${Math.round(Math.max(0, ...a.perches.map((p) => p.coverage)) * 100)}%)`, over);
+    rule('perch coverage', excess, `${over.length} perch(es) see more than ${Math.round(most * 100)}% of guard time (most ${Math.round(Math.max(0, ...a.perches.map((p) => p.coverage)) * 100)}%)`, over);
   }
   {
     const over: number[] = [];

@@ -1,5 +1,6 @@
 import type { GenTuning } from '../../config/tuning';
 import { circleDirections, datan2, dcos, dsin, dtanDeg } from '../kernel/core/detmath';
+import { Blocks, type ColliderSet, type RayHit } from '../kernel/world/colliders';
 import { cellIndex, type GridLayer } from '../kernel/world/grid';
 import { makeTerrainSample, type Heightfield } from '../kernel/world/heightfield';
 import { GridSearch } from '../kernel/world/search';
@@ -195,6 +196,41 @@ export function overviewPerches(R: Raster, views: readonly Float32Array[], halfA
     for (const c of inside) if (R.ground[c]! + gen.sight.chest >= v[c]!) n++;
     return inside.length > 0 && n >= gen.compound.overviewShare * inside.length;
   });
+}
+
+/**
+ * Whether a perch sees a man standing on a deck or an upper floor, his feet at `feet`.
+ *
+ * On a camp of one storey that's his chest through the raster, as everywhere in the analysis
+ * (`perchSeesDeck`). On a camp with an upper floor it's a line to his head, his chest or his
+ * belt through what really stands there. A window is a 1.2 m gap in a wall 0.2 m thick, and the
+ * raster makes of it one or two cells of a row a metre thick: a line that comes through it at
+ * a slant is stopped there and isn't in the world, so the raster hid a man upstairs from perches
+ * that had him (on 8 of 20 camps that buried their target, a firing point had a line to him).
+ * And behind a sill it's the middle of him that shows, under the window's head, where his own
+ * head doesn't.
+ */
+export function perchSeesMan(R: Raster, hf: Heightfield, colliders: ColliderSet, p: PerchSpot, x: number, feet: number, z: number, S: GenTuning['sight']): boolean {
+  if (R.extra === 0) return perchSeesDeck(R, hf, p, x, feet + S.chest, z);
+  return clearLine(R, hf, colliders, p, x, feet + S.eye, z) || clearLine(R, hf, colliders, p, x, feet + S.chest, z) || clearLine(R, hf, colliders, p, x, feet + S.crouchHead, z);
+}
+
+/** How far back from a man the colliders on a line to him are asked: the camp's own, and what stands round it. */
+const NEAR = 200;
+const lineHit: RayHit = { dist: Infinity, id: -1 };
+
+/** A line from a perch's eye to a point: over the ground, clear of the crowns, and through nothing in the camp that stops sight. */
+function clearLine(R: Raster, hf: Heightfield, colliders: ColliderSet, p: PerchSpot, x: number, y: number, z: number): boolean {
+  const dx = x - p.x;
+  const dy = y - p.eye;
+  const dz = z - p.z;
+  const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (d < 1e-6) return true;
+  if (hf.raycast(p.x, p.eye, p.z, dx / d, dy / d, dz / d, d) < d - 0.5) return false;
+  for (let s = 0; s < d; s += R.canopy.cell / 2) if (p.eye + (dy * s) / d < canopyTop(R.canopy, p.x + (dx * s) / d, p.z + (dz * s) / d)) return false;
+  const from = Math.max(0, d - NEAR);
+  colliders.raycast(p.x + (dx * from) / d, p.eye + (dy * from) / d, p.z + (dz * from) / d, dx / d, dy / d, dz / d, d - from - 0.3, Blocks.Sight, lineHit);
+  return lineHit.id < 0;
 }
 
 /**

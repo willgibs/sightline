@@ -191,6 +191,13 @@ export const defaultTuning = {
           vehicleDoorGap: 0, // metres his vehicle keeps off every door: the plain yard's never needed it
           storeys: { hq: 1, barracks: 1, mess: 1, storage: 1 }, // a module with 2 here has a second floor, stairs and windows
           windowPost: 0, // marksmen at the upper windows of its two-storey buildings, the target's first
+          // What the ridges get of it (validation's perch coverage, and staffing.ts): no perch may have more than `maxCoverage` of its
+          // men's time in view, and posts on the ground are moved out of a perch's sight while one has more than `easeTo`. `posts`:
+          // 'open' moves them as the yard always did; 'covered' keeps a post so moved out of doors and with its old place in view,
+          // leaves a man holding a door at it, and gives its marksmen the upper windows before the towers.
+          maxCoverage: 0.6,
+          easeTo: 0.58,
+          posts: 'open',
           modules: { hq: [12, 9, 3.2], barracks: [18, 8, 3], mess: [13, 9, 3], storage: [13, 10, 4.4], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
         },
         // The same plot behind a wall: the yard can only be seen into through the gate, the breach,
@@ -212,6 +219,9 @@ export const defaultTuning = {
           vehicleDoorGap: 3,
           storeys: { hq: 2, barracks: 2, mess: 1, storage: 1 },
           windowPost: 2, // marksmen at the upper windows of its two-storey buildings, the target's first
+          maxCoverage: 0.45,
+          easeTo: 0.22,
+          posts: 'covered',
           modules: { hq: [12, 9, 6], barracks: [18, 8, 3], mess: [13, 9, 3], storage: [13, 10, 4.4], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
         },
         // A keep on a hilltop: a tight walled plot, one narrow gate, and in the middle of it the
@@ -233,6 +243,9 @@ export const defaultTuning = {
           vehicleDoorGap: 3,
           storeys: { hq: 2, barracks: 2, mess: 1, storage: 1 },
           windowPost: 2, // marksmen at the upper windows of its two-storey buildings, the target's first
+          maxCoverage: 0.45,
+          easeTo: 0.22,
+          posts: 'covered',
           modules: { hq: [16, 12, 6], barracks: [16, 8, 3], mess: [12, 8, 3], storage: [12, 9, 3.6], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
         },
         // A depot strung along a road: a long plot with the road running right through it, gate to
@@ -254,6 +267,9 @@ export const defaultTuning = {
           vehicleDoorGap: 3,
           storeys: { hq: 2, barracks: 2, mess: 1, storage: 1 },
           windowPost: 2, // marksmen at the upper windows of its two-storey buildings, the target's first
+          maxCoverage: 0.45,
+          easeTo: 0.22,
+          posts: 'covered',
           modules: { hq: [13, 9, 6], barracks: [20, 9, 3], mess: [13, 9, 3], storage: [24, 11, 5], radio: [7, 5, 2.8], shed: [6, 4, 2.6] },
         },
         // A farm and its outbuildings: no fence, a farmhouse, a barn and a byre round a small
@@ -276,6 +292,9 @@ export const defaultTuning = {
           vehicleDoorGap: 3,
           storeys: { hq: 2, barracks: 1, mess: 1, storage: 1 },
           windowPost: 1, // marksmen at the upper windows of its two-storey buildings, the target's first
+          maxCoverage: 0.45,
+          easeTo: 0.22,
+          posts: 'covered',
           modules: { hq: [13, 10, 6], barracks: [18, 8, 3.2], mess: [12, 8, 3], storage: [22, 12, 7], radio: [6, 5, 2.8], shed: [6, 5, 2.6] },
         },
       },
@@ -344,8 +363,8 @@ export const defaultTuning = {
       estimateStep: 3, // while staffing, sightlines are estimated from every this-many samples of the cycle (the analysis takes them all)
       workerInside: 2.5, // metres inside a door that a worker's chores are done
       targetFan: [6, 10, 14], // metres out from his door that the target's walks are tried, in a fan
-      coverageMargin: 0.02, // posts are moved while a perch comes this near validation's limit on guard time
-      coverageRounds: 6, // posts so moved, at most (rule 18)
+      coverageRounds: 6, // posts moved out of a perch's sight, at most (rule 18); how far a kind of place takes it is its own `easeTo`
+      headRoom: 0.15, // where a kind of place keeps its posts under cover, ground is hidden from a perch if it hides a man to this far over his eyes
       witnessTries: 12, // walkers' phases tried to give every perch someone it can't see watching, and as many turns of posts (rule 18)
       witnessTurns: [45, -45, 90, -90, 135, -135], // degrees a post is tried turned for that
       witnessMargin: 0.02, // the estimate of who's watched keeps this over validation's duty, on a camp built around a crux
@@ -395,7 +414,6 @@ export const defaultTuning = {
       seenSeconds: 15, // a perch sees a guard if he's in its view this long a cycle: the plan's minimum time in view
       longRangePerches: 2, // perches that see half the guards and hold the target, for a 'walk' crux: the old promise
       targetSeconds: 10, // long enough a cycle for a perch to count as having the target
-      maxCoverage: 0.6, // no perch sees more than this share of guard time
       maxTarget: 0.25, // nor the target for more than this share of the cycle
       watchedDuty: 0.03, // a guard counts as watched if another would see him drop for this share of the cycle
       witnessedFrom: 0.05, // a perch only has to have its shots witnessed if it sees this share of guard time
