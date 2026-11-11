@@ -270,7 +270,7 @@ export function squadArrives(ctx: TickContext, c: CommanderEntity, x: number, z:
     c.camp.roster.push({ id: g.id, post: g.guard.spawn, x: g.body.x, z: g.body.z, tick: ctx.tick, status: 'ok', ...(g.guard.reserve ? { reserve: { x: g.guard.reserve.x, z: g.guard.reserve.z } } : {}) });
     if (room && !c.camp.relief && fetchers < ctx.tuning.brain.protect.fetchers) {
       fetchers++;
-      g.brain.task = { id: c.camp.nextTask++, kind: 'fetch', x: room.x, z: room.z, issued: ctx.tick, cause: event };
+      g.brain.task = { id: c.camp.nextTask++, kind: 'fetch', x: room.x, z: room.z, ...(room.y === undefined ? {} : { y: room.y }), issued: ctx.tick, cause: event };
       continue;
     }
     const target = c.camp.search ?? (c.camp.shots.estimate ? { x: c.camp.shots.estimate.x, z: c.camp.shots.estimate.z } : { x: site.x, z: site.z });
@@ -486,7 +486,7 @@ export const orderDeliver: ScheduleHandler = (ctx, entry) => {
   const task = c.camp.tasks.find((t) => t.id === entry.b);
   if (!task) return;
   const b = g.brain;
-  b.task = { id: task.id, kind: task.kind, x: task.x, z: task.z, issued: ctx.tick, cause: task.cause };
+  b.task = { id: task.id, kind: task.kind, x: task.x, z: task.z, ...(task.y === undefined ? {} : { y: task.y }), issued: ctx.tick, cause: task.cause };
   // A new order starts afresh, even mid-task: not the old one's linger, its sweep or its cover.
   b.linger = -1;
   b.until = -1;

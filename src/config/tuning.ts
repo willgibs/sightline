@@ -189,6 +189,15 @@ export const defaultTuning = {
           barbican: 0, // metres of wall running out from each side of a gate, so it can only be seen into from straight ahead
           towers: [2, 4],
           vehicleDoorGap: 0, // metres his vehicle keeps off every door: the plain yard's never needed it
+          storeys: { hq: 1, barracks: 1, mess: 1, storage: 1 }, // a module with 2 here has a second floor, stairs and windows
+          windowPost: 0, // marksmen at the upper windows of its two-storey buildings, the target's first
+          // What the ridges get of it (validation's perch coverage, and staffing.ts): no perch may have more than `maxCoverage` of its
+          // men's time in view, and posts on the ground are moved out of a perch's sight while one has more than `easeTo`. `posts`:
+          // 'open' moves them as the yard always did; 'covered' keeps a post so moved out of doors and with its old place in view,
+          // leaves a man holding a door at it, and gives its marksmen the upper windows before the towers.
+          maxCoverage: 0.6,
+          easeTo: 0.58,
+          posts: 'open',
           modules: { hq: [12, 9, 3.2], barracks: [18, 8, 3], mess: [13, 9, 3], storage: [13, 10, 4.4], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
         },
         // The same plot behind a wall: the yard can only be seen into through the gate, the breach,
@@ -206,9 +215,14 @@ export const defaultTuning = {
           breachWidth: 4,
           breachSides: ['back', 'left', 'right'],
           barbican: 12,
-          towers: [2, 4],
+          towers: [1, 2],
           vehicleDoorGap: 3,
-          modules: { hq: [12, 9, 3.2], barracks: [18, 8, 3], mess: [13, 9, 3], storage: [13, 10, 4.4], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
+          storeys: { hq: 2, barracks: 2, mess: 1, storage: 1 },
+          windowPost: 2, // marksmen at the upper windows of its two-storey buildings, the target's first
+          maxCoverage: 0.55,
+          easeTo: 0.22,
+          posts: 'covered',
+          modules: { hq: [12, 9, 6], barracks: [18, 8, 3], mess: [13, 9, 3], storage: [13, 10, 4.4], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
         },
         // A keep on a hilltop: a tight walled plot, one narrow gate, and in the middle of it the
         // target's building, standing in a ring of open ground with the outbuildings against the wall.
@@ -225,9 +239,14 @@ export const defaultTuning = {
           breachWidth: 2.4,
           breachSides: ['back', 'left', 'right'],
           barbican: 10,
-          towers: [2, 4],
+          towers: [1, 2],
           vehicleDoorGap: 3,
-          modules: { hq: [16, 12, 6.2], barracks: [16, 8, 3], mess: [12, 8, 3], storage: [12, 9, 3.6], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
+          storeys: { hq: 2, barracks: 2, mess: 1, storage: 1 },
+          windowPost: 2, // marksmen at the upper windows of its two-storey buildings, the target's first
+          maxCoverage: 0.55,
+          easeTo: 0.22,
+          posts: 'covered',
+          modules: { hq: [16, 12, 6], barracks: [16, 8, 3], mess: [12, 8, 3], storage: [12, 9, 3.6], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
         },
         // A depot strung along a road: a long plot with the road running right through it, gate to
         // gate, long sheds on both sides with their doors on the road. The road is the yard.
@@ -244,9 +263,14 @@ export const defaultTuning = {
           breachWidth: 4,
           breachSides: ['left', 'right'],
           barbican: 12,
-          towers: [2, 3],
+          towers: [1, 2],
           vehicleDoorGap: 3,
-          modules: { hq: [13, 9, 3.4], barracks: [20, 9, 3], mess: [13, 9, 3], storage: [24, 11, 5], radio: [7, 5, 2.8], shed: [6, 4, 2.6] },
+          storeys: { hq: 2, barracks: 2, mess: 1, storage: 1 },
+          windowPost: 2, // marksmen at the upper windows of its two-storey buildings, the target's first
+          maxCoverage: 0.55,
+          easeTo: 0.22,
+          posts: 'covered',
+          modules: { hq: [13, 9, 6], barracks: [20, 9, 3], mess: [13, 9, 3], storage: [24, 11, 5], radio: [7, 5, 2.8], shed: [6, 4, 2.6] },
         },
         // A farm and its outbuildings: no fence, a farmhouse, a barn and a byre round a small
         // farmyard, huts scattered across the plot behind long stone field walls (a few low enough
@@ -266,9 +290,21 @@ export const defaultTuning = {
           barbican: 10,
           towers: [1, 1],
           vehicleDoorGap: 3,
-          modules: { hq: [13, 10, 3.2], barracks: [18, 8, 3.2], mess: [12, 8, 3], storage: [22, 12, 7], radio: [6, 5, 2.8], shed: [6, 5, 2.6] },
+          storeys: { hq: 2, barracks: 1, mess: 1, storage: 1 },
+          windowPost: 1, // marksmen at the upper windows of its two-storey buildings, the target's first
+          maxCoverage: 0.55,
+          easeTo: 0.22,
+          posts: 'covered',
+          modules: { hq: [13, 10, 6], barracks: [18, 8, 3.2], mess: [12, 8, 3], storage: [22, 12, 7], radio: [6, 5, 2.8], shed: [6, 5, 2.6] },
         },
       },
+      // A two-storey building (compound.ts): floor to floor, how thick its slabs are, the stairs
+      // up (a straight flight against a wall), and the windows of its upper floor.
+      storey: 3,
+      floorThickness: 0.2,
+      stairs: { rise: 0.25, tread: 0.3, width: 1.1 }, // a rise inside the motor's stepHeight
+      upperWindow: { sill: 0.95, head: 2.15, width: 1.2, every: 12 }, // metres above the floor, wide, and how far apart along a wall
+      rail: 1, // round the stairwell upstairs
       fieldWall: 1.1, // a farm's low field walls: to see over, and to crawl behind
       fieldWallHigh: 2.4, // and its high ones, which nobody sees over
       fieldHighShare: 0.95, // how many of a farm's runs of wall are high
@@ -327,8 +363,8 @@ export const defaultTuning = {
       estimateStep: 3, // while staffing, sightlines are estimated from every this-many samples of the cycle (the analysis takes them all)
       workerInside: 2.5, // metres inside a door that a worker's chores are done
       targetFan: [6, 10, 14], // metres out from his door that the target's walks are tried, in a fan
-      coverageMargin: 0.02, // posts are moved while a perch comes this near validation's limit on guard time
-      coverageRounds: 6, // posts so moved, at most (rule 18)
+      coverageRounds: 6, // posts moved out of a perch's sight, at most (rule 18); how far a kind of place takes it is its own `easeTo`
+      headRoom: 0.15, // where a kind of place keeps its posts under cover, ground is hidden from a perch if it hides a man to this far over his eyes
       witnessTries: 12, // walkers' phases tried to give every perch someone it can't see watching, and as many turns of posts (rule 18)
       witnessTurns: [45, -45, 90, -90, 135, -135], // degrees a post is tried turned for that
       witnessMargin: 0.02, // the estimate of who's watched keeps this over validation's duty, on a camp built around a crux
@@ -378,7 +414,6 @@ export const defaultTuning = {
       seenSeconds: 15, // a perch sees a guard if he's in its view this long a cycle: the plan's minimum time in view
       longRangePerches: 2, // perches that see half the guards and hold the target, for a 'walk' crux: the old promise
       targetSeconds: 10, // long enough a cycle for a perch to count as having the target
-      maxCoverage: 0.6, // no perch sees more than this share of guard time
       maxTarget: 0.25, // nor the target for more than this share of the cycle
       watchedDuty: 0.03, // a guard counts as watched if another would see him drop for this share of the cycle
       witnessedFrom: 0.05, // a perch only has to have its shots witnessed if it sees this share of guard time
@@ -644,6 +679,7 @@ export const defaultTuning = {
       // arrives by the straight line only (A11: a shout's whole flood cost a frame).
       floodReach: 25,
       wallLossDb: 12, // the straight route loses this much per wall it passes through (as Rainbow Six Siege's does)
+      floorLossDb: 9, // and this much per floor it passes through: an upper floor passes a sound muffled, not stopped
       sirenWallLossDb: 3, // a siren's a good deal lower and louder than anything else in the camp, and walls barely touch it: it's meant to be heard indoors
       terrainLossDb: 15, // and this much where the ground is in the way
       maxWalls: 4, // through more walls than this, the straight route is silent
@@ -814,6 +850,7 @@ export const defaultTuning = {
         stepOut: 1.5, // metres he'll step out from behind something to see round it
         preferLine: 9, // metres farther he'll go for a place he can fight from than for one that only hides him
         eye: 1.3, // metres above the ground he takes the intruder's eyes to be, and what he'd see of him
+        raised: 2.4, // metres above the ground that the intruder is believed to be before his own height is what counts: an upper floor, a deck
         shoulder: 0.3, // metres either side of his head that have to be hidden too
         keep: 6, // metres the believed place may move before he checks his position against it again
         standoff: 7, // metres: never a position nearer the intruder than this

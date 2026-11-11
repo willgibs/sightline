@@ -30,7 +30,7 @@ beforeAll(() => {
     }
   }
   expect(world, 'a seed that passes at its first attempt').toBeDefined();
-  const R = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, G, world.props.trees);
+  const R = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, G, world.props.trees, world.grid);
   ({ analysis, parts } = analyzeCamp(world.camp, world.terrain, world.colliders, world.grid, G, R));
 }, 180_000);
 
@@ -94,7 +94,7 @@ describe('each rule', () => {
   it('no single perch: coverage and the target, and which perch broke them', () => {
     const over = check((a) => {
       const b = copyPerches(a);
-      b.perches[3]!.coverage = G.validation.maxCoverage + 0.05;
+      b.perches[3]!.coverage = G.compound.types[world.camp.layout!.type].maxCoverage + 0.05;
       return b;
     });
     expect(failed(over, 'perch coverage')).toBe(true);

@@ -7,7 +7,7 @@ import { sightlines, takeApart, type Cluster, type PerchSight, type Sightlines }
 import { buildTimeline, exposureField, heatmaps, witnessDuty, witnessEdges, type Field, type Timeline, type Witnesses } from './field';
 import { infiltrate, rimCells, type Exposure, type Infiltration, type Meter, type Search, type Space } from './infiltrate';
 import type { Point2 } from './paths';
-import { findPerches, perchSeesDeck, perchViewshed, type PerchSpot } from './perches';
+import { findPerches, perchSeesMan, perchViewshed, type PerchSpot } from './perches';
 import { cellOf, centreOf, clearShot, frameOf, type Raster } from './raster';
 import { campWalkStart } from './site';
 
@@ -145,7 +145,7 @@ export function analyzeCamp(
       let count = 0;
       if (t.onDeck) {
         // He holds one spot all cycle, under an open-sided roof: one line says it.
-        if (perchSeesDeck(R, hf, spot, t.x[0]!, t.chest[0]!, t.z[0]!)) {
+        if (perchSeesMan(R, hf, colliders, spot, t.x[0]!, t.chest[0]! - gen.sight.chest, t.z[0]!, gen.sight)) {
           count = K;
           seen.fill(1, (p * n + g) * K, (p * n + g) * K + K);
         }
@@ -220,6 +220,13 @@ export function analyzeCamp(
           if ((m.x - p.x) * (m.x - p.x) + (m.z - p.z) * (m.z - p.z) <= radius * radius) set.add(c);
         }
       }
+      // And any upper floor's cells: a target upstairs is reached from upstairs.
+      for (let e = 0; e < R.extra; e++) {
+        const c = R.na * R.nb + e;
+        if (!R.walk[c] || set.has(c)) continue;
+        const m = centreOf(R, c);
+        if ((m.x - p.x) * (m.x - p.x) + (m.z - p.z) * (m.z - p.z) <= radius * radius) set.add(c);
+      }
     }
     return [...set].sort((a, b) => a - b); // unique: cell indices
   };
@@ -250,7 +257,11 @@ export function analyzeCamp(
       if (d2 > close * close || d2 < touch * touch) return false;
       return clearShot(R, colliders, m.x, m.y + gen.sight.crouchHead, m.z, t.x[k]!, t.chest[k]!, t.z[k]!);
     };
-    infiltration = find(all, { goal, goalCells, horizon, maxExpansions: A.maxExpansions });
+    // On an upper floor he holds one spot, with a floor between him and nearly everything in
+    // reach of him: only the cells with a line to him are worth getting to, and a search that
+    // aims at the rest spends its whole budget under his feet.
+    const reach = t.onDeck ? goalCells.filter((c) => goal(c, 0)) : goalCells;
+    infiltration = find(all, { goal, goalCells: reach, horizon, maxExpansions: A.maxExpansions });
   }
   const gen0 = (camp.devices ?? []).find((d) => d.kind === 'generator');
   let sabotage: Infiltration = { found: false, time: -1, cells: [], start: -1, peak: 0, meter: 0, expanded: 0, exhausted: false };
@@ -295,8 +306,9 @@ export function analyzeCamp(
     dt: T.dt,
     samples: K,
     frame: { ox: R.ox, oz: R.oz, ux: R.ux, uz: R.uz, vx: R.vx, vz: R.vz, a0: R.a0, b0: R.b0, cell: R.cell, na: R.na, nb: R.nb },
-    coverage,
-    idleness,
+    // The ground's cells, as the frame lays them out: an upper floor's come after them, and aren't drawn.
+    coverage: coverage.slice(0, R.na * R.nb),
+    idleness: idleness.slice(0, R.na * R.nb),
     perches,
     duty: [...duty],
     clusters: certified,

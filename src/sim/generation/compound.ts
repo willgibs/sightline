@@ -2,7 +2,7 @@ import type { GenTuning } from '../../config/tuning';
 import { dcos, dsin } from '../kernel/core/detmath';
 import type { Rng } from '../kernel/core/rng';
 import { Blocks, type ColliderSet } from '../kernel/world/colliders';
-import { Cell, Edge, type SpatialGrid } from '../kernel/world/grid';
+import { Cell, Edge, type SpatialGrid, type StairSpec, type StoreySpec } from '../kernel/world/grid';
 import type { Heightfield } from '../kernel/world/heightfield';
 import { Surface } from '../kernel/world/surfaces';
 import type { Camp, Structure, StructureKind } from './camp';
@@ -154,6 +154,22 @@ export interface Parcel {
   module: ModuleName;
 }
 
+/** A window of an upper floor: a gap in a wall between a sill and a head, in the world. */
+export interface WindowSpec {
+  /** The middle of its gap in the wall. */
+  x: number;
+  z: number;
+  /** Along the wall. */
+  ux: number;
+  uz: number;
+  width: number;
+  /** Heights: the top of the sill, the underside of the head, the top of the wall. */
+  sill: number;
+  head: number;
+  top: number;
+  building: number;
+}
+
 export interface BuildingSpec {
   module: ModuleName;
   /** Middle of its footprint. */
@@ -165,6 +181,10 @@ export interface BuildingSpec {
   length: number;
   depth: number;
   height: number;
+  /** Floors: 1, or 2 with stairs, windows and a floor above at `floorY` (0 if one), `storey` its index in camp.storeys (−1 if one). */
+  storeys: number;
+  floorY: number;
+  storey: number;
   /** Its doors (indices into camp.doors). */
   doors: number[];
   /** The index of its structure in camp.structures. */
@@ -228,7 +248,8 @@ export interface CampLayout {
   openings: Opening[];
   parcels: Parcel[];
   buildings: BuildingSpec[];
-  towers: Array<{ x: number; z: number; deck: number; corner: string }>;
+  /** Where its marksmen stand: a tower at a corner, or an upper window (`corner` 'window'), which has the way he looks out of it and whose building it is. */
+  towers: Array<{ x: number; z: number; deck: number; corner: string; out?: Point2; building?: number }>;
   breach: Side;
   skeleton: Skeleton;
   /** The loops its patrols walk, in the frame (staffing.ts). */
@@ -248,6 +269,10 @@ declare module './camp' {
     devices?: DeviceSpec[];
     /** What the mission is for (D5), set once the camp is staffed. */
     objective?: ObjectiveSpec;
+    /** Upper floors' windows, stair flights and floors, for the raster and the grid (docs/compound-types.md). */
+    windows?: WindowSpec[];
+    storeys?: StoreySpec[];
+    stairs?: StairSpec[];
   }
 }
 
@@ -576,6 +601,9 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     const p = at(a, b);
     devices.push({ kind, x: p.x, y, z: p.z, structure, feed: -1 });
   };
+  const windows: WindowSpec[] = [];
+  const campStoreys: StoreySpec[] = [];
+  const campStairs: StairSpec[] = [];
   /** The wall facing a direction (unit, in the camp frame): which of a building's four sides. */
   type Face = 'a+' | 'a-' | 'b+' | 'b-';
   const faceToward = (da: number, db: number): Face => (Math.abs(da) >= Math.abs(db) ? (da >= 0 ? 'a+' : 'a-') : db >= 0 ? 'b+' : 'b-');
@@ -583,9 +611,133 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
    * A hollow building: four walls with doorways on the given faces, and a roof. `lenA` and
    * `lenB` are its extent along the camp's axes. Returns its index in `buildings`.
    */
-  const building = (module: ModuleName, a: number, b: number, lenA: number, lenB: number, h: number, surface: Surface, faces: Face[], doorRng: Rng, doorWidth = C.doorWidth): number => {
+  /**
+   * A second storey: the upper walls with their windows (none over a door), a floor with a
+   * stairwell, a straight flight up against a wall (the one the doors leave clear, climbing
+   * whichever way leaves them clear), a rail round the well, and a roof. Its floor goes on the
+   * grid's list and its flight joins it to the ground (grid.ts). `windowsOn` is the walls that
+   * have windows, null for all four.
+   */
+  const upperStorey = (a: number, b: number, lenA: number, lenB: number, y0: number, surface: Surface, ids: number[], index: number, cutsOf: Record<Face, number[]>, doorFaces: Face[], windowsOn: readonly Face[] | null): number => {
+    const S = C.storey;
+    const t = C.wallThickness;
+    const floor = y0 + S;
+    const roofUnder = y0 + 2 * S - C.floorThickness;
+    const W = C.upperWindow;
+    for (const face of ['a+', 'a-', 'b+', 'b-'] as const) {
+      const horizontal = face === 'a+' || face === 'a-';
+      const wa = face === 'a+' ? a + lenA / 2 - t / 2 : face === 'a-' ? a - lenA / 2 + t / 2 : a;
+      const wb = face === 'b+' ? b + lenB / 2 - t / 2 : face === 'b-' ? b - lenB / 2 + t / 2 : b;
+      const span = horizontal ? lenB : lenA;
+      const count = windowsOn && !windowsOn.includes(face) ? 0 : Math.max(1, Math.floor(span / W.every));
+      const cuts: number[] = [];
+      for (let k = 0; k < count; k++) {
+        const c = ((k + 0.5) / count - 0.5) * span;
+        if (cutsOf[face].every((d) => Math.abs(d - c) > W.width / 2 + C.doorWidth / 2 + 0.5)) cuts.push(c);
+      }
+      const piece = (p: number, q: number, yb: number, yt: number) => {
+        if (q - p < 0.05 || yt - yb < 0.05) return;
+        const mid = (p + q) / 2;
+        if (horizontal) ids.push(box(wa, b + mid, t, q - p, yt - yb, Blocks.All, surface, yb));
+        else ids.push(box(a + mid, wb, q - p, t, yt - yb, Blocks.All, surface, yb));
+      };
+      let from = -span / 2;
+      for (const c of cuts) {
+        piece(from, c - W.width / 2, floor, roofUnder);
+        piece(c - W.width / 2, c + W.width / 2, floor, floor + W.sill);
+        piece(c - W.width / 2, c + W.width / 2, floor + W.head, roofUnder);
+        const p = horizontal ? at(wa, b + c) : at(a + c, wb);
+        const runs = horizontal ? along(0, 1) : along(1, 0);
+        windows.push({ x: p.x, z: p.z, ux: runs.x, uz: runs.z, width: W.width, sill: floor + W.sill, head: floor + W.head, top: roofUnder, building: index });
+        from = c + W.width / 2;
+      }
+      piece(from, span / 2, floor, roofUnder);
+    }
+    // The flight: along the building's long axis, against the long wall its doors leave clear.
+    const T = C.stairs;
+    const longA = lenA >= lenB;
+    const halfLong = (longA ? lenA : lenB) / 2;
+    const halfShort = (longA ? lenB : lenA) / 2;
+    const steps = Math.max(1, Math.round(S / T.rise));
+    const rise = S / steps;
+    const run = steps * T.tread;
+    const wallPlus: Face = longA ? 'b+' : 'a+';
+    const wallMinus: Face = longA ? 'b-' : 'a-';
+    const order = doorFaces[0] === wallPlus ? [-1, 1] : [1, -1];
+    let sign = order[0]!;
+    let dir = 1;
+    let foundPlace = false;
+    for (const sg of order) {
+      const cuts = cutsOf[sg > 0 ? wallPlus : wallMinus];
+      for (const d of [1, -1]) {
+        const startAt = d > 0 ? -halfLong + t + 1.4 : halfLong - t - 1.4;
+        const centre = startAt + (d * run) / 2;
+        if (!foundPlace && cuts.every((c) => Math.abs(c - centre) > run / 2 + C.doorWidth / 2 + 0.6)) {
+          sign = sg;
+          dir = d;
+          foundPlace = true;
+        }
+      }
+    }
+    // The flight starts a body's turning room from the end wall: its foot stands in that gap.
+    const start = dir > 0 ? -halfLong + t + 1.4 : halfLong - t - 1.4;
+    const across = sign * (halfShort - t - T.width / 2);
+    /** A point of the building in the frame: `al` along its long axis, `ac` across it. */
+    const frame = (al: number, ac: number): [number, number] => (longA ? [a + al, b + ac] : [a + ac, b + al]);
+    for (let k = 0; k < steps; k++) {
+      const [ta, tb] = frame(start + dir * (k + 0.5) * T.tread, across);
+      const [la, lb] = longA ? [T.tread, T.width] : [T.width, T.tread];
+      ids.push(box(ta, tb, la, lb, (k + 1) * rise + 0.25, Blocks.All, Surface.Wood, y0 - 0.25));
+    }
+    // The floor, with a hole for the flight: three slabs round it.
+    const end = start + dir * run;
+    const holeMin = Math.min(start, end);
+    const holeMax = Math.max(start, end);
+    const wallIn = sign * (halfShort - t);
+    const holeIn = sign * (halfShort - t - T.width - 0.2);
+    const slab = (al0: number, al1: number, ac0: number, ac1: number) => {
+      if (al1 - al0 < 0.05 || Math.abs(ac1 - ac0) < 0.05) return;
+      const [ca, cb] = frame((al0 + al1) / 2, (ac0 + ac1) / 2);
+      const [la, lb] = longA ? [al1 - al0, Math.abs(ac1 - ac0)] : [Math.abs(ac1 - ac0), al1 - al0];
+      ids.push(box(ca, cb, la, lb, C.floorThickness, Blocks.All, surface, floor - C.floorThickness));
+    };
+    const edge = -(halfShort - t);
+    slab(-halfLong + t, holeMin, -(halfShort - t), halfShort - t);
+    slab(holeMax, halfLong - t, -(halfShort - t), halfShort - t);
+    slab(holeMin, holeMax, sign * edge, holeIn);
+    // A rail along the open side of the well, and across its foot end: the head end is the way off.
+    const railPiece = (al0: number, al1: number, ac0: number, ac1: number) => {
+      if (Math.abs(al1 - al0) < 0.05 && Math.abs(ac1 - ac0) < 0.05) return;
+      const [ca, cb] = frame((al0 + al1) / 2, (ac0 + ac1) / 2);
+      const thin = 0.08;
+      const lenAl = Math.max(thin, Math.abs(al1 - al0));
+      const lenAc = Math.max(thin, Math.abs(ac1 - ac0));
+      const [la, lb] = longA ? [lenAl, lenAc] : [lenAc, lenAl];
+      ids.push(box(ca, cb, la, lb, C.rail, Blocks.All, Surface.Wood, floor));
+    };
+    railPiece(holeMin, holeMax, holeIn, holeIn);
+    railPiece(start, start, wallIn, holeIn);
+    // The roof over it all.
+    ids.push(box(a, b, lenA + 0.3, lenB + 0.3, C.floorThickness, Blocks.All, surface, roofUnder));
+    // On the grid's list: the floor's footprint, and the flight from its foot to its head.
+    const corners = [at(a - lenA / 2, b - lenB / 2), at(a + lenA / 2, b - lenB / 2), at(a - lenA / 2, b + lenB / 2), at(a + lenA / 2, b + lenB / 2)];
+    const margin = 0.5;
+    const storey = campStoreys.length;
+    campStoreys.push({ minX: Math.min(...corners.map((c) => c.x)) - margin, minZ: Math.min(...corners.map((c) => c.z)) - margin, maxX: Math.max(...corners.map((c) => c.x)) + margin, maxZ: Math.max(...corners.map((c) => c.z)) + margin, y: floor });
+    const [footA, footB] = frame(start - dir * 0.8, across);
+    const [headA, headB] = frame(end + dir * 0.6, across);
+    const footP = at(footA, footB);
+    const headP = at(headA, headB);
+    campStairs.push({ storey, footX: footP.x, footZ: footP.z, headX: headP.x, headZ: headP.z, length: run + 1.4 });
+    return storey;
+  };
+  const building = (module: ModuleName, a: number, b: number, lenA: number, lenB: number, h: number, surface: Surface, faces: Face[], doorRng: Rng, doorWidth = C.doorWidth, storeys = 1, windowsOn: readonly Face[] | null = null): number => {
     const t = C.wallThickness;
     const y0 = ground(a, b);
+    // A two-storey building: its ground floor's walls are one storey high, and the upper floor stands on them.
+    const two = storeys >= 2;
+    const wallH = two ? C.storey : h;
+    const cutsOf: Record<Face, number[]> = { 'a+': [], 'a-': [], 'b+': [], 'b-': [] };
     const ids: number[] = [];
     const index = buildings.length;
     const myDoors: number[] = [];
@@ -598,19 +750,20 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
       const cuts: number[] = [];
       for (let k = 0; k < doorsHere; k++) cuts.push(((k + 1) / (doorsHere + 1) - 0.5) * span + doorRng.range(-0.12, 0.12) * span);
       cuts.sort((x, y) => x - y); // unique: doors are spread along the wall
+      cutsOf[face] = cuts;
       let from = -span / 2;
       const piece = (p: number, q: number) => {
         if (q - p < 0.05) return;
         const mid = (p + q) / 2;
         // From under the ground to the roof's underside.
-        if (horizontal) ids.push(box(wa, b + mid, t, q - p, h + 0.25, Blocks.All, surface, y0 - 0.25));
-        else ids.push(box(a + mid, wb, q - p, t, h + 0.25, Blocks.All, surface, y0 - 0.25));
+        if (horizontal) ids.push(box(wa, b + mid, t, q - p, wallH + 0.25, Blocks.All, surface, y0 - 0.25));
+        else ids.push(box(a + mid, wb, q - p, t, wallH + 0.25, Blocks.All, surface, y0 - 0.25));
       };
       for (const c of cuts) {
         piece(from, c - doorWidth / 2);
         // The lintel over the doorway: it roofs the doorway, and stops sight above it.
-        if (horizontal) ids.push(box(wa, b + c, t, doorWidth, h - C.doorHeight, Blocks.All, surface, y0 + C.doorHeight));
-        else ids.push(box(a + c, wb, doorWidth, t, h - C.doorHeight, Blocks.All, surface, y0 + C.doorHeight));
+        if (horizontal) ids.push(box(wa, b + c, t, doorWidth, wallH - C.doorHeight, Blocks.All, surface, y0 + C.doorHeight));
+        else ids.push(box(a + c, wb, doorWidth, t, wallH - C.doorHeight, Blocks.All, surface, y0 + C.doorHeight));
         const p = horizontal ? at(wa, b + c) : at(a + c, wb);
         const runs = horizontal ? along(0, 1) : along(1, 0);
         const inward = along(face === 'a+' ? -1 : face === 'a-' ? 1 : 0, face === 'b+' ? -1 : face === 'b-' ? 1 : 0);
@@ -621,12 +774,13 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
       piece(from, span / 2);
     };
     for (const f of ['a+', 'a-', 'b+', 'b-'] as const) wall(f);
-    // The roof: over the walls, so the inside is roofed and walkable.
-    ids.push(box(a, b, lenA + 0.3, lenB + 0.3, 0.2, Blocks.All, surface, y0 + h));
+    // The roof: over the walls, so the inside is roofed and walkable. Two storeys: the upper floor, stairs and windows first.
+    const storey = two ? upperStorey(a, b, lenA, lenB, y0, surface, ids, index, cutsOf, faces, windowsOn) : -1;
+    if (!two) ids.push(box(a, b, lenA + 0.3, lenB + 0.3, 0.2, Blocks.All, surface, y0 + h));
     const structure = add('building', ids);
     const p = at(a, b);
     const len = lenA >= lenB ? along(1, 0) : along(0, 1);
-    buildings.push({ module, x: p.x, z: p.z, ux: len.x, uz: len.z, length: Math.max(lenA, lenB), depth: Math.min(lenA, lenB), height: h, doors: myDoors, structure });
+    buildings.push({ module, x: p.x, z: p.z, ux: len.x, uz: len.z, length: Math.max(lenA, lenB), depth: Math.min(lenA, lenB), height: two ? 2 * C.storey : h, storeys, floorY: two ? y0 + C.storey : 0, storey, doors: myDoors, structure });
     occupied.push({ a0: a - lenA / 2 - 1.5, a1: a + lenA / 2 + 1.5, b0: b - lenB / 2 - 1.5, b1: b + lenB / 2 + 1.5 });
     return index;
   };
@@ -661,12 +815,23 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   const yardFace = inwardFace(hqFit.a, hqFit.b);
   const sideFace: Face = yardFace === 'a+' || yardFace === 'a-' ? (openings[1]!.b >= hqFit.b ? 'b+' : 'b-') : openings[1]!.a >= hqFit.a ? 'a+' : 'a-';
   const hqFaces: Face[] = !needsWayIn(crux) ? [yardFace] : [yardFace, buried(crux) && backFace === yardFace ? sideFace : backFace];
-  const hqIndex = building('hq', hqFit.a, hqFit.b, hqFit.lenA, hqFit.lenB, M.hq[2]!, Surface.Wood, hqFaces, hqRng);
+  // A buried target keeps on the upper floor where there is one, and a window up there shows him
+  // to whoever finds the line through it: a ridge, or the fields beyond the wire, far enough out
+  // to see over the sill. Measured with windows all round, a firing point had such a line on 8
+  // camps of 20 and the ground beyond the wire on 11 more, and every one of them was the same
+  // mission: find the window. With one window left for a marksman, and the target kept out of
+  // its line, the ground beyond the wire still had him on 2 of 8. So his floor has none: he is
+  // as buried as he was on one storey, and what shows of his building is that it stands tall
+  // and blank where the others have windows.
+  const hqWindows: readonly Face[] | null = buried(crux) ? [] : null;
+  const hqIndex = building('hq', hqFit.a, hqFit.b, hqFit.lenA, hqFit.lenB, M.hq[2]!, Surface.Wood, hqFaces, hqRng, C.doorWidth, type.storeys.hq, hqWindows);
   const hqB = buildings[hqIndex]!;
   // A buried target's doors have screens: a short wall just inside each, so nobody gets a
   // straight line to him through the door from the yard. To reach him you step inside. A
-  // screen stops short of the room's side walls, so there is always a way round it.
-  if (buried(crux)) {
+  // screen stops short of the room's side walls, so there is always a way round it. Where his
+  // building has an upper floor he keeps up there and the floor is what buries him: its doors
+  // are left to show the room below, and the stairs.
+  if (buried(crux) && hqB.storeys < 2) {
     const screens: number[] = [];
     for (const di of hqB.doors) {
       const d = doors[di]!;
@@ -696,7 +861,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     const f = fit(slotOf(slot), size[0]!, size[1]!, brng);
     const face = inwardFace(f.a, f.b);
     const faces: Face[] = doorsWanted === 2 ? [face, f.lenA >= f.lenB ? (f.b > 0 ? 'b-' : 'b+') : f.a > 0 ? 'a-' : 'a+'] : [face];
-    building(module, f.a, f.b, f.lenA, f.lenB, size[2]!, surface, faces, brng, module === 'storage' ? C.doorWidth * 2 : C.doorWidth);
+    building(module, f.a, f.b, f.lenA, f.lenB, size[2]!, surface, faces, brng, module === 'storage' ? C.doorWidth * 2 : C.doorWidth, type.storeys[module]);
   }
 
   // The radio room, and its mast beside it.
@@ -706,6 +871,42 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   const radioB = rf.lenA >= rf.lenB ? rf.b : rf.b - 2;
   const radioLenA = rf.lenA >= rf.lenB ? rf.lenA - 4 : rf.lenA;
   const radioLenB = rf.lenA >= rf.lenB ? rf.lenB : rf.lenB - 4;
+  // Marksmen at the upper windows of its two-storey buildings, so height isn't only the towers: the
+  // target's building first, its window toward the gate, then each other, its window toward the wall nearest it.
+  {
+    const gateAt = at(openings[0]!.a, openings[0]!.b);
+    const best = (b: (typeof buildings)[number], index: number, toward: (w: (typeof windows)[number]) => Point2): { x: number; z: number; nx: number; nz: number; score: number } | null => {
+      let top: { x: number; z: number; nx: number; nz: number; score: number } | null = null;
+      for (const w of windows) {
+        if (w.building !== index) continue;
+        // Out of the window: across its wall, away from the middle of the building.
+        const side = (w.x - b.x) * -w.uz + (w.z - b.z) * w.ux >= 0 ? 1 : -1;
+        const nx = -w.uz * side;
+        const nz = w.ux * side;
+        const t = toward(w);
+        const tl = Math.sqrt(t.x * t.x + t.z * t.z) || 1;
+        const score = nx * (t.x / tl) + nz * (t.z / tl);
+        // A pace back from the sill: he sees out of it, and is seen through it and from nowhere else.
+        if (!top || score > top.score) top = { x: w.x - nx * 0.9, z: w.z - nz * 0.9, nx, nz, score };
+      }
+      return top;
+    };
+    // On a camp where someone has to get to him, his own floor stays clear of them: a way up has to
+    // exist. And a floor he's buried on has no window for anyone to stand at.
+    const twoFloors = buildings.map((b, index) => ({ b, index })).filter(({ b, index }) => b.storeys >= 2 && (index !== hqIndex || !needsWayIn(crux))).sort((p, q) => (p.index === hqIndex ? -1 : q.index === hqIndex ? 1 : p.index - q.index)); // unique: building indices
+    let left = type.windowPost;
+    for (const { b, index } of twoFloors) {
+      if (left <= 0) break;
+      const here = index === hqIndex ? best(b, index, (w) => ({ x: gateAt.x - w.x, z: gateAt.z - w.z })) : best(b, index, (w) => {
+        const f = toFrame(w.x, w.z);
+        const toEdge = HA - Math.abs(f.x) < HB - Math.abs(f.z) ? along(Math.sign(f.x) || 1, 0) : along(0, Math.sign(f.z) || 1);
+        return toEdge;
+      });
+      if (!here) continue;
+      towers.push({ x: here.x, z: here.z, deck: b.floorY, corner: 'window', out: { x: here.nx, z: here.nz }, building: index });
+      left--;
+    }
+  }
   building('radio', radioA, radioB, radioLenA, radioLenB, M.radio[2]!, Surface.Wood, [inwardFace(radioA, radioB)], radioRng);
   // The set against the room's far wall from its door; its antenna is the mast outside.
   const radioDoor = doors[doors.length - 1]!;
@@ -858,7 +1059,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   };
   const generator = devices.findIndex((d) => d.kind === 'generator');
   for (const d of devices) d.feed = d.kind === 'generator' ? -1 : generator;
-  return { site, structures, guards: [], fenceHalf: Math.max(HA, HB), layout, doors, vehicles, ladders, devices, crux };
+  return { site, structures, guards: [], fenceHalf: Math.max(HA, HB), layout, doors, vehicles, ladders, devices, crux, windows, storeys: campStoreys, stairs: campStairs };
 }
 
 /**

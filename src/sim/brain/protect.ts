@@ -92,8 +92,8 @@ export function performShelter(m: GuardMind, out: Order): void {
   const dx = at.x - m.self.x;
   const dz = at.z - m.self.z;
   const P = m.tuning.brain.protect;
-  if (dx * dx + dz * dz > P.near * P.near * 0.25) {
-    const w = walk(m, out, at.x, at.z, m.tuning.brain.alarm.flee.pace, 'sprint', at.x, at.z);
+  if (dx * dx + dz * dz > P.near * P.near * 0.25 || (at.y !== undefined && Math.abs(at.y - m.self.y) > m.tuning.gen.compound.storey / 2)) {
+    const w = walk(m, out, at.x, at.z, m.tuning.brain.alarm.flee.pace, 'sprint', at.x, at.z, at.y);
     if (w === 'walking') return;
   }
   b.down = 'crouch';
@@ -151,8 +151,9 @@ export function performFetch(m: GuardMind, out: Order, task: Tasking): boolean {
   }
   const dx = task.x - m.self.x;
   const dz = task.z - m.self.z;
-  const near = dx * dx + dz * dz <= P.near * P.near;
-  const w = near ? 'arrived' : walk(m, out, task.x, task.z, T.paces.run, 'sprint', task.x, task.z);
+  // On the same floor as him, if he's upstairs: under his feet isn't at his door.
+  const near = dx * dx + dz * dz <= P.near * P.near && (task.y === undefined || Math.abs(task.y - m.self.y) < m.tuning.gen.compound.storey / 2);
+  const w = near ? 'arrived' : walk(m, out, task.x, task.z, T.paces.run, 'sprint', task.x, task.z, task.y);
   if (w === 'arrived' || near) {
     b.linger = m.tick + Math.round(P.wait * hz);
     call(m, task);

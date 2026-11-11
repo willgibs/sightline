@@ -35,6 +35,8 @@ export interface Task {
   kind: TaskKind;
   x: number;
   z: number;
+  /** How high the place is, where a report said: which floor of a building to go to. */
+  y?: number;
   priority: number;
   /** How many guards it's for, and who's on it. */
   capacity: number;
@@ -53,6 +55,8 @@ export interface SearchState {
   startLevel: AlertLevel;
   x: number;
   z: number;
+  /** How high the latest report's place was: which floor. */
+  y?: number;
   radius: number;
   /** Someone has been to the spot the latest report named and called it clear: nobody else is sent there until a new report. */
   cleared: boolean;
@@ -78,7 +82,7 @@ export interface CampState {
    * of trouble he goes there, and he leaves only when someone comes for him. Absent for a
    * camp that runs him to his vehicle the moment the siren sounds.
    */
-  protects?: { x: number; z: number };
+  protects?: { x: number; z: number; y?: number };
   /** The tick the relief got down at the gate, and how many times, and when last, men have been sent for the target since. */
   relief?: { at: number; fetches: number; last: number };
   /** The tick of the last blast on the whistle. */

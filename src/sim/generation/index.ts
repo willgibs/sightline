@@ -13,7 +13,7 @@ export { SITE_KINDS, siteKindOf, type Ford, type Ridge, type SiteKind } from './
 export { CRUX_KINDS, cruxOf, type CruxKind } from './crux';
 export { COMPOUND_TYPES, compoundTypeOf, type CompoundType } from './plots';
 export type { Overwatch } from './overwatch';
-export type { BuildingSpec, CampLayout, DeviceKind, DeviceSpec, DoorSpec, LadderSpec, ModuleName, ObjectiveSpec, Opening, Parcel, Side, Skeleton, SlotName, VehicleSpec } from './compound';
+export type { BuildingSpec, CampLayout, DeviceKind, DeviceSpec, DoorSpec, LadderSpec, ModuleName, ObjectiveSpec, Opening, Parcel, Side, Skeleton, SlotName, VehicleSpec, WindowSpec } from './compound';
 export { GUARD_ROLES, type Camp, type GuardRole, type GuardSpawn, type Structure, type StructureKind } from './camp';
 export { buildRoutine, routinePose, type Leg, type Routine, type RoutinePose } from './routine';
 export type { Bush, Props, Rock, Tree } from './props';

@@ -1,5 +1,5 @@
 import type { WorkCounts } from '../work';
-import { Edge, type GridLayer } from './grid';
+import { Edge, type GridLayer, type Stair, type Storey } from './grid';
 
 /**
  * Search over a layer of the spatial grid (grid.ts), the map layer or the site layer: one
@@ -17,6 +17,10 @@ import { Edge, type GridLayer } from './grid';
  * edge between them is open (grid.ts, Edge). With eight neighbours, a diagonal is open
  * only where both of its two-step paths are, so no path cuts a corner. A cost function
  * can price or close any move: walls for sound, roofs for a search, danger for a route.
+ *
+ * A search can also be over a layer and the storeys above it (grid.ts): one stacked index
+ * space, each storey's cells after the layer's, with a stair a move between two cells of it.
+ * A search with no storeys is exactly the one-layer search.
  */
 
 /** Cost units per metre: costs are whole numbers of centimetres. */
@@ -97,6 +101,15 @@ const WEST = 4;
 const SOUTH = 8;
 const SIDES = 4;
 
+/** A storey in a search's index space: its layer, the first index of its cells, where it lies on the base layer, and each neighbour's offset. */
+export interface SearchLevel {
+  readonly layer: GridLayer;
+  readonly base: number;
+  readonly i0: number;
+  readonly j0: number;
+  readonly offset: Int32Array;
+}
+
 /**
  * Searches one layer. It holds the scratch every search on the layer rewrites, so keep one
  * for the world's life: nothing carries over from one search to the next. Results (costs
@@ -117,6 +130,12 @@ export class GridSearch {
   /** The length cost of a move to a side and to a corner, in COST_PER_METRE units. */
   readonly side: number;
   readonly corner: number;
+  /** The storeys above the base layer, and where each one's cells begin. */
+  readonly levels: readonly SearchLevel[];
+  private readonly ground: SearchLevel;
+  private readonly groundCells: number;
+  /** Moves between levels: the stairs, both ways, by the cell they leave. */
+  private readonly links: ReadonlyMap<number, ReadonlyArray<{ to: number; cost: number }>> | null;
   private readonly closed: Uint8Array;
   private readonly buckets = new BucketQueue();
   private readonly heap = new MinHeap();
@@ -128,14 +147,45 @@ export class GridSearch {
   /** The goal's row of a search's bounds, read once. */
   private goalBounds = new Int32Array(8);
 
-  constructor(readonly layer: GridLayer) {
-    const n = layer.nx * layer.nz;
+  constructor(readonly layer: GridLayer, storeys: readonly Storey[] = [], stairs: readonly Stair[] = []) {
+    const offsets = (nx: number): Int32Array => Int32Array.from(NEIGHBOURS, ([di, dj]) => dj * nx + di);
+    this.groundCells = layer.nx * layer.nz;
+    this.offset = offsets(layer.nx);
+    this.ground = { layer, base: 0, i0: 0, j0: 0, offset: this.offset };
+    let n = this.groundCells;
+    this.levels = storeys.map((s) => {
+      const base = n;
+      n += s.layer.nx * s.layer.nz;
+      return { layer: s.layer, base, i0: Math.round((s.layer.x0 - layer.x0) / layer.cell), j0: Math.round((s.layer.z0 - layer.z0) / layer.cell), offset: offsets(s.layer.nx) };
+    });
     this.cost = new Int32Array(n).fill(NOT_REACHED);
     this.parent = new Int32Array(n).fill(NOT_REACHED);
     this.closed = new Uint8Array(n);
     this.side = Math.round(layer.cell * COST_PER_METRE);
     this.corner = Math.round(layer.cell * COST_PER_METRE * Math.SQRT2);
-    this.offset = Int32Array.from(NEIGHBOURS, ([di, dj]) => dj * layer.nx + di);
+    if (stairs.length === 0) {
+      this.links = null;
+    } else {
+      const links = new Map<number, Array<{ to: number; cost: number }>>();
+      const add = (a: number, b: number, cost: number): void => {
+        const out = links.get(a);
+        if (out) out.push({ to: b, cost });
+        else links.set(a, [{ to: b, cost }]);
+      };
+      for (const st of stairs) {
+        const head = this.levels[st.storey]!.base + st.head;
+        add(st.foot, head, st.cost);
+        add(head, st.foot, st.cost);
+      }
+      this.links = links;
+    }
+  }
+
+  /** The level a cell index belongs to: the base layer, or a storey. */
+  levelOf(c: number): SearchLevel {
+    if (c < this.groundCells) return this.ground;
+    for (const lv of this.levels) if (c < lv.base + lv.layer.nx * lv.layer.nz) return lv;
+    throw new Error(`No cell ${c} in this search`);
   }
 
   /** The cell index of (i, j). */
@@ -171,13 +221,14 @@ export class GridSearch {
     }
     const limit = opts.maxCost ?? Infinity;
     const max = opts.maxExpansions;
-    const nx = this.layer.nx;
     const corners = (opts.neighbours ?? 8) === 8;
     const count = corners ? 8 : SIDES;
     const price = opts.cost;
     const side = this.side;
     const diagonal = this.corner;
-    const offset = this.offset;
+    const ground = this.ground;
+    const groundCells = this.groundCells;
+    const links = this.links;
     let expanded = 0;
     for (let c = q.pop(); c >= 0; c = q.pop()) {
       const g = q.popped;
@@ -185,8 +236,12 @@ export class GridSearch {
       if (expanded >= max) return { expanded, exhausted: true };
       closed[c] = 1;
       expanded++;
-      const i = c % nx;
-      const open = this.openMoves(c, i, (c - i) / nx, corners);
+      const lv = c < groundCells ? ground : this.levelOf(c);
+      const offset = lv.offset;
+      const nx = lv.layer.nx;
+      const local = c - lv.base;
+      const i = local % nx;
+      const open = this.openMoves(lv.layer, local, i, (local - i) / nx, corners);
       for (let k = 0; k < count; k++) {
         if ((open & (1 << k)) === 0) continue;
         const to = c + offset[k]!;
@@ -206,6 +261,22 @@ export class GridSearch {
         cost[to] = ng;
         parent[to] = c;
         q.push(to, ng);
+      }
+      const flights = links === null ? undefined : links.get(c);
+      if (flights) {
+        for (const link of flights) {
+          const move = price ? price(c, link.to, link.cost) : link.cost;
+          if (move === -1) continue;
+          const ng = g + move;
+          if (ng > limit) continue;
+          const old = cost[link.to]!;
+          if (old !== NOT_REACHED) {
+            if (old <= ng) continue;
+          } else this.touch(link.to);
+          cost[link.to] = ng;
+          parent[link.to] = c;
+          q.push(link.to, ng);
+        }
       }
     }
     return { expanded, exhausted: false };
@@ -232,13 +303,14 @@ export class GridSearch {
     const cost = this.cost;
     const parent = this.parent;
     const closed = this.closed;
-    const nx = this.layer.nx;
     const corners = (opts.neighbours ?? 8) === 8;
     const count = corners ? 8 : SIDES;
     const price = opts.cost;
     const side = this.side;
     const diagonal = this.corner;
-    const offset = this.offset;
+    const ground = this.ground;
+    const groundCells = this.groundCells;
+    const links = this.links;
     const max = opts.maxExpansions;
     const bounds = opts.bounds;
     const tables = bounds ? bounds.count : 0;
@@ -246,12 +318,19 @@ export class GridSearch {
       if (this.goalBounds.length < tables) this.goalBounds = new Int32Array(tables);
       for (let t = 0; t < tables; t++) this.goalBounds[t] = bounds.table[goal * tables + t]!;
     }
-    const gi = goal % nx;
-    const gj = (goal - gi) / nx;
+    // The goal's cell on the base layer's lattice: a storey's cells line up with it.
+    const gl = goal < groundCells ? ground : this.levelOf(goal);
+    const gLocal = goal - gl.base;
+    const gi0 = gLocal % gl.layer.nx;
+    const gi = gi0 + gl.i0;
+    const gj = (gLocal - gi0) / gl.layer.nx + gl.j0;
+    const sl = start < groundCells ? ground : this.levelOf(start);
+    const sLocal = start - sl.base;
+    const si0 = sLocal % sl.layer.nx;
     this.touch(start);
     cost[start] = 0;
     parent[start] = NOT_REACHED;
-    const h0 = this.remaining(start, start % nx, (start - (start % nx)) / nx, gi, gj, corners, bounds, tables);
+    const h0 = this.remaining(start, si0 + sl.i0, (sLocal - si0) / sl.layer.nx + sl.j0, gi, gj, corners, bounds, tables);
     heap.push(h0, h0, start);
     let expanded = 0;
     while (heap.size > 0) {
@@ -266,9 +345,13 @@ export class GridSearch {
       closed[c] = 1;
       expanded++;
       const g = cost[c]!;
-      const i = c % nx;
-      const j = (c - i) / nx;
-      const open = this.openMoves(c, i, j, corners);
+      const lv = c < groundCells ? ground : this.levelOf(c);
+      const offset = lv.offset;
+      const nx = lv.layer.nx;
+      const local = c - lv.base;
+      const i = local % nx;
+      const j = (local - i) / nx;
+      const open = this.openMoves(lv.layer, local, i, j, corners);
       for (let k = 0; k < count; k++) {
         if ((open & (1 << k)) === 0) continue;
         const to = c + offset[k]!;
@@ -287,9 +370,29 @@ export class GridSearch {
         } else this.touch(to);
         cost[to] = ng;
         parent[to] = c;
-        const ti = to % nx;
-        const h = this.remaining(to, ti, (to - ti) / nx, gi, gj, corners, bounds, tables);
+        const toLocal = to - lv.base;
+        const ti = toLocal % nx;
+        const h = this.remaining(to, ti + lv.i0, (toLocal - ti) / nx + lv.j0, gi, gj, corners, bounds, tables);
         heap.push(ng + h, h, to);
+      }
+      const flights = links === null ? undefined : links.get(c);
+      if (flights) {
+        for (const link of flights) {
+          const move = price ? price(c, link.to, link.cost) : link.cost;
+          if (move === -1 || closed[link.to] !== 0) continue;
+          const ng = g + move;
+          const old = cost[link.to]!;
+          if (old !== NOT_REACHED) {
+            if (old <= ng) continue;
+          } else this.touch(link.to);
+          cost[link.to] = ng;
+          parent[link.to] = c;
+          const tl = this.levelOf(link.to);
+          const toLocal = link.to - tl.base;
+          const ti = toLocal % tl.layer.nx;
+          const h = this.remaining(link.to, ti + tl.i0, (toLocal - ti) / tl.layer.nx + tl.j0, gi, gj, corners, bounds, tables);
+          heap.push(ng + h, h, link.to);
+        }
       }
     }
     return { expanded, exhausted: false, found: false, cost: -1 };
@@ -297,9 +400,16 @@ export class GridSearch {
 
   /** The cheapest cost of a path from `a` to `b` on an open layer: what A* aims by. */
   estimate(a: number, b: number, corners = true): number {
-    const nx = this.layer.nx;
-    const di = Math.abs((a % nx) - (b % nx));
-    const dj = Math.abs(Math.floor(a / nx) - Math.floor(b / nx));
+    const place = (c: number): { i: number; j: number } => {
+      const lv = this.levelOf(c);
+      const local = c - lv.base;
+      const i = local % lv.layer.nx;
+      return { i: i + lv.i0, j: (local - i) / lv.layer.nx + lv.j0 };
+    };
+    const pa = place(a);
+    const pb = place(b);
+    const di = Math.abs(pa.i - pb.i);
+    const dj = Math.abs(pa.j - pb.j);
     if (!corners) return (di + dj) * this.side;
     const lo = Math.min(di, dj);
     return (di + dj - 2 * lo) * this.side + lo * this.corner;
@@ -320,7 +430,7 @@ export class GridSearch {
       const lo = di < dj ? di : dj;
       h = (di + dj - 2 * lo) * this.side + lo * this.corner;
     } else h = (di + dj) * this.side;
-    if (tables > 0) {
+    if (tables > 0 && c < this.groundCells) {
       const table = bounds!.table;
       const row = c * tables;
       const goal = this.goalBounds;
@@ -337,12 +447,11 @@ export class GridSearch {
   }
 
   /**
-   * The open moves out of cell `c` at (i, j), as bits in NEIGHBOURS order. A side is open
+   * The open moves out of cell `c` of layer `L` at (i, j), as bits in NEIGHBOURS order. A side is open
    * where the walk edge between the two cells is; a corner, only where both two-step paths
    * around it are, so no path cuts one.
    */
-  private openMoves(c: number, i: number, j: number, corners: boolean): number {
-    const L = this.layer;
+  private openMoves(L: GridLayer, c: number, i: number, j: number, corners: boolean): number {
     const nx = L.nx;
     const e = L.edges;
     const here = e[c]!;
@@ -368,7 +477,7 @@ export class GridSearch {
   /** True if any move leads out of cell `c`. */
   connected(c: number): boolean {
     const i = c % this.layer.nx;
-    return this.openMoves(c, i, (c - i) / this.layer.nx, false) !== 0;
+    return this.openMoves(this.layer, c, i, (c - i) / this.layer.nx, false) !== 0;
   }
 
   /** Notes a cell the search has reached for the first time. */

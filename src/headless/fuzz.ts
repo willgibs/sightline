@@ -3,7 +3,7 @@
  * checked after every tick (sim/body/invariants.ts). A run that breaks a promise is saved
  * as a recording that reproduces it: `npm run sim -- --replay <file>` re-simulates it.
  *
- *   npm run fuzz                                    6 fresh valleys × both bots × 10 min
+ *   npm run fuzz                                    6 fresh valleys × both bots × 10 min, and their towers' ladders and their camps' stairs
  *   npm run fuzz -- --seeds 20 --minutes 60         longer (the weekly CI run)
  *   npm run fuzz -- --seed TAL-4471 --bot chaos     one valley, one bot
  *   npm run fuzz -- --out fuzz-failures             where failing runs' recordings go
@@ -17,6 +17,8 @@ import { join } from 'node:path';
 import { defaultTuning } from '../config/tuning';
 import { ChaosBot } from '../sim/game/bots/chaos';
 import { LadderBot } from '../sim/game/bots/ladderBot';
+import { StairBot } from '../sim/game/bots/stairBot';
+import { placePlayer } from '../sim/game/setup';
 import { InvariantWatch } from '../sim/body';
 import { WanderBot } from '../sim/game/bots/wander';
 import { normalizeSeed, randomSeed } from '../sim/kernel/core/seed';
@@ -49,6 +51,9 @@ const scenes = one || args.has('no-scenes') ? [] : ['movement-lab', 'movement-co
 // many short runs, because a bot left on one tower for long ends up stuck at the top of it or wandering off.
 const towers = one || args.has('no-scenes') ? [] : seeds.flatMap((s) => [0, 1, 2, 3, 4].map((k) => `tower:${s}-${k}`));
 const TOWER_MINUTES = 4;
+// Stairs, the same way: a valley's bots seldom go indoors and never upstairs, so every flight of each
+// valley's camp gets a bot that goes up and down it and makes trouble on it (bots/stairBot.ts).
+const stairs = one || args.has('no-scenes') ? [] : seeds.map((s) => `stairs:${s}`);
 const bots = (args.get('bot') ?? 'wander,chaos').split(',').map((b) => b.trim());
 const outDir = args.get('out') ?? '.';
 const synctest = args.has('synctest') ? (args.get('synctest') === 'true' ? 30 : Number(args.get('synctest'))) : 0;
@@ -65,18 +70,28 @@ console.log(`seeds   ${seeds.join(' ')}\n`);
 let failed = 0;
 let totalTicks = 0;
 const t0 = performance.now();
-for (const seed of [...seeds, ...scenes.map((s) => `scene:${s}`), ...towers]) {
+for (const seed of [...seeds, ...scenes.map((s) => `scene:${s}`), ...towers, ...stairs]) {
   const tower = seed.startsWith('tower:');
+  const stair = seed.startsWith('stairs:');
   const scene = tower ? SCENES['ladder-tower']!(`seed=${seed.slice(6)}`) : seed.startsWith('scene:') ? SCENES[seed.slice(6)]!() : null;
-  const world = scene ? scene.world(tuning) : generateWorld(missionSpec(seed), tuning);
-  for (const name of tower ? ['ladder'] : bots) {
-    const sim: Simulation = scene ? (startScene(scene, tuning, world) as Simulation) : new Simulation(world, tuning);
+  const world = scene ? scene.world(tuning) : generateWorld(missionSpec(stair ? seed.slice(7) : seed), tuning);
+  for (const name of tower ? ['ladder'] : stair ? world.grid.stairs.map((_, k) => `flight${k}`) : bots) {
+    /** A run's simulation as it starts: on a flight's run, the player at the foot of it. */
+    const fresh = (): Simulation => {
+      const made: Simulation = scene ? (startScene(scene, tuning, world) as Simulation) : new Simulation(world, tuning);
+      if (stair) {
+        const st = world.grid.stairs[Number(name.slice(6))]!;
+        placePlayer(made, st.footX, st.footZ, st.headX - st.footX, st.headZ - st.footZ);
+      }
+      return made;
+    };
+    const sim = fresh();
     const recorder = new Recorder(sim, build);
     const watch = new InvariantWatch(sim);
-    const sync = synctest ? new SyncTest(sim, scene ? (startScene(scene, tuning, world) as Simulation) : new Simulation(world, tuning), synctest) : null;
-    const bot = name === 'ladder' ? new LadderBot(seed) : name === 'chaos' ? new ChaosBot(seed) : new WanderBot(seed);
+    const sync = synctest ? new SyncTest(sim, fresh(), synctest) : null;
+    const bot = name === 'ladder' ? new LadderBot(seed) : stair ? new StairBot(seed, Number(name.slice(6))) : name === 'chaos' ? new ChaosBot(seed) : new WanderBot(seed);
     const raw = neutralInput();
-    const ticks = Math.round((tower ? Math.min(minutes, TOWER_MINUTES) : minutes) * 60 * tuning.sim.tickHz);
+    const ticks = Math.round((tower || stair ? Math.min(minutes, TOWER_MINUTES) : minutes) * 60 * tuning.sim.tickHz);
     const start = performance.now();
     for (let i = 0; i < ticks; i++) {
       watch.beforeTick();
@@ -93,6 +108,7 @@ for (const seed of [...seeds, ...scenes.map((s) => `scene:${s}`), ...towers]) {
     const line =
       `${seed} ${name.padEnd(6)} ${fmt.clock(r.ticks / tuning.sim.tickHz).padStart(6)} · ${fmt.int(r.checks)} body-ticks · ` +
       `rise ≤ ${(r.worstRise * 1000).toFixed(1)} mm · overlap ≤ ${(r.worstOverlap * 1000).toFixed(3)} mm · steep gain ≤ ${(r.steepGain * 1000).toFixed(2)} mm (at seams ≤ ${(r.seamGain * 1000).toFixed(1)}) · ` +
+      (bot instanceof StairBot ? `up ${bot.ups}, down ${bot.downs} · ` : '') +
       (sync ? `${fmt.int(sync.report.saves)} restores, ${fmt.int(sync.report.ticks)} ticks re-stepped · ` : '') +
       fmt.ms(performance.now() - start);
     const syncFailure = sync?.report.failure ?? null;

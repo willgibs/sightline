@@ -413,7 +413,7 @@ function stayAt(m: GuardMind, out: Order, x: number, z: number, stance: Stance, 
 /** Whether he can be seen from the intruder's place, looked at every few ticks: it's what makes him run. */
 function exposure(m: GuardMind): boolean {
   const ff = m.brain!.ff!;
-  if ((m.tick + m.id) % 3 === 0) ff.exposed = exposedAt(m.world, m.tuning, m.self.x, m.self.z, m.self.stance, ff.x, ff.z, m.nav.work);
+  if ((m.tick + m.id) % 3 === 0) ff.exposed = exposedAt(m.world, m.tuning, m.self.x, m.self.z, m.self.stance, ff.x, ff.z, m.nav.work, ff.y, m.self.y);
   return ff.exposed;
 }
 
@@ -435,7 +435,7 @@ function position(m: GuardMind, ff: Firefight, seen: boolean): Position | null {
   // he has time to be useful: he'll go farther, for somewhere he can see the place from, and the more so the more it's his job.
   const urgent = seen || m.tick < ff.pinned || ff.exposed;
   const far = S.maxRun * (1 + m.tuning.brain.roles[m.post.role].flank);
-  const here = { x: m.self.x, z: m.self.z, tx: ff.x, tz: ff.z, gain: 0 };
+  const here = { x: m.self.x, z: m.self.z, tx: ff.x, tz: ff.z, ty: ff.y, gain: 0 };
   let s = ff.spot;
   if (s) {
     const moved = (s.tx - ff.x) * (s.tx - ff.x) + (s.tz - ff.z) * (s.tz - ff.z) > S.keep * S.keep;
@@ -444,11 +444,11 @@ function position(m: GuardMind, ff: Firefight, seen: boolean): Position | null {
       if (!mayLook(m)) return s;
       s.tx = ff.x;
       s.tz = ff.z;
-      if (exposedAt(m.world, m.tuning, s.hx, s.hz, s.hs, ff.x, ff.z, m.nav.work)) {
+      if (exposedAt(m.world, m.tuning, s.hx, s.hz, s.hs, ff.x, ff.z, m.nav.work, ff.y)) {
         s = ff.spot = null;
         ff.there = false;
         ff.up = false;
-      } else s.line = lineFrom(m.world, m.tuning, s.fx, s.fz, s.fs, ff.x, ff.z, m.nav.work);
+      } else s.line = lineFrom(m.world, m.tuning, s.fx, s.fz, s.fs, ff.x, ff.z, m.nav.work, ff.y);
     }
   }
   if (s) {
@@ -466,7 +466,7 @@ function position(m: GuardMind, ff: Firefight, seen: boolean): Position | null {
     return s;
   }
   if (!mayLook(m)) return null;
-  ff.exposed = exposedAt(m.world, m.tuning, m.self.x, m.self.z, m.self.stance, ff.x, ff.z, m.nav.work);
+  ff.exposed = exposedAt(m.world, m.tuning, m.self.x, m.self.z, m.self.stance, ff.x, ff.z, m.nav.work, ff.y, m.self.y);
   const hurry = urgent || ff.exposed;
   const found = fightingSpot(m.world, m.tuning, { ...here, maxRun: hurry ? S.maxRun : far, needLine: !hurry, dash: hurry ? 0 : dashOf(m) }, m.nav.work);
   if (found) ff.spot = { ...found, tx: ff.x, tz: ff.z, tick: m.tick, careful: !hurry };
@@ -545,7 +545,7 @@ export function performFight(m: GuardMind, out: Order): void {
       ff.until = m.tick;
     } else {
       const open = exposure(m);
-      const w = walk(m, out, s.hx, s.hz, open ? F.paces.bound : F.paces.careful, open ? 'sprint' : 'walk', ff.x, ff.z, s.careful ? dangerOf(m.world, T, ff.x, ff.z).cost : undefined);
+      const w = walk(m, out, s.hx, s.hz, open ? F.paces.bound : F.paces.careful, open ? 'sprint' : 'walk', ff.x, ff.z, undefined, s.careful ? dangerOf(m.world, T, ff.x, ff.z, ff.y).cost : undefined);
       if (w === 'walking') return;
       // Stuck short of it: someone or something is on it, and he makes do with where he's got to.
       if (w === 'stuck') {
@@ -564,7 +564,7 @@ export function performFight(m: GuardMind, out: Order): void {
   if (!ff.up) {
     stayAt(m, out, s.hx, s.hz, s.hs, ff.x, ff.z);
     // Down, and what he's down behind doesn't hide him from where the intruder is now: somewhere better, or flat.
-    if ((m.tick + m.id) % 6 === 0 && !pinned && !seen && s.hs !== 'prone' && self.stance === s.hs && exposedAt(m.world, T, self.x, self.z, s.hs, ff.x, ff.z, m.nav.work)) {
+    if ((m.tick + m.id) % 6 === 0 && !pinned && !seen && s.hs !== 'prone' && self.stance === s.hs && exposedAt(m.world, T, self.x, self.z, s.hs, ff.x, ff.z, m.nav.work, ff.y, self.y)) {
       ff.spot = null;
       ff.there = false;
       return;
@@ -589,7 +589,7 @@ export function performFight(m: GuardMind, out: Order): void {
     // next think takes it up); if not, he doesn't run at a man who's waiting for him, and it's the camp's to hunt.
     if (!seen && ff.bound === null && dueToGo(m) && mayLook(m)) {
       const P = F.push;
-      const found = fightingSpot(m.world, T, { x: self.x, z: self.z, tx: ff.x, tz: ff.z, maxRun: P.maxRun, needLine: true, gain: gainOf(m), dash: dashOf(m) }, m.nav.work);
+      const found = fightingSpot(m.world, T, { x: self.x, z: self.z, tx: ff.x, tz: ff.z, ty: ff.y, maxRun: P.maxRun, needLine: true, gain: gainOf(m), dash: dashOf(m) }, m.nav.work);
       if (found) {
         ff.bound = { ...found, tx: ff.x, tz: ff.z, tick: m.tick, careful: true };
         b.thinkAt = m.tick;
@@ -658,7 +658,7 @@ export function performPush(m: GuardMind, out: Order): void {
       steer(m, out, 0, 0, 'idle', ff.x, ff.z, 'crouch');
       return;
     }
-    const found = fightingSpot(m.world, T, { x: self.x, z: self.z, tx: ff.x, tz: ff.z, maxRun: P.maxRun, needLine: true, gain: gainOf(m), dash: dashOf(m) }, m.nav.work);
+    const found = fightingSpot(m.world, T, { x: self.x, z: self.z, tx: ff.x, tz: ff.z, ty: ff.y, maxRun: P.maxRun, needLine: true, gain: gainOf(m), dash: dashOf(m) }, m.nav.work);
     if (!found) {
       // No way nearer that keeps out of his view: he doesn't run at a man who's waiting for him. It's the camp's to hunt.
       ff.lost = true;
@@ -676,7 +676,7 @@ export function performPush(m: GuardMind, out: Order): void {
   }
   if (!ff.there) {
     const open = exposure(m);
-    const w = walk(m, out, s.hx, s.hz, open ? F.paces.bound : F.paces.careful, open ? 'sprint' : 'walk', ff.x, ff.z, dangerOf(m.world, T, ff.x, ff.z).cost);
+    const w = walk(m, out, s.hx, s.hz, open ? F.paces.bound : F.paces.careful, open ? 'sprint' : 'walk', ff.x, ff.z, undefined, dangerOf(m.world, T, ff.x, ff.z, ff.y).cost);
     if (w === 'walking') return;
     if (w === 'stuck') {
       s.hx = s.fx = self.x;

@@ -68,6 +68,14 @@ describe('with only the yard weighted', () => {
     expect(w.camp.layout!.type).toBe('yard');
     // The layout's two new fields aside, every generated field: colliders, guards, report.
     for (const key of ['type', 'loops', 'road']) delete (w.camp.layout as unknown as Record<string, unknown>)[key];
+    // Nor do the fields the second storey added, which a one-storey camp leaves empty.
+    for (const key of ['windows', 'storeys', 'stairs']) delete (w.camp as unknown as Record<string, unknown>)[key];
+    for (const key of ['storeys', 'stairs']) delete (w.grid as unknown as Record<string, unknown>)[key];
+    for (const b of w.camp.layout!.buildings as unknown as Array<Record<string, unknown>>) {
+      delete b.storeys;
+      delete b.floorY;
+      delete b.storey;
+    }
     expect(worldFingerprint(w)).toBe(BEFORE_TYPES);
   }, 120_000);
 });
@@ -137,7 +145,10 @@ describe('each kind of place', () => {
     const L = w.camp.layout!;
     expect(L.plan.perimeter).toBe('fields');
     expect(w.camp.structures.some((s) => s.kind === 'fence')).toBe(false);
-    expect(L.towers.length).toBe(1);
+    // The silo, and nobody at a window: the house is the only building here with an upper floor,
+    // and on a camp that buries its target that floor has no windows (tests/storeys.test.ts).
+    expect(L.towers.map((t) => t.corner)).toEqual(['silo']);
+    expect((w.camp.windows ?? []).filter((x) => L.buildings[x.building]!.module === 'hq')).toEqual([]);
     const C = T.gen.compound;
     // Nearly every run of its field walls stands higher than a man, and there are gaps between them.
     const walls = w.camp.structures.filter((s) => s.kind === 'block').flatMap((s) => s.colliders.map((id) => w.colliders.list[id]!)).filter((c) => c.kind === 'box' && Math.abs(Math.max(c.hx, c.hz) * 2) >= 10 && Math.min(c.hx, c.hz) <= 0.3);

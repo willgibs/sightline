@@ -22,7 +22,7 @@ let best: Plan;
 
 beforeAll(() => {
   world = generateWorld(campMission('BNC-0101'), plain);
-  const R = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, G, world.props.trees);
+  const R = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, G, world.props.trees, world.grid);
   ({ analysis, parts } = analyzeCamp(world.camp, world.terrain, world.colliders, world.grid, G, R));
   ({ plans, best } = campPlans(world.camp, analysis, parts, G));
 }, 120_000);
