@@ -20,7 +20,7 @@ let world: World;
 let raster: Raster;
 beforeAll(() => {
   world = generateWorld(campMission('MUD-9031'), T);
-  raster = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, T.gen, world.props.trees);
+  raster = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, T.gen, world.props.trees, world.grid);
 }, 120_000);
 
 /** The exact answer: the heightfield's own raycast, then every collider that stops sight, then parked vehicles. */
@@ -76,7 +76,7 @@ describe("a perch's viewshed", () => {
     let n = 0;
     const r = new Rng('perch-check');
     for (const w of [world, generateWorld(campMission('KOR-1188'), T), generateWorld(campMission('BNC-0303'), T)]) {
-      const R = w === world ? raster : buildRaster(w.camp, w.terrain, w.colliders, w.grid.site, T.gen, w.props.trees);
+      const R = w === world ? raster : buildRaster(w.camp, w.terrain, w.colliders, w.grid.site, T.gen, w.props.trees, w.grid);
       const perches = findPerches(w.terrain, w.camp.site, T.gen, w.grid.map, R.canopy).slice(0, 8);
       expect(perches.length).toBeGreaterThan(4);
       const L = w.camp.layout!;
@@ -115,9 +115,11 @@ function sight(guards: number, samples: number, seen: (g: number, k: number) => 
 }
 
 describe('a tower', () => {
-  it('is open under its roof: its guard sees out, and perches see him', () => {
-    const tower = world.camp.guards.find((g) => g.elevated)!;
-    expect(tower).toBeDefined();
+  it('is open under its roof: a man on its deck sees out, and perches see him', () => {
+    // The tower itself, manned or not: on a taller camp the marksmen take the upper windows first.
+    const deck = world.camp.layout!.towers.find((t) => t.corner !== 'window')!;
+    expect(deck).toBeDefined();
+    const tower = { x: deck.x, y: deck.deck, z: deck.z };
     const eye = tower.y + T.gen.sight.eye;
     // Straight out from the tower, every way round, the line clears his own tower's parapet and roof.
     let clear = 0;

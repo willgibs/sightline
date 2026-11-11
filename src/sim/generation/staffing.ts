@@ -91,8 +91,8 @@ export function staffCamp(camp: Camp, hf: Heightfield, colliders: ColliderSet, g
   // --- Posts and routes. ---------------------------------------------------------------
   interface Plan {
     role: GuardRole;
-    /** A post: where he holds, and what he watches. */
-    post?: { at: Point2; look: number; scan: ScanKind; elevated?: number; door?: true; window?: true };
+    /** A post: where he holds, and what he watches. `door`: he holds the target's door. `sill`: he stands at an upper window, looking out of it. */
+    post?: { at: Point2; look: number; scan: ScanKind; elevated?: number; door?: true; sill?: true };
     /** A route: its stops, the legs between them, and which of the patrols on it he is. */
     stops?: Stop[];
     legs?: Point2[][];
@@ -250,7 +250,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, colliders: ColliderSet, g
     } else if (role === 'marksman') {
       const t = towers.shift();
       // A tower looks out from the camp; a window looks out of itself.
-      if (t) plans.push({ role, post: { at: { x: t.x, z: t.z }, look: t.out ? lookAt(t, { x: t.x + t.out.x, z: t.z + t.out.z }) : outward({ x: t.x, z: t.z }), scan: 'half', elevated: t.deck, ...(t.out ? { window: true as const } : {}) } });
+      if (t) plans.push({ role, post: { at: { x: t.x, z: t.z }, look: t.out ? lookAt(t, { x: t.x + t.out.x, z: t.z + t.out.z }) : outward({ x: t.x, z: t.z }), scan: 'half', elevated: t.deck, ...(t.out ? { sill: true as const } : {}) } });
     } else if (role === 'radio-operator') {
       const radio = L.buildings.find((b) => b.module === 'radio');
       if (radio) {
@@ -534,6 +534,8 @@ export function staffCamp(camp: Camp, hf: Heightfield, colliders: ColliderSet, g
     order: number;
   }
   const placed: Placed[] = [];
+  /** Posts moved out of a perch's sight (easeCoverage), each as he stood before, in the order they were moved. */
+  const eased: Array<{ q: Placed; plan: Plan; routine: Routine; xz: Float64Array | null; sight: GuardTrack }> = [];
   /** Witness edges among the placed guards, by placed index: a sees b drop for at least clusterDuty. */
   const edges: boolean[][] = [];
   const clusterLimit = (candidate: GuardTrack): { ok: boolean; largest: number; links: Array<[number, number]> } => {
@@ -611,7 +613,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, colliders: ColliderSet, g
     let fallback: { routine: Routine; xz: Float64Array | null; sight: GuardTrack; links: Array<[number, number]>; largest: number } | null = null;
     let done = false;
     // A man at a window looks out of it or at a wall: he isn't tried turned.
-    for (const turn of post.window ? [0] : [0, 90, -90, 180]) {
+    for (const turn of post.sill ? [0] : [0, 90, -90, 180]) {
       const routine = turn === 0 ? p.routine : postRoutine(postAt(p.routine), post.look + turn * DEG, post.scan, R, cycle, scanOf(p.routine));
       const xz = deck === null ? track(routine) : null;
       if (xz && placed.some((q) => q.xz && clashes(q.xz, xz))) continue;
@@ -738,6 +740,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, colliders: ColliderSet, g
         const next = perchShares(sight);
         const trial = shares.map((row, g) => (g === i ? next : row));
         if (excess(trial) >= before - 1e-9) continue;
+        eased.push({ q, plan: q.plan, routine: q.routine, xz: q.xz, sight: q.sight });
         if (look !== null) q.plan = { ...q.plan, post: { ...post, look } };
         q.routine = routine;
         q.xz = xz;
@@ -865,6 +868,36 @@ export function staffCamp(camp: Camp, hf: Heightfield, colliders: ColliderSet, g
         q.sight = before.sight;
         setEdges(i);
       }
+    }
+    // Still broken, on a place that keeps its posts under cover, where far more of them are
+    // moved: a man put out of a perch's sight may have been the one a perch's men were watched
+    // by, or the one watched. The last moved goes back first, and stays back if that mends a
+    // perch without handing any perch more of the men's time than validation allows.
+    const most = gen.compound.types[L.type].maxCoverage - S.witnessMargin;
+    for (let k = covered ? eased.length - 1 : -1; k >= 0 && bad > 0; k--) {
+      const was = eased[k]!;
+      const q = was.q;
+      const i = placed.indexOf(q);
+      const moved = { plan: q.plan, routine: q.routine, xz: q.xz, sight: q.sight };
+      if (was.xz && placed.some((o) => o !== q && o.xz && clashes(o.xz, was.xz!))) continue;
+      const put = (to: typeof moved): void => {
+        q.plan = to.plan;
+        q.routine = to.routine;
+        q.xz = to.xz;
+        q.sight = to.sight;
+        setSeen(i);
+        setEdges(i);
+      };
+      put(was);
+      const now = breaking();
+      let top = 0;
+      for (let p = 0; p < perches.views.length; p++) {
+        let sum = 0;
+        for (let g = 0; g < n; g++) for (let s = 0; s < K; s++) sum += seenAt[p]![g]![s]!;
+        top = Math.max(top, sum / (K * n));
+      }
+      if (now < bad && top <= most) bad = now;
+      else put(moved);
     }
   }
 

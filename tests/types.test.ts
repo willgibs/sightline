@@ -145,8 +145,10 @@ describe('each kind of place', () => {
     const L = w.camp.layout!;
     expect(L.plan.perimeter).toBe('fields');
     expect(w.camp.structures.some((s) => s.kind === 'fence')).toBe(false);
-    // The silo, and a window of the house's upper floor.
-    expect(L.towers.map((t) => t.corner).sort()).toEqual(['silo', 'window']);
+    // The silo, and nobody at a window: the house is the only building here with an upper floor,
+    // and on a camp that buries its target that floor has no windows (tests/storeys.test.ts).
+    expect(L.towers.map((t) => t.corner)).toEqual(['silo']);
+    expect((w.camp.windows ?? []).filter((x) => L.buildings[x.building]!.module === 'hq')).toEqual([]);
     const C = T.gen.compound;
     // Nearly every run of its field walls stands higher than a man, and there are gaps between them.
     const walls = w.camp.structures.filter((s) => s.kind === 'block').flatMap((s) => s.colliders.map((id) => w.colliders.list[id]!)).filter((c) => c.kind === 'box' && Math.abs(Math.max(c.hx, c.hz) * 2) >= 10 && Math.min(c.hx, c.hz) <= 0.3);

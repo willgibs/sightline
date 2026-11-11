@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T, type Tuning } from '../src/config/tuning';
 import { emptyRoute, navigatorOf } from '../src/sim/brain';
+import { createBody } from '../src/sim/body';
 import { InvariantWatch } from '../src/sim/body/invariants';
 import { stimulus } from '../src/sim/game/drops';
 import { compound } from '../src/sim/game/scenes/compound';
@@ -8,7 +9,11 @@ import { commanderOf } from '../src/sim/game/comms';
 import { hardRoom } from '../src/sim/game/protection';
 import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
-import { campMission, COMPOUND_TYPES, generateWorld, type CompoundType, type CruxKind } from '../src/sim/generation';
+import { oneStorey } from '../src/lab/experiments/circling';
+import { readCorners } from '../src/lab/experiments/corners';
+import { campMission, COMPOUND_TYPES, generateWorld, worldFingerprint, type CompoundType, type CruxKind } from '../src/sim/generation';
+import { rimCells, stepsTo } from '../src/sim/generation/infiltrate';
+import { buildRaster, openAt } from '../src/sim/generation/raster';
 import { Cell, cellIndex, storeyAt } from '../src/sim/kernel/world/grid';
 import { neutralInput } from '../src/sim/kernel/input';
 import { startScene, type Scene } from '../src/sim/kernel/scene';
@@ -98,17 +103,58 @@ describe('a two-storey building', () => {
     expect(nav.find(siteCentre.x, siteCentre.z, target.x, target.z, {}, route, undefined, up.y)).toBe('found');
     const footX = G.site.x0 + ((st.foot % G.site.nx) + 0.5) * G.site.cell;
     const footZ = G.site.z0 + (Math.floor(st.foot / G.site.nx) + 0.5) * G.site.cell;
-    const visits = (x: number, z: number): boolean => {
-      for (let i = 0; i < route.points.length; i += 2) {
-        if (Math.hypot(route.points[i]! - x, route.points[i + 1]! - z) < 1.2) return true;
-      }
-      return false;
+    const headX = up.layer.x0 + ((st.head % up.layer.nx) + 0.5) * up.layer.cell;
+    const headZ = up.layer.z0 + (Math.floor(st.head / up.layer.nx) + 0.5) * up.layer.cell;
+    /** Which waypoint of a route is at a point, or −1. */
+    const at = (r: typeof route, x: number, z: number): number => {
+      for (let i = 0; i < r.points.length; i += 2) if (Math.hypot(r.points[i]! - x, r.points[i + 1]! - z) < 1e-6) return i / 2;
+      return -1;
     };
-    expect(visits(footX, footZ)).toBe(true);
-    // And from upstairs back down to the same point on the ground.
+    // Up: the foot of the flight, and the head of it next. Nothing is pulled taut across the stairs.
+    expect(at(route, footX, footZ)).toBeGreaterThanOrEqual(0);
+    expect(at(route, headX, headZ)).toBe(at(route, footX, footZ) + 1);
+    // And from upstairs back down to the same point on the ground: the head, and the foot next. A
+    // line from the head to the door below is clear on the ground, and no body can take it.
     const down = emptyRoute();
     expect(nav.find(target.x, target.z, siteCentre.x, siteCentre.z, {}, down, up.y)).toBe('found');
+    expect(at(down, headX, headZ)).toBeGreaterThanOrEqual(0);
+    expect(at(down, footX, footZ)).toBe(at(down, headX, headZ) + 1);
   });
+
+  it('a body upstairs walks its route down the flight and out of the door, by the motor alone', () => {
+    const sim = new Simulation(world, T);
+    const G = world.grid;
+    const st = G.stairs[0]!;
+    const up = G.storeys[st.storey]!;
+    const target = world.camp.guards.find((g) => g.role === 'target')!;
+    const hq = world.camp.layout!.buildings.find((b) => b.module === 'hq')!;
+    const door = world.camp.doors![hq.doors[0]!]!;
+    const out = { x: door.x - door.nx * 4, z: door.z - door.nz * 4 };
+    const route = emptyRoute();
+    expect(navigatorOf(world, T).find(target.x, target.z, out.x, out.z, {}, route, up.y)).toBe('found');
+    // The player in his place, on his floor: a body made standing there, as the game makes one.
+    for (const g of [...sim.guards]) if (Math.hypot(g.body.x - target.x, g.body.z - target.z) < 1) sim.despawn(g.id);
+    Object.assign(sim.player, createBody(world, sim.solids, T.bodies.player, target.x, target.z, 1, 0, up.y));
+    expect(sim.player.y).toBeCloseTo(up.y, 2);
+    const watch = new InvariantWatch(sim);
+    const input = neutralInput();
+    let next = 0;
+    for (let t = 0; t < 60 * T.sim.tickHz && next < route.points.length; t++) {
+      const dx = route.points[next]! - sim.player.x;
+      const dz = route.points[next + 1]! - sim.player.z;
+      if (Math.hypot(dx, dz) < 0.35) {
+        next += 2;
+        continue;
+      }
+      watch.beforeTick();
+      sim.step({ ...input, yaw: yawFromDirection(dx, dz), moveZ: 1 });
+      watch.afterTick();
+    }
+    expect(watch.report.first).toBeNull();
+    expect(watch.report.inside).toBe(0);
+    expect(next).toBe(route.points.length);
+    expect(sim.player.y).toBeCloseTo(world.terrain.heightAt(sim.player.x, sim.player.z), 1);
+  }, 60_000);
 
   it('a body climbs the flight on foot, by the motor alone, and stands on the floor above', () => {
     const sim = new Simulation(world, T);
@@ -204,5 +250,113 @@ describe('a two-storey building', () => {
     // Cell lookups stay within the storey's layer.
     expect(cellIndex(up.layer, target.x, target.z)).toBeGreaterThanOrEqual(0);
     void hqStorey;
+  });
+});
+
+describe("the analysis's upper floor", () => {
+  it('is one piece, joined to the ground by its stairs, on a camp turned off the world’s axes', () => {
+    // The raster lies along the camp's axes and the storey's layer along the world's. On ZUV-9136,
+    // a farm turned 51° whose target is to be reached, three straight lines between raster cells'
+    // middles left the head of the stairs in a pocket of its own: no way in, and the camp built again.
+    const w = generateWorld(campMission('ZUV-9136'), T);
+    const L = w.camp.layout!;
+    expect(w.camp.crux).toBe('inside');
+    expect(Math.min(Math.abs(L.ux), Math.abs(L.uz))).toBeGreaterThan(0.5);
+    const R = buildRaster(w.camp, w.terrain, w.colliders, w.grid.site, T.gen, w.props.trees, w.grid);
+    expect(R.extra).toBeGreaterThan(100);
+    const steps = stepsTo(R, rimCells(R));
+    for (let e = 0; e < R.extra; e++) expect(steps[R.na * R.nb + e], `upper cell ${e}`).toBeGreaterThanOrEqual(0);
+    // And the way in to him is found the first time the camp is built.
+    expect(w.report.camp!.infiltration.found).toBe(true);
+    expect(w.report.campAttempt).toBe(0);
+    expect(w.report.firstFailed).toEqual([]);
+  }, 60_000);
+
+  it('keeps two slabs a cell: out on his floor, nothing below it closes the room he stands in', () => {
+    const R = buildRaster(world.camp, world.terrain, world.colliders, world.grid.site, T.gen, world.props.trees, world.grid);
+    const hq = world.camp.layout!.buildings.find((b) => b.module === 'hq')!;
+    const up = world.grid.storeys[hq.storey]!;
+    let open = 0;
+    let cells = 0;
+    for (let c = 0; c < up.layer.nx * up.layer.nz; c++) {
+      if ((up.layer.flags[c]! & Cell.Walkable) === 0) continue;
+      const x = up.layer.x0 + ((c % up.layer.nx) + 0.5) * up.layer.cell;
+      const z = up.layer.z0 + (Math.floor(c / up.layer.nx) + 0.5) * up.layer.cell;
+      // Clear of the walls' own row of raster cells, which is solid by design.
+      const dx = x - hq.x;
+      const dz = z - hq.z;
+      if (Math.abs(dx * hq.ux + dz * hq.uz) > hq.length / 2 - 1.5 || Math.abs(-dx * hq.uz + dz * hq.ux) > hq.depth / 2 - 1.5) continue;
+      cells++;
+      if (openAt(R, x, up.y + T.gen.sight.chest, z) && openAt(R, x, up.y + T.gen.sight.eye, z)) open++;
+    }
+    expect(cells).toBeGreaterThan(50);
+    // All but the cells the rail round the stairwell runs through.
+    expect(open / cells).toBeGreaterThan(0.9);
+  });
+});
+
+describe('what taller camps are for (the owner, Nov 10)', () => {
+  it('with every storey one, each kind of place generates what it did on one storey', () => {
+    // Everything upper floors changed is the types' own data, so the same seeds can be measured
+    // both ways (npm run experiment -- taller, corners). These are Step 1's camps, fingerprinted
+    // on main (#34) with the fields a second storey added left out.
+    const before: Array<[string, CompoundType, string]> = [
+      ['MAZ-1737', 'walled', '5d2134af69fdd862'],
+      ['HAM-3144', 'keep', '114ae6a5b563b24e'],
+      ['TAP-5457', 'depot', '03f9552b4045ce4c'],
+      ['HUB-9331', 'farm', '23f833cb57d1b468'],
+    ];
+    for (const [seed, type, was] of before) {
+      const w = generateWorld(campMission(seed), oneStorey(T));
+      expect(w.camp.layout!.type, seed).toBe(type);
+      for (const key of ['windows', 'storeys', 'stairs']) delete (w.camp as unknown as Record<string, unknown>)[key];
+      for (const key of ['storeys', 'stairs']) delete (w.grid as unknown as Record<string, unknown>)[key];
+      for (const b of w.camp.layout!.buildings as unknown as Array<Record<string, unknown>>) {
+        delete b.storeys;
+        delete b.floorY;
+        delete b.storey;
+      }
+      expect(worldFingerprint(w), `${seed}, a ${type}`).toBe(was);
+    }
+  }, 300_000);
+
+  it('buries its target on a floor with no windows, in one room that the head of his stairs shows all of', () => {
+    const hq = world.camp.layout!.buildings.findIndex((b) => b.module === 'hq');
+    expect((world.camp.windows ?? []).filter((w) => w.building === hq)).toEqual([]);
+    // The owner's limit, in the lab's numbers (npm run experiment -- corners).
+    const r = readCorners(world, T);
+    expect(r.targetUp).toBe(1);
+    expect(r.buriedNowhere, 'nobody outside his building has a line to him').toBe(1);
+    expect(r.floorSeen, 'his floor from the head of his stairs, %').toBe(100);
+    expect(r.himSeen).toBe(1);
+    expect(r.unread, 'men besides him nobody outside can read').toBe(0);
+    expect(r.noWindow, 'posts upstairs with no window').toBe(0);
+    expect(r.rooms, 'buildings besides his that hold someone unread').toBe(0);
+    expect(r.wayIn).toBe(1);
+    expect(r.wayOther, 'the way in goes through his building and no other').toBe(0);
+  }, 60_000);
+
+  it('stands its marksmen at upper windows before its towers, each looking out of his window', () => {
+    const L = world.camp.layout!;
+    const marksmen = world.camp.guards.filter((g) => g.role === 'marksman');
+    const posts = L.towers.filter((t) => t.corner === 'window');
+    expect(posts.length).toBeGreaterThanOrEqual(1);
+    // The first place a marksman takes is a window's, and none is in the target's building.
+    expect(L.towers[0]!.corner).toBe('window');
+    for (const t of posts) expect(L.buildings[t.building!]!.module).not.toBe('hq');
+    const first = marksmen.find((g) => Math.hypot(g.x - posts[0]!.x, g.z - posts[0]!.z) < 1e-6)!;
+    expect(first).toBeDefined();
+    expect(storeyAt(world.grid, first.x, first.y, first.z)).toBeGreaterThanOrEqual(0);
+    // A pace back from a window: the wall's gap is right in front of him.
+    const out = posts[0]!.out!;
+    expect(world.camp.windows!.some((x) => Math.hypot(x.x - (first.x + out.x * 0.9), x.z - (first.z + out.z * 0.9)) < 0.1)).toBe(true);
+  });
+
+  it('shows every perch less of its men than validation allows, and eases well under that', () => {
+    const kind = T.gen.compound.types.keep;
+    const most = Math.max(...world.report.camp!.perches.map((p) => p.coverage));
+    expect(most).toBeLessThanOrEqual(kind.maxCoverage);
+    expect(kind.maxCoverage).toBeLessThan(T.gen.compound.types.yard.maxCoverage);
+    expect(kind.easeTo).toBeLessThan(kind.maxCoverage);
   });
 });

@@ -219,7 +219,7 @@ export const defaultTuning = {
           vehicleDoorGap: 3,
           storeys: { hq: 2, barracks: 2, mess: 1, storage: 1 },
           windowPost: 2, // marksmen at the upper windows of its two-storey buildings, the target's first
-          maxCoverage: 0.45,
+          maxCoverage: 0.55,
           easeTo: 0.22,
           posts: 'covered',
           modules: { hq: [12, 9, 6], barracks: [18, 8, 3], mess: [13, 9, 3], storage: [13, 10, 4.4], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
@@ -243,7 +243,7 @@ export const defaultTuning = {
           vehicleDoorGap: 3,
           storeys: { hq: 2, barracks: 2, mess: 1, storage: 1 },
           windowPost: 2, // marksmen at the upper windows of its two-storey buildings, the target's first
-          maxCoverage: 0.45,
+          maxCoverage: 0.55,
           easeTo: 0.22,
           posts: 'covered',
           modules: { hq: [16, 12, 6], barracks: [16, 8, 3], mess: [12, 8, 3], storage: [12, 9, 3.6], radio: [6, 5, 2.8], shed: [5, 4, 2.6] },
@@ -267,7 +267,7 @@ export const defaultTuning = {
           vehicleDoorGap: 3,
           storeys: { hq: 2, barracks: 2, mess: 1, storage: 1 },
           windowPost: 2, // marksmen at the upper windows of its two-storey buildings, the target's first
-          maxCoverage: 0.45,
+          maxCoverage: 0.55,
           easeTo: 0.22,
           posts: 'covered',
           modules: { hq: [13, 9, 6], barracks: [20, 9, 3], mess: [13, 9, 3], storage: [24, 11, 5], radio: [7, 5, 2.8], shed: [6, 4, 2.6] },
@@ -292,7 +292,7 @@ export const defaultTuning = {
           vehicleDoorGap: 3,
           storeys: { hq: 2, barracks: 1, mess: 1, storage: 1 },
           windowPost: 1, // marksmen at the upper windows of its two-storey buildings, the target's first
-          maxCoverage: 0.45,
+          maxCoverage: 0.55,
           easeTo: 0.22,
           posts: 'covered',
           modules: { hq: [13, 10, 6], barracks: [18, 8, 3.2], mess: [12, 8, 3], storage: [22, 12, 7], radio: [6, 5, 2.8], shed: [6, 5, 2.6] },
