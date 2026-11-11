@@ -66,6 +66,16 @@ export interface Stair {
   foot: number;
   head: number;
   cost: number;
+  /**
+   * The flight's own two ends, on its middle line: where a body steps on to it at the bottom
+   * and off it at the top. The cells are the nearest to these, up to half a cell to one side,
+   * and a flight is barely wider than a body: a walk from one cell's middle to the other's
+   * runs into its wall or its rail.
+   */
+  footX: number;
+  footZ: number;
+  headX: number;
+  headZ: number;
 }
 
 export interface SpatialGrid {
@@ -131,7 +141,7 @@ export function buildGrid(terrain: Heightfield, colliders: ColliderSet, site: { 
     const dj = Math.abs(Math.floor(foot / siteLayer.nx) - (Math.floor(head / up.layer.nx) + Math.round((up.layer.z0 - siteLayer.z0) / fine)));
     const lo = Math.min(di, dj);
     const level = (di + dj - 2 * lo) * Math.round(fine * 100) + lo * Math.round(fine * 100 * Math.SQRT2);
-    return [{ storey: st.storey, foot, head, cost: Math.max(Math.ceil(st.length * 100), level) }];
+    return [{ storey: st.storey, foot, head, cost: Math.max(Math.ceil(st.length * 100), level), footX: st.footX, footZ: st.footZ, headX: st.headX, headZ: st.headZ }];
   });
   return { map, site: siteLayer, storeys: built, stairs: joined };
 }
@@ -288,14 +298,22 @@ function clearPath(terrain: Heightfield, colliders: ColliderSet, x: number, z: n
   return true;
 }
 
-/** Which storey (index) a body with its feet at height y stands on at (x, z), or −1 for the ground. */
+/**
+ * Which storey (index) a body with its feet at height y stands on at (x, z), or −1 for the
+ * ground. On it is from the last tread of the flight up to it (0.4 m under the floor) to as far
+ * above it as a floor's own headroom: a man on a tower's deck beside the building, or on its
+ * roof, is over the floor's footprint and not on the floor.
+ */
 export function storeyAt(grid: SpatialGrid, x: number, y: number, z: number): number {
   for (let k = 0; k < grid.storeys.length; k++) {
     const s = grid.storeys[k]!;
-    if (y >= s.y - 0.4 && cellIndex(s.layer, x, z) >= 0) return k;
+    if (y >= s.y - 0.4 && y < s.y + STOREY_HEADROOM && cellIndex(s.layer, x, z) >= 0) return k;
   }
   return -1;
 }
+
+/** Metres above a storey's floor that a body's feet can be and still be on it. */
+const STOREY_HEADROOM = 2.4;
 
 /** The cell index of (x, z) in a layer, or −1 outside it. */
 export function cellIndex(L: GridLayer, x: number, z: number): number {

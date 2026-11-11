@@ -101,10 +101,8 @@ describe('a two-storey building', () => {
     const route = emptyRoute();
     const siteCentre = { x: world.camp.site.x + world.camp.layout!.ux * 20, z: world.camp.site.z + world.camp.layout!.uz * 20 };
     expect(nav.find(siteCentre.x, siteCentre.z, target.x, target.z, {}, route, undefined, up.y)).toBe('found');
-    const footX = G.site.x0 + ((st.foot % G.site.nx) + 0.5) * G.site.cell;
-    const footZ = G.site.z0 + (Math.floor(st.foot / G.site.nx) + 0.5) * G.site.cell;
-    const headX = up.layer.x0 + ((st.head % up.layer.nx) + 0.5) * up.layer.cell;
-    const headZ = up.layer.z0 + (Math.floor(st.head / up.layer.nx) + 0.5) * up.layer.cell;
+    // The flight's own two ends, on its middle line: a body walks between these, not between the cells nearest them.
+    const { footX, footZ, headX, headZ } = st;
     /** Which waypoint of a route is at a point, or −1. */
     const at = (r: typeof route, x: number, z: number): number => {
       for (let i = 0; i < r.points.length; i += 2) if (Math.hypot(r.points[i]! - x, r.points[i + 1]! - z) < 1e-6) return i / 2;

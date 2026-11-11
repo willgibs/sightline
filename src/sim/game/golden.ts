@@ -19,12 +19,12 @@ export const GOLDEN = {
   /** Bits of every deterministic math function over 4,000 inputs each. */
   detmath: '8d55144e8e74968f',
   /** Everything generation decides for TAL-4471 (also pinned in tests/world.test.ts). */
-  world: 'f6f346913137d617',
+  world: '2e3469153b6e94ba',
   /** 60 s of play: the person-like bot in two valleys, the fuzzing bot in one. */
   play: {
-    'TAL-4471 wander': { behaviour: 'c20b1c1f47f068d0', state: '9e7affdc07a603fb' },
-    'MUD-9031 wander': { behaviour: 'cbd802616078d245', state: 'fae6471eb8e7165d' },
-    'TAL-4471 chaos': { behaviour: '289f960866273037', state: '719cda8b629fc982' },
+    'TAL-4471 wander': { behaviour: 'dd04c3ea131fbc77', state: '0ae5c726c4f49579' },
+    'MUD-9031 wander': { behaviour: 'd0bf5d5bff35c730', state: '237861a9fc2164db' },
+    'TAL-4471 chaos': { behaviour: '8bea5ca7b1faa4e3', state: '416f91b96d99d46d' },
   },
   /**
    * Scenes run by their own drivers, each pinning its lane (benches.ts): the movement
@@ -43,8 +43,8 @@ export const GOLDEN = {
     'shooting-range': { behaviour: '8cc3e0f7a274c3c5', state: '96aaf03fb351723a' },
     'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '8d4c75a6b711d511' },
     'kernel-alone': { behaviour: '0698e581024f5b35', state: '0bb32cdd438c309a' },
-    'camp-systems': { behaviour: '96c9a2242ca4b1ae', state: 'ad706259cd48e4b1' },
-    'camp-fight': { behaviour: '2bba409a31191ce0', state: '5e85ca29a7598a37' },
+    'camp-systems': { behaviour: 'ee2f1f13c3740683', state: 'ad03d67526d32af2' },
+    'camp-fight': { behaviour: 'f4a1366f53199466', state: '69287963d647a036' },
   },
 } as const;
 

@@ -219,6 +219,20 @@ export class Navigator {
       const level = lv.base === 0 ? -1 : this.stacked.levels.indexOf(lv);
       return { x: cellX(lv.layer, local), z: cellZ(lv.layer, local), level };
     });
+    // Where the path takes a flight, its waypoints are the flight's own two ends, on its middle
+    // line (grid.ts), not the middles of the cells nearest them: those lie up to half a cell to
+    // one side, and the line between them runs a body into the flight's wall or its rail.
+    for (let t = 0; t + 1 < raw.length; t++) {
+      if (raw[t]!.level === raw[t + 1]!.level) continue;
+      const lower = raw[t]!.level < 0 ? t : t + 1;
+      const upper = lower === t ? t + 1 : t;
+      const flight = this.world.grid.stairs.find((s) => s.foot === cells[lower] && this.stacked.levels[s.storey]!.base + s.head === cells[upper]);
+      if (!flight) continue;
+      raw[lower]!.x = flight.footX;
+      raw[lower]!.z = flight.footZ;
+      raw[upper]!.x = flight.headX;
+      raw[upper]!.z = flight.headZ;
+    }
     const N = this.tuning.brain.nav;
     let px = ax;
     let pz = az;
