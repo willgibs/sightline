@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import type { AttackDriver } from '../src/sim/game/attacks';
-import { REHEARSAL_SECONDS, rehearse } from '../src/sim/game/rehearsal';
+import { FIREFIGHT_SECONDS, REHEARSAL_SECONDS, rehearse, rehearseFirefight } from '../src/sim/game/rehearsal';
+import { firefight, meetingOf } from '../src/sim/game/scenes/firefight';
 import { compound } from '../src/sim/game/scenes/compound';
 import type { Simulation } from '../src/sim/game/sim';
 import { generateWorld } from '../src/sim/generation';
@@ -39,8 +40,24 @@ describe('the rehearsal', () => {
     expect(before.events).toBeGreaterThan(100);
   }, 240_000);
 
+  it('rehearses a fight at close quarters too, and that changes nothing either', () => {
+    const world = worldOf(SEED);
+    const close = (): string => {
+      const scene = { ...(firefight(`seed=${SEED}`) as Scene<Simulation>), world: () => world };
+      const sim = startScene(scene, T, world);
+      const driver = scene.driver!();
+      const raw = scene.game.still(sim);
+      for (let i = 0; i < 40 * T.sim.tickHz; i++) sim.step(driver.next(sim, raw));
+      return sim.hash();
+    };
+    const before = close();
+    expect(rehearseFirefight(world, T)).toBe(meetingOf(world, T) ? FIREFIGHT_SECONDS * T.sim.tickHz : 0);
+    expect(close()).toBe(before);
+  }, 240_000);
+
   it('has nothing to rehearse where there is no camp to attack', () => {
     expect(rehearse(testWorld(), T)).toBe(0);
+    expect(rehearseFirefight(testWorld(), T)).toBe(0);
   });
 
   it('runs on the valley’s own camp as on any other', () => {
