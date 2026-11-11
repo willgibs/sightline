@@ -124,6 +124,7 @@ const CALL_LINES: Readonly<Record<ReportCode, string>> = {
   clear: 'Clear here.',
   claim: "I'll take a look.",
   escort: 'Time to go. Move!',
+  moving: 'Moving! Cover me!',
   outage: "Something's dead over here.",
 };
 
@@ -1151,7 +1152,8 @@ export class Game {
     for (const e of events) {
       if (e.type === 'call') {
         if (this.sound.levelAt(e.x, e.y, e.z, e.radius, ear.x, ear.y, ear.z) < 1) continue;
-        this.cues.say(CALL_LINES[e.say], e.radio === 0, e.x, e.z, view, this.time);
+        // A contact shouted across the yard isn't a call on the radio, and shouldn't read as one.
+        this.cues.say(e.say === 'contact' && e.radio === 0 ? 'Contact! Over there!' : CALL_LINES[e.say], e.radio === 0, e.x, e.z, view, this.time);
         continue;
       }
       if (e.type !== 'bark') continue;

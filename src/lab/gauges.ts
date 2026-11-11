@@ -102,6 +102,8 @@ export interface Readings {
   targetStatus: string;
   /** Where a camp that protects its target has got to with it, in words; '' for a camp that doesn't (brain/protect.ts). */
   protection: string;
+  /** The firefight, in words: how many men are fighting from positions, how many of them are up, and who's going after you; '' with nobody in one (brain/firefight.ts). */
+  firefight: string;
 }
 
 const distance = (ax: number, az: number, bx: number, bz: number): number => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
@@ -196,11 +198,33 @@ export class CampGauges {
       siren: this.siren,
       targetStatus: c?.camp.objective?.status ?? 'none',
       protection: protectionOf(sim),
+      firefight: firefightOf(sim),
     };
   }
 }
 
 /** The stage a protecting camp has reached, as the lab panel says it: the truth, read off the state. */
+/** The firefight as it stands, in words: who's fighting from a position, who's up, who's pinned, and who's coming. */
+export function firefightOf(sim: Simulation): string {
+  let fighting = 0;
+  let up = 0;
+  let pinned = 0;
+  let going = 0;
+  for (const g of sim.guards) {
+    const b = g.brain;
+    const ff = b?.ff;
+    if (!b || !ff) continue;
+    if (b.act === 'push') going++;
+    else if (b.act === 'fight') {
+      fighting++;
+      if (sim.tick < ff.pinned) pinned++;
+      else if (ff.up) up++;
+    }
+  }
+  if (fighting + going === 0) return '';
+  return `${fighting} in position${up > 0 ? `, ${up} up` : ''}${pinned > 0 ? `, ${pinned} pinned` : ''}${going > 0 ? ` · ${going} coming for you` : ''}`;
+}
+
 export function protectionOf(sim: Simulation): string {
   const camp = commanderOf(sim)?.camp;
   if (!camp?.protects || !camp.objective) return '';

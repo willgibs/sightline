@@ -4,7 +4,7 @@ import type { Driver } from '../../kernel/scene';
 import type { World } from '../../kernel/world/world';
 import { defaultCampSpec } from '../../generation';
 import { OverlookShooter } from '../bots/overlook';
-import { Careless, ShootAndCircle, ShootAndRelocate, ShootOnceAndLeave } from '../bots/person';
+import { Careless, ContactAndBreak, ShootAndCircle, ShootAndRelocate, ShootOnceAndLeave } from '../bots/person';
 import { ViewDriver } from '../bots/playerView';
 import { placePlayer } from '../setup';
 import { parseSwitches, switchedOff, type CampSwitch } from '../switches';
@@ -24,10 +24,13 @@ import { takedownTuning } from './takedown';
  *   static     the perfect shooter on the best overview, who never moves (bots/overlook.ts): the upper limit of one perch
  *   relocate   shoots from one firing point, moves to the next after each engagement, and leaves once the target's down
  *   circle     a few rounds from a perch, then round the outside of the base shooting each man as he comes into view
+ *   contact    round the outside until a stop shows him someone, a shot, then a run on out of sight to watch the way he came
  *
- * `circle` isn't a plan to win by: it doesn't leave, so it isn't on the ladder's tally.
- * It's the owner's complaint from the takedown, for `npm run experiment -- circling` to hold
- * a camp's shape against. `ready=alert` plays any of them against the takedown's camp.
+ * `circle` and `contact` aren't plans to win by: they don't leave, so they aren't on the
+ * ladder's tally. They're the owner's complaints, from the takedown and from walking into a
+ * camp: `npm run experiment -- circling` holds a camp's shape against the first, and
+ * `-- firefight` holds what its men do against both. `ready=alert` plays any of them against
+ * the takedown's camp.
  *
  * They all start on their firing point. The walk in is a separate question, and someone
  * who has found a perch has had the time to.
@@ -35,7 +38,7 @@ import { takedownTuning } from './takedown';
 
 export const LADDER_PLANS = ['careless', 'leave', 'static', 'relocate'] as const;
 export type LadderPlan = (typeof LADDER_PLANS)[number];
-type AnyPlan = LadderPlan | 'circle';
+type AnyPlan = LadderPlan | 'circle' | 'contact';
 
 export interface LadderParams {
   seed: string;
@@ -50,7 +53,7 @@ export function parseLadder(text: string | undefined): LadderParams {
     if (!part) continue;
     const [key, value] = part.split('=');
     if (key === 'seed' && value) p.seed = value;
-    else if (key === 'plan' && ([...LADDER_PLANS, 'circle'] as readonly string[]).includes(value ?? '')) p.plan = value as AnyPlan;
+    else if (key === 'plan' && ([...LADDER_PLANS, 'circle', 'contact'] as readonly string[]).includes(value ?? '')) p.plan = value as AnyPlan;
     else if (key === 'off') p.off = parseSwitches(value ?? '');
     else if (key === 'ready' && (READINESS as readonly string[]).includes(value ?? '')) p.ready = value as Readiness;
     else throw new Error(`The ladder doesn't know '${part}'`);
@@ -102,6 +105,7 @@ function onTargetPerches(world: World): Array<{ x: number; z: number }> {
 
 /** Where a plan starts. */
 function startOf(plan: AnyPlan, world: World): { x: number; z: number } {
+  if (plan === 'contact') return ringAround(world, bestOverview(world))[0]!;
   return plan === 'static' || plan === 'careless' || plan === 'circle' ? bestOverview(world) : bestOnTarget(world);
 }
 
@@ -155,6 +159,13 @@ export function circleOf(sim: Simulation): ShootAndCircle {
   return new ShootAndCircle(new Rng(`${world.seed}/dice${sim.tuning.sim.dice}`, 'person/circle'), site, ringAround(world, at));
 }
 
+/** The `contact` plan's bot, for this simulation: built here so an experiment can see when he breaks away. */
+export function contactOf(sim: Simulation): ContactAndBreak {
+  const world = sim.world;
+  const site = { x: world.camp.site.x, z: world.camp.site.z };
+  return new ContactAndBreak(new Rng(`${world.seed}/dice${sim.tuning.sim.dice}`, 'person/contact'), site, ringAround(world, bestOverview(world)));
+}
+
 /** Makes the plan's bot when the run starts, from the simulation it finds itself in. */
 class PlanDriver implements Driver<Simulation> {
   private inner: Driver<Simulation> | null = null;
@@ -172,6 +183,7 @@ class PlanDriver implements Driver<Simulation> {
     // A bot has its own stream, and another roll of the dice gives it other hands too.
     const rng = new Rng(`${world.seed}/dice${sim.tuning.sim.dice}`, `person/${this.plan}`);
     if (this.plan === 'circle') return new ViewDriver(circleOf(sim));
+    if (this.plan === 'contact') return new ViewDriver(contactOf(sim));
     if (this.plan === 'static') return new OverlookShooter(5);
     if (this.plan === 'careless') return new ViewDriver(new Careless(rng, site));
     if (this.plan === 'leave') return new ViewDriver(new ShootOnceAndLeave(rng, site, onTargetPerches(world)));

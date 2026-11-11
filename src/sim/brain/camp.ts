@@ -71,6 +71,8 @@ export interface CampState {
   /** `getOut`: the mission isn't won when the target falls, but when the player then reaches this place (Lab F). */
   /** A camp that fights back (Lab F): absent for a camp that doesn't. */
   fights?: true;
+  /** A camp whose men know how to fight someone close (firefight.ts): cover, find him, fight from the cover, follow. Absent for a camp that only does the drill. */
+  firefight?: true;
   /**
    * A camp that protects its target (protect.ts): where his hard room is. At the first sign
    * of trouble he goes there, and he leaves only when someone comes for him. Absent for a

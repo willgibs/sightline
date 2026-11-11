@@ -74,8 +74,8 @@ export function tell(ctx: TickContext, g: GuardEntity, r: Report, via: Via, caus
     const draw = (): number => ctx.draw(g.id, 'awareness', (rng) => rng.next());
     stimulate(s.awareness, { kind: 'voice', level, x: r.x, y: r.y, z: r.z, cause, reason: 'voice' }, ctx.tick, ctx.tuning, draw);
   }
-  // Being told it's clear, or that it's time to go, says nothing about where an intruder is.
-  if (r.kind !== 'clear' && r.kind !== 'escort') {
+  // Being told it's clear, that it's time to go, or that someone's moving, says nothing new about where an intruder is.
+  if (r.kind !== 'clear' && r.kind !== 'escort' && r.kind !== 'moving') {
     const p: Percept = { kind: 'voice', x: r.x, y: r.y, z: r.z, radius: r.radius, strength: level, tick: ctx.tick, expires: ctx.tick + Math.round(T.keep * hz), cause };
     believe(s, p, false, ctx.tick, ctx.tuning);
   }

@@ -2,6 +2,7 @@ import { dcos, dlog, dsin } from '../kernel/core/detmath';
 import type { AwarenessName } from '../kernel/events';
 import { routinePose, type RoutinePose } from '../generation';
 import type { TaskKind } from './camp';
+import { beginFirefight, noteFirefight, offerFirefight, performFight, performPush, seesHim, type Firefight } from './firefight';
 import { groundSpot } from './ground';
 import type { GuardMind } from './mind';
 import { focusOf, lookAround, sameGoal, stand, standToward, walk } from './moves';
@@ -29,7 +30,7 @@ import { choose, response, type Option } from './utility';
  * percept, an awareness, a belief.
  */
 
-export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee', 'suppress', 'shelter', 'stand-to'] as const;
+export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee', 'suppress', 'shelter', 'stand-to', 'fight', 'push'] as const;
 export type ActName = (typeof ACTS)[number];
 
 /** Why a guard changed what he's doing: A's reasons for a change of state, and the brain's own. */
@@ -126,6 +127,8 @@ export interface BrainState {
   standToUntil?: number;
   /** The target, in such a camp: the tick he was told to come out, or lost his nerve waiting. */
   releasedAt?: number;
+  /** The firefight he's in (firefight.ts): where he believes the intruder is, his position, and what he's doing at it. Absent until he's in one. */
+  ff?: Firefight;
 }
 
 /** An order as it reached a guard: what to do, where, when it was given, and the event behind it. */
@@ -195,6 +198,7 @@ export function decide(m: GuardMind, out: Order): ActChange | null {
   const newest = Math.max(newestPercept(m), newestTold(b));
   if (b.sirenAt < 0 && heardSiren(m)) b.sirenAt = m.tick;
   noteProtection(m);
+  noteFirefight(m);
   if (b.done || m.tick >= b.thinkAt || a.state !== b.state || newest !== b.percept) {
     b.state = a.state;
     b.percept = newest;
@@ -281,7 +285,7 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
   // Why: what his senses gave him, while something drives him; calm or nothing when it doesn't.
   const reacting = act !== 'routine' && act !== 'return';
   const ordered = act === 'task' && b.task !== null;
-  const reason: ActWhy = ordered ? 'ordered' : act === 'flee' || (act === 'shelter' && b.sirenAt >= 0) ? 'siren' : reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
+  const reason: ActWhy = ordered ? 'ordered' : act === 'flee' || (act === 'shelter' && b.sirenAt >= 0) ? 'siren' : act === 'push' ? 'lost' : act === 'fight' && seesHim(m) ? 'seen' : reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
   // A reaction traces to what he sensed; if that memory is gone, to the act that led here.
   const cause = ordered ? b.task!.cause : reacting ? perceptCause(m) || b.event : b.event;
   b.cause = cause;
@@ -289,6 +293,7 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
     b.x = b.task!.x;
     b.z = b.task!.z;
   }
+  if (act === 'fight' || act === 'push') beginFirefight(m, act);
   // Going to look, or running for the alarm: he says so, and whoever hears it leaves it to him.
   if (act === 'investigate') {
     // He says so aloud, and calls it in unverified: the camp knows, and he has it.
@@ -377,6 +382,9 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   // Sent to bring him out: ahead of anything but a fight in front of him.
   if (order && fetching && state !== 'combat') out.push({ act: 'task', rank: 4.8, weight: 1 });
   const off = offRoutine(m);
+  // Someone close, and he knows where: a trained man's fight, ahead of the answers below (firefight.ts).
+  // It has its own clock: he doesn't wander off because his alarm has worn down to unease.
+  offerFirefight(m, out, state === 'combat' ? 5.2 : 4.9);
   switch (state) {
     case 'unaware':
       if (off && !elevated) out.push({ act: 'return', rank: 1, weight: 1 });
@@ -589,6 +597,12 @@ function perform(m: GuardMind, out: Order): void {
       break;
     case 'stand-to':
       performStandTo(m, out);
+      break;
+    case 'fight':
+      performFight(m, out);
+      break;
+    case 'push':
+      performPush(m, out);
       break;
   }
 }
