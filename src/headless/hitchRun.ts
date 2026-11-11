@@ -135,3 +135,11 @@ least.forEach((d, i) => {
   slow.push(`    tick ${String(i + 1).padStart(5)}  ${d.toFixed(1).padStart(5)} ms  ${by[0]} ${by[1].ms.toFixed(1)} ms (${by[1].nodes.toLocaleString('en-US')} cells, ${by[1].rays.toLocaleString('en-US')} rays)`);
 });
 if (slow.length > 0) console.log(`  ticks over ${limit} ms in every run:\n${slow.slice(0, 20).join('\n')}${slow.length > 20 ? `\n    and ${slow.length - 20} more` : ''}`);
+// And the ones slow only the first time, which is what a fresh tab feels: code run for the first time, or something the world works out on first use.
+const once: string[] = [];
+first.ticks.forEach((d, i) => {
+  if (d <= limit || least[i]! > limit) return;
+  const by = [...first.systems[i]!.entries()].sort((a, b) => b[1].ms - a[1].ms)[0]!;
+  once.push(`    tick ${String(i + 1).padStart(5)}  ${d.toFixed(1).padStart(5)} ms  ${by[0]} ${by[1].ms.toFixed(1)} ms (${by[1].nodes.toLocaleString('en-US')} cells, ${by[1].rays.toLocaleString('en-US')} rays) · ${least[i]!.toFixed(1)} ms once warm`);
+});
+if (once.length > 0) console.log(`  ticks over ${limit} ms in the first run only:\n${once.slice(0, 20).join('\n')}${once.length > 20 ? `\n    and ${once.length - 20} more` : ''}`);
