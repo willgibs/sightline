@@ -861,6 +861,22 @@ export const defaultTuning = {
       paces: { careful: 2.4, bound: 5.2, shift: 1.8 }, // m/s: out of the intruder's sight, across ground he can see, and between hiding and firing
       near: 0.45, // metres: close enough to a spot to be on it
     },
+    // The hunt (Lab F, step 2b; brain/approach.ts): a section that goes out after someone the camp has placed.
+    hunt: {
+      // The valley at the scale a section moves on: which ground a believed firing point can see, and the way that keeps out of it.
+      ground: {
+        every: 10, // metres between the places the valley is judged at; its relief is read at the map's own spacing
+        head: 1.7, // metres: the top of a man on his feet, which is what has to be out of view
+        eye: 1.3, // metres above the ground that a shooter's eyes are taken to be
+        tall: 1.5, // metres something solid has to stand to stop a line
+        price: 2, // how many times its length a step out onto ground in view adds to a way's cost,
+        priceOn: 9, // and each step farther across it: so a way is short dashes between places out of view, where the ground allows, and the way round is taken up to ten times as long
+        cells: 9000, // places one search for a way may expand (rule 18): every place a section has any business on
+        around: 450, // metres from the camp's middle that a section's ways are found within
+        reach: 700, // metres from a shooter beyond which nothing counts as in his view
+        bound: { covered: 40, lit: 25, off: 7 }, // metres in one bound out of view and in it, and how far a way may stray from the straight line before a bound ends
+      },
+    },
     getOut: { radius: 15 }, // metres from the way out at which you've got out (Lab F)
     // A camp that protects its target (brain/protect.ts): he goes to his hard room at a whistle
     // or a siren, and leaves it only when men come for him. Only camps with `protects` do this.
