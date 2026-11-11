@@ -38,6 +38,7 @@ import { SCENES } from './scenes';
 import { Blocks, pushOutCircle } from '../kernel/world/colliders';
 import { sightLine, type QueryView } from '../kernel/world/query';
 import { emptyShape } from '../kernel/world/shape';
+import { storeyAt } from '../kernel/world/grid';
 import { SIGHT_TABLE, sightScenario } from './scenes/sightScenario';
 import { FACTORS, SITTING, generateSitting, pairsCovered, scoreSitting, verdict, type Trial } from './trials';
 import { SWAY_RUNGS, decisionSensitivity, swayRadius, sweepCases, sweepWorst } from './ballisticsBench';
@@ -591,7 +592,8 @@ function brainMetrics(): Record<string, number> {
  * a generated camp, and for each of the systems that search, the most it did in any one
  * tick. A tick's time follows its work, and the work is the same on every machine, so this
  * is where a hitch is caught before anyone feels it. Then the routes a fight asks for, each
- * asked alone: between every two posts on the ground.
+ * asked alone: between every two posts on the ground, and between each of them and every
+ * man posted on an upper floor.
  */
 function fightCost(): Record<string, number> {
   const T = defaultTuning;
@@ -642,6 +644,29 @@ function fightCost(): Record<string, number> {
   m[`routes between a camp’s posts: found (of ${asked})`] = found;
   m['routes between a camp’s posts: grid cells a search looks at, on average'] = asked > 0 ? Math.round(cells / asked) : 0;
   m['routes between a camp’s posts: the most one search looks at'] = worst;
+  // And the routes with an end upstairs: from every post on the ground to every man posted on an
+  // upper floor, and back. One search over the ground and the floors together cost forty times a
+  // route on the ground here, and ran out of budget from the far end of the camp (brain/nav.ts, findLevels).
+  const upstairs = world.camp.guards.filter((g) => storeyAt(world.grid, g.x, g.y, g.z) >= 0);
+  let upCells = 0;
+  let upWorst = 0;
+  let upAsked = 0;
+  let upFound = 0;
+  for (const a of posts) {
+    for (const b of upstairs) {
+      for (const up of [true, false]) {
+        const work = { rays: 0, nodes: 0, bodies: 0 };
+        const r = up ? nav.find(a.x, a.z, b.x, b.z, { work }, route, undefined, b.y) : nav.find(b.x, b.z, a.x, a.z, { work }, route, b.y);
+        if (r === 'found') upFound++;
+        upAsked++;
+        upCells += work.nodes;
+        upWorst = Math.max(upWorst, work.nodes);
+      }
+    }
+  }
+  m[`routes to a camp’s upper floors and back: found (of ${upAsked})`] = upFound;
+  m['routes to a camp’s upper floors and back: grid cells a search looks at, on average'] = upAsked > 0 ? Math.round(upCells / upAsked) : 0;
+  m['routes to a camp’s upper floors and back: the most one search looks at'] = upWorst;
   return m;
 }
 

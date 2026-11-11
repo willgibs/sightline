@@ -184,7 +184,10 @@ export const BENCH_GOLDEN: PinnedBench = {
       "a fight’s worst tick: grid cells sounds flood": 19332,
       "routes between a camp’s posts: found (of 56)": 56,
       "routes between a camp’s posts: grid cells a search looks at, on average": 459,
-      "routes between a camp’s posts: the most one search looks at": 2716
+      "routes between a camp’s posts: the most one search looks at": 2716,
+      "routes to a camp’s upper floors and back: found (of 32)": 32,
+      "routes to a camp’s upper floors and back: grid cells a search looks at, on average": 287,
+      "routes to a camp’s upper floors and back: the most one search looks at": 683
     },
     "runs": {
       "camp-fight": {
