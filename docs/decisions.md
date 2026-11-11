@@ -2,6 +2,14 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-10 · The page has an instrument of its own
+
+**Why.** The scope's overlay was a full-window canvas cleared and redrawn every frame though nothing on it had changed. No test and no profile of the simulation could see it; the owner felt it.
+
+**Built.** `npm run frames` (`headless/frames.ts`): the game in Chromium on the machine's own GPU, and for each way of looking, what the page wrote every frame (DOM changes by element, 2D canvas calls by canvas, how often a canvas was cleared whole), the slowest frame after each change of view, the frames after "begin", and a frame's time with the frame-rate limit off.
+
+**What it found, after the overlay's fix and the fight's:** nothing else of that kind. The whole list, with each item's cost and why it's left, is `docs/performance.md`, section 6: the largest are building the valley on the page's thread (3 to 10 s at load) and sound being made at the click on "begin" (one frame of 150 to 180 ms).
+
 ## 2026-11-10 · A fight's slow ticks: landmarks for routes, and nothing made in play
 
 **Why.** The owner's first go at the takedown: "it freezes and jumps a few frames", "sometimes the whole experience gets laggy". A tick takes a tenth of a millisecond on average and has 33, so the average said nothing. The one tick in a thousand did: under a sniper on LEB-2534, 22 ticks in four minutes took over 4 ms, and 4 took over 33 ms, the worst 59 ms. `docs/performance.md` has the whole account and the numbers; this is what was decided.
