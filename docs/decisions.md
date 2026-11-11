@@ -76,6 +76,27 @@ Four more fights on the camps of the owner's sitting have none over 4 ms either,
 
 **Not done, on purpose.** A search the commander orders doesn't climb (only a man who sensed something upstairs, or is sent for the target, goes up). Nothing tells a player which building is the target's except that it stands tall and blank on a camp that buries him: a flag on it is the owner's call. Patrols and workers are as visible from a ridge as they were. A floor has one flight: a route's legs take that for granted, and a second flight to a floor would want the shorter of the two ways.
 
+## 2026-11-11 · The firefight: cover, find, fight, follow
+
+**Why.** The owner walked into a camp and out again: "when enemy defender saw me, it was easy to run away behind cover when they stopped and they wouldn't even attempt to follow", and circling one, "I'm not targeted or under pressure even at close quarters". And what they asked for instead: phases ("I need to find cover then identify the threat" versus "threat identified, combat engaged"), trained men, and never the whole camp converging "into one location as a ring". A man who lost sight of an intruder went to the nearest thing that hid him for the length of a stand-to, and one who could see him stood in the open to shoot.
+
+**Built** (`brain/firefight.ts`, `brain/positions.ts`; `docs/camp-engine.md`, section 9, has the design and the numbers). A man who knows where someone close is fights from a position: somewhere that hides him kneeling, with a place to look and fire from. He comes up to look, fires a few rounds at a man in sight, and goes down again; rounds striking close keep him down. When he's had no view of his own for long enough, one man says he's moving and goes after the intruder a bound at a time.
+
+**Four decisions inside it.**
+- **He fires back at a flash.** A place he's sure of by his own senses is shot at for a few seconds with nobody in his sights. It's what makes a shot cost the shooter something, and it needs no change to what a man knows.
+- **A figure where he expects one is the man.** Sight's law takes about 5 s to be sure of someone at 70 m. It was made for a man who isn't expecting anyone, and it stays as it is: the pre-screened trial sets rest on it. What changed is the brain: with fresh news of an intruder at a place, a glimpse there is enough to shoot at.
+- **Covered ways, or he doesn't go.** Ground in the intruder's view is judged without rays, from the grid's own record of what stands in each cell (`positions.ts`, `Danger`), priced in his route, and never crossed more than a dash at a time. With no such way he holds. So nobody follows across an open field: that's a section's job, and step 2b.
+- **Nobody fires with one of his own in front of his muzzle.** Firing back at a place put a man in front of his own side's rounds twice in sixteen camps. A brain can't know where its own side is (rule 13), and a man can see who's in front of his rifle, so the check is where the round is made (`game/combat.ts`, `guardFire`), below the brain, as stepping out of a vehicle's way is. It applies to every round a guard fires.
+- **A shout of its own.** "Moving!" is a new kind of report (`moving`), said aloud. Whoever hears it leaves the going to him and keeps watching the place, and a player in earshot knows someone is coming.
+
+**Not done here, on purpose.** Covering fire on the place while someone moves: a mind doesn't know where its own side is, so it would shoot the man it's covering. Pairs. Tower men, who still stand upright on an open deck.
+
+**Measured.** `npm run experiment -- firefight`, 16 of the takedown's camps: circling ends with the shooter dead on 15, from 10, and he gets all the way round on 1, from 6. Nobody is shot by his own side. `npm run scene -- firefight`: someone who's seen and goes to ground is followed and found; with `off=firefight` nobody goes.
+
+**Not settled, so not pinned.** The numbers are a person's to set by playing. `tests/firefight.test.ts` holds what's settled: a position hides a man and has the line it says it has, nobody fires at nothing, a pinned man stays down, one or two go and the camp keeps its ground, the same fight ends the same way twice, and a camp without it does none of this.
+
+**Versions.** `SIM_VERSION` 17. No pinned run has anyone that close, so no `behaviour` value moved. `STATE_SCHEMA` 11: a camp says whether it's drilled for this, and a man in a firefight keeps what he knows of it, so every pinned `state` value moved with the schema.
+
 ## 2026-11-10 · The page has an instrument of its own
 
 **Why.** The scope's overlay was a full-window canvas cleared and redrawn every frame though nothing on it had changed. No test and no profile of the simulation could see it; the owner felt it.

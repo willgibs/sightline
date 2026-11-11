@@ -4,6 +4,8 @@ import { eyeOf, startle } from '../body';
 import { dcos, dsin } from '../kernel/core/detmath';
 import { air, windAt } from '../kernel/env';
 import { Faction } from '../kernel/state';
+import { Blocks } from '../kernel/world/colliders';
+import { emptyHit, raycast } from '../kernel/world/query';
 import type { BodyPart } from '../kernel/world/shape';
 import type { SimEvent } from '../kernel/events';
 import { decide, type System, type TickContext } from '../kernel/systems';
@@ -22,6 +24,7 @@ const to = vec3();
 const head = { x: 0, y: 0, z: 0 };
 const aim = vec3();
 const wind = { x: 0, z: 0 };
+const inFront = emptyHit();
 
 /**
  * A guard fires at where he believes his target is: a shot from his eye, with his aim's
@@ -52,9 +55,16 @@ export function guardFire(ctx: TickContext, g: GuardEntity, target: { x: number;
     line.z = target.z - eye.z;
   }
   const d = Math.sqrt(line.x * line.x + line.y * line.y + line.z * line.z) || 1;
+  // One of his own in front of his muzzle: he holds his fire. A brain knows nothing of where its own side is (rule 13), but a
+  // man sees who's in front of his rifle, so it's settled here, where the round is made, as his eyes would settle it.
+  const reach = Math.sqrt((target.x - eye.x) * (target.x - eye.x) + (target.y - eye.y) * (target.y - eye.y) + (target.z - eye.z) * (target.z - eye.z));
+  raycast(ctx.query(), eye.x, eye.y, eye.z, line.x / d, line.y / d, line.z / d, reach, Blocks.Bullet, inFront, g.id);
+  if (inFront.what === 'body' && ctx.index.get(inFront.id)?.faction === Faction.Camp) return;
   // His aim's error: a small disk around the line to the target, from his own stream.
   const role = ctx.world.camp.guards[g.guard.spawn]?.role;
-  const spread = ((fights ? (role === 'marksman' ? T.brain.fight.spreadDeg.marksman : T.brain.fight.spreadDeg.other) : C.spreadDeg) * Math.PI) / 180;
+  // From a position, in a firefight (brain/firefight.ts), he has something to steady the rifle on.
+  const steady = g.brain?.act === 'fight' && role !== 'marksman';
+  const spread = ((steady ? T.brain.firefight.spreadDeg : fights ? (role === 'marksman' ? T.brain.fight.spreadDeg.marksman : T.brain.fight.spreadDeg.other) : C.spreadDeg) * Math.PI) / 180;
   const [eu, ev] = ctx.draw(g.id, 'aim', (rng) => {
     const r = spread * Math.sqrt(rng.next());
     const a = rng.next() * 2 * Math.PI;

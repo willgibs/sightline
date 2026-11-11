@@ -665,3 +665,105 @@ export class ShootAndCircle extends Plan {
     if ((!someone && here > this.look) || here > this.linger) this.walkOn();
   }
 }
+
+/**
+ * Contact, and break it (the owner's notes on the camp, Nov 10): "when enemy defender saw me,
+ * it was easy to run away behind cover when they stopped and they wouldn't even attempt to
+ * follow". He walks the outside of the base until a stop shows him someone, shoots, then
+ * runs on round the outside, well out of sight of where he fired from, gets down and watches
+ * the way he came, shooting whoever comes. Then he does it again. The question is what comes
+ * after him (lab/experiments/firefight.ts).
+ */
+export class ContactAndBreak extends Plan {
+  private readonly orders: Orders = { onlyTarget: false, clean: false, patience: 0, lase: false, reach: 250 };
+  private stop = 0;
+  private looked = 0;
+  private walker: Walker | null = null;
+  private since = -1;
+  /** Looking in from a stop, running, or down and watching the way he came. */
+  phase: 'look' | 'run' | 'watch' = 'look';
+  /** How many times he's broken away, and the mission second he last did, or −1. */
+  breaks = 0;
+  brokeAt = -1;
+  /** He's done it as often as he meant to, or been all the way round without seeing anyone. */
+  done = false;
+  private readonly firedFrom = { x: 0, z: 0 };
+
+  constructor(
+    rng: Rng,
+    camp: { x: number; z: number },
+    /** Where he stops to look in, in the order he walks them. */
+    private readonly ring: ReadonlyArray<{ x: number; z: number }>,
+    /** Stops he runs on after firing: far enough to be out of sight of where he was. */
+    private readonly hop = 4,
+    /** Seconds he watches the way he came. */
+    private readonly watch = 60,
+    /** Seconds at a stop with nobody in view before he walks on. */
+    private readonly look = 5,
+    /** How many times he does it. */
+    private readonly times = 2,
+    skill: Skill = PERSON,
+  ) {
+    super(skill, rng, camp);
+  }
+
+  /** He isn't here for the target, so the target going down doesn't send him home. */
+  override next(view: PlayerView, out: InputFrame): InputFrame {
+    this.hands.begin(view, out);
+    this.act(view, out);
+    return this.hands.end(view, out);
+  }
+
+  private walkOn(stops: number): void {
+    this.stop = (this.stop + stops) % this.ring.length;
+    const p = this.ring[this.stop]!;
+    this.walker = new Walker(p.x, p.z, 0, 2.5);
+    this.since = -1;
+  }
+
+  protected act(view: PlayerView, out: InputFrame): void {
+    if (this.done) {
+      settle(view, this.hands, out, 'crouch', this.camp);
+      return;
+    }
+    if (this.walker) {
+      const running = this.phase === 'run';
+      if (!this.walker.step(view, this.hands, out, running ? 'stand' : 'crouch', running)) return;
+      this.walker = null;
+      this.since = -1;
+      this.shooter.reset();
+      if (running) this.phase = 'watch';
+    }
+    if (this.since < 0) this.since = view.time;
+    const here = view.time - this.since;
+    if (this.phase === 'watch') {
+      if (!settle(view, this.hands, out, 'crouch', this.firedFrom)) return;
+      this.shooter.step(view, this.hands, out, this.orders);
+      if (here > this.watch) {
+        if (this.breaks >= this.times) this.done = true;
+        else {
+          this.phase = 'look';
+          this.looked = 0;
+          this.walkOn(1);
+        }
+      }
+      return;
+    }
+    if (!settle(view, this.hands, out, 'crouch', this.camp)) return;
+    this.shooter.step(view, this.hands, out, this.orders);
+    if (this.shooter.finished) {
+      // He's fired, and seen what it did. Away.
+      this.firedFrom.x = view.you.x;
+      this.firedFrom.z = view.you.z;
+      this.breaks++;
+      this.brokeAt = view.time;
+      this.phase = 'run';
+      this.walkOn(this.hop);
+      return;
+    }
+    if (!view.seen.some((m) => m.distance <= this.orders.reach) && here > this.look) {
+      if (++this.looked >= this.ring.length) this.done = true;
+      else this.walkOn(1);
+    }
+  }
+}

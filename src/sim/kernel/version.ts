@@ -41,5 +41,8 @@ export const GEN_VERSION = 9;
  * budget is now found, and of equally short routes a different one may be taken; a place
  * that can't be reached is known at once; a tick's looks for dead ground share a budget of
  * rays. No pinned run moved.
+ * 17: the firefight (brain/firefight.ts): in a camp drilled for it, men who know where
+ * someone close is fight from positions, fire back at a flash, and go after him by ways out
+ * of his view, one at a time. No pinned run has anyone that close, so no fingerprint moved.
  */
-export const SIM_VERSION = 16;
+export const SIM_VERSION = 17;

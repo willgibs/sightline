@@ -197,7 +197,7 @@ export const BENCH_GOLDEN: PinnedBench = {
           "perception-hearing": { "rays": 51, "nodes": 29269, "bodies": 0 },
           "perception-spotting": { "rays": 8477, "nodes": 0, "bodies": 0 },
           "perception-awareness": { "rays": 0, "nodes": 64535, "bodies": 0 },
-          "guard-brains": { "rays": 269, "nodes": 8945, "bodies": 0 }
+          "guard-brains": { "rays": 277, "nodes": 8945, "bodies": 0 }
         }
       }
     }

@@ -334,7 +334,7 @@ These are scored with the person-limited shooter, not the perfect one, and every
 | --- | --- | --- | --- |
 | **0 · The bench** | Done: experiments, switches, gauges, the panel, the way out, forking a run, re-rolling the dice on one camp, a shooter limited to what a person can do, a fight pinned on the bench | Today's camp with the panel on: the "before" | Medium |
 | **1 · The first fight** | Built: a whistle you can hear, men who leave the line and come back, tower men who fire back, near misses that knock you off your rest, a muzzle flash anyone looking can see. The compound simulator and its flaw detectors. So far: a perfect shooter's kills fall from 8.7 to 7.0 of 9.6, and the share of guards in his line 20 s after a shot from 61% to 41% | The compound simulator first, then a real perch. Fifteen minutes, three questions: what did the camp do, why did you move, what would you do next? | Medium |
-| **2 · The camp hunts** | Done: stance for guards, routes that reach the ridges. Still to come: Picture and Command, sections that sweep, cut-offs on the road, the fallbacks | Getting out, with someone coming | Large |
+| **2 · The camp hunts** | Done: stance for guards, routes that reach the ridges, and the firefight (2a, below). Still to come: Picture and Command, sections that sweep, cut-offs on the road, the fallbacks | Getting out, with someone coming | Large |
 | **3 · The camp has means** | The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels | Break the Chain, The Duel | Large |
 | **4 · If play asks for it** | Mortar, smoke, hardening, Memory, decoys, Second Front, Be the Camp, the tournament | | Large |
 
@@ -367,7 +367,7 @@ So the job of step 2 is that the camp comes after him, in a way he can see comin
 
 ### The owner's brief for what comes next (Nov 10)
 
-From playing the takedown and the live camp, and two answers on the desk. None of it is started: weekly usage was at 88%, so it's scheduled for after the limit resets on Nov 15, in this order.
+From playing the takedown and the live camp, and two answers on the desk. It was scheduled for after the weekly limit reset. The owner's usage was reset early, so it began on Nov 11: the first part of 1 is built (*Step 2a*, below), 3 is being finished alongside it, and the rest follows in this order.
 
 **1. A camp that responds in phases (step 2).** Today men take cover and look where a shot came from, and it ends there. Walk through a camp and they neither converge nor follow; break their line of sight and they stop.
 - **Not knowing where the threat is:** cover from the rough direction first, then work out what's happening. Men near a shot come in slowly, to deal with the nearer threat.
@@ -380,6 +380,59 @@ From playing the takedown and the live camp, and two answers on the desk. None o
 **3. Levels (two storeys).** The second half of compound types (`docs/compound-types.md`, *Where this stands*: built and measured on Nov 11, ahead of the other two, and waiting on the owner's sitting). Taller buildings hide men from a perch and add vertical range to read. The limit: "I don't want to have to go clear every corner of every building to claim success."
 
 **Behind all of it:** realistic on both sides. A fence gives the view outward but stops no pot shots, so a camp that expects attack needs a real layer of walls. Defenders shouldn't make "the dumb decisions laughably made in most horror movies", and players shouldn't be left banging their heads against a wall either.
+
+### Step 2a, built: the firefight (Nov 11)
+
+`brain/firefight.ts` and `brain/positions.ts`. Only a camp with `firefight` does it (`off=firefight` plays the camp as it was), and only men who fight and aren't on a tower.
+
+**What was wrong.** A man who lost sight of an intruder ran to the nearest thing that hid him and stayed there for the stand-to, 45 to 60 s. One who could see him stood in the open to shoot, or stopped to make a radio call. Nobody followed. That's the owner's walk into a camp, and it's why circling one worked.
+
+**A man is in a firefight when he knows where someone close is:** within 130 m of him, and to within 25 m. He knows by his own eyes, a muzzle flash he saw, a report close enough to place, or a contact someone called. A sniper on a ridge is still the drill's business (step 1).
+
+**What he does, in phases:**
+
+| Phase | What he does | What you see |
+| --- | --- | --- |
+| Cover | To a *position*: somewhere that hides him kneeling, with a place to look and fire from. Behind something low that's the same spot stood up; behind something tall, a step out to one side | Men running for the nearest wall, not all for the same one |
+| Find | Up to look at where he believes you are for 2.6 to 4 s, down for 1.6 to 3.4 s | Heads coming up at places you can learn |
+| Fight | In sight: three aimed rounds, then down. A round striking within 4 m keeps his head down 2.5 to 5 s | You can pin a man, and move while he's down |
+| Follow | With no view of his own for long enough, one man shouts "Moving!" and goes a bound at a time to where he can see the place. If it's empty he goes on the way you were heading, four bounds and no farther than 90 m from his post | You hear him say it. Whoever heard him keeps watching |
+
+**Four rules carry it.**
+
+- **Firing back at the flash.** A man with a line to a place he's sure of (a flash he saw, the man himself, a report near enough to place to within 9 m) fires at it for 4 s after, with nobody in his sights. A shot from somewhere costs something: rounds come back at where it was fired from. A place he was only told of isn't sure enough to shoot at.
+- **A figure where he expects one is the man.** His eyes alone take about 5 s to be sure of someone at 70 m, which is right for a man who isn't expecting anyone, and longer than a look over cover lasts. A man who has news of you there within 12 s takes what he glimpses there for you. Perception's law is untouched: this is what a brain does with a glimpse.
+- **Covered ways, or he doesn't go.** A man who isn't running for his life moves by routes that cost five times as much on ground in your view, and never crosses more than 10 m of it at a stretch (30 m while someone has you in his sights and is saying so). If there's no such way nearer, he doesn't run at a man who's waiting for him. He holds, and the hunt is the camp's (step 2b).
+- **The likeliest man goes first.** The keener his role and the nearer he is, the sooner his turn comes, so he has said he's moving before the next man's does. Two who say it at once settle it by who heard whom. Men out of earshot of each other may both go, from different sides.
+
+**Nobody crosses the camp.** A position is within 26 m of where a man stands if he has to get out of sight, and up to about 48 m if he's out of it already and going for a view, so the camp fights from where it is. That's the owner's "the whole enemy camp doesn't just converge into one location as a ring".
+
+**Nobody fires with one of his own in front of his muzzle.** Firing back at a place put two men in sixteen camps in front of their own side's rounds. A brain knows nothing of where its own side is, but a man sees who's in front of his rifle, so it's settled where the round is made (`game/combat.ts`): he holds his fire.
+
+**Honest.** All of it is decided from a mind (rule 13). Where you are reaches a man by his senses or by someone's voice, and who's moving reaches him by hearing it said. Cut the radio and the men in earshot still fight as one; the rest never hear of it.
+
+**Measured** (`npm run experiment -- firefight`, 16 of the takedown's camps, the same seeds before and after, played by bots limited to what a person can do):
+
+| | Before | With the firefight |
+| --- | --- | --- |
+| Circling: shot dead on the walk | 10 of 16 | 15 of 16 |
+| Circling: got all the way round | 6 of 16 | 1 of 16 |
+| Circling: men down from the walk | 2.5 | 2.1 |
+| Circling: rounds at him | 10.6 | 16.3 |
+| Contact from outside the wire: men he put down | 3.1 | 2.3 |
+| Men who left their own ground (over 45 m) | 1.9 | 1.1 |
+| Men shot by their own side | 0 | 0 |
+
+And the walk in itself (`npm run scene -- firefight`): someone stands in front of a guard until he's seen, then goes behind the nearest thing that hides him from every post. Before, nobody goes after him. Now a man who had no view says he's moving, works round, and has eyes on him about 20 s after he went to ground, while the man who first saw him keeps him busy, and nobody else leaves his place.
+
+**What it doesn't do yet, and where each belongs.**
+
+- **Outside the wire nobody follows.** Across an open field there's no covered way, so they hold and shoot. Going out after someone is a section's job, by dead ground or by truck: step 2b.
+- **One man goes, alone.** A pair bounding in turn, with covering fire on the place, needs a man to know where his own side is, which a mind doesn't yet (`docs/foundation-review.md`, "People should be one kind of thing"). Until then nobody fires blind at a place someone has said he's moving on.
+- **Tower men are as they were:** upright on an open deck, and the first to die. A parapet and the counter-sniper pair are step 3.
+- **The first man up still dies** to someone already aiming at his spot. That's fair to a careful player, and it's why a careless one still gets three or four men before he's stopped.
+
+**Dials a person should set by playing,** all in `tuning.brain.firefight`: how well they shoot from a position (`spreadDeg`, 0.6°: about one round in two on a standing man at 50 m), how long a look lasts, how long a near miss pins a man, and how far a man will follow.
 
 ## 10. Decisions
 

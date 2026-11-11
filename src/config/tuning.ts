@@ -831,6 +831,72 @@ export const defaultTuning = {
       nearMiss: { radius: 3, knock: 1.4 }, // metres from your head that a round counts as a near miss, and the seconds it knocks you off your rest
       flash: { range: 520, suppressed: 140 }, // metres a muzzle flash can be seen at, by someone looking that way
     },
+    // The firefight (Lab F, step 2; brain/firefight.ts): how trained men fight someone close whose place they know.
+    // Cover first, then find him, then fight from the cover, and follow when he breaks away. Only camps with `firefight` do this.
+    firefight: {
+      reach: 130, // metres from a man to where he believes the intruder is: nearer than this it's a firefight, farther it's the drill above
+      fix: 25, // metres: how sure of the place he has to be for it to be one
+      forget: 35, // seconds without news of the intruder before the fight is over for this man
+      range: 110, // metres he'll shoot at what he sees from a position (or his role's `combat.range`, if that's more)
+      // Finding a place to fight from (brain/positions.ts).
+      spot: {
+        maxRun: 26, // metres of path to a position, for a man who has to get out of sight; one who's out of it already will go farther for a view, by his role's `flank`
+        cells: 9000, // cells one search may walk (rule 18)
+        rays: 160, // rays one search may cast (rule 18)
+        cover: 0.8, // metres tall a thing has to be for the places behind it to be worth a look
+        behind: 1.5, // metres from a place toward the intruder that such a thing has to be within
+        spacing: 1, // metres between the places he considers near him: twice that past nearRun
+        nearRun: 12,
+        stepOut: 1.5, // metres he'll step out from behind something to see round it
+        preferLine: 9, // metres farther he'll go for a place he can fight from than for one that only hides him
+        eye: 1.3, // metres above the ground he takes the intruder's eyes to be, and what he'd see of him
+        shoulder: 0.3, // metres either side of his head that have to be hidden too
+        keep: 6, // metres the believed place may move before he checks his position against it again
+        standoff: 7, // metres: never a position nearer the intruder than this
+        snapRun: 7, // metres: with the intruder in sight and cover farther off than this, he drops where he is and fires first
+      },
+      answer: { sure: 9, fresh: 4 }, // firing back at a place with nobody in his sights: how sure of it he has to be (metres: a flash he saw, the man himself, or a report close enough to place), and for how many seconds after
+      expect: { fresh: 12, within: 10 }, // a figure glimpsed where he believes the intruder to be is the intruder: for this many seconds after news of him, and within this many metres of the place (and as far again as the intruder could have gone since)
+      // Keeping out of his view on the way (brain/positions.ts, Danger): for a man who isn't running for his life.
+      danger: {
+        every: 2, // metres between the points the camp's ground is judged at
+        tall: 1.5, // metres: something this tall between hides a man on his feet
+        price: 4, // how many times its length ground in his view adds to a route's cost: the way round is taken up to five times as long
+        dash: 10, // metres of it he'll cross at a stretch: farther than that in the open, he doesn't go,
+        fixedDash: 30, // unless someone has the intruder in his sights and is saying so: then this far
+        fixedFor: 8, // seconds a shout of contact counts for that
+      },
+      // The rhythm at a position: down behind it, up to look or to fire, down again.
+      down: { min: 1.6, max: 3.4 }, // seconds down between looks
+      look: { min: 2.6, max: 4 }, // seconds up with nothing to shoot at: long enough for his eyes to pick a man out where he expects one
+      react: 0.55, // seconds from seeing him to the first round
+      every: 1, // seconds between rounds
+      burst: 3, // rounds before he gets down again
+      spreadDeg: 0.6, // the error radius of a round fired from a position, degrees: a rifle with something to steady it, in trained hands
+      pin: { within: 4, min: 2.5, max: 5 }, // a round striking this close keeps his head down for this long (metres, seconds)
+      // Following him: one man goes, in bounds, while whoever heard him say so watches.
+      push: {
+        after: 4, // seconds he holds the angle on where he lost him before anyone goes
+        reluctant: 6, // seconds longer the least keen role waits (by its `flank`), so that the keenest has said he's going first
+        perSecond: 10, // and a second longer for each of these metres he is from the place: the nearest goes
+        reach: 100, // metres: farther than this from the place, he isn't the one to go
+        gain: 5, // metres nearer a bound has to bring him,
+        closeIn: 30, // from farther than this: nearer, it's the angle he's after, and anywhere with a view will do
+        maxRun: 45, // metres of path in one bound
+        bounds: 4, // bounds before he calls it lost
+        leash: 90, // metres from his post that he'll follow
+        lead: 12, // metres farther along the way the intruder was going that he looks next
+        claimFor: 12, // seconds a "moving" holds: nobody else in earshot goes meanwhile, and whoever can see the place keeps watching it
+        claimWithin: 30, // metres between the places two men mean for it to be the same one
+        clear: 1.2, // seconds with eyes on the place and nobody there before it counts as empty
+        pause: 0.6, // seconds he gets his breath at the end of a bound before he looks
+      },
+      improve: { after: 9, run: 16, times: 2 }, // with no view of the place: seconds before he tries for a better position, how far he'll go for one, and how many times
+      contactEvery: 6, // seconds between shouts of where the intruder is
+      call: 2.5, // seconds down and out of his sight before he gets on the radio about it
+      paces: { careful: 2.4, bound: 5.2, shift: 1.8 }, // m/s: out of the intruder's sight, across ground he can see, and between hiding and firing
+      near: 0.45, // metres: close enough to a spot to be on it
+    },
     getOut: { radius: 15 }, // metres from the way out at which you've got out (Lab F)
     // A camp that protects its target (brain/protect.ts): he goes to his hard room at a whistle
     // or a siren, and leaves it only when men come for him. Only camps with `protects` do this.
@@ -927,8 +993,8 @@ export const defaultTuning = {
       keep: 25, // seconds a guard remembers what he's been told
       maxTold: 8, // reports a guard's memory holds
       reportEvery: 20, // seconds between his calls about the same thing
-      level: { contact: 0.8, heard: 0.32, shot: 0.8, body: 0.82, missing: 0.4, clear: 0, claim: 0, outage: 0.32, escort: 0 }, // what a report raises him to
-      radius: { contact: 4, heard: 18, shot: 22, body: 6, missing: 8, clear: 12, claim: 8, outage: 6, escort: 2 }, // metres of uncertainty each kind adds to the speaker's
+      level: { contact: 0.8, heard: 0.32, shot: 0.8, body: 0.82, missing: 0.4, clear: 0, claim: 0, outage: 0.32, escort: 0, moving: 0 }, // what a report raises him to
+      radius: { contact: 4, heard: 18, shot: 22, body: 6, missing: 8, clear: 12, claim: 8, outage: 6, escort: 2, moving: 8 }, // metres of uncertainty each kind adds to the speaker's
       clearRadius: 18, // metres a searcher's "clear" report wipes from the map
       // Claims (Blacklist): "I've got it": one guard goes, those who hear him don't all pile in.
       claimWithin: 14, // metres between a claim's spot and his own for it to count

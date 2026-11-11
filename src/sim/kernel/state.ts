@@ -24,9 +24,10 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * 6: the outcome. 7: guards keep the order their brain last gave. 8: bodies keep a lean and a
  * mantle; the player's controls keep a climb press (lab C, Nov 8). 9: the valley's guards
  * carry their senses (A13). 10: a vehicle on its way out keeps who is in its cab, so that he
- * can get out again.
+ * can get out again. 11: a camp says whether its men are drilled for a firefight, and a man
+ * in one keeps what he knows of it and his position (brain/firefight.ts).
  */
-export const STATE_SCHEMA = 10;
+export const STATE_SCHEMA = 11;
 
 export type EntityId = number;
 

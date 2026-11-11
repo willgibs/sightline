@@ -34,7 +34,7 @@ import { GameSound } from './sound';
 import { BrowserStore, DevInbox, PlaytestCapture, type StoredRun } from './playtest';
 import { DROP_KEYS, LabPanel, SHOOTER_VIEW_KEY } from './labPanel';
 import { CampGauges } from '../lab/gauges';
-import { rehearse } from '../sim/game/rehearsal';
+import { rehearse, rehearseFirefight } from '../sim/game/rehearsal';
 import { commanderOf } from '../sim/game/comms';
 import { stimulus, type StimulusName } from '../sim/game/drops';
 import type { Command } from '../sim/kernel/commands';
@@ -124,6 +124,7 @@ const CALL_LINES: Readonly<Record<ReportCode, string>> = {
   clear: 'Clear here.',
   claim: "I'll take a look.",
   escort: 'Time to go. Move!',
+  moving: 'Moving! Cover me!',
   outage: "Something's dead over here.",
 };
 
@@ -520,7 +521,10 @@ export class Game {
       this.hud.map.setWorld(world);
       if (!this.trial) this.overlay.setKey('minimap', this.hud.map.applies);
       // The camp's fight, once, out of sight: the first shot of the real one then costs what the tenth does.
-      if (!this.opts.bench) rehearse(world, this.tuning);
+      if (!this.opts.bench) {
+        rehearse(world, this.tuning);
+        rehearseFirefight(world, this.tuning);
+      }
       this.restartRun();
       const url = new URL(window.location.href);
       url.searchParams.delete('replay');
@@ -1151,7 +1155,8 @@ export class Game {
     for (const e of events) {
       if (e.type === 'call') {
         if (this.sound.levelAt(e.x, e.y, e.z, e.radius, ear.x, ear.y, ear.z) < 1) continue;
-        this.cues.say(CALL_LINES[e.say], e.radio === 0, e.x, e.z, view, this.time);
+        // A contact shouted across the yard isn't a call on the radio, and shouldn't read as one.
+        this.cues.say(e.say === 'contact' && e.radio === 0 ? 'Contact! Over there!' : CALL_LINES[e.say], e.radio === 0, e.x, e.z, view, this.time);
         continue;
       }
       if (e.type !== 'bark') continue;

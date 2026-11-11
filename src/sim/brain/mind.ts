@@ -64,6 +64,8 @@ export interface GuardMind {
   readonly alarms: readonly { x: number; z: number }[];
   /** Whether his camp fights back (Lab F): a fact about the camp, like its alarm boxes. */
   readonly fights: boolean;
+  /** Whether its men are drilled for a fight at close quarters (firefight.ts): another fact about the camp. */
+  readonly firefight: boolean;
   /** Where his camp's hard room is, if it protects its target (protect.ts): another fact about the camp, and null if it doesn't. */
   readonly protects: Readonly<{ x: number; z: number; y?: number }> | null;
   /** Where the camp's escape vehicle stands, if it has one (static, like the alarm boxes): the target's way out at lockdown. */

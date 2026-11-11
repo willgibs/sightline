@@ -3,6 +3,7 @@ import type { Simulation } from '../sim';
 import { ladderTower } from './ladderTower';
 import { campBrain } from './campBrain';
 import { compound } from './compound';
+import { firefight } from './firefight';
 import { CAMP_SCENARIOS, campScenario } from './campScenario';
 import { campSystems } from './campSystems';
 import { liveCamp } from './liveCamp';
@@ -39,6 +40,7 @@ export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   'spawn-tick': spawnTick,
   'camp-systems': campSystems,
   'live-camp': liveCamp,
+  firefight,
   overlook,
   ladder,
   'shooting-range': shootingRange,

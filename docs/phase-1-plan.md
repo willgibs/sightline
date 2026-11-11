@@ -310,7 +310,8 @@ The [Sightline Desk](https://claude.ai/artifact/RB4pjU2qNsYE3zCuBYYb7f), which o
   | Once E7 and E8 are on `main` | E, and D's three camps | `?scene=live-camp&params=seed=LEB-2534`, then `KUV-9210` and `HUM-0755` | 25 min |
   | Any time | F, the first fight | `?scene=compound&params=seed=LEB-2534%26attack=sniper`, then `?scene=live-camp&params=seed=LEB-2534%26perch=1&lab`. What did the camp do, why did you move, what would you do next? | 15 min |
   | Any time | F, the takedown | `?scene=takedown&params=seed=LEB-2534%26perch=1&lab`, and without `perch=1` to walk in. Is this the contest? Do the stages read as a camp thinking? | 20 min |
-  | Once the taller camps are on `main` | D, taller camps (two storeys) | `?scene=takedown&params=seed=VIH-9105%26perch=1`, then `KAT-3755`, `MUD-8412` and `LUL-8783`, and without `perch=1` to walk in. Does a taller camp make you scout? Did you have to clear any room but his? Is it plain which building is his? | 15 min |
+  | Any time | F, the firefight | `?scene=takedown&params=seed=LEB-2534&lab`: walk in, get seen, break away behind something, and listen for "Moving!". Then circle it. `%26off=firefight` is the camp as it was. Do they fight like trained men, and is there time to make a push? | 15 min |
+  | Any time | D, taller camps (two storeys) | `?scene=takedown&params=seed=VIH-9105%26perch=1`, then `KAT-3755`, `MUD-8412` and `LUL-8783`, and without `perch=1` to walk in. Does a taller camp make you scout? Did you have to clear any room but his? Is it plain which building is his? | 15 min |
 
   What each sitting asks is in its lab's section. Lab A's questions wait until after its first sitting.
 
@@ -1036,7 +1037,9 @@ Added on Nov 8, the owner's call. *Labs pass* requires it. Design and reasoning:
 - [ ] F2 · The camp hunts. Picture and Command, sections that sweep, cut-offs on the road, fallbacks.
   - [x] Stance for guards.
   - [x] Routes that reach the ridges: 99% of post-to-perch routes found (`npm run experiment -- routes`), at about 0.5 ms each.
-  - [ ] A camp that responds in phases (the owner's brief, Nov 10; `docs/camp-engine.md`, section 9): cover, identify, then an intelligent gunfight; men who follow; never a ring. First after the weekly limit resets on Nov 15.
+  - [x] A camp that responds in phases (the owner's brief, Nov 10; `docs/camp-engine.md`, section 9, *Step 2a*): the firefight. Men fight from positions, fire back at a flash, and one at a time goes after an intruder by ways out of his view (`brain/firefight.ts`, `npm run experiment -- firefight`, `npm run scene -- firefight`). Circling a camp gets the shooter killed on 15 of 16 camps, from 10.
+  - [ ] The hunt outside the wire (2b): sections that go out by dead ground, pairs that bound in turn with covering fire, cut-offs on the road, the fallbacks.
+  - [ ] The owner's sitting on the firefight.
   - [ ] The target answers by the camp's problem, with tells a player can read (the owner's call, Nov 10).
   - [x] Levels: two storeys, the second half of compound types (lab D's *Two-storey buildings*, above). A guard who hears something upstairs goes up, a target who keeps upstairs shelters there, and the men sent for him climb to him. A search the commander orders still keeps to the ground.
 - [ ] F3 · The camp has means. The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels.

@@ -92,6 +92,7 @@ export class LabPanel {
       `camp        ${r.level}${r.siren ? ', siren' : ''}`,
       `target      ${r.targetStatus}`,
       ...(r.protection ? [`protection  ${r.protection}`] : []),
+      ...(r.firefight ? [`firefight   ${r.firefight}`] : []),
     ].join('\n');
     // In the honest view nothing else brings the dock up to date.
     this.dock.refresh();
