@@ -135,6 +135,21 @@ describe('what the satellite saw', () => {
     for (const [x0, z0, x1, z1] of s.walls) expect(s.roofs.some((q) => insideQuad(q, (x0 + x1) / 2, (z0 + z1) / 2))).toBe(false);
   });
 
+  it('shows a building of two storeys as it shows any: one outline, with its stairs, its floor and its windows under the roof', () => {
+    // As built, a walled compound whose target's building and barracks have an upper floor.
+    const tall = generateWorld(campMission('VIH-9105', defaultCampSpec(), 'overlook'), T);
+    expect(tall.grid.storeys.length).toBeGreaterThanOrEqual(2);
+    const s = satelliteOf(tall)!;
+    expect(s.roofs.length).toBe(count(tall, 'building') + count(tall, 'shed'));
+    for (const b of tall.camp.structures.filter((c) => c.kind === 'building')) {
+      const parts = b.colliders.map((id) => tall.colliders.list[id]!);
+      expect(s.roofs.filter((q) => parts.every((c) => insideQuad(q, c.x, c.z))).length, 'one outline round all of a building').toBeGreaterThanOrEqual(1);
+    }
+    // Nothing of a building's insides is drawn as a wall, and nothing says which building has a floor above.
+    for (const [x0, z0, x1, z1] of s.walls) expect(s.roofs.some((q) => insideQuad(q, (x0 + x1) / 2, (z0 + z1) / 2))).toBe(false);
+    expect(Object.keys(s).sort()).toEqual(['creek', 'fence', 'road', 'roofs', 'side', 'terrain', 'trees', 'walls', 'x0', 'z0']);
+  }, 120_000);
+
   it('reads nothing that lives: no state, no guards, no targets, no vehicles', () => {
     const source = readFileSync(new URL('../src/app/minimap.ts', import.meta.url), 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '')
