@@ -284,7 +284,7 @@ export const defaultTuning = {
       storey: 3,
       floorThickness: 0.2,
       stairs: { rise: 0.25, tread: 0.3, width: 1.1 }, // a rise inside the motor's stepHeight
-      window: { sill: 0.95, head: 2.15, width: 1.2, every: 12 }, // metres above the floor, wide, and how far apart along a wall
+      upperWindow: { sill: 0.95, head: 2.15, width: 1.2, every: 12 }, // metres above the floor, wide, and how far apart along a wall
       rail: 1, // round the stairwell upstairs
       fieldWall: 1.1, // a farm's low field walls: to see over, and to crawl behind
       fieldWallHigh: 2.4, // and its high ones, which nobody sees over

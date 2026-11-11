@@ -621,7 +621,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
     const t = C.wallThickness;
     const floor = y0 + S;
     const roofUnder = y0 + 2 * S - C.floorThickness;
-    const W = C.window;
+    const W = C.upperWindow;
     for (const face of ['a+', 'a-', 'b+', 'b-'] as const) {
       const horizontal = face === 'a+' || face === 'a-';
       const wa = face === 'a+' ? a + lenA / 2 - t / 2 : face === 'a-' ? a - lenA / 2 + t / 2 : a;
@@ -817,8 +817,10 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
   const hqB = buildings[hqIndex]!;
   // A buried target's doors have screens: a short wall just inside each, so nobody gets a
   // straight line to him through the door from the yard. To reach him you step inside. A
-  // screen stops short of the room's side walls, so there is always a way round it.
-  if (buried(crux)) {
+  // screen stops short of the room's side walls, so there is always a way round it. Where his
+  // building has an upper floor he keeps up there and the floor is what buries him: its doors
+  // are left to show the room below, and the stairs.
+  if (buried(crux) && hqB.storeys < 2) {
     const screens: number[] = [];
     for (const di of hqB.doors) {
       const d = doors[di]!;
@@ -877,7 +879,7 @@ export function buildCompound(rng: Rng, hf: Heightfield, features: TerrainFeatur
       return top;
     };
     // On a camp where someone has to get to him, his own floor stays clear of them: a way up has to exist.
-    const twoFloors = buildings.map((b, index) => ({ b, index })).filter(({ b, index }) => b.storeys >= 2 && (index !== hqIndex || !needsWayIn(crux))).sort((p, q) => (p.index === hqIndex ? -1 : q.index === hqIndex ? 1 : p.index - q.index));
+    const twoFloors = buildings.map((b, index) => ({ b, index })).filter(({ b, index }) => b.storeys >= 2 && (index !== hqIndex || !needsWayIn(crux))).sort((p, q) => (p.index === hqIndex ? -1 : q.index === hqIndex ? 1 : p.index - q.index)); // unique: building indices
     let left = type.windowPost;
     for (const { b, index } of twoFloors) {
       if (left <= 0) break;

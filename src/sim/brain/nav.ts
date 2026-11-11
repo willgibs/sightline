@@ -228,6 +228,15 @@ export class Navigator {
       let end = i;
       while (end + 1 < raw.length && raw[end + 1]!.level === level) end++;
       let k = i;
+      // The far end of a flight is a waypoint of its own. A line from the near end to a cell
+      // beyond it is clear on the new level (under the floor, or over the landing) and isn't
+      // a way a body can go: it would walk past the stairs and never take them.
+      if (i > 0) {
+        pts.push(raw[i]!.x, raw[i]!.z);
+        px = raw[i]!.x;
+        pz = raw[i]!.z;
+        k = i + 1;
+      }
       while (k <= end) {
         let far = k;
         for (let j = k + 1; j <= end && j - k <= N.pullAhead; j++) {

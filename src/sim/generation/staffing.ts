@@ -12,7 +12,7 @@ import type { DoorSpec } from './compound';
 import { segmentDistance, type Point2 } from './paths';
 import { naturalPeriod, nearestWalkable, patrolRoutine, pickScan, postRoutine, walkPath, type ScanKind, type Stop } from './patrols';
 import { dropDuty, seesDrop, trackOf, type GuardTrack } from './field';
-import { cellOf, centreOf, lineOfSight, lineOfSightStrict, type Raster } from './raster';
+import { cellOf, centreOf, lineOfSight, lineOfSightStrict, openAt, type Raster } from './raster';
 import { overviewPerches, perchSeesDeck, type PerchViews } from './perches';
 import { Cell } from '../kernel/world/grid';
 import { contactRate, reachOf, sightRate } from './sight';
@@ -444,6 +444,9 @@ export function staffCamp(camp: Camp, hf: Heightfield, grid: SpatialGrid, raster
         if ((floor.flags[c]! & Cell.Walkable) === 0) continue;
         const x = floor.x0 + (i + 0.5) * floor.cell;
         const z = floor.z0 + (j + 0.5) * floor.cell;
+        // Out on the floor, where the analysis can see him stand. Against a wall he's inside it as
+        // far as the raster can tell: no perch has him there, and no way in ends in a shot at him.
+        if (!openAt(raster, x, chest, z) || !openAt(raster, x, hq.floorY + gen.sight.eye, z)) continue;
         let seen = 0;
         for (const p of perches.spots) if (perchSeesDeck(raster, hf, p, x, chest, z)) seen++;
         let apart = Infinity;

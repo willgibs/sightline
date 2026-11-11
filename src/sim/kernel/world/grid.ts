@@ -124,7 +124,14 @@ export function buildGrid(terrain: Heightfield, colliders: ColliderSet, site: { 
     if (!up) throw new Error(`A stair to storey ${st.storey}, and there are ${built.length}`);
     const foot = nearestWalkableCell(siteLayer, st.footX, st.footZ);
     const head = nearestWalkableCell(up.layer, st.headX, st.headZ);
-    return foot < 0 || head < 0 ? [] : [{ storey: st.storey, foot, head, cost: Math.ceil(st.length * 100) }];
+    if (foot < 0 || head < 0) return [];
+    // Never less than a straight walk between the two cells would cost on one level, so the
+    // estimate a path search aims by (search.ts) stays a lower bound across a flight.
+    const di = Math.abs((foot % siteLayer.nx) - ((head % up.layer.nx) + Math.round((up.layer.x0 - siteLayer.x0) / fine)));
+    const dj = Math.abs(Math.floor(foot / siteLayer.nx) - (Math.floor(head / up.layer.nx) + Math.round((up.layer.z0 - siteLayer.z0) / fine)));
+    const lo = Math.min(di, dj);
+    const level = (di + dj - 2 * lo) * Math.round(fine * 100) + lo * Math.round(fine * 100 * Math.SQRT2);
+    return [{ storey: st.storey, foot, head, cost: Math.max(Math.ceil(st.length * 100), level) }];
   });
   return { map, site: siteLayer, storeys: built, stairs: joined };
 }

@@ -257,7 +257,11 @@ export function analyzeCamp(
       if (d2 > close * close || d2 < touch * touch) return false;
       return clearShot(R, colliders, m.x, m.y + gen.sight.crouchHead, m.z, t.x[k]!, t.chest[k]!, t.z[k]!);
     };
-    infiltration = find(all, { goal, goalCells, horizon, maxExpansions: A.maxExpansions });
+    // On an upper floor he holds one spot, with a floor between him and nearly everything in
+    // reach of him: only the cells with a line to him are worth getting to, and a search that
+    // aims at the rest spends its whole budget under his feet.
+    const reach = t.onDeck ? goalCells.filter((c) => goal(c, 0)) : goalCells;
+    infiltration = find(all, { goal, goalCells: reach, horizon, maxExpansions: A.maxExpansions });
   }
   const gen0 = (camp.devices ?? []).find((d) => d.kind === 'generator');
   let sabotage: Infiltration = { found: false, time: -1, cells: [], start: -1, peak: 0, meter: 0, expanded: 0, exhausted: false };
@@ -302,8 +306,9 @@ export function analyzeCamp(
     dt: T.dt,
     samples: K,
     frame: { ox: R.ox, oz: R.oz, ux: R.ux, uz: R.uz, vx: R.vx, vz: R.vz, a0: R.a0, b0: R.b0, cell: R.cell, na: R.na, nb: R.nb },
-    coverage,
-    idleness,
+    // The ground's cells, as the frame lays them out: an upper floor's come after them, and aren't drawn.
+    coverage: coverage.slice(0, R.na * R.nb),
+    idleness: idleness.slice(0, R.na * R.nb),
     perches,
     duty: [...duty],
     clusters: certified,
