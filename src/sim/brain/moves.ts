@@ -3,6 +3,7 @@ import { DEG, dsin } from '../kernel/core/detmath';
 import { turnTowards, wrapAngle, yawFromDirection } from '../kernel/core/math';
 import type { Gait } from '../body';
 import type { GuardMind } from './mind';
+import type { MoveCost } from '../kernel/world/search';
 import { emptySteering, followRoute, navigatorOf, type Steering } from './nav';
 import type { Order } from './orders';
 
@@ -65,8 +66,8 @@ export function lookAround(m: GuardMind, out: Order): void {
   stand(m, out, true);
 }
 
-/** Walks toward a goal by the navigator, then says whether he's there. */
-export function walk(m: GuardMind, out: Order, x: number, z: number, pace: number, gait: Gait, lookX: number, lookZ: number): 'walking' | 'arrived' | 'stuck' {
+/** Walks toward a goal by the navigator, then says whether he's there. `cost` prices the route's moves, for a way that keeps out of someone's view (positions.ts, Danger). */
+export function walk(m: GuardMind, out: Order, x: number, z: number, pace: number, gait: Gait, lookX: number, lookZ: number, cost?: MoveCost): 'walking' | 'arrived' | 'stuck' {
   const b = m.brain!;
   const T = m.tuning.brain;
   const hz = m.tuning.sim.tickHz;
@@ -78,7 +79,7 @@ export function walk(m: GuardMind, out: Order, x: number, z: number, pace: numbe
       return 'walking';
     }
     m.nav.searches.left--;
-    const r = navigatorOf(m.world, m.tuning).find(m.self.x, m.self.z, x, z, { work: m.nav.work }, b.route);
+    const r = navigatorOf(m.world, m.tuning).find(m.self.x, m.self.z, x, z, cost ? { work: m.nav.work, cost } : { work: m.nav.work }, b.route);
     b.routed = m.tick;
     b.routeOk = r === 'found';
     b.goalX = x;

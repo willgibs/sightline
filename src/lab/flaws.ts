@@ -37,7 +37,7 @@ export interface Flaw {
 }
 
 const WALKING = new Set(['cover', 'task', 'search', 'investigate', 'return', 'flee', 'alarm', 'flank']);
-const BUSY = new Set(['alarm', 'report', 'flee', 'suppress', 'engage']);
+const BUSY = new Set(['alarm', 'report', 'flee', 'suppress', 'engage', 'fight', 'push']);
 
 export class FlawWatch {
   readonly flaws: Flaw[] = [];

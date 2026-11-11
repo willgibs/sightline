@@ -1,4 +1,4 @@
-import { createBrain } from '../brain';
+import { createBrain, firefightPhase } from '../brain';
 import type { DebugDraw } from '../kernel/debugDraw';
 import type { TickContext } from '../kernel/systems';
 import type { GuardEntity } from './entities';
@@ -21,7 +21,20 @@ export function drawBrain(draw: DebugDraw, ctx: TickContext, g: GuardEntity): vo
   const ground = (x: number, z: number): number => h(x, z) + 0.15;
   const a = g.senses?.awareness.state ?? 'unaware';
   const tone = a === 'combat' ? 'bad' : a === 'searching' ? 'warn' : a === 'unaware' ? 'muted' : 'info';
-  draw.label(body.x, body.y + body.eyeHeight + 0.95, body.z, b.act, tone, `${b.act} · ${a}${b.linger >= 0 ? ' · looking around' : ''}`);
+  const phase = firefightPhase(b, ctx.tick);
+  draw.label(body.x, body.y + body.eyeHeight + 0.95, body.z, phase ? `${b.act} · ${phase}` : b.act, tone, `${b.act}${phase ? ` (${phase})` : ''} · ${a}${b.linger >= 0 ? ' · looking around' : ''}`);
+  // A firefight: where he believes the intruder is, and his position: where he hides, and where he fires from.
+  const ff = b.ff;
+  if (ff && phase) {
+    draw.line(body.x, body.y + body.eyeHeight, body.z, ff.x, ff.y, ff.z, ff.own ? 'bad' : 'warn');
+    draw.circle(ff.x, ground(ff.x, ff.z), ff.z, Math.max(0.5, ff.r), 'bad');
+    const s = ff.spot;
+    if (s) {
+      draw.point(s.hx, ground(s.hx, s.hz), s.hz, 0.25, 'good');
+      if (s.fx !== s.hx || s.fz !== s.hz) draw.line(s.hx, ground(s.hx, s.hz), s.hz, s.fx, ground(s.fx, s.fz), s.fz, s.line ? 'good' : 'muted');
+      draw.point(s.fx, ground(s.fx, s.fz) + (s.fs === 'stand' ? 1.2 : 0.6), s.fz, 0.15, s.line ? 'good' : 'muted');
+    }
+  }
   // The route: from him through what's left of it.
   let px = body.x;
   let pz = body.z;

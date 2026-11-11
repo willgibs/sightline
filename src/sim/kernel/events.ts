@@ -214,8 +214,8 @@ export type AlertReason = 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'rep
 /** What a heard sound sounded like (perception/hearing.ts). */
 export type HeardKind = 'sound' | 'shot' | 'voice';
 /** What a guard can be doing, and why he changed (brain/brain.ts, ACTS and ACT_WHYS). Stored by index: only add at the end. */
-export type ActCode = 'routine' | 'return' | 'look' | 'investigate' | 'search' | 'hold' | 'report' | 'task' | 'engage' | 'cover' | 'alarm' | 'flank' | 'flee' | 'suppress' | 'shelter' | 'stand-to';
-export type ReportCode = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear' | 'claim' | 'outage' | 'escort';
+export type ActCode = 'routine' | 'return' | 'look' | 'investigate' | 'search' | 'hold' | 'report' | 'task' | 'engage' | 'cover' | 'alarm' | 'flank' | 'flee' | 'suppress' | 'shelter' | 'stand-to' | 'fight' | 'push';
+export type ReportCode = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear' | 'claim' | 'outage' | 'escort' | 'moving';
 export type TaskCode = 'investigate' | 'search' | 'check' | 'sweep' | 'cover' | 'fetch' | 'escort';
 export type LevelCode = 'calm' | 'uneasy' | 'alert' | 'lockdown';
 export type ActReason = 'start' | 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm' | 'arrived' | 'nothing' | 'stalled' | 'no-route' | 'lost' | 'told' | 'report' | 'ordered' | 'body' | 'glint' | 'outage' | 'door' | 'siren' | 'muzzle';
@@ -494,8 +494,8 @@ const HEARD = every<HeardKind>()(['sound', 'shot', 'voice']);
 const STANCES = every<StanceName>()(['stand', 'crouch', 'prone']);
 const SOUND = { x: 'f32', y: 'f32', z: 'f32', surface: 'u8', loudness: 'f32', radius: 'f32' } as const;
 const LEVELS = every<LevelCode>()(['calm', 'uneasy', 'alert', 'lockdown']);
-const REPORT_CODES = every<ReportCode>()(['contact', 'heard', 'shot', 'body', 'missing', 'clear', 'claim', 'outage', 'escort']);
-const ACT_NAMES = every<ActCode>()(['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee', 'suppress', 'shelter', 'stand-to']);
+const REPORT_CODES = every<ReportCode>()(['contact', 'heard', 'shot', 'body', 'missing', 'clear', 'claim', 'outage', 'escort', 'moving']);
+const ACT_NAMES = every<ActCode>()(['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee', 'suppress', 'shelter', 'stand-to', 'fight', 'push']);
 const ACT_WHY_NAMES = every<ActReason>()(['start', 'seen', 'glimpse', 'heard', 'shot', 'voice', 'repeat', 'contact', 'calm', 'arrived', 'nothing', 'stalled', 'no-route', 'lost', 'told', 'report', 'ordered', 'body', 'glint', 'siren', 'outage', 'door', 'muzzle']);
 const STRIKES = every<StrikeKind>()(['terrain', 'collider', 'body']);
 const PARTS = every<PartName>()(['none', 'head', 'torso', 'legs']);
