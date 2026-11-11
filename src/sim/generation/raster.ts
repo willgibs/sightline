@@ -74,9 +74,11 @@ export const MOVE_DIRS: ReadonlyArray<readonly [number, number]> = [
 
 /**
  * Builds the raster over the camp and the analysis margin around its fence. `levels` is the
- * spatial grid's upper floors: on a camp with some, the raster gets their cells too.
+ * spatial grid's upper floors and stairs (the world's grid itself will do): on a camp with some,
+ * the raster gets their cells too. It has to be given: a raster made without them takes a floor
+ * and the roof over it for one solid slab, and everything upstairs for buried in it.
  */
-export function buildRaster(camp: Camp, hf: Heightfield, colliders: ColliderSet, layer: GridLayer, gen: GenTuning, trees: readonly Tree[], levels: { storeys: readonly Storey[]; stairs?: readonly Stair[] } = { storeys: [] }): Raster {
+export function buildRaster(camp: Camp, hf: Heightfield, colliders: ColliderSet, layer: GridLayer, gen: GenTuning, trees: readonly Tree[], levels: { storeys: readonly Storey[]; stairs?: readonly Stair[] }): Raster {
   const { cell, margin } = gen.analysis;
   const L = camp.layout!;
   const site = camp.site;

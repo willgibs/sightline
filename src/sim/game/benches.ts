@@ -131,7 +131,7 @@ export const BENCHES: Readonly<Record<LayerName, Bench>> = {
       // (the analysis itself runs a greedy search first, which finds a way sooner still).
       if (hardest) {
         const w = hardest;
-        const R = buildRaster(w.camp, w.terrain, w.colliders, w.grid.site, defaultTuning.gen, w.props.trees);
+        const R = buildRaster(w.camp, w.terrain, w.colliders, w.grid.site, defaultTuning.gen, w.props.trees, w.grid);
         sipp = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, R, (S, E, M, Q) => infiltrate(S, E, M, { ...Q, weight: 1 })).analysis.infiltration.expanded;
         plain = analyzeCamp(w.camp, w.terrain, w.colliders, w.grid, defaultTuning.gen, R, spaceTimeSearch).analysis.infiltration.expanded;
       }

@@ -218,7 +218,7 @@ export function staffCamp(camp: Camp, hf: Heightfield, colliders: ColliderSet, g
   const leastSeen = (t: (typeof L.towers)[number]): (typeof L.towers)[number] => {
     if (t.building === undefined) return t;
     const b = L.buildings[t.building]!;
-    const seenAt =(x: number, z: number): number => perches.spots.reduce((n, p) => n + (perchSeesMan(raster, hf, colliders, p, x, t.deck, z, gen.sight) ? 1 : 0), 0);
+    const seenAt = (x: number, z: number): number => perches.spots.reduce((n, p) => n + (perchSeesMan(raster, hf, colliders, p, x, t.deck, z, gen.sight) ? 1 : 0), 0);
     let best = t;
     let fewest = seenAt(t.x, t.z);
     for (const w of camp.windows ?? []) {
