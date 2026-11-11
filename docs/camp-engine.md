@@ -409,6 +409,8 @@ From playing the takedown and the live camp, and two answers on the desk. It was
 
 **Nobody fires with one of his own in front of his muzzle.** Firing back at a place put two men in sixteen camps in front of their own side's rounds. A brain knows nothing of where its own side is, but a man sees who's in front of his rifle, so it's settled where the round is made (`game/combat.ts`): he holds his fire.
 
+**Cover is judged from where the intruder is, including how high.** On the ground a man takes the intruder's eyes to be 1.3 m up, whatever the intruder is doing. Someone believed to be more than 2.4 m above the ground (a tower's deck, an upper window) is judged from there: his line to a man's head climbs toward him, so a low wall hides only what's close behind it. Asked as if he stood on the ground beneath, one position in eight on the camps tried was in his view (`positions.ts`, `eyesAt`).
+
 **Honest.** All of it is decided from a mind (rule 13). Where you are reaches a man by his senses or by someone's voice, and who's moving reaches him by hearing it said. Cut the radio and the men in earshot still fight as one; the rest never hear of it.
 
 **Measured** (`npm run experiment -- firefight`, 16 of the takedown's camps, the same seeds before and after, played by bots limited to what a person can do):
@@ -430,6 +432,7 @@ And the walk in itself (`npm run scene -- firefight`): someone stands in front o
 - **Outside the wire nobody follows.** Across an open field there's no covered way, so they hold and shoot. Going out after someone is a section's job, by dead ground or by truck: step 2b.
 - **One man goes, alone.** A pair bounding in turn, with covering fire on the place, needs a man to know where his own side is, which a mind doesn't yet (`docs/foundation-review.md`, "People should be one kind of thing"). Until then nobody fires blind at a place someone has said he's moving on.
 - **Tower men are as they were:** upright on an open deck, and the first to die. A parapet and the counter-sniper pair are step 3.
+- **Nobody takes a position indoors or upstairs.** Positions are found on the ground. A man who is upstairs when a fight starts comes down to one, and someone in a windowless upper room is watched from outside until the fight lapses (35 s) and a man goes up to look, as before the firefight. What a camp does about an intruder inside a building belongs with how the target answers (the brief's second part).
 - **The first man up still dies** to someone already aiming at his spot. That's fair to a careful player, and it's why a careless one still gets three or four men before he's stopped.
 
 **Dials a person should set by playing,** all in `tuning.brain.firefight`: how well they shoot from a position (`spreadDeg`, 0.6°: about one round in two on a standing man at 50 m), how long a look lasts, how long a near miss pins a man, and how far a man will follow.

@@ -850,6 +850,7 @@ export const defaultTuning = {
         stepOut: 1.5, // metres he'll step out from behind something to see round it
         preferLine: 9, // metres farther he'll go for a place he can fight from than for one that only hides him
         eye: 1.3, // metres above the ground he takes the intruder's eyes to be, and what he'd see of him
+        raised: 2.4, // metres above the ground that the intruder is believed to be before his own height is what counts: an upper floor, a deck
         shoulder: 0.3, // metres either side of his head that have to be hidden too
         keep: 6, // metres the believed place may move before he checks his position against it again
         standoff: 7, // metres: never a position nearer the intruder than this
