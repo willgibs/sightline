@@ -2,25 +2,79 @@
 
 The design, Nov 9, 2026, for the owner's call of the same day ("compound types are the next thing the generator learns, on their own branch, alongside the camp work", with two-storey buildings to come with them). It is on the owner's desk as a decision (the *Compound types* ask). **The next section says where it stands.**
 
-## Where this stands (Nov 10)
+## Where this stands (Nov 11)
 
 **Step 1, the types on one storey, has landed** (#34, `GEN_VERSION` 8): four places as records in `gen.compound.types` (a walled compound, a keep, a depot, a farm) on four plot shapes in `generation/plots.ts`. A seed picks its type from its own root stream, weighted by crux × ground, and `staffing.ts` walks the loops and zones the shape gives it. The chain-link yard is out of the mix, kept as the bench's baseline. 96 of 100 valid at the first attempt on a new held-out series (`npm run seeds -- --count 100 --from compound-types-exit-5`, 4 repaired, none invalid; lab D's bar is 90), and the owner's circling case is on the bench (section 4a). A sitting to walk each type is on the desk.
 
-**Step 2, levels and taller camps, is not on `main` and not finished. It waits until after Nov 15, on the branch `compound-storeys` (da2da59, `GEN_VERSION` 9).** The owner chose the full engine in two steps, and to bring the running work home before starting the second. Their brief for it, from the desk's `compound-types` decision: taller buildings make every man less openly visible from any one perch and give height to read beyond the towers, and "I don't want to have to go clear every corner of every building to claim success." Success needs only the target, and only his building has to be entered.
+**Step 2, levels and taller camps, is built and measured, in a pull request of its own** (`GEN_VERSION` 9). The owner chose the full engine in two steps. Their brief, from the desk's `compound-types` decision: "I think taller buildings help a lot with increasing the offensive challenge. Makes every enemy troop less openly visible from any given perch, and creates a bit more vertical range to assess versus just sweeping the guard towers first, then knowing everyone else is ground level. However, I don't want to have to go clear every corner of every building to claim success."
 
-**What the branch has:** storeys and stairs in the grid, one `GridSearch` over a stacked index space (one-storey searches unchanged), routes, hearing and the certified way in across floors, and a guard who hears something upstairs going up to see. A camp's target building and barracks have an upper floor, by type. Marksmen stand at upper windows as well as on towers, with fewer towers, so height isn't only the towers. Windows are 12 m apart: at 4 m, watchers outside could see most of an upper floor and on *inside* camps no way in existed. A target who keeps upstairs has his hard room upstairs, and the men sent for him climb.
+**What it is.** The engine of section 5: storeys and stairs in the grid, one `GridSearch` over a stacked index space (one-storey searches unchanged), routes, hearing and the certified way in across floors, a guard who hears something upstairs going up to see, a target who keeps upstairs sheltering there, and the men sent for him climbing to him. On it, taller camps: the target's building and the barracks have an upper floor (on a farm, the house). Upper floors alone left a ridge with the same men (5.1 in view from the best overview against 5.4), because two thirds of what a ridge had were men standing still in the open, sentries and marksmen on towers. So three things more, each a type's own data (`maxCoverage`, `easeTo`, `posts` in its record):
 
-**What it measured:** 94 of 100 valid at the first attempt on `compound-storeys-exit-2`, 6 repaired, none invalid. That and a short fuzz that held every promise were run before the branch's last merge of `main`, which brought a rewritten grid search. On the bench after that merge (`npm run experiment -- circling`, 24 camps): from the walk, 1.8 men down against 4.2 on the yard; 0.88 in view at a stop against 2.5; 2.1 firing points to see everyone a perch can against 1.6.
+- **Posts keep under cover.** A kind of place says how much of its men's time one perch may have: 55% for validation, where the yard's is 60%, and 22% for staffing to ease down to. A post a perch has too much of is moved behind something, out of doors and never into a room, to ground that hides him to over his head and from which he still sees the place he was posted to, and he's turned to watch it. A man holding a door stays at it, and a post goes back if its move left a perch's men unwatched.
+- **Marksmen take the upper windows before the towers,** each at the window of his building the fewest perches have a line to, looking out of it. A man at a window is seen through it and from nowhere else, so there is height to read that isn't a tower.
+- **A buried target's floor has no windows,** and is one room (section 5a).
 
-**The gap against the owner's brief:** from one perch the men are not yet less visible. The best overview shows 5.0 men at a moment against the yard's 5.3, and 3.7 of them on the ground against 3.4. Men kept indoors more of the time, or overhead cover, are the next things to try.
+**What it measured.** The same 24 camps both ways (`npm run experiment -- taller`): `one storey` is each kind of place with its storeys set to one, which generates what `main` did (`tests/storeys.test.ts` holds it to four of `main`'s fingerprints). ± is the 95% interval over camps; *clear* is a difference, seed by seed, beyond the camps' own spread.
 
-**To pick it up cold:**
+| | One storey | As built | |
+| --- | --- | --- | --- |
+| Men in view from the best overview | 5.4 ±0.35 | **3.9 ±0.38** | 1.5 fewer, clear |
+| Of them, on the ground | 3.8 ±0.43 | 2.9 ±0.33 | 0.95 fewer, clear |
+| Men in view from the firing point that shows most | 6.1 ±0.36 | **4.7 ±0.35** | 1.4 fewer, clear |
+| Firing points needed to see everyone a perch can | 1.8 ±0.26 | 2.3 ±0.34 | 0.5 more, clear |
+| Men who go down from the walk round the outside | 2.5 ±0.49 | 2.4 ±0.69 | no worse |
+| Men in view at a stop on the walk | 1.2 ±0.09 | 0.77 ±0.14 | 0.41 fewer, clear |
+| Share of the walk a man can be seen from | 15.1% | 11.1% | clear |
+| The shooter shot dead on the walk | 19 of 24 | 19 of 24 | |
 
-1. Read the desk's `compound-types` decision and the roadmap for anything newer.
-2. Merge `main` into `compound-storeys`, never rebasing. This section will conflict: keep this version and update it.
-3. Set the pins for `GEN_VERSION` 9: the values in `src/sim/game/golden.ts` and `GOLDEN_TAL_4471` from `npm run selftest`, then `npm run golden` and `npm run bench -- --write`. The pins on the branch are still the ones from before the taller camps. Add the line in `docs/decisions.md`.
-4. Run `npm run check`, which has not been run on the branch, then a new held-out `npm run seeds` series, `npm run experiment -- circling` and the `variety-*` experiments, `npm run fuzz`, and `npm run look` for pictures.
-5. Close the gap above, put a sitting on the desk, and land it as its own pull request.
+The best overview is the perch the analysis names, where `perch=1` puts you. The firing point that shows most is the truest reading of "any given perch": the most men any listed perch has a real line to.
+
+And each kind of place against `main` itself (`npm run experiment -- circling` on both builds, the same 24 seeds in every arm; the yard, the bench's baseline, gives the same numbers on both to the last digit):
+
+| Men in view from the best overview | `main` | Taller |
+| --- | --- | --- |
+| Walled compound | 5.1 ±0.31 | 4.0 ±0.37 |
+| Keep | 5.2 ±0.28 | 3.7 ±0.31 |
+| Depot | 5.5 ±0.42 | 3.5 ±0.54 |
+| Farm | 6.2 ±0.48 | 5.1 ±0.51 |
+| As built, each seed its own kind | 5.4 ±0.35 | **3.9 ±0.38** |
+
+A farm gains least. It has one tall building, the house, in open fields, and a lap of its outside hands over what it did: 6.1 men against 5.8, where the other three kinds hand over 0.2 to 0.7 fewer.
+
+**The owner's limit, in numbers** (`npm run experiment -- corners`, the same 24 camps). A man can be *read from outside* if somewhere a person could be, outside every building, has a line to his head or his chest: a firing point, the ground beyond the wire, or open ground inside it.
+
+| | One storey | As built |
+| --- | --- | --- |
+| Men besides the target nobody outside can read, a camp | 0.50 ±0.20 | **0** |
+| Guard time spent that way | 2.9% | **0%** |
+| Buildings besides his that hold such a man | 0 | 0 |
+| Men besides him posted upstairs whom no window shows | none upstairs | 0 |
+| Unread men in his own building besides him | 0.67 ±0.19 | **0** |
+| A buried target read from a firing point, or from the ground beyond the wire | 0 of 20 | 0 of 20 |
+| His floor in view from the head of his stairs | no stairs | 100%, and he is in view from there on 20 of 20 |
+| A way in certified, where the camp is built round one | 12 of 12 | 12 of 12 |
+| It goes through a building that isn't his | 0 of 12 | 0 of 12 |
+
+So: success needs only the target; only his building is ever entered, and only on a camp built round going in; he is on the one floor it has above the door, in one room that the head of the stairs shows all of; and nobody else in the camp stands where no one outside can see him. On one storey it was the officer a pace inside the target's door, behind the door's screen, half a man a camp.
+
+**Verified.**
+
+- `npm run check`, and `npm run test:browser` in Chromium.
+- **Generation:** 95 of 100 valid at the first attempt on a new held-out series, 5 repaired, none invalid (`npm run seeds -- --count 100 --from compound-storeys-exit-3`; `main` on the same series, 92). A camp takes 3.3 s to generate on average, as on `main`.
+- **Every body's promises:** `npm run fuzz -- --seeds 8 --minutes 10` held them over 741,600 ticks, and now plays every flight of each valley's camp with a bot of its own (13 flights, each climbed 3 to 14 times in its four minutes). And again with `--synctest`, on eight other valleys: 24,720 restores and 1,483,200 ticks stepped again, none different.
+- **Ticks:** `npm run hitches` has no tick over 4 ms in the four standing fights, whose camps are taller now, in a fresh tab's run or warm: the slowest 3.6 ms, where `main` has one of 4.2 ms. Four more fights on the sitting's camps have none either. Getting there took routes found in legs (section 5a).
+- **Pictures** of a taller camp in the honest view and the debug view: from a perch and from inside the wire, a man at an upper window, a man on the stairs. The mini-map draws a building of two storeys as one outline (`tests/hud.test.ts`).
+- **Pins:** every pinned run that doesn't stand on a generated camp is unmoved.
+
+**Not verified, and known limits.**
+
+- **Nobody has played it.** The sitting is in the plan (`docs/phase-1-plan.md`, *The owner's time*), with its camps and its three questions.
+- **Which building is his is not told.** On a camp that buries him his is the one that stands tall and blank; nothing else marks it, on the map or in the world. A flag on it would be a small thing to add (the range already flies one, as a wind cue) and is the owner's call.
+- **A search the commander orders doesn't climb** (section 5): only a man who sensed something upstairs, or is sent for the target, goes up.
+- **Three first builds in the hundred failed on rules `main`'s camps passed** on that series: the crux, the way in and the two ways out, one each. Each was rebuilt once and is valid. The witness rule failed 4 first builds, against 6 on `main`.
+- **Men on the ground are still what a ridge has most of:** patrols and workers are as visible as they were. Loops chosen against the ridges, or a roofed way between buildings, would be the next step if the owner wants fewer still. A farm has gained least (the table above).
+- **A floor has one flight.** A route's legs take that for granted (section 5a); a second flight to a floor would want the shorter of two ways.
+- **Frame rate with a hand on the mouse.** Ticks were timed headless and the pictures drawn by a headless browser, which says nothing of feel: that is the sitting's.
 
 ## 1. The gap
 
@@ -134,7 +188,7 @@ The owner played the takedown on the plain yard and wrote: "a few perch shots, t
 
 Against the yard, seed by seed, the walk hands over 1.9 fewer men as built (clear of the camps' own spread), and each man can be seen from about half as much of it.
 
-**What it didn't do.** Of the men who still go down on the walk (a scratch tally, the same camps), 70% came out to look for him or came with the relief: that's the camp coming after you, the next piece of the camp's engine. What the shape itself hands over, through a wall line, the gate, the breach or from a tower, fell from 2.7 men a lap on the yard to 0.9. A farm stays the most open of the four. **From the firing points nothing changed:** the best overview still shows about five men at a moment, and two firing points still show everyone a perch can. Walls hide the yard from the ground, not from a ridge, and the owner's note calls a poor shot from a perch exposed to return fire "good". If scouting from the ridges should cost more, that is a further step, and needs overhead cover or men kept indoors more of the time.
+**What it didn't do.** Of the men who still go down on the walk (a scratch tally, the same camps), 70% came out to look for him or came with the relief: that's the camp coming after you, the next piece of the camp's engine. What the shape itself hands over, through a wall line, the gate, the breach or from a tower, fell from 2.7 men a lap on the yard to 0.9. A farm stays the most open of the four. **From the firing points nothing changed:** the best overview still shows about five men at a moment, and two firing points still show everyone a perch can. Walls hide the yard from the ground, not from a ridge, and the owner's note calls a poor shot from a perch exposed to return fire "good". If scouting from the ridges should cost more, that is a further step, and needs overhead cover or men kept indoors more of the time. (Step 2 took that step, with posts under cover and marksmen at windows: the best overview shows 3.9 men where it showed 5.4. *Where this stands* has the table.)
 
 ## 5. What a second storey asks of everything that assumes one surface per column
 
@@ -156,11 +210,23 @@ The honest list. Today the game is two-and-a-half-dimensional in several places,
 
 **The engine under all that: levels.** A level is a walkable surface above the ground, a building's upper floor. `SpatialGrid` gains a list of levels (each a small layer over its own footprint, at the site's 0.5 m, on the site layer's cell boundaries) and the stairs that join them, as links between cells. `GridSearch` treats the site layer and its levels as one index space, the site's cells first, so a flood or a path crosses a stair like any other move, and everything above follows from that. The analysis raster does the same one level up, with extra cells after its `na × nb`, derived from the same list. A storey is 3.0 m floor to floor.
 
-**What the second storey is for.** A place to bury him that a perch can't reach except through a window. A vantage inside the camp: a marksman at a window watches the bailey or the road. A silhouette at 6 m that blocks what a perch sees of the ground behind it. And for a player, somewhere to go: up the stairs, and the same things that hold for him hold for the guards.
+**What the second storey is for.** A place to bury him: a floor above the door, reached by one flight of stairs. A vantage inside the camp: a marksman at a window watches over the wall. A silhouette at 6 m that blocks what a perch sees of the ground behind it. And for a player, somewhere to go: up the stairs, and the same things that hold for him hold for the guards.
 
-**Which buildings get two.** By type, as data: a keep's keep, a depot's office, a farm's house. Everything else stays at one, so a storey means something.
+**Which buildings get two.** By type, as data (`storeys` in a type's record): the target's building and the barracks; on a farm, the house alone. Everything else stays at one, so a storey means something.
 
-**Who stands upstairs.** The target where the crux is *inside* or *flush* and his building has two storeys: a post, picked where no perch's window line reaches him and away from the head of the stairs, so getting in means going up and finding him. A marksman at an upper window where the plan has one (the keep and the farm); a tower still holds him elsewhere.
+**Who stands upstairs** (as built, section 5a). The target where the crux is *inside* or *flush*: on a floor with no windows, one room with nothing in it but him, at the spot farthest from the head of the stairs. Marksmen, at upper windows before towers, each at the window of his building that the fewest perches have a line to, and never in a building whose target is buried. Nobody else: no routine climbs, and nobody is posted in a room that can't be read from outside.
+
+## 5a. What building it changed
+
+The table above is what was asked. Seven things turned out differently, each found by a measurement or a test and not by reading the design.
+
+- **An upper floor is one room.** The partition the table lists was never built, and isn't wanted: the head of the stairs shows the whole floor, so there is no corner up there to clear (the owner's limit, measured in `npm run experiment -- corners`).
+- **The raster's upper floor is made from the storey layer's own cells and walk edges**, not from straight lines between raster cells' middles. The raster lies along the camp's axes and a storey's layer along the world's; on a camp turned off them the lines left the stair's head in a pocket of its own, there was no way in, and the camp was built again (three of twelve camps, 30 to 70 s each).
+- **A man on a deck or an upper floor is seen by a perch through what really stands there**, on a camp with upper floors: the colliders, by a line to his head, his chest or his belt. A window is a 1.2 m gap in a 0.2 m wall and the raster makes one or two cells of a metre-thick row of it, so it stopped lines at a slant that the world lets through. Everything else the analysis sees is still the raster's.
+- **The floor a buried target keeps on has no windows.** With windows all round, a firing point had a line to him on 8 camps of 20 that buried him, and the ground beyond the wire on 11 more: every such camp was the same mission, find the window. With one window left for a marksman and the target kept out of its line, the ground beyond the wire still had him on 2 of 8. So there are none, he is as buried as he was on one storey, and what tells his building from the others is that it stands tall and blank.
+- **His door screens are gone where he keeps upstairs.** They were built to his building's height and ran up through his floor. The floor is what buries him now: the doors show the room below and the stairs, and the officer a pace inside his door can be seen from the yard.
+- **A flight is taken by its own two ends.** A route's waypoints across a flight are the points on its middle line where a body steps on and off, not the middles of the cells nearest them (up to half a cell to one side, on a flight 1.1 m wide); and the far end is always a waypoint, or a man upstairs is routed straight at a door below him.
+- **A route with an end upstairs is found in legs, not by the one search.** The search over the ground and the floors together does find such a route, and a sound's flood still goes up a stairwell that way. For a guard's route it aims straight at an end that has walls and a floor between, where the landmarks a ground route aims by don't reach: 15,000 cells a route on a long camp, and from the relief's 130 m it spent its whole budget of 40,000 and found nothing, so nobody came to the target's door for another fifty seconds, and each try was a tick of 10 ms (`npm run hitches`). A floor is joined to the ground by its flight and nothing else, so the route is a search of the one storey between the end and its flight's foot, and the ground between as any route on the ground. The same routes cost 300 to 1,300 cells, and the brain lane's bench pins them. The game's rehearsal at load asks for each floor from every post, so the first such route in a fight isn't the first time its code runs.
 
 ## 6. The order, and what each step proves
 

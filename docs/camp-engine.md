@@ -377,7 +377,7 @@ From playing the takedown and the live camp, and two answers on the desk. None o
 
 **2. The target answers by the camp's problem** (the owner's call on `core-challenge`). Some camps keep the target inside and others make the target run, so that play "can't be reduced to always cutting a radio or disabling a vehicle". A leader expecting to win from a stronghold hunkers down. The condition: "there needs to be a clear method to the madness". A player who lost has to be able to say what they should have read, so the tells are designed with it, and read before the end of a run. The takedown's stages (`?scene=takedown`) are the parts to build from.
 
-**3. Levels (two storeys).** The second half of compound types (`docs/compound-types.md`; the draft is on `compound-storeys`). Taller buildings hide men from a perch and add vertical range to read. The limit: "I don't want to have to go clear every corner of every building to claim success."
+**3. Levels (two storeys).** The second half of compound types (`docs/compound-types.md`, *Where this stands*: built and measured on Nov 11, ahead of the other two, and waiting on the owner's sitting). Taller buildings hide men from a perch and add vertical range to read. The limit: "I don't want to have to go clear every corner of every building to claim success."
 
 **Behind all of it:** realistic on both sides. A fence gives the view outward but stops no pot shots, so a camp that expects attack needs a real layer of walls. Defenders shouldn't make "the dumb decisions laughably made in most horror movies", and players shouldn't be left banging their heads against a wall either.
 
