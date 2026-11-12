@@ -543,19 +543,19 @@ The first of those came from playing the sitting's own link headless (`npm run s
 
 **The camp knows what has become of its vehicle.** Once he has driven off in it, or once a man has gone to start it and found it dead, there is no vehicle as far as anyone in the camp is concerned: nobody else runs to it, and nobody is sent to bring him out to it. Before that, the first version had every man in the camp taking his turn to go and start a vehicle that had left, and the fight stopped. The firefight's own test caught it.
 
-**Measured** (`npm run experiment -- answer --camps 40`: camps that protect their targets, under a sniper on the best overview for five minutes; 20 built to be gone into, 13 to be flushed, 7 an escort's; the siren sounded on 31):
+**Measured** (`npm run experiment -- answer --camps 40`: camps under a sniper on the best overview for five minutes; 20 built to be gone into, 13 to be flushed, 7 an escort's. The first two columns are camps that protect their targets, where the siren sounded on 31. The third is the same camps not ready for trouble, which protect nobody and run him at the siren: every camp's answer before the takedown. There it sounded on 33.)
 
-| | One answer for every camp | By the camp's problem |
-| --- | --- | --- |
-| He left, of the 31 | 31 | 15 |
-| Built to be gone into: he left | 16 of 16, 120 s after the siren | 0 of 16 |
-| Its relief on his doors at the end | 0 | 1.9 men |
-| Built to be flushed: he left | 10 of 10, 121 s after | 10 of 10, 84 s after |
-| Its engine ran before he was in it | he started it himself | 79 s |
-| He came out with nobody telling him | 0 | 4 of 10: the sniper had shot the man on his door |
-| An escort's: he left | 5 of 5, 114 s after | the same |
-| He left: something to hear of it from the overview first | 28 of 31 | 14 of 15 |
-| For how long before he was in his vehicle | 50 s | 78 s |
+| | One answer for every camp | By the camp's problem | Not ready for trouble |
+| --- | --- | --- | --- |
+| He left | 31 of 31 | 15 of 31 | 33 of 33 |
+| Built to be gone into: he left | 16 of 16, 120 s after the siren | 0 of 16 | 17 of 17, 8 s after |
+| Its relief on his doors at the end | 0 | 1.9 men | 0 |
+| Built to be flushed: he left | 10 of 10, 121 s after | 10 of 10, 84 s after | 10 of 10, 10 s after |
+| Its engine ran before he was in it | he started it himself | 79 s | he started it himself |
+| He came out with nobody telling him | 0 | 4 of 10: the sniper had shot the man on his door | all: nobody is sent |
+| An escort's: he left | 5 of 5, 114 s after | the same | 6 of 6, 4 s after |
+| He left: something to hear of it from the overview first | 28 of 31 | 14 of 15 | 0 of 33 |
+| For how long before he was in his vehicle | 50 s | 78 s | 0 s |
 
 So the three kinds of camp now end three ways under the same attack, and where he leaves there is more than a minute of something to hear first, from where a player most likely is.
 
@@ -564,7 +564,7 @@ So the three kinds of camp now end three ways under the same attack, and where h
 - **Nobody has played it, or heard it.** The engine's voice is checked for being one unbroken sound that fades with distance (`tests/browser/engine.test.ts`). Whether it sounds like an engine, and whether a person reads it in time, is a sitting's to say.
 - **Where his vehicle stands tells you nothing.** The generator puts it by his door on every camp, so on a camp that holds it's a getaway that is never used. It can't simply go to the motor pool: a camp that isn't ready for trouble still runs him to it at the siren, and standing by his door is what keeps that run out of a perch's view. It moves when those camps take an answer of their own (preparedness, step 3). Until then the things to read before a shot are the men on his door and whether he walks out.
 - **He does nothing about someone who comes into his room.** He crouches there. What he and the men on his door do about an intruder inside his building is close protection, the next of step 3's means.
-- **A camp that isn't ready for trouble is as it was:** he runs for his vehicle at the siren. These answers are a protecting camp's (`ready=alert`, the takedown).
+- **A camp that isn't ready for trouble is as it was:** he runs for his vehicle at the siren, and is in it a median of 4 to 10 s later with nothing to hear first (the table's third column). These answers are a protecting camp's (`ready=alert`, the takedown). Giving the other kind an answer of its own, slower and sloppier, is the open call on preparedness (section 10, 4 and 10).
 - **Nine camps in forty never sounded the siren** under this sniper in five minutes, and on those nothing happens to him either way.
 
 **Dials a person should set by playing,** in `tuning.brain.protect.answer` and `tuning.brain.engine`: how long the engine runs before he's sent for (`prep`, 60 s: the length of the warning), how much longer before he comes by himself (`own`), how long before another man takes over starting it (`takeOver`, `perMetre`), how many of the relief go to his doors (`keepers`), how far a man on his door will go for a position (`firefight.spot.doorRun`), and how far an engine carries starting, standing and driving.
