@@ -153,19 +153,21 @@ function drill(m: GuardMind): void {
   const mine = (kind: 'start' | 'fetch', x: number, z: number, y?: number): void => {
     b.task = { id: 0, kind, x, z, ...(y === undefined ? {} : { y }), issued: m.tick, cause: m.awareness.cause };
   };
+  if (b.drilled === 'fetch') return;
   if (b.engine) {
     if (b.task?.kind === 'start' && b.drilled !== 'start' && !holds) {
       b.task = null;
       b.done = true;
-    } else if ((holds || b.drilled === 'start') && (m.tick - b.engine.since) / hz >= A.prep && b.task?.kind !== 'fetch' && b.task?.kind !== 'escort') {
+    } else if ((holds || b.drilled === 'start') && (m.tick - b.engine.since) / hz >= A.prep) {
+      // Once: a man who has been in for him and seen him to the vehicle doesn't go round again.
       b.drilled = 'fetch';
       mine('fetch', room.x, room.z, room.y);
     }
     return;
   }
-  // Not a man who's already on it, or has been in for the target, or has been sent on another errand about him.
+  // Not a man who's already on it, or has been sent on another errand about him.
   const errand = b.task?.kind;
-  if (b.drilled === 'fetch' || errand === 'start' || errand === 'fetch' || errand === 'escort' || errand === 'post') return;
+  if (errand === 'start' || errand === 'fetch' || errand === 'escort' || errand === 'post') return;
   const dx = at.x - m.self.x;
   const dz = at.z - m.self.z;
   const turn = holds ? 0 : A.takeOver + Math.sqrt(dx * dx + dz * dz) * A.perMetre;
