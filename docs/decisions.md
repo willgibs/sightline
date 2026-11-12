@@ -2,6 +2,28 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-12 · Out of the gate isn't out of the fight: the chase
+
+**Why.** The owner, from playing: seen by a whole camp, they left by an opening in its wall, turned along the outside and were gone. "It was very, very rare for a guard to even step outside the door to look around or continue a gunfight... the current reaction gives a slight impression of 'he walked out that door, must be gone forever'." What they'd expect is "a guard or two maybe continue pursuit to fire from behind me as I escape, but if I can shoot them down as they expose themselves outside of the camp, then I get more of that sense of security because I took out the ones that did pursue, and the rest are still defending within". And how to go about it: "Don't want our efforts in fixing this more minor problem to cascade into massive errors in judgment across the reactive intelligence you're starting to hone in already."
+
+**Measured first** (`npm run experiment -- out-the-gate`, a new scene and bench, 24 camps). Someone came out after him on 3 camps of 21, a median 66 s behind, and on none inside 25 s.
+
+**Built** (`brain/firefight.ts`, the chase; `brain/walls.ts`; the rules and the numbers are in `docs/camp-engine.md`, section 9, *Step 2c*). A man who watched the intruder go out of the walls, or heard it from one who did, goes after him at once, at a run, to a step outside the opening, and looks each way along the wall. Two at most go in one fight. They keep to the camp's own ground, and from the moment anyone has gone, everyone else keeps inside the walls. A man is out after him inside 25 s on 17 camps of 21 and has him in sight about 14 s after he left; a man who waits by the wall and shoots the two who come out has nobody else come out.
+
+**Decided along the way.**
+- **It's the firefight's fifth phase, not an engine of its own.** The follow was right for a man gone to ground and wrong for one leaving: it holds the angle, goes by covered ways, and looks the way he was heading. The chase is the same man, the same record and the same switch family, with those three things turned round.
+- **Contained by what starts it.** Nothing here runs until someone has gone out of the walls by an opening with a man watching. No pinned run has that, so no behaviour fingerprint moved, and no lane's bench did. The wider experiments were re-run against `main` to show the same.
+- **A camp's walls are static knowledge** (`brain/walls.ts`, rule 13): a mind may know which side of its perimeter a place is on, as it knows its alarm boxes.
+- **Counted by ear.** A brain doesn't see its own side, so who has gone out is who he has heard say so, aloud or on the net. The first to say it go, and a man who said it third turns back when he hears the two before him.
+- **Watching him go takes having seen him in, and the wider benches are what said so.** `npm run experiment -- ladder` differed from `main` on one camp of 16: a man walking in at the gate stopped a step outside it, was last seen there, and was read as one who had left. Two men went out to look along the wall while he walked to the target. A man now chases only someone he has seen inside the walls (`Firefight.inside`), and "going out" is through the opening (`walls.openingThrough`), not at the wall beside it.
+- **Only a chaser's word counts.** The first count took any "Moving!" about a place outside the walls, which a man going after a shooter in the trees says too. It moved no bench, and it held a camp to its walls in a fight nobody had left. A chaser's word carries `Report.out`, and `tests/firefight.test.ts` checks that a fight with someone outside all along counts nobody.
+- **"He's gone out" is kept apart from "he's there".** The net delivers a contact a few seconds after it was true. A stale "he's by the gate, inside" arriving after "he's gone out" would have unsaid it, so the second is its own word (`Report.out`) and its own memory (`Firefight.heardOut`).
+- **The man with the box still raises the alarm.** A witness with a box in reach goes for it, and says where the intruder went as he goes. One already on the chase doesn't turn back for a box he passes: the men who heard him are counting on him.
+- **A look is as long as his eyes need.** 0.9 s each way had a chaser look straight at a man standing still 9 m off and move on. It's 2.6 s, the firefight's look over cover, for the same reason.
+- **The scene waits for a man with a rifle to see him.** On one camp the only witness in five seconds was a worker, who tells nobody where. That's a real gap (what an unarmed man says about what he sees), and it isn't this one.
+
+**What moved.** `SIM_VERSION` 22, with no pinned behaviour changed. `STATE_SCHEMA` 16 (what a man in a firefight remembers of a chase, a camp's `chases`, a contact's `out`).
+
 ## 2026-11-12 · One thing is a question, and two that agree are an answer
 
 **Why.** The first move (below) left a man making up his mind alone, and news raising every man who heard it. The owner's fair realism has a man who has noticed something "more confused than immediately sprint to cover, depending on how likely I can confirm an attacking gunshot versus a mix of personal confusion and curiosity, as well as the reactions (or lack thereof) of those around me".

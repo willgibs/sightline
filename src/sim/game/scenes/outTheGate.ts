@@ -166,10 +166,12 @@ export interface GateSeen {
   /** Of the men who came out after him, those he put down (`plan=fight`), and the men who came out once two were down already. */
   down: Set<number>;
   late: Set<number>;
+  /** Men of the camp shot dead by the camp, once he'd gone through: a man sent out to where the camp believes the intruder is mustn't be standing where it's shooting. */
+  own: Set<number>;
 }
 
 export function emptyGateSeen(): GateSeen {
-  return { sure: -1, left: -1, hidden: -1, astray: false, aware: 0, already: new Set(), came: new Set(), went: new Set(), outFor: new Map(), outAt: -1, cameAt: -1, wentAt: -1, found: -1, seenAgain: -1, rounds: 0, roundsOut: 0, most: 0, home: Infinity, down: new Set(), late: new Set() };
+  return { sure: -1, left: -1, hidden: -1, astray: false, aware: 0, already: new Set(), came: new Set(), went: new Set(), outFor: new Map(), outAt: -1, cameAt: -1, wentAt: -1, found: -1, seenAgain: -1, rounds: 0, roundsOut: 0, most: 0, home: Infinity, down: new Set(), late: new Set(), own: new Set() };
 }
 
 /** Metres from the opening's middle that count as at it, and as having come out by it. */
@@ -199,7 +201,10 @@ export function watchGate(sim: Simulation, events: ReturnType<Simulation['step']
   if (seen.left >= 0 && seen.hidden < 0 && (you.x - m.hide.x) * (you.x - m.hide.x) + (you.z - m.hide.z) * (you.z - m.hide.z) < 4) seen.hidden = sim.tick;
   if (seen.left < 0) return;
   for (const e of events) {
-    if (e.type === 'death' && seen.outFor.has(e.victim)) seen.down.add(e.victim);
+    if (e.type === 'death') {
+      if (e.source !== sim.playerId) seen.own.add(e.victim);
+      else if (seen.outFor.has(e.victim)) seen.down.add(e.victim);
+    }
     if (e.type !== 'shot' || e.source === sim.playerId) continue;
     seen.rounds++;
     if (seen.went.has(e.source)) seen.roundsOut++;
@@ -303,6 +308,10 @@ export function outTheGate(params?: string): Scene {
                 : seen.home < sim.tuning.brain.hunt.keep
                   ? `only ${seen.home} fighting men were left inside`
                   : undefined,
+        },
+        {
+          name: 'and nobody is shot by his own side',
+          after: () => (seen.own.size > 0 ? `${seen.own.size} of the camp's men were shot dead by the camp (guard ${[...seen.own].join(', ')})` : undefined),
         },
       ],
     },

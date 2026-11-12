@@ -59,9 +59,9 @@ function play(seed: string, arm: Arm, t: Tuning, plan: 'wall' | 'run' | 'fight')
 function run(seed: string, arm: Arm, t: Tuning): Record<string, number> {
   const hz = t.sim.tickHz;
   const out: Record<string, number> = {
-    done: 0, aware: NaN, came: NaN, cameAt: NaN, went: NaN, wentAt: NaN, soon: NaN, found: NaN, foundAt: NaN, most: NaN, men: NaN, home: NaN, rounds: NaN,
+    done: 0, aware: NaN, came: NaN, cameAt: NaN, went: NaN, wentAt: NaN, soon: NaN, found: NaN, foundAt: NaN, most: NaN, men: NaN, home: NaN, rounds: NaN, own: NaN,
     'r.done': 0, 'r.fired': NaN, 'r.struck': NaN, 'r.killed': NaN,
-    'f.done': 0, 'f.came': NaN, 'f.down': NaN, 'f.late': NaN, 'f.most': NaN,
+    'f.done': 0, 'f.came': NaN, 'f.down': NaN, 'f.late': NaN, 'f.most': NaN, 'f.own': NaN,
   }; // prettier-ignore
   const after = (seen: GateSeen, tick: number): number => (tick < 0 ? NaN : (tick - seen.left) / hz);
   const wall = play(seed, arm, t, 'wall');
@@ -79,6 +79,7 @@ function run(seed: string, arm: Arm, t: Tuning): Record<string, number> {
     out.men = wall.went.size;
     out.home = wall.home === Infinity ? NaN : wall.home;
     out.rounds = wall.roundsOut;
+    out.own = wall.own.size;
   }
   const ran = play(seed, arm, t, 'run');
   if (ran) {
@@ -94,6 +95,7 @@ function run(seed: string, arm: Arm, t: Tuning): Record<string, number> {
     out['f.down'] = fought.down.size;
     out['f.late'] = fought.late.size;
     out['f.most'] = fought.most;
+    out['f.own'] = fought.own.size;
   }
   return out;
 }
@@ -118,6 +120,7 @@ export const outTheGateExperiment: Experiment = {
     { key: 'men', label: 'by the wall: men who came out, in all', kind: 'mean' },
     { key: 'most', label: 'by the wall: most out at once', kind: 'mean' },
     { key: 'home', label: 'by the wall: fewest fighting men left inside', kind: 'mean' },
+    { key: 'own', label: 'by the wall: men shot by their own side', kind: 'mean' },
     { key: 'r.fired', label: 'runs for the trees: rounds fired at him', kind: 'mean' },
     { key: 'r.struck', label: 'runs for the trees: rounds that hit him once he was out', kind: 'mean' },
     { key: 'r.killed', label: 'runs for the trees: enough of them to kill', kind: 'rate' },
@@ -125,6 +128,7 @@ export const outTheGateExperiment: Experiment = {
     { key: 'f.down', label: 'shoots whoever comes out: of them, put down', kind: 'mean' },
     { key: 'f.late', label: 'shoots whoever comes out: men who came out once two were down', kind: 'mean' },
     { key: 'f.most', label: 'shoots whoever comes out: most out at once', kind: 'mean' },
+    { key: 'f.own', label: 'shoots whoever comes out: men shot by their own side', kind: 'mean' },
   ],
   run,
 };

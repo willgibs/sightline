@@ -954,6 +954,10 @@ export const defaultTuning = {
         look: 2.6, // seconds he looks each way along the wall: as long as a look over cover, which is as long as his eyes need to pick out a man standing still
         along: 12, // metres along it, or out from it, that he looks at
         hold: 5, // seconds he then watches the ground beyond with nobody in sight before he gives it up and goes back in
+        spot: 25, // metres from the opening within which a figure he glimpses, out there and looking, is the man he came out for: he's expecting him
+        patience: 12, // seconds after he said he was going that he keeps trying to get there, with something in his way that no map shows
+        cease: 60, // seconds after a man said he was going out that nobody fires at ground he can't see into
+        clearOf: 15, // within this many metres of where he said he was going
       },
       improve: { after: 9, run: 16, times: 2 }, // with no view of the place: seconds before he tries for a better position, how far he'll go for one, and how many times
       contactEvery: 6, // seconds between shouts of where the intruder is
