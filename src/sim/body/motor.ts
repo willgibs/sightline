@@ -32,12 +32,21 @@ import type { DebugDraw } from '../kernel/debugDraw';
  * following it or falling, landing, footsteps. Settling picks the next mode. A mode that
  * moves along a path of its own, such as lab C's mantle or ladder, replaces both.
  *
- * Invariants (tests/invariants.test.ts, tests/steep.test.ts, tests/solids.test.ts):
+ * Invariants (tests/invariants.test.ts, tests/steep.test.ts, tests/solids.test.ts, tests/ladder.test.ts):
  * - in every mode, the body never ends a tick inside anything solid or under the terrain,
  *   and never rises more than stepHeight in one tick; solid geometry (the world's
  *   colliders and entities' shapes, world/solids.ts) always beats other bodies, which can
  *   shove it but never through a wall. Entities' shapes hold this only because whatever
  *   moves one never moves it into a body;
+ * - a move that can't end clear is refused (resolveMove), and a refused move keeps the
+ *   body's place and its footing: it ends the tick where it began, standing on what it
+ *   stood on, or falling if it was falling or that has gone from under it, and never
+ *   higher. Settling looks a step up for the ground only where a move was resolved to,
+ *   because only there was the body's headroom checked at the height that ground gives it
+ *   (isClear). The first promise rests on this: the place and the height a body ended the
+ *   last tick at were clear, and a refused move keeps them, or lets it fall. It promises
+ *   nothing about getting anywhere: a ledge with no room over it to stand in stops a body
+ *   that walks into it, as the ground rising under a ceiling does;
  * - on the ground, the body never gains height on ground steeper than maxSlopeDeg, from
  *   any angle of approach. Exactly: from such ground it ends a tick no higher, wherever it
  *   ends; onto such ground it ends no higher either; and it gains nothing on the steep
@@ -62,8 +71,20 @@ import type { DebugDraw } from '../kernel/debugDraw';
  *   tick: never inside anything solid, with no allowance for steps, and never inside
  *   another body; it waits for what's in the way, and gives up if it stays. Only colliders can be
  *   mantled, never the terrain, and never onto ground too steep to stand on;
- * - on a ladder (ladder.ts) the same: every pose re-checked every tick, the rise no
- *   faster than the ladder's rate, and getting off only by a way checked pose by pose.
+ * - on a ladder (ladder.ts) the same: every pose is re-checked every tick against
+ *   everything solid, with no allowance for steps, and against every other body, and the
+ *   body holds still on the rungs while anything is in its way. It goes up or down no
+ *   faster than the ladder's rates, and gets off only by a way checked pose by pose (over
+ *   the top, a mantle) or by stepping off at the foot;
+ * - a body on a path of its own (a mantle, a ladder) never moves into another body, and
+ *   that is exact: such bodies move after every body that walks or falls (system.ts), so
+ *   the pose a path takes is clear of every other body where the tick leaves it. The other
+ *   half is soft, as it is between any two bodies: one that walks or falls into a body on a
+ *   path is shoved out of it, and can still end a tick overlapping it (held there by a
+ *   wall, or fallen onto it). The path holds still until it is clear;
+ * - against other bodies a body is taken over the band the tick leaves it in. Settling can
+ *   lift it as much as a step (onto a box, up a slope), so it is shoved from under feet
+ *   that are just over its head before it steps up into them, as it is from beside them.
  * A new mode states its own invariants here and adds them to the invariant run.
  *
  * Ground steeper than maxSlopeDeg is not ground you can stand on: you can't climb it, and
@@ -160,8 +181,22 @@ const leanEye = { x: 0, y: 0, z: 0 };
 const feetCircles: FootCircle[] = [];
 const turnCircles: FootCircle[] = [];
 
-/** Moves a body one tick toward what it intends. */
+/**
+ * Moves a body one tick toward what it intends: both halves of its tick at once, for a
+ * body stepped on its own (a test, a bench). Among other bodies the motor system takes the
+ * halves apart (system.ts), so that a path is the last thing to move.
+ */
 export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext): void {
+  if (stepFree(b, i, spec, ctx)) stepPath(b, i, spec, ctx);
+}
+
+/**
+ * The first half of a body's tick: it turns, eases its stance, takes a ladder or starts a
+ * mantle on a press, and, walking or falling, moves. Returns true for a body on a path of
+ * its own, which hasn't moved yet: `stepPath` is its move, and `ctx.others` then has to be
+ * where every body that walks or falls has ended the tick.
+ */
+export function stepFree(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext): boolean {
   const tanMax = dtanDeg(spec.maxSlopeDeg);
 
   pushHistory(b);
@@ -176,16 +211,28 @@ export function stepMotor(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: Moto
     const ladder = ladderInReach(b, spec, ctx);
     if (ladder < 0 || !startLadder(b, spec, ctx, ladder)) startMantle(b, spec, ctx);
   }
-  // On a path of their own the legs are climbing, not running, whatever the body arrived at.
-  if (b.motor === 'mantle' || b.motor === 'ladder') b.gait = i.gait === 'sprint' ? 'walk' : i.gait;
-  if (b.motor === 'mantle') stepMantle(b, spec, ctx);
-  else if (b.motor === 'ladder') stepLadder(b, i, spec, ctx);
-  else if (moveBody(b, i, spec, ctx, tanMax)) {
+  if (b.motor === 'mantle' || b.motor === 'ladder') return true;
+  if (moveBody(b, i, spec, ctx, tanMax)) {
     // No room yet to draw the body in: it gets up when there is, not before.
     b.eyeHeight = eye;
     b.stanceTimer = timer;
     b.proneTransition = changing;
   }
+  finishStep(b, i, spec, ctx, tanMax);
+  return false;
+}
+
+/** The second half, for a body on a path of its own: one tick along its mantle or its ladder. */
+export function stepPath(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext): void {
+  // On a path of their own the legs are climbing, not running, whatever the body arrived at.
+  b.gait = i.gait === 'sprint' ? 'walk' : i.gait;
+  if (b.motor === 'mantle') stepMantle(b, spec, ctx);
+  else stepLadder(b, i, spec, ctx);
+  finishStep(b, i, spec, ctx, dtanDeg(spec.maxSlopeDeg));
+}
+
+/** What ends a body's tick, whichever way it moved: its lean, and the controller overlay. */
+function finishStep(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext, tanMax: number): void {
   stepLean(b, i, spec, ctx);
   if (ctx.draw) {
     drawController(ctx.draw, b, spec, ctx.world, tanMax);
@@ -217,11 +264,13 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
   const vz = b.vz;
   const toX = b.x + vx * dt;
   const toZ = b.z + vz * dt;
-  if (!resolveMove(b, toX, toZ, spec, ctx, dest)) {
+  // Whether the last move asked for was refused: `dest` is then where the body began.
+  let refused = !resolveMove(b, toX, toZ, spec, ctx, dest);
+  if (refused) {
     if (grew) {
       // No room to grow into: it stays as long as it was.
       b.lying = was;
-      resolveMove(b, b.x, b.z, spec, ctx, dest);
+      refused = !resolveMove(b, b.x, b.z, spec, ctx, dest);
     } else if (b.lying < was) {
       // No room at the shorter length. If the move works at the length it has, it keeps
       // that length, so a body held down in a tight place can still crawl out of it.
@@ -229,7 +278,8 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
       b.lying = was;
       b.vx = vx;
       b.vz = vz;
-      if (!resolveMove(b, toX, toZ, spec, ctx, dest)) b.lying = shorter;
+      refused = !resolveMove(b, toX, toZ, spec, ctx, dest);
+      if (refused) b.lying = shorter;
     }
   }
   const nx = dest.x;
@@ -239,7 +289,15 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
   const movedDist = Math.sqrt(mdx * mdx + mdz * mdz);
 
   // --- Settle: follow the ground, fall or land. ----------------------------------
-  const under = groundBelow(world, ctx.solids, nx, nz, feet + spec.stepHeight, restRadius(b, spec));
+  // Where a move was resolved to, the ground a step up was counted into the body's height
+  // when its headroom was checked (isClear). A refused move was checked nowhere, so it keeps
+  // the body's footing along with its place: it finds what it stands on, or what's left
+  // under it, and nothing higher. A box it only touches, whose top its feet have come
+  // within a step of (it walked up a slope along the box's side), is not ground to be lifted
+  // onto: the move onto it was refused for a shelf with no room under it for a body standing
+  // on the box, and the lift put the body's head in that shelf (the fuzz run's tower
+  // SWP-1085-0, Nov 12).
+  const under = groundBelow(world, ctx.solids, nx, nz, refused ? feet : feet + spec.stepHeight, restRadius(b, spec));
   const ground = { height: under.height, surface: under.surface, collider: under.collider };
   // Lying, the pivot steps down off a ledge only once the circles still on it could rest
   // where they are from the lower height: until then it comes down only as far as they allow.
@@ -528,9 +586,12 @@ function driveAir(b: BodyState): void {
  * height on ground too steep to stand on, and no rising faster than a walkable slope
  * allows), and colliders, the world's and entities' (hard, always win). A ceiling the body is deep under but
  * no longer fits beneath (the ground rose) is never pushed out of sideways; a shallow
- * overlap at its edge is. If anything still overlaps after the passes, the body stays
- * where it was. That keeps every tick's end position clear, by induction from a clear
- * spawn.
+ * overlap at its edge is. If anything still overlaps after the passes, the move is refused:
+ * this returns false with `out` where the body was, and settling keeps the body on what it
+ * stood on there (moveBody). That keeps every tick's end pose clear, by induction from a
+ * clear spawn: a move that is resolved ends where its headroom was checked, at the height
+ * the ground there gives it, and a move that is refused ends in the pose the last tick
+ * left clear, or below it.
  */
 export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec, ctx: MotorContext, out: { x: number; z: number }): boolean {
   const { world, solids } = ctx;
@@ -550,7 +611,9 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
     let moved = false;
 
     for (const o of ctx.others) {
-      if (o.y > feet + height || o.y + o.height < feet) continue;
+      if (o.y > feet + height + spec.stepHeight || o.y + o.height < feet) continue;
+      // Feet just over this body's head are in its way only if the tick lifts it that far.
+      const over = o.y > feet + height;
       for (let c = 0; c < circles.length; c++) {
         const C = circles[c]!;
         const dx = nx + C.x - o.x;
@@ -558,6 +621,7 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
         const rr = C.r + o.radius;
         const d2 = dx * dx + dz * dz;
         if (d2 < rr * rr && d2 > 1e-12) {
+          if (over && o.y > liftedFeet(b, nx, nz, spec, ctx) + height) break;
           const d = Math.sqrt(d2);
           const k = Math.min(rr - d, spec.shoveMax) / d;
           ctx.draw?.line(nx, feet + 0.1, nz, nx + dx * k, feet + 0.1, nz + dz * k, 'warn');
@@ -774,6 +838,16 @@ function fallFloor(b: BodyState, spec: BodySpec, ctx: MotorContext): number {
 /** The highest a lying body's pivot can be standing at (x, z) at the end of this tick. */
 function highFeet(b: BodyState, x: number, z: number, spec: BodySpec, ctx: MotorContext): number {
   return Math.max(b.y, groundBelow(ctx.world, ctx.solids, x, z, b.y + spec.stepHeight, spec.radius).height);
+}
+
+/**
+ * The highest a body's feet can be at the end of this tick if it ends it at (x, z): where
+ * they are, or the ground settling will find there, which may be as much as a step up (a
+ * ledge, a box, a slope). Asked only when another body's feet are within a step of its head
+ * and over it, which is seldom: under a ladder, or under a mantle.
+ */
+function liftedFeet(b: BodyState, x: number, z: number, spec: BodySpec, ctx: MotorContext): number {
+  return Math.max(b.y, groundBelow(ctx.world, ctx.solids, x, z, b.y + spec.stepHeight, restRadius(b, spec)).height);
 }
 
 /** Where a lying body is growing toward (1 down, 0 up), and the step it takes this tick. Returns whether it grew. */

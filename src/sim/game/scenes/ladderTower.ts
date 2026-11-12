@@ -1,5 +1,5 @@
 import type { Tuning } from '../../../config/tuning';
-import type { Ladder } from '../../body';
+import { InvariantWatch, type Ladder } from '../../body';
 import { buildRoutine, buildWorld, type GuardSpawn, type Routine } from '../../generation';
 import { dcos, dsin } from '../../kernel/core/detmath';
 import { Rng } from '../../kernel/core/rng';
@@ -16,8 +16,37 @@ import type { Scene } from '.';
  * A tower with a ladder, drawn from a seed, for the ladder's fuzzing (C5): ground flat,
  * rolling or sloping under it, clutter on the deck and round the foot, sometimes a roof,
  * two guards walking past the foot, and a body lying near it. Its driver is the ladder
- * bot, and the long invariant run plays a fresh one per valley.
+ * bot, and the long invariant run plays fresh ones for every valley.
+ *
+ * The scene holds its run to the motor's promises itself (body/invariants.ts), tick by
+ * tick, so a tower the long run broke a promise on is that run again by its name:
+ * `npm run scene -- ladder-tower --params seed=RES-2063-3`. The ones found so far are kept
+ * in TOWER_FINDS, and run with every other scene.
  */
+
+/**
+ * Towers that broke a promise, played as the long invariant run plays one, kept after the
+ * default tower.
+ *
+ * Three are one mistake: a body on the ladder took a pose that was clear, and in the same
+ * tick a guard walking under it rose into its feet. A path now moves after everything that
+ * walks, and whoever walks is shoved from under feet he would rise into (body/system.ts,
+ * motor.ts).
+ * - RES-2063-3 (the long run, Nov 12): coming down, as he stepped up onto a box (tick 855);
+ * - SWP-1295-0: going up, as he stepped up onto a box (tick 1260);
+ * - SWP-1381-1: coming down, as he walked up a slope, by a millimetre (tick 1791).
+ *
+ * One is a refused move that was lifted. A guard walked up a slope along the side of a box,
+ * under a shelf with room for him on the ground and none on the box. When the box's top
+ * came within a step of his feet his move onto it was refused, for the shelf, and settling
+ * lifted him onto the box where he stood, his head 0.28 m into the shelf. A refused move
+ * now keeps its footing (body/motor.ts).
+ * - SWP-1085-0: tick 1273.
+ */
+export const TOWER_FINDS: readonly string[] = ['seed=TOWER-0', 'seed=RES-2063-3', 'seed=SWP-1295-0', 'seed=SWP-1381-1', 'seed=SWP-1085-0'];
+
+/** How long a tower is played, seconds: the long run's length for one, so whatever it finds on a tower the scene finds too. */
+export const TOWER_SECONDS = 240;
 
 const SIDE = 1.5;
 
@@ -89,6 +118,7 @@ function towerWorld(seed: string, tuning: Tuning): World {
 export function ladderTower(params?: string): Scene {
   const seed = params?.startsWith('seed=') ? params.slice(5) : 'TOWER-0';
   let took = false;
+  let watch: InvariantWatch | null = null;
   return {
     name: 'ladder-tower',
     version: 1,
@@ -103,9 +133,13 @@ export function ladderTower(params?: string): Scene {
       const x = l.x + l.ox * 1.6;
       const z = l.z + l.oz * 1.6;
       sim.spawn((id): RemainsEntity => ({ id, kind: 'remains', faction: Faction.Camp, remains: { of: 0, post: -1, x, y: sim.world.terrain.heightAt(x, z), z, yaw: 0, eye: sim.tuning.bodies.guard.eyeHeight.stand, vx: 0, vz: 0, fell: -5, part: 'torso', carriedBy: 0, hidden: false } }));
+      // Where every body starts the first tick. It only reads the state.
+      watch = new InvariantWatch(sim);
+      watch.beforeTick();
     },
-    driver: () => new LadderBot(seed),
-    seconds: 40,
+    // The long invariant run's bot for this tower, by the name that run gives it (headless/fuzz.ts).
+    driver: () => new LadderBot(`tower:${seed}`),
+    seconds: TOWER_SECONDS,
     expect: [
       {
         name: 'it takes the ladder',
@@ -113,6 +147,16 @@ export function ladderTower(params?: string): Scene {
           if (sim.player.motor === 'ladder') took = true;
         },
         after: () => (took ? undefined : 'it never got onto the ladder'),
+      },
+      {
+        name: 'every body keeps the motor\'s promises',
+        during: () => {
+          const w = watch!;
+          w.afterTick();
+          // Nothing touches the state between one tick's end and the next one's start, so where each body starts the next is noted here.
+          w.beforeTick();
+          return w.report.first ? `entity ${w.report.first.entity} ${w.report.first.what}` : undefined;
+        },
       },
     ],
   };

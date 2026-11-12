@@ -69,10 +69,20 @@ export const GEN_VERSION = 9;
  * takes a gun he heard or saw for himself. What a man was told leaves his mind before what
  * he sensed himself, so talk doesn't push out the shot he heard; and a camp that hunts
  * sends nobody out alone to a sound off its own ground. The camp-fight run moved again.
- * 22: the chase (brain/firefight.ts): in a camp that chases, a man who watched an intruder
- * leave its walls by an opening, or heard it from one who did, goes after him at once, at a
- * run, to the opening and a step out of it, and looks each way along the wall. Two at most
- * go in one fight; they keep to the camp's own ground, and once anyone has gone the rest
- * keep inside the walls. No pinned run has anyone inside a camp, so no fingerprint moved.
+ * 22: a body on a path of its own (a mantle, a ladder) moves after every body that walks
+ * or falls, so the pose it takes is clear of where they end the tick; and a body is shoved
+ * from under feet just over its head when the tick would lift it into them (a step up, a
+ * slope). No pinned run has a body under a ladder or a mantle, so no fingerprint moved.
+ * 23: a refused move keeps the body's footing along with its place: settling looks a step
+ * up for the ground only where a move was resolved to, so a body whose move is refused is
+ * no longer lifted onto a ledge it only touches, into what is over it (body/motor.ts). No
+ * pinned run has a refused body touching a ledge within a step, so no fingerprint moved.
+ * 24: the chase (brain/firefight.ts): in a camp that chases, a man who knows an intruder
+ * was inside its walls and watched him leave them by an opening, or heard it from one who
+ * did, goes after him at once, at a run, to the opening and a step out of it, and looks
+ * each way along the wall. Two at most are out at a time; they keep to the camp's own
+ * ground, and once anyone has gone the rest keep inside the walls. And nobody fires at
+ * ground he can't see into near where one of his own said he was going out. No pinned run
+ * has anyone leave a camp by an opening, so no fingerprint moved.
  */
-export const SIM_VERSION = 22;
+export const SIM_VERSION = 24;
