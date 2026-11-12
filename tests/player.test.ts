@@ -4,7 +4,8 @@ import { footfall } from '../src/sim/body/footfall';
 import { Simulation } from '../src/sim/game/sim';
 import { PLAYER_ID } from '../src/sim/game/entities';
 import type { SimEvent } from '../src/sim/kernel/events';
-import { Blocks } from '../src/sim/kernel/world/colliders';
+import { InvariantWatch, OVERLAP_TOLERANCE } from '../src/sim/body';
+import { Blocks, circleOverlaps, pushOutCircle } from '../src/sim/kernel/world/colliders';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { EAST, testGuard, testWorld, tuningCopy } from './fixtures';
 
@@ -468,5 +469,144 @@ describe('controller edge cases (from the second audit)', () => {
     hold(sim, 1, {}, { crouch: true });
     hold(sim, 1, {}, { crouch: true });
     expect(sim.player.stance).toBe('stand');
+  });
+});
+
+/**
+ * What a refused move keeps (body/motor.ts): the body's place, and its footing with it.
+ *
+ * The long run's tower SWP-1085-0 (Nov 12) had a guard walk up a slope along the side of a
+ * box, under a shelf with room for him on the ground and none on the box. His circle
+ * touched the box by the last bit of a float. When his feet came within a step of its top
+ * his move onto it was refused, for the shelf, and settling lifted him onto the box where
+ * he stood: 0.448 m up without moving, his head 0.28 m into the shelf.
+ */
+describe('a refused move', () => {
+  const P = tuningCopy().bodies.player;
+  const SOUTH = Math.PI;
+  /** A box from its corners. */
+  const box = (x0: number, x1: number, z0: number, z1: number, y0: number, y1: number, surface: Surface = Surface.Wood) => ({
+    kind: 'box' as const,
+    x: (x0 + x1) / 2,
+    z: (z0 + z1) / 2,
+    hx: (x1 - x0) / 2,
+    hz: (z1 - z0) / 2,
+    y0,
+    y1,
+    ux: 1,
+    uz: 0,
+    flags: Blocks.All,
+    surface,
+  });
+
+  it('is not lifted onto a box it only touches, under a shelf with no room over the box', () => {
+    const slope = 0.15;
+    const top = 0.75;
+    let met = 0;
+    let tried = 0;
+    // Up the slope, pressed against the side of the crate at one angle or another: whether the
+    // circle ends a tick on the crate by a bit of a float or off it by one is the float's to say,
+    // so a spread of approaches gets there by both.
+    for (const face of [0.3, 0.317, 0.3391, 0.3573, 0.41, 0.4737]) {
+      for (const deg of [8, 17, 26]) {
+        // A crate along the south side of the way up, its top a step over the ground 2 m up the
+        // slope, and a shelf over all of it: 1.8 m of room on the ground under it, 1.7 m on the crate.
+        const crate = box(0, 3.3, face, face + 1, -1, top);
+        const shelf = box(1, 3.6, face - 1.5, face + 1, 2.45, 2.6);
+        const sim = new Simulation(testWorld({ size: 40, cell: 0.5, height: (x) => slope * x, colliders: [crate, shelf], spawn: { x: -1, z: face - 0.7 } }), tuningCopy());
+        const watch = new InvariantWatch(sim);
+        const input = { ...neutralInput(EAST - (deg * Math.PI) / 180), moveZ: 1 };
+        let touching = false;
+        for (let t = 0; t < 4 * HZ; t++) {
+          const p = sim.player;
+          // What settling took for ground: the crate's top within a step over the feet, and the circle on the crate at all.
+          if (top > p.y && top <= p.y + P.stepHeight && circleOverlaps(sim.world.colliders.list[0]!, p.x, p.z, P.radius)) touching = true;
+          watch.beforeTick();
+          sim.step(input);
+          watch.afterTick();
+          // Never up on the crate: there is nowhere on it a body fits.
+          expect(sim.player.standingOn, `crate at ${face}, ${deg}° off, tick ${sim.tick}`).toBe(-1);
+          expect(sim.player.y).toBe(sim.world.terrain.heightAt(sim.player.x, sim.player.z));
+        }
+        expect(watch.report.first, `crate at ${face}, ${deg}° off`).toBeNull();
+        // It got as far as the crate being a step it might take.
+        expect(sim.player.y + P.stepHeight).toBeGreaterThanOrEqual(top);
+        tried++;
+        if (touching) met++;
+      }
+    }
+    // Enough of them were touching the crate when its top came within a step: each of those was lifted into the shelf.
+    expect(tried).toBe(18);
+    expect(met).toBeGreaterThanOrEqual(6);
+  });
+
+  it('keeps what it stands on, a box as much as the ground', () => {
+    // On a low box, a hair into a higher one beside it that is a step up from there, under a
+    // roof with room over the low box and none over the high one. A tick can leave a body so:
+    // it came along the high box's side on the ground, where that was a wall, and stepped up.
+    const high = box(-2, 3, 0.3, 1.3, -1, 0.7);
+    const low = box(0, 3, -2, 0.3, -1, 0.3, Surface.Metal);
+    const roof = box(-2.5, 3.5, -2, 1.3, 2.4, 2.6);
+    const sim = new Simulation(testWorld({ size: 40, cell: 0.5, colliders: [high, low, roof], spawn: { x: 1, z: -0.5 }, spawnOnTop: true }), tuningCopy());
+    const p = sim.player;
+    expect(p.y).toBe(0.3);
+    p.z = 0.3 - P.radius + OVERLAP_TOLERANCE / 2;
+    const push = { x: 0, z: 0 };
+    expect(pushOutCircle(sim.world.colliders.list[0]!, p.x, p.z, P.radius, push)).toBe(true);
+    expect(Math.hypot(push.x, push.z)).toBeLessThan(OVERLAP_TOLERANCE);
+    const at = { x: p.x, z: p.z };
+    const watch = new InvariantWatch(sim);
+    // Into the high box: refused every tick, for the roof.
+    for (let t = 0; t < HZ; t++) {
+      watch.beforeTick();
+      sim.step({ ...neutralInput(SOUTH), moveZ: 1 });
+      watch.afterTick();
+      expect(p.y).toBe(0.3);
+    }
+    expect(watch.report.first).toBeNull();
+    expect(p.x).toBe(at.x);
+    expect(p.z).toBe(at.z);
+    expect(p.standingOn).toBe(1);
+    expect(p.surface).toBe(Surface.Metal);
+    expect(p.motor).toBe('ground');
+    // And it isn't held there: it walks off across the low box, away from the high one.
+    for (let t = 0; t < HZ / 3; t++) {
+      watch.beforeTick();
+      sim.step({ ...neutralInput(0), moveZ: 1 });
+      watch.afterTick();
+    }
+    expect(watch.report.first).toBeNull();
+    expect(p.z).toBeLessThan(at.z - 0.5);
+    expect(p.y).toBe(0.3);
+    expect(p.standingOn).toBe(1);
+  });
+
+  it('keeps its place and not its height in the air: it goes on falling', () => {
+    // Off one platform toward another across a gap a body fits down, the far one a step up from
+    // where it left, under a slab with room over the near one and none over the far one.
+    const near = box(-3, 0, -2, 2, -1, 1);
+    const far = box(0.7, 3, -2, 2, -1, 1.2);
+    const slab = box(-1, 3, -2, 2, 2.9, 3.1);
+    const sim = new Simulation(testWorld({ size: 40, cell: 0.5, colliders: [near, far, slab], spawn: { x: -2, z: 0 }, spawnOnTop: true }), tuningCopy());
+    const p = sim.player;
+    expect(p.y).toBe(1);
+    const watch = new InvariantWatch(sim);
+    let refusedInAir = 0;
+    for (let t = 0; t < 3 * HZ; t++) {
+      const before = { x: p.x, y: p.y, air: p.motor === 'air' };
+      watch.beforeTick();
+      sim.step({ ...neutralInput(EAST), moveZ: 1 });
+      watch.afterTick();
+      // Falling, with the far platform a step up and in its way: it stays where it is, and falls.
+      if (before.air && p.x === before.x && p.y < before.y) refusedInAir++;
+      expect(p.standingOn).not.toBe(1);
+    }
+    expect(watch.report.first).toBeNull();
+    expect(refusedInAir).toBeGreaterThan(0);
+    // Down the gap, onto the ground between them.
+    expect(p.motor).toBe('ground');
+    expect(p.y).toBe(0);
+    expect(p.x).toBeGreaterThan(0.3 - 1e-9);
+    expect(p.x).toBeLessThan(0.4 + 1e-9);
   });
 });
