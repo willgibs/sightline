@@ -175,7 +175,7 @@ export const campRules: System = {
         else decide(ctx, 'succeeded', 'the target is down', death.source, death.id);
       }
     } else if (obj.status === 'escaped') {
-      decide(ctx, 'failed', `the target got away${whatGaveItAway(ctx, obj.left)}`, p.id);
+      decide(ctx, 'failed', `the target got away${whatGaveItAway(ctx, obj.left, ctx.index.of('commander')[0]?.camp.protects !== undefined)}`, p.id);
     } else if (obj.status === 'done' && obj.getOut && (p.body.x - obj.getOut.x) * (p.body.x - obj.getOut.x) + (p.body.z - obj.getOut.z) * (p.body.z - obj.getOut.z) <= ctx.tuning.brain.getOut.radius * ctx.tuning.brain.getOut.radius) {
       decide(ctx, 'succeeded', 'the target is down, and you got out', p.id);
     }
@@ -187,14 +187,16 @@ export const campRules: System = {
  * him (the owner, Nov 10: a player who lost has to be able to say what they should have
  * read). The first of these that happened: his vehicle's engine was running before he got to
  * it; the relief was at the gate and went in for him; or nothing came between the siren and
- * his run.
+ * his run: because nobody came, in a camp that had him wait, or because his camp runs him at
+ * the siren.
  */
-function whatGaveItAway(ctx: TickContext, left: { tick: number; engine: number; relief: number; siren: number } | undefined): string {
+function whatGaveItAway(ctx: TickContext, left: { tick: number; engine: number; relief: number; siren: number } | undefined, protects: boolean): string {
   if (!left) return '';
   const hz = ctx.tuning.sim.tickHz;
   const since = (tick: number): number => Math.round((left.tick - tick) / hz);
   if (left.engine >= 0 && since(left.engine) >= 5) return `: his vehicle's engine had been running for ${since(left.engine)} s when he got to it`;
   if (left.relief >= 0) return `: the relief had been at the gate for ${since(left.relief)} s, and went in for him`;
-  if (left.siren >= 0) return since(left.siren) >= 5 ? `: nobody came for him, and he ran for his vehicle ${since(left.siren)} s after the siren` : ': he ran for his vehicle at the siren';
+  // A camp that protects him had him wait, and nobody came. One that doesn't had him run at once, however long the run took.
+  if (left.siren >= 0) return protects ? `: nobody came for him, and he ran for his vehicle ${since(left.siren)} s after the siren` : ': he ran for his vehicle at the siren';
   return '';
 }
