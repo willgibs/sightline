@@ -266,7 +266,8 @@ function dueToGo(m: GuardMind): boolean {
   const P = m.tuning.brain.firefight.push;
   const hz = m.tuning.sim.tickHz;
   const keen = m.tuning.brain.roles[m.post.role].flank;
-  if (ff.lost || ff.bounds >= P.bounds || keen <= 0 || m.tick < ff.pinned || someoneMoving(m)) return false;
+  // A man holding the target's door with the alarm up doesn't go after anyone: he's what stands between them and the target (protect.ts).
+  if (ff.lost || ff.bounds >= P.bounds || keen <= 0 || m.tick < ff.pinned || someoneMoving(m) || onTheDoor(m)) return false;
   const dx = ff.x - m.self.x;
   const dz = ff.z - m.self.z;
   const d = Math.sqrt(dx * dx + dz * dz);
@@ -277,6 +278,11 @@ function dueToGo(m: GuardMind): boolean {
   const lx = m.self.x - m.post.x;
   const lz = m.self.z - m.post.z;
   return lx * lx + lz * lz <= P.leash * P.leash;
+}
+
+/** True for a man posted on the target's door, once the siren has sounded: from then on the door is his whole job. */
+function onTheDoor(m: GuardMind): boolean {
+  return m.post.holdsDoor === true && m.brain!.sirenAt >= 0;
 }
 
 /** Whether someone has the intruder in his sights now: this man himself, or someone he's heard say so in the last few seconds. Then the intruder has other things to look at, and ground in his view can be crossed farther. */
@@ -434,7 +440,10 @@ function position(m: GuardMind, ff: Firefight, seen: boolean): Position | null {
   // Seen, shot at or in the open: the nearest thing that hides him, and a view from it if one's close. Out of sight already,
   // he has time to be useful: he'll go farther, for somewhere he can see the place from, and the more so the more it's his job.
   const urgent = seen || m.tick < ff.pinned || ff.exposed;
-  const far = S.maxRun * (1 + m.tuning.brain.roles[m.post.role].flank);
+  // A man holding the target's door fights from beside it: a few metres of path, whatever the view from farther off.
+  const door = onTheDoor(m);
+  const near = door ? S.doorRun : S.maxRun;
+  const far = door ? S.doorRun : S.maxRun * (1 + m.tuning.brain.roles[m.post.role].flank);
   const here = { x: m.self.x, z: m.self.z, tx: ff.x, tz: ff.z, ty: ff.y, gain: 0 };
   let s = ff.spot;
   if (s) {
@@ -456,7 +465,7 @@ function position(m: GuardMind, ff: Firefight, seen: boolean): Position | null {
     if (ff.there && !s.line && !seen && ff.improved < F.improve.times && (m.tick - s.tick) / hz >= F.improve.after && m.tick >= ff.pinned && mayLook(m)) {
       ff.improved++;
       s.tick = m.tick;
-      const better = fightingSpot(m.world, m.tuning, { ...here, maxRun: Math.max(F.improve.run, far), needLine: true, dash: dashOf(m) }, m.nav.work);
+      const better = fightingSpot(m.world, m.tuning, { ...here, maxRun: door ? far : Math.max(F.improve.run, far), needLine: true, dash: dashOf(m) }, m.nav.work);
       if (better) {
         s = ff.spot = { ...better, tx: ff.x, tz: ff.z, tick: m.tick, careful: true };
         ff.there = false;
@@ -468,7 +477,7 @@ function position(m: GuardMind, ff: Firefight, seen: boolean): Position | null {
   if (!mayLook(m)) return null;
   ff.exposed = exposedAt(m.world, m.tuning, m.self.x, m.self.z, m.self.stance, ff.x, ff.z, m.nav.work, ff.y, m.self.y);
   const hurry = urgent || ff.exposed;
-  const found = fightingSpot(m.world, m.tuning, { ...here, maxRun: hurry ? S.maxRun : far, needLine: !hurry, dash: hurry ? 0 : dashOf(m) }, m.nav.work);
+  const found = fightingSpot(m.world, m.tuning, { ...here, maxRun: hurry ? near : far, needLine: !hurry, dash: hurry ? 0 : dashOf(m) }, m.nav.work);
   if (found) ff.spot = { ...found, tx: ff.x, tz: ff.z, tick: m.tick, careful: !hurry };
   // Nothing in reach. In the open, he gets flat and fires from a knee. Out of sight, he stays where he is, low, with no view.
   else if (hurry) ff.spot = whereHeIs(m, ff, 'prone', 'crouch');

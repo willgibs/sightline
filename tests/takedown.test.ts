@@ -22,9 +22,15 @@ import { worldOf } from './live';
  *
  * The exact seconds are still being found (the review's section on the takedown says which
  * a person should play first), so these pin the order and the consequences, not the times.
+ *
+ * These are the stages of a camp that waits for its relief to bring him out. A camp's answer
+ * now depends on the problem it's built round (tests/answer.test.ts), and this one is built
+ * to be flushed, so the stages are checked here with that switched off (`off=answer`).
  */
 
 const SEED = 'LEB-2534';
+/** A camp that protects its target, answering as every such camp did before answers went by the camp's problem. */
+const STAGED = '&ready=alert&off=answer';
 const GRADED_SHOTS = T.modes.takedown.shots;
 const HZ = T.sim.tickHz;
 
@@ -95,7 +101,7 @@ describe('the takedown’s numbers', () => {
 
 describe('a camp that protects its target', () => {
   it('keeps him in his room at the siren, and lets him go only once the relief has come to his door', () => {
-    const t = attack('&ready=alert', 420);
+    const t = attack(STAGED, 420);
     expect(t.siren).toBeGreaterThan(0);
     // To his room, and there until he's told: the relief first, then the word at his door, then the run.
     expect(Number.isNaN(t.room)).toBe(false);
@@ -120,7 +126,7 @@ describe('a camp that protects its target', () => {
   it('has nobody to send for with its radio out, so he waits until his nerve goes, and then runs alone', () => {
     const tuning = tuningCopy();
     tuning.brain.protect.giveUp = 60;
-    const t = attack('&ready=alert&off=radio', 300, tuning);
+    const t = attack('&ready=alert&off=radio,answer', 300, tuning);
     expect(t.siren).toBeGreaterThan(0);
     expect(Number.isNaN(t.relief)).toBe(true);
     expect(Number.isNaN(t.told)).toBe(true);
@@ -133,7 +139,7 @@ describe('a camp that protects its target', () => {
     const tuning = tuningCopy();
     tuning.brain.protect.giveUp = 150;
     tuning.brain.protect.fetchers = 0;
-    const t = attack('&ready=alert', 420, tuning, (x) => !Number.isNaN(x.left));
+    const t = attack(STAGED, 420, tuning, (x) => !Number.isNaN(x.left));
     expect(t.relief).toBeGreaterThan(t.siren);
     expect(Number.isNaN(t.told)).toBe(true);
     expect(t.left - t.siren).toBeGreaterThanOrEqual(150);
@@ -142,7 +148,7 @@ describe('a camp that protects its target', () => {
   it('keeps him where he is when there is no vehicle to run to', () => {
     const tuning = tuningCopy();
     tuning.brain.protect.giveUp = 30;
-    const t = attack('&ready=alert&off=truck', 200, tuning);
+    const t = attack('&ready=alert&off=truck,answer', 200, tuning);
     expect(t.siren).toBeGreaterThan(0);
     expect(Number.isNaN(t.left)).toBe(true);
     expect(Number.isNaN(t.gone)).toBe(true);
@@ -162,7 +168,7 @@ describe('a camp that protects its target', () => {
 describe('a vehicle that won’t start', () => {
   it('leaves him stranded when he gets to it, and he goes back to his room', () => {
     const world = worldOf(SEED);
-    const scene = { ...(compound(`seed=${SEED}&attack=sniper&ready=alert`) as Scene<Simulation>), world: () => world };
+    const scene = { ...(compound(`seed=${SEED}&attack=sniper${STAGED}`) as Scene<Simulation>), world: () => world };
     const sim = startScene(scene, T, world);
     const driver = scene.driver!() as AttackDriver;
     const raw = scene.game.still(sim);

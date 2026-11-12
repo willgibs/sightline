@@ -22,5 +22,5 @@ export { choose, response, type Curve, type Option } from './utility';
 export { REPORT_KINDS, type Report, type ReportKind, type Told, type Via } from './reports';
 export { clearSeen, createSearchMap, hottestCell, injectBelief, mapMass, mapSpread, spreadBelief, type SearchMap } from './searchMap';
 export { ellipseArea, emptyEstimate, fuseBearings, inEllipse, mahalanobis2, type Bearing, type FuseGrid, type ShotEstimate } from './triangulate';
-export { ALERT_LEVELS, alertRung, createCamp, type AlertLevel, type CampState, type HuntOrder, type RosterEntry, type SearchState, type Section, type Task, type TaskKind, type Threat } from './camp';
+export { ALERT_LEVELS, alertRung, createCamp, type AlertLevel, type CampAnswer, type CampState, type HuntOrder, type RosterEntry, type SearchState, type Section, type Task, type TaskKind, type Threat } from './camp';
 export { digest, fuseShots, plan, spreadCamp, type CampMind, type CampOrder } from './commander';

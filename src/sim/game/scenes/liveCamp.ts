@@ -25,8 +25,10 @@ import type { World } from '../../kernel/world/world';
  * as `seed=LEB-2534%26difficulty=0.7`): which camp, and how hard. `perch=1` starts you on
  * the camp's best overview, for a sitting that's about the fight and not the walk there.
  * `ready=alert` is a camp that protects its target (game/protection.ts): he goes to his hard
- * room at the first sign of trouble and leaves only when the relief has come for him. Without
- * it the camp is relaxed, and runs him to his vehicle the moment the siren sounds.
+ * room at the first sign of trouble, and what happens then goes by the problem the camp is
+ * built round: it holds him there, it starts his vehicle and bolts, or it waits for its
+ * relief to bring him out. Without it the camp is relaxed, and runs him to his vehicle the
+ * moment the siren sounds.
  */
 
 export const READINESS = ['relaxed', 'alert'] as const;

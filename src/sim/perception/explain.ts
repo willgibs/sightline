@@ -95,6 +95,8 @@ export function describe(e: SimEvent): string {
       return `a door was ${e.open ? 'opened' : 'shut'}`;
     case 'siren':
       return `the siren, heard to ${m(e.radius)} m`;
+    case 'engine':
+      return e.load === 'start' ? `an engine starting, heard to ${m(e.radius)} m` : `an engine ${e.load === 'drive' ? 'on the move' : 'running'}, heard to ${m(e.radius)} m`;
     case 'reinforce':
       return `${e.count} reinforcements arrived at (${m(e.x)}, ${m(e.z)})`;
   }

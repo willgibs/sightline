@@ -1,4 +1,4 @@
-import { createBrain, firefightPhase, huntPhase } from '../brain';
+import { createBrain, firefightPhase, huntPhase, type TaskKind } from '../brain';
 import type { DebugDraw } from '../kernel/debugDraw';
 import type { TickContext } from '../kernel/systems';
 import type { GuardEntity } from './entities';
@@ -13,6 +13,14 @@ export function giveBrains(sim: Simulation): void {
  * A guard's brain in the debug view: what he's doing, why and because of what, over his
  * head; the route he's walking, its next waypoint and where the act points.
  */
+/** An order about the target, in the debug view's words: the rest are named by what the man is seen to do. */
+const ERRANDS: Partial<Record<TaskKind, string>> = {
+  'start': 'to start his vehicle',
+  'fetch': 'in for the target',
+  'escort': 'to his vehicle with him',
+  'post': 'to hold his door',
+};
+
 export function drawBrain(draw: DebugDraw, ctx: TickContext, g: GuardEntity): void {
   const b = g.brain;
   if (!b) return;
@@ -21,7 +29,9 @@ export function drawBrain(draw: DebugDraw, ctx: TickContext, g: GuardEntity): vo
   const ground = (x: number, z: number): number => h(x, z) + 0.15;
   const a = g.senses?.awareness.state ?? 'unaware';
   const tone = a === 'combat' ? 'bad' : a === 'searching' ? 'warn' : a === 'unaware' ? 'muted' : 'info';
-  const phase = firefightPhase(b, ctx.tick) ?? huntPhase(b, ctx.tick);
+  // What he's on, for a man in a fight, on a hunt, or on an errand about the target (brain/protect.ts): the part he's at, or what the errand is.
+  const errand = b.act === 'task' && b.task ? ERRANDS[b.task.kind] : undefined;
+  const phase = firefightPhase(b, ctx.tick) ?? huntPhase(b, ctx.tick) ?? (errand ? (b.task!.kind === 'start' && b.engine ? 'by the vehicle, engine running' : errand) : null);
   draw.label(body.x, body.y + body.eyeHeight + 0.95, body.z, phase ? `${b.act} · ${phase}` : b.act, tone, `${b.act}${phase ? ` (${phase})` : ''} · ${a}${b.linger >= 0 ? ' · looking around' : ''}`);
   // A firefight: where he believes the intruder is, and his position: where he hides, and where he fires from.
   const ff = b.ff;

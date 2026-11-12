@@ -16,7 +16,7 @@ import type { Simulation } from './sim';
  * differently draws differently, as he should.
  */
 
-export const CAMP_SWITCHES = ['commander', 'radio', 'alarm', 'truck', 'reinforce', 'fight', 'firefight', 'hunt', 'power'] as const;
+export const CAMP_SWITCHES = ['commander', 'radio', 'alarm', 'truck', 'reinforce', 'fight', 'firefight', 'hunt', 'answer', 'power'] as const;
 
 export type CampSwitch = (typeof CAMP_SWITCHES)[number];
 
@@ -69,14 +69,19 @@ export function takeAway(sim: Simulation, off: readonly CampSwitch[]): void {
     for (const a of [...sim.index.of('alarm')]) sim.despawn(a.id);
     camp.devices.alarms.length = 0;
   }
-  // Nothing to run for: the vehicle stays parked, and the target stays where he is.
-  if (has('truck')) camp.devices.escape = null;
+  // Nothing to run for: the vehicle stays parked, and the target stays where he is. A camp can't bolt in a vehicle it hasn't got.
+  if (has('truck')) {
+    camp.devices.escape = null;
+    if (camp.answer === 'bolt') delete camp.answer;
+  }
   // The first fight (Lab F): a camp that only does what lab E built.
   if (has('fight')) delete camp.fights;
   // Step 2 (brain/firefight.ts): men who hide from a close threat and don't follow, as they were before it.
   if (has('fight') || has('firefight')) delete camp.firefight;
   // Step 2b (brain/hunt.ts): nobody goes out after a shooter the camp has placed. A hunt ends in a firefight, so without that there's none.
   if (has('fight') || has('firefight') || has('hunt')) delete camp.hunts;
+  // The target's answer by the camp's problem (brain/protect.ts): every protecting camp waits for its relief to bring him out, as before it.
+  if (has('answer')) delete camp.answer;
   // Already called, as far as the commander knows: it never calls them again, and any on their way don't come.
   if (has('reinforce')) {
     camp.reinforceCalled = 0;

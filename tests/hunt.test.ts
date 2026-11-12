@@ -17,7 +17,7 @@ import { worldOf } from './live';
  * - the section says what it's doing aloud, watches the place before anyone goes on to it,
  *   and either finds him or calls the place clear;
  * - nobody is sent while he's still firing, and nobody without the radio;
- * - a man whose partner is gone comes home, and calls nothing clear;
+ * - a man whose partner is gone doesn't go on alone, and calls nothing clear;
  * - a camp without it does none of this, and the same hunt ends the same way twice.
  */
 
@@ -123,24 +123,40 @@ describe('what a hunt waits for', () => {
 });
 
 describe('a section that loses a man', () => {
-  it('comes home, and calls nothing clear', () => {
+  it('doesn’t go on alone, and calls nothing clear', () => {
     let gone = -1;
     let left = -1;
+    let goneAt = -1;
+    /** The most seconds he was still out on the hunt with nobody left alive in his section but himself. */
+    let alone = 0;
+    let since = -1;
+    // A camp that still has men to spare sends him out again with another, which is a new section and not his going on alone:
+    // so this watches the stretch after his partner is gone, and stops before a second section could have reached the place.
+    const AFTER = 100;
     const h = run('', 330, (sim, out) => {
-      if (gone >= 0) return;
-      // Once both are out past where they gathered, one of them is gone, without a sound.
-      const out2 = sim.guards.filter((g) => out.seen.men.has(g.id) && g.brain?.hunt && g.brain.hunt.at >= 2);
-      if (out2.length < 2) return;
-      gone = out2[1]!.id;
-      left = out2[0]!.id;
-      sim.despawn(gone);
+      if (gone < 0) {
+        // Once both are out past where they gathered, one of them is gone, without a sound.
+        const out2 = sim.guards.filter((g) => out.seen.men.has(g.id) && g.brain?.hunt && g.brain.hunt.at >= 2);
+        if (out2.length < 2) return;
+        gone = out2[1]!.id;
+        left = out2[0]!.id;
+        goneAt = sim.tick;
+        sim.despawn(gone);
+        return;
+      }
+      if (sim.tick - goneAt > AFTER * HZ) return;
+      const b = sim.guards.find((g) => g.id === left)?.brain;
+      const order = b?.task?.hunt;
+      const lone = b?.hunt !== undefined && b.hunt.phase !== 'home' && (!order || order.men.every((id) => id === left || !sim.guards.some((g) => g.id === id)));
+      if (lone && since < 0) since = sim.tick;
+      if (!lone) since = -1;
+      if (since >= 0) alone = Math.max(alone, (sim.tick - since) / HZ);
+      // Nothing is called clear, and nobody is found, by a man with no partner.
+      if (lone) expect(out.seen.cleared, `called clear at ${(sim.tick / HZ).toFixed(0)} s, alone`).toBe(-1);
     });
     expect(gone, 'both men of the section got out past the wire').toBeGreaterThan(0);
-    const survivor = h.sim.guards.find((g) => g.id === left);
-    expect(survivor, 'the other man is still alive').toBeDefined();
-    // He gave it up: on his way home or there, or taken off it for something else, and he never called the place.
-    expect(survivor!.brain!.hunt === undefined || survivor!.brain!.hunt.phase === 'home').toBe(true);
-    expect(h.seen.cleared).toBe(-1);
-    expect(h.seen.found).toBe(-1);
+    expect(h.sim.guards.some((g) => g.id === left), 'the other man is still alive').toBe(true);
+    // He gave it up within the time it takes a man to be sure nobody is coming: three bounds' worth of waiting, and a little.
+    expect(alone).toBeLessThan(H.bound.wait * H.bound.giveUp + 25);
   });
 });

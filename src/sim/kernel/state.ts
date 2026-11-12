@@ -28,8 +28,11 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * in one keeps what he knows of it and his position (brain/firefight.ts). 12: a camp keeps
  * who it's hunting, its sections, the places they've found empty and the bodies it has
  * named, and a man on the hunt keeps the way out and where he is on it (brain/hunt.ts).
+ * 13: a vehicle keeps when its engine was started; a camp keeps how it answers for its
+ * target, which of its relief it has posted on his doors, and how he left; and a man keeps
+ * the engine he hears and his part in the drill (brain/protect.ts).
  */
-export const STATE_SCHEMA = 12;
+export const STATE_SCHEMA = 13;
 
 export type EntityId = number;
 

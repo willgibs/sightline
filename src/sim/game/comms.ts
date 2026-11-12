@@ -10,6 +10,7 @@ import { Surface } from '../kernel/world/surfaces';
 import { believe, createSenses, stimulate, type Percept } from '../perception';
 import { boardingPoint, escapeRoute, yardRoute, routeSeconds, spawnTruck, truckRoute } from './camp';
 import type { GuardEntity } from './entities';
+import { startEngine } from './escape';
 import { deliverSound } from './perception';
 import type { Simulation } from './sim';
 
@@ -255,6 +256,8 @@ export function squadArrives(ctx: TickContext, c: CommanderEntity, x: number, z:
       const body = createBody(ctx.world, ctx.solids, ctx.tuning.bodies.guard, px, pz, faceX, faceZ);
       const senses = createSenses(false);
       const brain = createBrain();
+      // They were sent for because the alarm is up, and know it: the siren itself was over before they came in earshot.
+      brain.sirenAt = ctx.tick;
       return { id, kind: 'guard', faction: Faction.Camp, body, guard: { spawn: post >= 0 ? post : 0, headYaw: 0, order: standStill(), reserve: { x: px, z: pz, yaw: yawFromDirection(faceX, faceZ) } }, senses, brain };
     });
   }
@@ -263,10 +266,24 @@ export function squadArrives(ctx: TickContext, c: CommanderEntity, x: number, z:
   // camp that protects its target (brain/protect.ts), the first of them are what they were
   // called for: they go to his door to bring him out, and need no further order to.
   // With no vehicle for him there is nowhere to bring him out to, and he's safest where he is.
-  const room = c.camp.devices.escape ? c.camp.protects : undefined;
+  // A camp that holds isn't bringing him out at all: its relief goes to his doors, and those are their posts from then on.
+  const holds = c.camp.answer === 'hold';
+  // Nor is there anyone to bring out once he's in his vehicle and away.
+  const going = c.camp.objective?.status === 'escaping' || c.camp.objective?.status === 'escaped';
+  const room = c.camp.devices.escape && !holds && !going ? c.camp.protects : undefined;
+  const doors = holds ? keepDoors(ctx) : [];
   let fetchers = 0;
+  let keepers = 0;
   for (const g of ctx.index.of('guard')) {
     if (!g.brain || g.guard.order.tick !== 0 || g.brain.act !== 'routine' || c.camp.roster.some((m) => m.id === g.id)) continue;
+    const door = !c.camp.relief && keepers < ctx.tuning.brain.protect.answer.keepers ? doors[keepers] : undefined;
+    if (door && g.guard.reserve) {
+      keepers++;
+      g.guard.reserve = door;
+      c.camp.roster.push({ id: g.id, post: g.guard.spawn, x: g.body.x, z: g.body.z, tick: ctx.tick, status: 'ok', reserve: { x: door.x, z: door.z }, keeps: true });
+      g.brain.task = { id: c.camp.nextTask++, kind: 'post', x: door.x, z: door.z, issued: ctx.tick, cause: event };
+      continue;
+    }
     c.camp.roster.push({ id: g.id, post: g.guard.spawn, x: g.body.x, z: g.body.z, tick: ctx.tick, status: 'ok', ...(g.guard.reserve ? { reserve: { x: g.guard.reserve.x, z: g.guard.reserve.z } } : {}) });
     if (room && !c.camp.relief && fetchers < ctx.tuning.brain.protect.fetchers) {
       fetchers++;
@@ -279,6 +296,18 @@ export function squadArrives(ctx: TickContext, c: CommanderEntity, x: number, z:
     g.brain.task = { id: c.camp.nextTask++, kind: 'search', x: target.x, z: target.z, issued: ctx.tick, cause: event };
   }
   if (c.camp.protects && !c.camp.relief) c.camp.relief = { at: ctx.tick, fetches: fetchers > 0 ? 1 : 0, last: ctx.tick };
+}
+
+/** Where a man stands to hold each door of the target's building, facing out from it: a camp that holds posts its relief there. */
+function keepDoors(ctx: TickContext): Array<{ x: number; z: number; yaw: number; door: true }> {
+  const camp = ctx.world.camp;
+  const hq = camp.layout?.buildings.find((b) => b.module === 'hq');
+  if (!hq || !camp.doors) return [];
+  const out = ctx.tuning.brain.protect.answer.doorPost;
+  return hq.doors.map((k) => {
+    const d = camp.doors![k]!;
+    return { x: d.x - d.nx * out, z: d.z - d.nz * out, yaw: yawFromDirection(-d.nx, -d.nz), door: true as const };
+  });
 }
 
 /**
@@ -302,12 +331,35 @@ export function targetEscapes(ctx: TickContext, g: GuardEntity): void {
   }
   const status = vehicle ? 'escaping' : 'escaped';
   c.camp.objective.status = status;
+  const running = vehicle?.vehicle.running;
+  c.camp.objective.left = { tick: ctx.tick, engine: running !== undefined && running <= ctx.tick ? running : -1, relief: c.camp.relief?.at ?? -1, siren: g.brain!.sirenAt };
   for (const o of ctx.index.of('objective')) if (o.objective.target === g.id) o.objective.status = status;
   if (vehicle) {
     vehicle.vehicle.driving = { route: [{ x: vehicle.solid.x, z: vehicle.solid.z }, ...yard!, ...escapeRoute(ctx.world, ctx.tuning)], leg: 1, waited: 0, then: 'escape', cause: 0 };
     vehicle.vehicle.rider = { spawn: g.guard.spawn };
+    // It has left its place, and the camp's men can see that: there's nothing standing there to start, or to run to.
+    c.camp.devices.escape = null;
   }
   ctx.despawn(g.id);
+}
+
+/**
+ * A man of a camp that bolts has reached its vehicle and has his hand on the starter
+ * (brain/protect.ts). It starts, and is heard from the next tick (game/escape.ts); or it's
+ * been sabotaged, and he says so, as the target does when he finds it dead.
+ */
+export function startsVehicle(ctx: TickContext, g: GuardEntity): void {
+  const c = commanderOf(ctx);
+  const vehicle = ctx.index.of('vehicle').find((v) => v.vehicle.escape);
+  // It has to be there to be started: one that has driven off isn't.
+  const box = vehicle?.solid as { hx?: number; hz?: number } | undefined;
+  const reach = ctx.tuning.brain.alarm.flee.arrive + Math.sqrt((box?.hx ?? 0) * (box?.hx ?? 0) + (box?.hz ?? 0) * (box?.hz ?? 0)) + ctx.tuning.bodies.guard.radius;
+  if (!c || !vehicle || vehicle.vehicle.driving || (vehicle.solid.x - g.body.x) * (vehicle.solid.x - g.body.x) + (vehicle.solid.z - g.body.z) * (vehicle.solid.z - g.body.z) > reach * reach) return;
+  if (startEngine(ctx, vehicle) || g.brain!.stranded) return;
+  g.brain!.stranded = true;
+  reportOutage(ctx, c, g, vehicle.solid.x, g.body.y, vehicle.solid.z);
+  // Word of it gets round: the camp has no vehicle, so nobody else runs to it, and nobody is sent to bring him out to it.
+  c.camp.devices.escape = null;
 }
 
 /** Someone found the camp's equipment dead and says so: it reaches the camp whether or not the radio works, because the set is what's dead. */
@@ -488,6 +540,8 @@ export const orderDeliver: ScheduleHandler = (ctx, entry) => {
   const task = c.camp.tasks.find((t) => t.id === entry.b);
   if (!task) return;
   const b = g.brain;
+  // A man bringing the target out, readying his way out or on his way to hold his door finishes that: a lesser order isn't taken.
+  if (b.task && forTheTarget(b.task.kind) && !forTheTarget(task.kind)) return;
   b.task = { id: task.id, kind: task.kind, x: task.x, z: task.z, ...(task.y === undefined ? {} : { y: task.y }), issued: ctx.tick, cause: task.cause, ...(task.hunt ? { hunt: { ...task.hunt, men: [...task.hunt.men], watch: [...task.hunt.watch] } } : {}) };
   // A new order starts afresh, even mid-task: not the old one's linger, its sweep or its cover.
   b.linger = -1;
@@ -497,6 +551,11 @@ export const orderDeliver: ScheduleHandler = (ctx, entry) => {
   // The order is news to him: he reconsiders now.
   b.thinkAt = ctx.tick;
 };
+
+/** The orders that are about the target himself (brain/protect.ts), which nothing else displaces. */
+function forTheTarget(kind: Task['kind']): boolean {
+  return kind === 'fetch' || kind === 'escort' || kind === 'start' || kind === 'post';
+}
 
 function radioUp(ctx: TickContext, c: CommanderEntity): boolean {
   if (!c.camp.netWorking) return false;

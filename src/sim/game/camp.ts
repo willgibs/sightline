@@ -44,6 +44,8 @@ export interface VehicleEntity extends EntityBase {
     disabled?: boolean;
     /** Who is in the cab on the way out (E7): the post he came from, so that he can get out again if it's held up (game/escape.ts). */
     rider?: { spawn: number };
+    /** Its engine is running, since this tick (game/escape.ts): on the move, or started and standing. Absent while it's off. */
+    running?: number;
     /** On the move (E7, E8): the way it's going, which leg it's on, how long it has been held up, what happens at the end, and why it's going. Absent while parked. */
     driving?: { route: Array<{ x: number; z: number }>; leg: number; waited: number; then: 'escape' | 'dismount'; cause: number };
   };

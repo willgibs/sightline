@@ -216,7 +216,7 @@ export type HeardKind = 'sound' | 'shot' | 'voice';
 /** What a guard can be doing, and why he changed (brain/brain.ts, ACTS and ACT_WHYS). Stored by index: only add at the end. */
 export type ActCode = 'routine' | 'return' | 'look' | 'investigate' | 'search' | 'hold' | 'report' | 'task' | 'engage' | 'cover' | 'alarm' | 'flank' | 'flee' | 'suppress' | 'shelter' | 'stand-to' | 'fight' | 'push' | 'hunt';
 export type ReportCode = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear' | 'claim' | 'outage' | 'escort' | 'moving' | 'set';
-export type TaskCode = 'investigate' | 'search' | 'check' | 'sweep' | 'cover' | 'fetch' | 'escort' | 'hunt';
+export type TaskCode = 'investigate' | 'search' | 'check' | 'sweep' | 'cover' | 'fetch' | 'escort' | 'hunt' | 'start' | 'post';
 export type LevelCode = 'calm' | 'uneasy' | 'alert' | 'lockdown';
 export type ActReason = 'start' | 'seen' | 'glimpse' | 'heard' | 'shot' | 'voice' | 'repeat' | 'contact' | 'calm' | 'arrived' | 'nothing' | 'stalled' | 'no-route' | 'lost' | 'told' | 'report' | 'ordered' | 'body' | 'glint' | 'outage' | 'door' | 'siren' | 'muzzle';
 
@@ -399,6 +399,16 @@ export interface SirenEvent extends EventBase, SoundFields {
   type: 'siren';
 }
 
+/**
+ * A vehicle's engine, running (game/escape.ts): one of these every couple of seconds while
+ * it does, from where the vehicle is. Source: the vehicle. `load` is what it's doing:
+ * being started, standing with it running, or on the move.
+ */
+export interface EngineEvent extends EventBase, SoundFields {
+  type: 'engine';
+  load: 'start' | 'idle' | 'drive';
+}
+
 /** A guard's brain changed what he is doing (brain/brain.ts): source the guard, cause the percept or act behind it. */
 export interface ActEvent extends EventBase {
   type: 'act';
@@ -438,6 +448,7 @@ export type SimEvent =
   | PassedEvent
   | DoorEvent
   | SirenEvent
+  | EngineEvent
   | ReinforceEvent
   | SpottedEvent
   | ReportEvent
@@ -559,13 +570,14 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   drag: { code: 51, range: 'body', sound: true, fields: { ...SOUND } },
   call: { code: 91, range: 'brain', sound: true, fields: { ...SOUND, radio: 'u8', say: { enum: REPORT_CODES } } },
   radio: { code: 92, range: 'brain', sound: false, fields: { kind: { enum: REPORT_CODES }, x: 'f32', z: 'f32', radius: 'f32' } },
-  order: { code: 93, range: 'brain', sound: false, fields: { to: 'u32', task: { enum: every<TaskCode>()(['investigate', 'search', 'check', 'sweep', 'cover', 'fetch', 'escort', 'hunt']) }, x: 'f32', z: 'f32' } },
+  order: { code: 93, range: 'brain', sound: false, fields: { to: 'u32', task: { enum: every<TaskCode>()(['investigate', 'search', 'check', 'sweep', 'cover', 'fetch', 'escort', 'hunt', 'start', 'post']) }, x: 'f32', z: 'f32' } },
   alarm: { code: 97, range: 'brain', sound: false, fields: { box: 'u8', stage: { enum: every<EventOf<'alarm'>['stage']>()(['raised', 'dead']) } } },
   reinforce: { code: 99, range: 'brain', sound: false, fields: { count: 'u8', x: 'f32', z: 'f32' } },
   siren: { code: 98, range: 'brain', sound: true, fields: { ...SOUND } },
   hurt: { code: 96, range: 'brain', sound: false, fields: { part: { enum: every<EventOf<'hurt'>['part']>()(['head', 'torso', 'legs']) }, hits: 'u8' } },
   checkin: { code: 95, range: 'brain', sound: false, fields: { post: 'i32', stage: { enum: every<EventOf<'checkin'>['stage']>()(['call', 'answer', 'silence', 'dead']) } } },
   whistle: { code: 103, range: 'brain', sound: true, fields: { ...SOUND } },
+  engine: { code: 105, range: 'brain', sound: true, fields: { ...SOUND, load: { enum: every<EventOf<'engine'>['load']>()(['start', 'idle', 'drive']) } } },
   passed: { code: 104, range: 'brain', sound: false, fields: { distance: 'f32' } },
   objective: { code: 102, range: 'brain', sound: false, fields: { stage: { enum: every<EventOf<'objective'>['stage']>()(['get-out']) } } },
   sabotage: { code: 100, range: 'brain', sound: false, fields: { what: { enum: every<EventOf<'sabotage'>['what']>()(['generator', 'radio', 'vehicle']) }, x: 'f32', z: 'f32' } },

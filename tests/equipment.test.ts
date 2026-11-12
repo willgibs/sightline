@@ -277,7 +277,7 @@ describe('the target and his vehicle (E7)', () => {
     const { sim } = lockdown(false);
     const v = sim.index.of('vehicle').find((x) => x.vehicle.escape)!;
     const parked = world.camp.vehicles!.find((x) => x.escape)!;
-    expect(sim.state.outcome).toMatchObject({ status: 'failed', reason: 'the target got away' });
+    expect(sim.state.outcome).toMatchObject({ status: 'failed', reason: expect.stringMatching(/^the target got away/) });
     expect(Math.hypot(v.solid.x - parked.x, v.solid.z - parked.z)).toBeGreaterThan(40);
     expect(sim.index.of('objective')[0]!.objective.status).toBe('escaped');
   }, 120_000);

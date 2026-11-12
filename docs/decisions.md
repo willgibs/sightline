@@ -2,6 +2,28 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-11 · The target's answer, by the camp's problem; and engines you can hear
+
+**Why.** The owner's call on `core-challenge` (Nov 10): what the target does under attack should depend on the camp, so that play "can't be reduced to always cutting a radio or disabling a vehicle", with "a clear method to the madness". Every protecting camp gave one answer: he waited for the relief, and its men brought him out. And vehicles made no sound, so nothing said he was about to go.
+
+**Built** (`brain/protect.ts`, `game/protection.ts`, `game/escape.ts`; the design and the numbers are in `docs/camp-engine.md`, section 9, *Step 3a*). A protecting camp takes its answer from the problem it's built round. One he's buried in holds him to the end and posts its relief on his doors. One built to be flushed bolts: at the siren the man on his door starts his vehicle, and when that engine has run a minute he goes in for him. Any other waits for its relief, as before. The method is one sentence: he leaves only by a way the camp has ready. `off=answer` gives every camp the old answer.
+
+**An engine is a sound** (the `engine` event): as a vehicle starts, and every two seconds while it runs, standing or on the move, heard by the law every sound obeys. The page voices each as a stretch that joins the next. So a camp that bolts gives over a minute's warning, and the relief's truck is heard on the road.
+
+**Decided along the way.**
+- **A bolt is a drill, not an order.** Each step is something a man does on what he hears: the siren, then the engine. So the radio makes no difference to it, and what you do to it shows: kill the man who started it and the target comes out late, alone; kill the vehicle and he stays.
+- **It doesn't hang on one man.** The man on the target's door is the guard a perch sees best, and a shooter who took him first defused the whole getaway without a sound. So if no engine is running 20 s after the siren the nearest man left goes to start it, each counting for himself, the longer the farther off he is. Found by playing the sitting's own link headless before putting it on the desk.
+- **A camp that holds never gives him up.** Its problem promises that no perch ever has him, so a patient sniper must still go in. The owner chose "keep him inside" over "leaves only if the camp is losing".
+- **A man on the target's door stays on it once the siren has sounded.** He used to walk off to look into things, which left the door open to the first distraction after an alarm. Now he looks into nothing, is ordered nowhere but in for the target, fights from within 8 m of where he stands, and goes after nobody. Before the siren he can still be drawn away.
+- **An order doesn't take a man off bringing the target out**, or off his way to hold a door. The relief knows the alarm is up when it arrives: the siren itself is over by then.
+- **A run that loses him says what there was to read**, in the outcome's reason: the engine, the relief, or nothing.
+
+**Measured** (`npm run experiment -- answer --camps 40`): under a sniper on the best overview, he left 31 camps of 31 before and 15 now. None of the 16 built to be gone into lose him. The 10 built to be flushed lose him 84 s after the siren, with their engine running for 79 s of that. Where he leaves, something says so from the overview first on 14 camps of 15, for 78 s.
+
+**Versions.** `SIM_VERSION` 19: runs with a vehicle on the move have engine events, and protecting camps answer differently. No pinned run has either, so no behaviour fingerprint moved. `STATE_SCHEMA` 13.
+
+**Not done.** Nobody has played or heard it. A camp that holds still has a vehicle standing at his door, which reads as a getaway. It stays there for now: a camp that isn't ready for trouble still runs him to it at the siren, and its place by his door is what hides that run from a perch. It moves when those camps take an answer of their own. What he does about someone in his room is close protection, next of step 3's means.
+
 ## 2026-11-11 · Taller camps: levels, and what a ridge gets of them
 
 **The owner's brief** (the desk's `compound-types` decision, Nov 10): "I think taller buildings help a lot with increasing the offensive challenge. Makes every enemy troop less openly visible from any given perch, and creates a bit more vertical range to assess versus just sweeping the guard towers first, then knowing everyone else is ground level. However, I don't want to have to go clear every corner of every building to claim success." This is the second step of compound types: `docs/compound-types.md` has the design (section 5), what building it changed (5a) and where it stands. `GEN_VERSION` 9.

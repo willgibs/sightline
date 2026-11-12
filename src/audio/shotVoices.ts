@@ -12,6 +12,8 @@ import { burst, ring, thump, type NoiseBuffers, type Rand } from './voices';
  *            water's splash.
  *   bolt     the action worked: two clacks a beat apart.
  *   cry      a hit guard's cry: a falling, throaty shout.
+ *   motor    a vehicle's engine: the simulation says it's running every couple of seconds,
+ *            and each time is a stretch of it long enough to join the next.
  */
 
 /** A level that a voice can't exceed, whatever the hearing law says up close. */
@@ -141,6 +143,83 @@ export function door(ctx: BaseAudioContext, out: AudioNode, noise: NoiseBuffers,
   if (open) return Math.max(end, burst(ctx, voice, noise.white, rand, when + 0.03, 'bandpass', 900 + rand() * 200, 9, 0.06, 0.28, 0.35));
   end = Math.max(end, thump(ctx, voice, when + 0.01, 110, 0.12, 0.9));
   return Math.max(end, burst(ctx, voice, noise.white, rand, when + 0.012, 'lowpass', 500, 0.7, 0.003, 0.09, 0.6));
+}
+
+/**
+ * A vehicle's engine, for one of the simulation's 'engine' events: a stretch of it that
+ * fades in as the one before fades out, so a running engine is one unbroken sound that
+ * follows the vehicle. `every` is the seconds between events.
+ *
+ *   start   the starter turning over, then it catches and revs
+ *   idle    a low, lumpy beat
+ *   drive   higher and harder, under load
+ */
+export function motor(ctx: BaseAudioContext, out: AudioNode, noise: NoiseBuffers, rand: Rand, when: number, amp: number, load: 'start' | 'idle' | 'drive', every: number): number {
+  const fade = 0.6;
+  const end = when + every + fade;
+  const level = capped(amp) * (load === 'idle' ? 0.3 : 0.42);
+  const voice = new GainNode(ctx, { gain: 0 });
+  voice.connect(out);
+  // In with the last stretch's way out, so the two add up to a steady level.
+  voice.gain.setValueAtTime(0, when);
+  voice.gain.linearRampToValueAtTime(level, when + (load === 'start' ? 0.05 : fade));
+  voice.gain.setValueAtTime(level, end - fade);
+  voice.gain.linearRampToValueAtTime(0, end);
+  const body = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: load === 'idle' ? 260 : 420, Q: 0.7 });
+  body.connect(voice);
+  // The firing beat: two low tones a fifth apart, their level beaten by the engine's turning.
+  const base = load === 'idle' ? 38 : 58;
+  const low = new OscillatorNode(ctx, { type: 'sawtooth', frequency: base });
+  const high = new OscillatorNode(ctx, { type: 'square', frequency: base * 1.5 });
+  const beat = new OscillatorNode(ctx, { type: 'sine', frequency: load === 'idle' ? 11 : 17 });
+  const lump = new GainNode(ctx, { gain: 0.35 });
+  const mix = new GainNode(ctx, { gain: 0.65 });
+  beat.connect(lump).connect(mix.gain);
+  low.connect(mix);
+  const thin = new GainNode(ctx, { gain: 0.3 });
+  high.connect(thin).connect(mix);
+  mix.connect(body);
+  if (load === 'start') {
+    // The starter: a second of a thin, grinding whirr, and then it catches: up through a rev and back down to a run.
+    const whirr = new OscillatorNode(ctx, { type: 'square', frequency: 190 });
+    const grind = new OscillatorNode(ctx, { type: 'sine', frequency: 23 });
+    const depth = new GainNode(ctx, { gain: 40 });
+    const env = new GainNode(ctx, { gain: 0 });
+    grind.connect(depth).connect(whirr.frequency);
+    whirr.connect(env).connect(voice);
+    env.gain.setValueAtTime(0.5, when);
+    env.gain.setValueAtTime(0.5, when + 0.85);
+    env.gain.linearRampToValueAtTime(0, when + 1);
+    whirr.start(when);
+    grind.start(when);
+    whirr.stop(when + 1.05);
+    grind.stop(when + 1.05);
+    mix.gain.setValueAtTime(0, when);
+    mix.gain.setValueAtTime(0, when + 0.8);
+    mix.gain.linearRampToValueAtTime(0.65, when + 1);
+    for (const o of [low, high]) {
+      const f = o === low ? base : base * 1.5;
+      o.frequency.setValueAtTime(f * 0.7, when + 0.8);
+      o.frequency.linearRampToValueAtTime(f * 1.9, when + 1.5);
+      o.frequency.linearRampToValueAtTime(f * 0.66, end);
+    }
+  } else if (load === 'drive') {
+    // Under way: it works a little harder and easier as it goes.
+    const wander = base * (0.94 + 0.12 * rand());
+    low.frequency.linearRampToValueAtTime(wander, end);
+    high.frequency.linearRampToValueAtTime(wander * 1.5, end);
+  }
+  for (const o of [low, high, beat]) {
+    o.start(when);
+    o.stop(end + 0.02);
+  }
+  // The exhaust: low noise under it, for as long as this stretch lasts.
+  const exhaust = new AudioBufferSourceNode(ctx, { buffer: noise.brown });
+  const breath = new GainNode(ctx, { gain: load === 'idle' ? 0.5 : 0.7 });
+  exhaust.connect(breath).connect(body);
+  exhaust.start(when, rand() * Math.max(0, noise.brown.duration - (end - when) - 0.05));
+  exhaust.stop(end + 0.02);
+  return end + 0.02;
 }
 
 /** The camp's whistle: three hard blasts, a trilled high note, carrying across the valley. */

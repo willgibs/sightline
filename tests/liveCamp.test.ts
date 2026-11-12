@@ -42,7 +42,7 @@ describe('a live camp (E13)', () => {
       expect(sim.index.of('alarm').filter((a) => a.alarm.raised).length).toBe(1);
       expect(commanderOf(sim)!.camp.level).toBe('lockdown');
       expect(events.some((e) => e.type === 'act' && e.to === 'flee'), 'the target never ran').toBe(true);
-      expect(sim.state.outcome).toMatchObject({ status: 'failed', reason: 'the target got away' });
+      expect(sim.state.outcome).toMatchObject({ status: 'failed', reason: expect.stringMatching(/^the target got away/) });
       expect(sim.index.of('objective')[0]!.objective.status).toBe('escaped');
     }, 180_000);
   }
