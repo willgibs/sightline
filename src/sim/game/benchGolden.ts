@@ -175,13 +175,13 @@ export const BENCH_GOLDEN: PinnedBench = {
       "re-found within 60 s (of 16): honest, unpaced": 16,
       "reactions (in the scripted scenarios)": 62,
       "reactions unexplained": 0,
-      "overlook: guards down from one perch, of 32": 17,
+      "overlook: guards down from one perch, of 32": 19,
       "overlook: camps cleared (of 3)": 0,
       "overlook: the target got away (of 3)": 2,
       "timed shot on an escort's camp: target down (of 3)": 3,
-      "a fight’s worst tick: grid cells the brains expand": 6503,
-      "a fight’s worst tick: rays the brains cast": 454,
-      "a fight’s worst tick: grid cells sounds flood": 19332,
+      "a fight’s worst tick: grid cells the brains expand": 7824,
+      "a fight’s worst tick: rays the brains cast": 558,
+      "a fight’s worst tick: grid cells sounds flood": 13313,
       "routes between a camp’s posts: found (of 56)": 56,
       "routes between a camp’s posts: grid cells a search looks at, on average": 459,
       "routes between a camp’s posts: the most one search looks at": 2716,
@@ -192,12 +192,12 @@ export const BENCH_GOLDEN: PinnedBench = {
     "runs": {
       "camp-fight": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 12105 },
-          "bullets": { "rays": 53, "nodes": 0, "bodies": 0 },
-          "perception-hearing": { "rays": 51, "nodes": 29269, "bodies": 0 },
-          "perception-spotting": { "rays": 8477, "nodes": 0, "bodies": 0 },
-          "perception-awareness": { "rays": 0, "nodes": 64535, "bodies": 0 },
-          "guard-brains": { "rays": 277, "nodes": 8945, "bodies": 0 }
+          "motor": { "rays": 0, "nodes": 0, "bodies": 11999 },
+          "bullets": { "rays": 79, "nodes": 0, "bodies": 0 },
+          "perception-hearing": { "rays": 75, "nodes": 45808, "bodies": 0 },
+          "perception-spotting": { "rays": 8866, "nodes": 0, "bodies": 0 },
+          "perception-awareness": { "rays": 0, "nodes": 75045, "bodies": 0 },
+          "guard-brains": { "rays": 290, "nodes": 14061, "bodies": 0 }
         }
       }
     }

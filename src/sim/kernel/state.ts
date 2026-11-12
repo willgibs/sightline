@@ -25,9 +25,11 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * mantle; the player's controls keep a climb press (lab C, Nov 8). 9: the valley's guards
  * carry their senses (A13). 10: a vehicle on its way out keeps who is in its cab, so that he
  * can get out again. 11: a camp says whether its men are drilled for a firefight, and a man
- * in one keeps what he knows of it and his position (brain/firefight.ts).
+ * in one keeps what he knows of it and his position (brain/firefight.ts). 12: a camp keeps
+ * who it's hunting, its sections, the places they've found empty and the bodies it has
+ * named, and a man on the hunt keeps the way out and where he is on it (brain/hunt.ts).
  */
-export const STATE_SCHEMA = 11;
+export const STATE_SCHEMA = 12;
 
 export type EntityId = number;
 

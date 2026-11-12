@@ -612,11 +612,11 @@ function planHunt(m: CampMind, out: CampOrder[]): void {
   heardThreat(m);
   // A fix goes stale, unless a section is out on it: then it stands until they've looked.
   if (camp.threat && camp.sections.length === 0 && (tick - camp.threat.news) / hz > H.fresh) camp.threat = null;
-  const th = camp.threat;
   // Sections whose time is up, or whose men are all gone as far as the camp knows, or who've cleared their place with nowhere to go on to.
   for (const s of [...camp.sections]) {
     const men = s.men.filter((id) => camp.roster.find((g) => g.id === id)?.status === 'ok').length;
-    const done = s.heard === 'clear' && (!th || s.legs >= H.legs) && (tick - s.heardAt) / hz > H.hold;
+    // Called its place clear, and hasn't been sent on in the time its men wait for orders: they're on their way home.
+    const done = s.heard === 'clear' && (tick - s.heardAt) / hz > H.hold;
     // One man isn't a section: what's left of it comes home by itself (hunt.ts).
     if ((tick - s.ordered) / hz <= H.lifetime && men >= 2 && !done) continue;
     camp.sections.splice(camp.sections.indexOf(s), 1);

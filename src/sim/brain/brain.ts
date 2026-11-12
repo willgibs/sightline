@@ -206,6 +206,8 @@ export function decide(m: GuardMind, out: Order): ActChange | null {
   if (b.sirenAt < 0 && heardSiren(m)) b.sirenAt = m.tick;
   noteProtection(m);
   noteFirefight(m);
+  // A hunt he's been taken off, by another order or by none: there's nothing of it to remember.
+  if (b.hunt && b.task?.kind !== 'hunt') delete b.hunt;
   if (b.done || m.tick >= b.thinkAt || a.state !== b.state || newest !== b.percept) {
     b.state = a.state;
     b.percept = newest;
