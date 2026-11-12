@@ -1,11 +1,11 @@
 import type { Stance } from '../body';
-import { dcos, dsin } from '../kernel/core/detmath';
 import { approachOf, emptyWay } from './approach';
 import type { ActName } from './brain';
 import type { HuntOrder } from './camp';
 import { stayAt, steer } from './firefight';
 import type { GuardMind } from './mind';
 import { walk } from './moves';
+import { navigatorOf } from './nav';
 import type { Order } from './orders';
 import { exposedAt, lineFrom } from './positions';
 import type { Report } from './reports';
@@ -20,17 +20,20 @@ import type { Option } from './utility';
  * crosses open ground alone to stop him, and nobody should. What goes is a section, by the
  * way that keeps most out of his view (approach.ts):
  *
- *   out      To where it gathers, and on. Out of his view they keep going, one behind the
- *            other. Where the way crosses ground he can see they go by bounds, in turn: a
- *            man dashes to the next stop, gets down, and says "Set!"; the other half goes
- *            when it hears him, one stop past where he is.
+ *   out      To where it gathers, and on. Out of his view they run on together: one says
+ *            he's moving and how far, and the rest go with him. Where the way crosses
+ *            ground he can see they go by bounds, in turn: a man dashes to the next stop,
+ *            gets down, and says "Set!"; the other half goes when it hears him, one stop
+ *            past where he is.
  *   watch    No way reaches a firing point unseen: the last of it is the ground the firing
  *            point looks down on. So they stop short of that, at the last cover within
  *            rifle range, and watch the place: up to look, down again. A shot from there
  *            now, or a man getting up to leave, is under two rifles.
  *   close    Nothing seen: the leader's half goes on to the place by short dashes, saying so,
  *            and the half behind covers it, with fire on the place while a man is up.
- *   sweep    On the place: he looks all round it.
+ *   sweep    On the place: he walks a box round it, looking in, and then round each listed
+ *            firing point close beside it. A man lying up a few metres off the believed
+ *            spot is still found.
  *   hold     Nobody there: he says so, on the net and aloud, and they wait for orders.
  *   home     None come, or the orders have run out: back to their posts.
  *
@@ -63,16 +66,20 @@ export interface Hunt {
   /** The stop he's on, or making for, and the one he left for it. */
   at: number;
   from: number;
-  /** The farthest stop he's heard the other half say it's down on (−1 for none); the ticks he last heard the other half say it's moving, and anyone call this place clear (−1 for never). Taken from what he's told as it comes, since a busy net pushes it out of mind. */
+  /** The farthest stop he's heard the other half say it's down on (−1 for none); the tick he last heard the other half say it's moving (−1 for never), the stop it named, and how far that is from the place; and the tick he last heard anyone call this place clear. Taken from what he's told as it comes, since a busy net pushes it out of mind. */
   theirs: number;
   theirMove: number;
+  theirMoveTo: number;
+  theirReach: number;
   heardClear: number;
   /** The tick up to which he's taken in what he's been told. */
   mark: number;
-  /** On his way to it. Otherwise he's down on it, since `since`, and has said so or not. */
+  /** On his way to it, since `left`. Otherwise he's down on it, since `since`, and has said so or not, and when he last did. */
   going: boolean;
+  left: number;
   since: number;
   said: boolean;
+  saidAt: number;
   /** How low he is at the stop he's on when he's down, and how he comes up to look. */
   stance: Stance;
   up: Stance;
@@ -84,8 +91,11 @@ export interface Hunt {
   unheard: number;
   /** Head down until this tick: rounds are striking close. */
   pinned: number;
-  /** The tick he first had the place under his eyes with nobody there, or −1. */
-  clear: number;
+  /** Looking it over: the points he walks round (x, z, flattened: the place, then the listed firing points close beside it), the one he's on, the corner of its box he's making for (the last is its middle), and whether he's got to any corner of this one. */
+  sweep: number[];
+  swept: number;
+  corner: number;
+  walked: boolean;
   /** Holding because the place is clear (true), or at the rally because the rest of his section never came. */
   cleared: boolean;
   /** The newest body he's taken note of out here: its percept's tick, or −1. */
@@ -169,8 +179,10 @@ export function beginHunt(m: GuardMind): void {
   const h = b.hunt;
   if (h && h.task === task.id) {
     // Back from a fight, or from getting out of the line: he may be anywhere. On to his stop again.
-    if (h.phase === 'out' || h.phase === 'close') h.going = true;
-    else if (h.phase === 'watch' || h.phase === 'sweep') h.since = m.tick;
+    if (h.phase === 'out' || h.phase === 'close') {
+      h.going = true;
+      h.left = m.tick;
+    } else if (h.phase === 'watch' || h.phase === 'sweep') h.since = m.tick;
     return;
   }
   renew(m);
@@ -192,11 +204,15 @@ function renew(m: GuardMind): void {
     from: 0,
     theirs: -1,
     theirMove: -1,
+    theirMoveTo: -1,
+    theirReach: 0,
     heardClear: -1,
     mark: m.tick - 1,
     going: true,
+    left: m.tick,
     since: m.tick,
     said: false,
+    saidAt: -1,
     stance: 'crouch',
     up: 'stand',
     looking: false,
@@ -204,7 +220,10 @@ function renew(m: GuardMind): void {
     line: false,
     unheard: 0,
     pinned: -1,
-    clear: -1,
+    sweep: [],
+    swept: 0,
+    corner: 0,
+    walked: false,
     cleared: false,
     body: -1,
   };
@@ -221,11 +240,12 @@ function renew(m: GuardMind): void {
   h.from = h.at;
   h.theirs = -1;
   h.theirMove = -1;
+  h.theirMoveTo = -1;
   h.heardClear = -1;
   h.going = true;
+  h.left = m.tick;
   h.said = false;
   h.unheard = 0;
-  h.clear = -1;
   b.routed = -1;
 }
 
@@ -267,11 +287,7 @@ function listen(m: GuardMind, h: Hunt): void {
     if (t.kind !== 'set' && t.kind !== 'moving') continue;
     const who = men.indexOf(t.from);
     if (who < 0 || who % 2 === mine) continue;
-    if (t.kind === 'moving') {
-      h.theirMove = t.heard;
-      continue;
-    }
-    // He said which stop he's on: the one nearest what he named.
+    // He named a stop: the one he's down on, or the one he's going to. The nearest to what he named.
     let at = -1;
     let bestD = Infinity;
     for (let k = 0; k < h.lit.length; k++) {
@@ -283,14 +299,19 @@ function listen(m: GuardMind, h: Hunt): void {
         at = k;
       }
     }
-    if (at > h.theirs) h.theirs = at;
+    if (t.kind === 'moving') {
+      // How far that is from the place says whether fire on the place is still safe.
+      h.theirMove = t.heard;
+      h.theirMoveTo = at;
+      h.theirReach = Math.sqrt((t.x - h.ox) * (t.x - h.ox) + (t.z - h.oz) * (t.z - h.oz));
+    } else if (at > h.theirs) h.theirs = at;
   }
   h.mark = mark;
 }
 
-/** True if the ground between the stop he left and the one he's on is all out of the shooter's view. */
-function cameCovered(h: Hunt): boolean {
-  for (let k = h.from + 1; k <= h.at; k++) if (h.lit[k] === 1) return false;
+/** True if the ground from one stop on to another is all out of the shooter's view. */
+function covered(h: Hunt, from: number, to: number): boolean {
+  for (let k = from + 1; k <= to; k++) if (h.lit[k] === 1) return false;
   return true;
 }
 
@@ -328,13 +349,59 @@ function getDown(m: GuardMind, h: Hunt): void {
   h.up = open ? 'crouch' : 'stand';
 }
 
-/** Leaves the stop he's on for another. */
-function setOff(m: GuardMind, h: Hunt, to: number): void {
+/** Leaves the stop he's on for another, saying so if it's for him to say: which stop, for whoever is covering him or coming with him. */
+function setOff(m: GuardMind, h: Hunt, to: number, announce: boolean): void {
   h.from = h.at;
   h.at = to;
   h.going = true;
+  h.left = m.tick;
   m.brain!.routed = -1;
-  if (h.lit[to] === 1 || h.phase === 'close') say(m, 'moving', h.ox, h.oz);
+  if (announce) say(m, 'moving', h.stops[2 * to]!, h.stops[2 * to + 1]!);
+}
+
+/** The corners of the box a man walks round a point, as offsets in units of its half-diagonal; the fifth is its middle. */
+const BOX: ReadonlyArray<readonly [number, number]> = [
+  [1, 1],
+  [-1, 1],
+  [-1, -1],
+  [1, -1],
+  [0, 0],
+];
+
+/** Starts looking the place over: the place, and the listed firing points the order names that are close beside it, the nearest next each time. */
+function startSweep(m: GuardMind, h: Hunt): void {
+  const o = m.brain!.task!.hunt!;
+  const S = m.tuning.brain.hunt.sweep;
+  h.phase = 'sweep';
+  h.sweep = [h.ox, h.oz];
+  h.swept = 0;
+  h.corner = 0;
+  h.walked = false;
+  const left: number[] = [];
+  for (let k = 0; k + 1 < o.watch.length; k += 2) {
+    const dx = o.watch[k]! - h.ox;
+    const dz = o.watch[k + 1]! - h.oz;
+    const d = dx * dx + dz * dz;
+    if (d > 1 && d <= S.reach * S.reach) left.push(o.watch[k]!, o.watch[k + 1]!);
+  }
+  let x = h.ox;
+  let z = h.oz;
+  while (left.length > 0) {
+    let best = 0;
+    let bestD = Infinity;
+    for (let k = 0; k < left.length; k += 2) {
+      const d = (left[k]! - x) * (left[k]! - x) + (left[k + 1]! - z) * (left[k + 1]! - z);
+      if (d < bestD) {
+        bestD = d;
+        best = k;
+      }
+    }
+    x = left[best]!;
+    z = left[best + 1]!;
+    h.sweep.push(x, z);
+    left.splice(best, 2);
+  }
+  m.brain!.routed = -1;
 }
 
 /** One tick of the hunt for one man. */
@@ -411,14 +478,33 @@ export function performHunt(m: GuardMind, out: Order): void {
   if (h.phase === 'sweep') {
     if (pinned) {
       steer(m, out, 0, 0, 'idle', h.ox, h.oz, 'prone');
-      h.clear = -1;
       return;
     }
-    // On the place: up on a knee, turning to look all round it. Anyone here comes under his eyes, and that's a fight.
-    if (h.clear < 0) h.clear = m.tick;
-    const turned = (2 * Math.PI * (m.tick - h.clear)) / (H.look * hz);
-    stayAt(m, out, self.x, self.z, 'crouch', self.x + 10 * dsin(turned), self.z - 10 * dcos(turned));
-    if ((m.tick - h.clear) / hz < H.look) return;
+    // On the place: round it in a box, looking in, and then round each firing point close beside it. Anyone lying up here
+    // comes under his eyes or his feet, and that's a fight. A corner he can't stand on, or can't get to, he leaves out.
+    const S = H.sweep;
+    while (2 * h.swept < h.sweep.length) {
+      const cx = h.sweep[2 * h.swept]!;
+      const cz = h.sweep[2 * h.swept + 1]!;
+      const [ox, oz] = BOX[h.corner]!;
+      const x = cx + ox * S.radius * Math.SQRT1_2;
+      const z = cz + oz * S.radius * Math.SQRT1_2;
+      const w = navigatorOf(m.world, T).standable(x, z) ? walk(m, out, x, z, h.corner === 0 && h.swept > 0 ? H.paces.covered : S.pace, h.corner === 0 && h.swept > 0 ? 'sprint' : 'walk', cx, cz) : 'stuck';
+      if (w === 'walking') return;
+      b.routed = -1;
+      if ((x - self.x) * (x - self.x) + (z - self.z) * (z - self.z) <= S.near * S.near) h.walked = true;
+      if (++h.corner < BOX.length) continue;
+      // The place itself, and he never got onto it: he can't call it. Back, and the camp leaves it be for a while.
+      if (h.swept === 0 && !h.walked) {
+        goHome(m, h);
+        steer(m, out, 0, 0, 'idle', h.ox, h.oz, 'crouch');
+        return;
+      }
+      h.corner = 0;
+      h.walked = false;
+      h.swept++;
+    }
+    steer(m, out, 0, 0, 'idle', h.ox, h.oz, 'crouch');
     const report = say(m, 'clear', h.ox, h.oz);
     report.radius = T.brain.comms.clearRadius;
     b.radio = { ...report };
@@ -441,7 +527,8 @@ export function performHunt(m: GuardMind, out: Order): void {
       h.looking = false;
       h.until = h.pinned;
     }
-    const covering = !leads(m) && h.theirMove >= 0 && (m.tick - h.theirMove) / hz <= W.cover.hold;
+    // Covering a man who's said he's moving on the place, until he's near enough to it that the fire has to lift.
+    const covering = !leads(m) && h.theirMove >= 0 && (m.tick - h.theirMove) / hz <= W.cover.hold && h.theirReach > W.cover.lift;
     if (m.tick >= h.until && !pinned) {
       h.looking = !h.looking || covering;
       const span = h.looking ? W.look : W.down;
@@ -452,8 +539,14 @@ export function performHunt(m: GuardMind, out: Order): void {
     const ready = stayAt(m, out, self.x, self.z, h.looking ? h.up : h.stance, h.ox, h.oz);
     if (!h.said && (m.tick - h.since) / hz >= H.bound.settle) {
       h.said = true;
+      h.saidAt = m.tick;
       say(m, 'set', h.stops[2 * h.at]!, h.stops[2 * h.at + 1]!);
       return;
+    }
+    // Until the other half has come up beside him he says it again now and then: they may not have been in earshot the first time.
+    if (h.theirs < h.at && h.theirMove < h.since && (m.tick - h.saidAt) / hz >= H.bound.again && !b.say) {
+      h.saidAt = m.tick;
+      say(m, 'set', h.stops[2 * h.at]!, h.stops[2 * h.at + 1]!);
     }
     // The half behind covers a man who's said he's moving on the place: rounds at it, while he has a line to it and it's in reach.
     if (covering && h.looking && ready && h.line && m.tick >= b.fireAt) {
@@ -470,12 +563,11 @@ export function performHunt(m: GuardMind, out: Order): void {
       if (waited < W.for || pinned) return;
       if (h.theirs < h.at && waited < W.for + H.bound.wait) return;
       if (h.at >= last) {
-        h.phase = 'sweep';
-        h.clear = -1;
+        startSweep(m, h);
         return;
       }
       h.phase = 'close';
-      setOff(m, h, h.at + 1);
+      setOff(m, h, h.at + 1, true);
       return;
     }
     // The half behind: there until the place is called, or until it's plain nobody's going to.
@@ -495,18 +587,24 @@ export function performHunt(m: GuardMind, out: Order): void {
       const w = walk(m, out, spot.x, spot.z, H.paces.lit, 'sprint', h.ox, h.oz);
       const dx = h.ox - self.x;
       const dz = h.oz - self.z;
-      const there = h.at === last && dx * dx + dz * dz <= H.arrive * H.arrive;
+      const there = h.at === last && dx * dx + dz * dz <= H.sweep.near * H.sweep.near;
       if (w === 'walking' && !there) return;
+      // No way found, or something in it: he tries again for a while before he makes do with where he's got to.
+      if (w === 'stuck' && !there && (m.tick - h.left) / hz < H.sweep.stuck) {
+        steer(m, out, 0, 0, 'idle', h.ox, h.oz, 'crouch');
+        return;
+      }
       getDown(m, h);
       if (h.at === last) {
-        h.phase = 'sweep';
-        h.clear = -1;
+        // On it, or near enough to walk round it. Stopped short of that, he can't call it: back, and the camp leaves the place be for a while.
+        if (dx * dx + dz * dz <= H.sweep.from * H.sweep.from) startSweep(m, h);
+        else goHome(m, h);
         return;
       }
     }
     stayAt(m, out, self.x, self.z, h.stance, h.ox, h.oz);
     if (pinned || (m.tick - h.since) / hz < H.watch.pause) return;
-    setOff(m, h, h.at + 1);
+    setOff(m, h, h.at + 1, true);
     return;
   }
 
@@ -516,37 +614,44 @@ export function performHunt(m: GuardMind, out: Order): void {
       steer(m, out, 0, 0, 'idle', h.ox, h.oz, 'prone');
       return;
     }
-    const lit = !cameCovered(h);
-    const w = walk(m, out, spot.x, spot.z, lit ? H.paces.lit : H.paces.covered, 'sprint', h.ox, h.oz);
+    const w = walk(m, out, spot.x, spot.z, covered(h, h.from, h.at) ? H.paces.covered : H.paces.lit, 'sprint', h.ox, h.oz);
     if (w === 'walking') return;
+    // No way found, or something in it: he tries again for a while before he makes do with where he's got to.
+    if (w === 'stuck' && (spot.x - self.x) * (spot.x - self.x) + (spot.z - self.z) * (spot.z - self.z) > H.sweep.near * H.sweep.near && (m.tick - h.left) / hz < H.sweep.stuck) {
+      steer(m, out, 0, 0, 'idle', h.ox, h.oz, 'crouch');
+      return;
+    }
     // There, or as near as he can get.
     getDown(m, h);
     if (h.at >= h.post) {
       h.phase = 'watch';
       return;
     }
-    // Out of his view all the way here, and for the next stretch too: on, without a word. Bounds are for ground he can see.
-    if (h.at > 0 && h.at + 1 <= h.post && cameCovered(h) && h.lit[h.at + 1] === 0) {
-      h.from = h.at;
-      h.at++;
-      h.going = true;
-      b.routed = -1;
-      spotAt(m, h, h.at, spot);
-      walk(m, out, spot.x, spot.z, H.paces.covered, 'sprint', h.ox, h.oz);
-      return;
-    }
   }
   stayAt(m, out, self.x, self.z, h.stance, h.ox, h.oz);
   if (!h.said && (m.tick - h.since) / hz >= H.bound.settle) {
     h.said = true;
+    h.saidAt = m.tick;
     say(m, 'set', h.stops[2 * h.at]!, h.stops[2 * h.at + 1]!);
     return;
   }
   if (!h.said || pinned) return;
+  // The other half has said it's running on, over ground out of the shooter's view all the way from here: with it, at once.
+  if (h.theirMoveTo > h.at && h.theirMove >= h.since - Math.round(H.bound.wait * hz) && covered(h, h.at, h.theirMoveTo)) {
+    h.unheard = 0;
+    setOff(m, h, Math.min(h.post, h.theirMoveTo), false);
+    return;
+  }
+  // Still waiting: he says it again now and then. Whoever he's waiting for may not have been in earshot the first time.
+  if ((m.tick - h.saidAt) / hz >= H.bound.again && !b.say) {
+    h.saidAt = m.tick;
+    say(m, 'set', h.stops[2 * h.at]!, h.stops[2 * h.at + 1]!);
+  }
   // His turn: the other half is down, on his stop or past it if he's of the half that goes first, and past it if he isn't.
   const theirs = h.theirs;
   const due = theirs >= h.at + (leads(m) ? 0 : 1);
-  const waited = (m.tick - h.since) / hz >= (h.at === 0 ? H.rally.wait : H.bound.wait);
+  // Where they gather, the wait runs from the order: the camp said how long the farthest man should take to come.
+  const waited = h.at === 0 ? (m.tick - task.issued) / hz >= task.hunt!.eta + H.rally.wait && (m.tick - h.since) / hz >= H.bound.settle : (m.tick - h.since) / hz >= H.bound.wait;
   if (!due && !waited) return;
   if (!due && h.at === 0 && theirs < 0) {
     // Where they gather, and the rest never came: the camp hears who, and he waits here for whoever it sends instead.
@@ -565,7 +670,10 @@ export function performHunt(m: GuardMind, out: Order): void {
     goHome(m, h);
     return;
   }
-  setOff(m, h, Math.min(h.post, Math.max(h.at + 1, theirs + 1)));
+  // One stop past the other half; and if that's all out of the shooter's view, on to the end of the cover, which they run together.
+  let to = Math.min(h.post, Math.max(h.at + 1, theirs + 1));
+  if (covered(h, h.at, to)) while (to < h.post && h.lit[to + 1] === 0) to++;
+  setOff(m, h, to, true);
 }
 
 /** What the debug view says of a man on the hunt: what he's doing, and how far along. */
@@ -575,7 +683,7 @@ export function huntPhase(b: { act: ActName; hunt?: Hunt }, tick: number): strin
   if (tick < h.pinned) return 'pinned';
   if (h.phase === 'home') return 'coming home';
   if (h.phase === 'hold') return h.cleared ? 'place clear' : 'nobody came';
-  if (h.phase === 'sweep') return 'on the place';
+  if (h.phase === 'sweep') return `looking it over ${h.swept + 1}/${h.sweep.length / 2}`;
   if (h.phase === 'watch') return h.looking ? 'watching, up' : 'watching, down';
   if (h.phase === 'close') return h.going ? 'closing in' : 'closing in, down';
   const of = `${h.at}/${h.post}`;

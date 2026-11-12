@@ -59,9 +59,10 @@ export interface HuntOrder {
   men: number[];
   /** How sure the camp is of the place, metres. */
   r: number;
-  /** Where they gather before they go. */
+  /** Where they gather before they go, and how long the slowest of them should take to get there, seconds. */
   rx: number;
   rz: number;
+  eta: number;
   /** x, z of each place the shooter is taken to be watching from, flattened: the place itself, and the listed firing points beside it. */
   watch: number[];
 }

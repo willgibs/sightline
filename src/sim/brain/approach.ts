@@ -1,4 +1,5 @@
 import type { Tuning } from '../../config/tuning';
+import { dtanDeg } from '../kernel/core/detmath';
 import { Cell, Edge, type GridLayer } from '../kernel/world/grid';
 import { GridSearch, components, type MoveCost } from '../kernel/world/search';
 import type { Ground } from './mind';
@@ -79,6 +80,9 @@ export class Approach {
   /** and up to three of the tree crowns that reach over it, as indices into the world's, −1 for none. */
   private readonly crowns: Int32Array;
   private readonly search: GridSearch;
+  /** Whether the way from each place to the next one east, and north, is a hard climb: joined only by ground steeper than a man runs up easily. */
+  private readonly hardEast: Uint8Array;
+  private readonly hardNorth: Uint8Array;
   /** Whether each place is part of the valley's open ground: the largest piece of the lattice. A room is a piece of its own, and no way starts or ends in one. */
   private readonly open: Uint8Array;
   /** What each listed firing point sees, place by place: null until it's asked for. */
@@ -96,6 +100,7 @@ export class Approach {
   private stop = 0.8;
   private price = 6;
   private priceOn = 6;
+  private priceHard = 3;
   private cells = 6000;
   private bound = { covered: 40, lit: 25, off: 7 };
 
@@ -113,24 +118,38 @@ export class Approach {
     this.px = new Float64Array(n);
     this.pz = new Float64Array(n);
     this.floor = new Float64Array(n);
+    this.hardEast = new Uint8Array(n);
+    this.hardNorth = new Uint8Array(n);
     this.stamp = new Uint32Array(n);
     this.value = new Uint8Array(n);
-    // A place: the walkable cell of the map nearest its middle, so a way's stops are somewhere a man can stand.
+    // A place: the walkable cell of the map nearest its middle, so a way's stops are somewhere a man can stand. One with
+    // room round it, where there is one: a man who runs to a cell on the lip of a steep face goes over it.
+    const roomy = (mc: number): boolean => {
+      const i = mc % M.nx;
+      const j = (mc - i) / M.nx;
+      if (i === 0 || j === 0 || i === M.nx - 1 || j === M.nz - 1) return false;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) if ((M.flags[mc + dj * M.nx + di]! & Cell.Walkable) === 0) return false;
+      return true;
+    };
     const anchor = new Int32Array(n).fill(-1);
     for (let J = 0; J < nz; J++) {
       for (let I = 0; I < nx; I++) {
         const c = J * nx + I;
         let best = -1;
         let bestD = Infinity;
+        let bestRoomy = false;
         for (let b = 0; b < k; b++) {
           for (let a = 0; a < k; a++) {
             const mc = (J * k + b) * M.nx + I * k + a;
             if ((M.flags[mc]! & Cell.Walkable) === 0) continue;
+            const room = roomy(mc);
+            if (bestRoomy && !room) continue;
             // Twice the distance from the place's middle, squared, in map cells: whole numbers, so the first of the nearest is the same everywhere.
             const d = (2 * a + 1 - k) * (2 * a + 1 - k) + (2 * b + 1 - k) * (2 * b + 1 - k);
-            if (d < bestD) {
+            if (d < bestD || (room && !bestRoomy)) {
               bestD = d;
               best = mc;
+              bestRoomy = room;
             }
           }
         }
@@ -147,10 +166,18 @@ export class Approach {
         this.floor[c] = world.terrain.heightAt(this.px[c]!, this.pz[c]!);
       }
     }
-    // The ways between neighbouring places: on foot over the map's own cells, without leaving the two places.
+    // The ground's height at the middle of each cell of the map: the relief below is built on it, and so is what follows.
+    const ground = new Float32Array(M.nx * M.nz);
+    for (let j = 0; j < M.nz; j++) for (let i = 0; i < M.nx; i++) ground[j * M.nx + i] = world.terrain.heightAt(M.x0 + (i + 0.5) * M.cell, M.z0 + (j + 0.5) * M.cell);
+    // The ways between neighbouring places: on foot over the map's own cells, without leaving the two places, and by
+    // ground a man can climb. The map knows where a body fits and where the ground under a cell's middle is too steep
+    // to stand on, but not how much the ground rises between two middles, and a man sent up a face he can't climb
+    // stands at the foot of it.
+    const easy = M.cell * dtanDeg(G.climbDeg);
+    const hard = M.cell * dtanDeg(G.hardDeg);
     const seen = new Uint8Array(2 * k * k);
     const queue = new Int32Array(2 * k * k);
-    const joined = (a: number, b: number, i0: number, j0: number, w: number, h: number): boolean => {
+    const joined = (a: number, b: number, i0: number, j0: number, w: number, h: number, rise: number): boolean => {
       if (a < 0 || b < 0) return false;
       seen.fill(0);
       const at = (mc: number): number => (Math.floor(mc / M.nx) - j0) * w + ((mc % M.nx) - i0);
@@ -166,7 +193,7 @@ export class Approach {
         const go = (to: number, ti: number, tj: number): void => {
           if (ti < i0 || tj < j0 || ti >= i0 + w || tj >= j0 + h) return;
           const s = (tj - j0) * w + (ti - i0);
-          if (seen[s] !== 0 || (M.flags[to]! & Cell.Walkable) === 0) return;
+          if (seen[s] !== 0 || (M.flags[to]! & Cell.Walkable) === 0 || Math.abs(ground[to]! - ground[mc]!) > rise) return;
           seen[s] = 1;
           queue[tail++] = to;
         };
@@ -181,8 +208,20 @@ export class Approach {
       for (let I = 0; I < nx; I++) {
         const c = J * nx + I;
         let e = 0;
-        if (I + 1 < nx && joined(anchor[c]!, anchor[c + 1]!, I * k, J * k, 2 * k, k)) e |= Edge.East;
-        if (J + 1 < nz && joined(anchor[c]!, anchor[c + nx]!, I * k, J * k, k, 2 * k)) e |= Edge.North;
+        if (I + 1 < nx) {
+          if (joined(anchor[c]!, anchor[c + 1]!, I * k, J * k, 2 * k, k, easy)) e |= Edge.East;
+          else if (joined(anchor[c]!, anchor[c + 1]!, I * k, J * k, 2 * k, k, hard)) {
+            e |= Edge.East;
+            this.hardEast[c] = 1;
+          }
+        }
+        if (J + 1 < nz) {
+          if (joined(anchor[c]!, anchor[c + nx]!, I * k, J * k, k, 2 * k, easy)) e |= Edge.North;
+          else if (joined(anchor[c]!, anchor[c + nx]!, I * k, J * k, k, 2 * k, hard)) {
+            e |= Edge.North;
+            this.hardNorth[c] = 1;
+          }
+        }
         this.layer.edges[c] = e;
       }
     }
@@ -212,7 +251,7 @@ export class Approach {
       for (let I = 0; I < this.rnx; I++) {
         const c = J * this.rnx + I;
         const cover = M.cover[c]!;
-        this.crest[c] = world.terrain.heightAt(this.rx0 + (I + 0.5) * this.rcell, this.rz0 + (J + 0.5) * this.rcell) + (cover >= tall ? cover / 10 : 0);
+        this.crest[c] = ground[c]! + (cover >= tall ? cover / 10 : 0);
       }
     }
     // Tree crowns: each cell keeps the first few that reach over it, in the world's order.
@@ -251,6 +290,7 @@ export class Approach {
     this.reach = G.reach;
     this.price = 1 + G.price;
     this.priceOn = 1 + G.priceOn;
+    this.priceHard = G.priceHard;
     this.cells = G.cells;
     this.bound = G.bound;
     this.stop = this.world.crownStop ?? Infinity;
@@ -411,7 +451,24 @@ export class Approach {
    * made of short dashes between places out of view, where the ground allows, and not one
    * long run. It keeps to the open ground round the camp.
    */
-  private readonly cost: MoveCost = (from, to, length) => (this.open[to] !== 1 ? -1 : !this.lit(to) ? length : length * (this.lit(from) ? this.priceOn : this.price));
+  private readonly cost: MoveCost = (from, to, length) => {
+    if (this.open[to] !== 1) return -1;
+    const seen = !this.lit(to) ? 1 : this.lit(from) ? this.priceOn : this.price;
+    return length * (seen + (this.climb(from, to) ? this.priceHard : 0));
+  };
+
+  /** Whether the move between two neighbouring places is a hard climb: a side move by its own way, a corner move by either of the two ways round it. */
+  private climb(from: number, to: number): boolean {
+    const nx = this.layer.nx;
+    const a = from < to ? from : to;
+    const b = from < to ? to : from;
+    const d = b - a;
+    if (d === 1) return this.hardEast[a] === 1;
+    if (d === nx) return this.hardNorth[a] === 1;
+    // North-east of `a`, or north-west of it.
+    if (d === nx + 1) return this.hardEast[a] === 1 || this.hardNorth[a + 1] === 1 || this.hardNorth[a] === 1 || this.hardEast[a + nx] === 1;
+    return this.hardEast[a - 1] === 1 || this.hardNorth[a - 1] === 1 || this.hardNorth[a] === 1 || this.hardEast[b] === 1;
+  }
 
   /**
    * The way from one place to another that keeps out of the view aimed at, as bounds: each

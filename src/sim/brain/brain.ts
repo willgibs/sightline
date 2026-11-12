@@ -945,6 +945,9 @@ function performCover(m: GuardMind, out: Order): void {
       // Something solid breaks the line at chest height, so he crouches behind it. With nothing at all, he gets down where he is.
       if (m.fights) b.coverStance = spot.x === m.self.x && spot.z === m.self.z ? 'prone' : 'crouch';
     }
+    // In a camp that hunts, he'll say where it came from once he's down, if he saw the flash or heard the muzzle: what he
+    // has in mind now is what the net gets then. It's what the camp places the shooter by (commander.ts).
+    if (m.hunts && m.tuning.brain.roles[m.post.role].report > 0 && (b.ended.report === undefined || (m.tick - b.ended.report) / hz >= m.tuning.brain.comms.reportEvery)) b.calling = shotCall(m);
     b.covered = true;
     b.coverX = spot.x;
     b.coverZ = spot.z;
@@ -954,6 +957,19 @@ function performCover(m: GuardMind, out: Order): void {
   if (w === 'arrived' || w === 'stuck') {
     if (b.coverStance) b.down = b.coverStance;
     stand(m, out, false);
+    // Down, and out of the line: the call he had ready. Killed before it's finished, the net never carries it.
+    if (b.calling) {
+      const K = m.tuning.brain.comms;
+      if (b.until < 0) {
+        b.until = m.tick + Math.round(K.talk * hz);
+        b.say = { report: { ...b.calling }, radius: K.talkRadius, radio: true };
+      } else if (m.tick >= b.until) {
+        b.radio = b.calling;
+        b.calling = null;
+        b.until = -1;
+        b.ended.report = m.tick;
+      }
+    }
     if (m.fights) {
       // Down until it's been quiet a while, then back out: hiding doesn't win a fight.
       const age = newsAge(m);
@@ -967,7 +983,7 @@ function performCover(m: GuardMind, out: Order): void {
 }
 
 /** Where he has evidence the shots are coming from: a flash he saw, or else a report he heard. A crack and a strike don't say. */
-function shotFrom(m: GuardMind): { x: number; y: number; z: number } | null {
+function shotFrom(m: GuardMind): Percept | null {
   let best: Percept | null = null;
   for (const p of m.percepts) {
     const report = p.kind === 'shot' && p.sound === 'report';
@@ -976,6 +992,21 @@ function shotFrom(m: GuardMind): { x: number; y: number; z: number } | null {
     if (!best || (p.kind === 'muzzle' && best.kind !== 'muzzle') || (p.kind === best.kind && p.tick >= best.tick)) best = p;
   }
   return best;
+}
+
+/**
+ * What a man would say of where a shot came from, by his own senses: the flash if he saw
+ * it, or else the muzzle's report with the bearing his ears give it. Null with neither: a
+ * crack or a strike is something to duck from, and says nothing worth the net.
+ */
+function shotCall(m: GuardMind): Report | null {
+  const p = shotFrom(m);
+  if (!p) return null;
+  const C = m.tuning.brain.comms;
+  const kind: ReportKind = p.kind === 'muzzle' ? 'contact' : 'shot';
+  const out: Report = { kind, x: p.x, y: p.y, z: p.z, radius: Math.max(p.radius, C.radius[kind]), tick: m.tick, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: p.cause };
+  if (kind === 'shot') bearingError(m, out, false);
+  return out;
 }
 
 /** A tower man answers: rounds at where he believes the shooter is, whether or not he can see him (Lab F). */

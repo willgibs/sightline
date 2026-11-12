@@ -44,7 +44,7 @@ export function drawBrain(draw: DebugDraw, ctx: TickContext, g: GuardEntity): vo
       if (k > 0) draw.line(hunt.stops[2 * k - 2]!, ground(hunt.stops[2 * k - 2]!, hunt.stops[2 * k - 1]!), hunt.stops[2 * k - 1]!, x, ground(x, z), z, hunt.lit[k] === 1 ? 'warn' : 'good');
       draw.point(x, ground(x, z), z, k === hunt.at ? 0.4 : 0.2, k === hunt.at ? 'info' : hunt.lit[k] === 1 ? 'warn' : 'good');
     }
-    draw.circle(hunt.ox, ground(hunt.ox, hunt.oz), hunt.oz, ctx.tuning.brain.hunt.arrive, 'bad');
+    draw.circle(hunt.ox, ground(hunt.ox, hunt.oz), hunt.oz, ctx.tuning.brain.hunt.sweep.radius, 'bad');
   }
   // The route: from him through what's left of it.
   let px = body.x;
