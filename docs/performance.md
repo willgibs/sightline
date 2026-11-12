@@ -134,3 +134,36 @@ Upper floors came with slow ticks of their own, and `npm run hitches` is what fo
 Four more fights on other taller camps (VIH-9105, KAT-3755, MUD-8412, LUL-8783) have none over 4 ms either, in the first run or warm. The brain lane's bench pins the routes to a camp's upper floors as work (287 cells on average, 683 at most, against 459 and 2,716 between posts on the ground).
 
 Not measured: a browser on these camps. Nothing on the page's side changed.
+
+
+## 8. The hunt (Nov 11)
+
+The hunt (`docs/camp-engine.md`, *Step 2b*) added a slow tick of its own, and took something out of the rehearsal without touching it.
+
+| What it was | What was done |
+| --- | --- |
+| The tick a section is first formed took 5.1 ms the first time and 1.6 after. The sniper in the rehearsal's attack keeps firing, and a camp sends nobody after a man who is still firing, so no section formed in it | A hunt is rehearsed at load as well: one shot, and a section formed and sent (`rehearseHunt`) |
+| One standing fight (HOT-7106, relocating, alert) had a tick of 5.5 ms in a fresh run, where `main` took 3.2: the relief's men finding their way to a door upstairs. Nothing in that tick had changed. A quarter of a minute earlier the section had found its first route out over the site's rim, the search that every route shares met something it hadn't been compiled for, and the engine threw its fast code away. Lone guards used to walk out to the ridges during the rehearsal, which found such a route at load. Now nobody leaves the camp's ground alone | The rehearsal asks for the routes out to each listed firing point and back, and between them (`rehearseRidges`): about 25 ms more at load |
+
+**Now**, the four standing fights and the hunt's own scene on this machine:
+
+| | Before the hunt | With it |
+| --- | --- | --- |
+| Ticks over 4 ms in a fresh tab's run | 0 | 0 |
+| Its slowest tick | 3.6 ms | 3.6 ms |
+| Ticks over 4 ms once warm | 0 | 0 |
+| The slowest tick once warm | 1.9 ms | 2.7 ms |
+| The rehearsal at load (HOT-7106) | 0.56 s | 0.97 s |
+
+The two slowest warm ticks are the hunt's: the tick a section is formed, when the commander works out its way over the valley and each man's route to where they gather (2.3 ms), and the tick its men set off (2.5 ms). The bench now pins the first as work, 2,567 cells, beside the brains' worst tick.
+
+**How the second was found.** `npm run hitches` has two options for a tick that is slow the first time only:
+- `--tick 3257` profiles that tick in the first run and in a warm one, and lists the functions it spent its time in side by side. Here it showed the route search taking three times as long as it does warm.
+- `--deopts` lists the functions the engine threw its fast code away for during the first run, by hundred ticks, with the engine's reason. Here it showed the search's inner loop among them, well before the slow tick, and in a build without the hunt it wasn't.
+
+**What to take from it:**
+- A rehearsal covers what its scripts provoke today. A change that stops something happening can take a code path out of the rehearsal without touching it. After a change to who does what, run `npm run hitches` on the standing fights as well as on the new scene.
+- The tool runs its ticks back to back, about three hundred times faster than play. The engine compiles code again in real time, so code it has thrown away stays slow for hundreds of the tool's ticks, where a game would see fewer. The tool errs toward finding these. A tick it flags this way may not be felt in play, and this one was not checked in a browser.
+
+Left: a section's own way searches, made by its men, aren't counted as work. Counting them would also count them against the brains' search budget for the tick, which changes what a camp does, so it belongs with the hunt's next change.
+

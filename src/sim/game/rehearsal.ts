@@ -37,6 +37,7 @@ export function rehearse(world: World, tuning: Tuning, seconds = REHEARSAL_SECON
   const ticks = Math.round(seconds * tuning.sim.tickHz);
   for (let i = 0; i < ticks; i++) sim.step(driver.next(sim, raw));
   rehearseFloors(world, tuning);
+  rehearseRidges(world, tuning);
   // What each listed firing point sees of the valley, read now and kept: otherwise the tick a section is first sent out reads three of them.
   approachOf(world, tuning).prepare();
   return ticks;
@@ -80,6 +81,33 @@ function rehearseFloors(world: World, tuning: Tuning): void {
 }
 
 /**
+ * And routes with an end on a ridge. Before a camp hunted, a man who went to look at where a
+ * shot came from walked out there during the attack above, and that found one. Now nobody
+ * leaves the camp's ground alone, and the section that does go (rehearseHunt) has only
+ * gathered by the time its rehearsal ends. So the first route out over the site's rim was
+ * found in the middle of a fight, the engine threw away its fast code for the search every
+ * route shares, and the next big search, a quarter of a minute on, took 5.5 ms where it
+ * takes 1.6 (`npm run hitches`, the first run only; docs/performance.md, section 8, has how
+ * it was found). They're asked for here instead: from a post on
+ * the ground out to each listed firing point and back, and from each firing point to the
+ * next, which is how a section moves between them.
+ */
+function rehearseRidges(world: World, tuning: Tuning): void {
+  const perches = world.report.camp?.perches ?? [];
+  const post = world.camp.guards.find((g) => !g.elevated);
+  if (!post) return;
+  const nav = navigatorOf(world, tuning);
+  const route = emptyRoute();
+  for (let k = 0; k < perches.length; k++) {
+    const p = perches[k]!;
+    const q = perches[(k + 1) % perches.length]!;
+    nav.find(post.x, post.z, p.x, p.z, {}, route);
+    nav.find(p.x, p.z, post.x, post.z, {}, route);
+    nav.find(p.x, p.z, q.x, q.z, {}, route);
+  }
+}
+
+/**
  * And a fight at close quarters (scenes/firefight.ts), on a camp that has a place for one:
  * someone seen in front of a guard, who goes to ground. A sniper on a ridge never brings on
  * the firefight (brain/firefight.ts), so its positions, its bounds and the ways that keep
@@ -102,10 +130,11 @@ export const FIREFIGHT_SECONDS = 45;
 
 /**
  * And a hunt (scenes/hunt.ts): one loud shot from the best overview, and the camp placing
- * him, forming a section and sending it out. The attack above is the compound simulator's,
- * whose camp doesn't hunt, so the tick a section was first formed took 5.1 ms where it
- * takes 1.6 once that code has run (`npm run hitches -- hunt`). Thrown away like the
- * others. Returns the ticks it ran: none where there's no overview to fire from.
+ * him, forming a section and sending it out. The sniper in the attack above keeps firing,
+ * and a camp sends nobody after a man who is still firing, so no section forms in it: the
+ * tick one was first formed took 5.1 ms where it takes 1.6 once that code has run
+ * (`npm run hitches -- hunt`). Thrown away like the others. Returns the ticks it ran: none
+ * where there's no overview to fire from.
  */
 export function rehearseHunt(world: World, tuning: Tuning, seconds = HUNT_SECONDS): number {
   if (!world.report.camp || world.report.camp.perches.length === 0 || world.camp.guards.length === 0 || !world.camp.layout) return 0;

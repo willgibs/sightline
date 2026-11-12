@@ -602,7 +602,7 @@ function fightCost(): Record<string, number> {
   const sim = startScene(scene, T);
   const driver = scene.driver!();
   const raw = scene.game.still(sim);
-  const most = { brainCells: 0, brainRays: 0, hearingCells: 0 };
+  const most = { brainCells: 0, brainRays: 0, hearingCells: 0, commandCells: 0 };
   const was = new Map<string, WorkCounts>();
   for (let i = 0; i < 120 * T.sim.tickHz; i++) {
     sim.step(driver.next(sim, raw));
@@ -615,13 +615,16 @@ function fightCost(): Record<string, number> {
       if (w.system === 'guard-brains') {
         most.brainCells = Math.max(most.brainCells, nodes);
         most.brainRays = Math.max(most.brainRays, rays);
-      } else if (w.system === 'perception-hearing' || w.system === 'perception-awareness') hearing += nodes;
+      } else if (w.system === 'camp-commander') most.commandCells = Math.max(most.commandCells, nodes);
+      else if (w.system === 'perception-hearing' || w.system === 'perception-awareness') hearing += nodes;
     }
     most.hearingCells = Math.max(most.hearingCells, hearing);
   }
   m['a fight’s worst tick: grid cells the brains expand'] = most.brainCells;
   m['a fight’s worst tick: rays the brains cast'] = most.brainRays;
   m['a fight’s worst tick: grid cells sounds flood'] = most.hearingCells;
+  // The tick a section is formed: its way out over the valley, and each man's route to where they gather.
+  m['a fight’s worst tick: grid cells the commander expands'] = most.commandCells;
   const world = sim.world;
   const L = world.grid.site;
   const posts = world.camp.guards.filter((g) => !g.elevated && g.x > L.x0 && g.z > L.z0 && g.x < L.x0 + L.nx * L.cell && g.z < L.z0 + L.nz * L.cell);

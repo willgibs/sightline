@@ -1,5 +1,6 @@
 import type { Tuning } from '../../config/tuning';
 import { routinePose, type RoutinePose } from '../generation';
+import type { SearchOptions } from '../kernel/world/search';
 import { approachOf, emptyWay } from './approach';
 import { emptyRoute, navigatorOf, routeLength } from './nav';
 import { ALERT_LEVELS, alertRung, type AlertLevel, type CampState, type RosterEntry, type Section, type Task, type TaskKind, type Threat } from './camp';
@@ -44,6 +45,8 @@ export interface CampMind {
   readonly time: number;
   /** The officer who runs the camp is on his feet: with no officer, the camp plans sloppily. A fact about the commander's own body, not about the world. */
   readonly officer: boolean;
+  /** Where the searches a plan makes are counted (a section's way out, and its men's routes to where they gather): the commander's system passes its tick's. */
+  readonly work?: SearchOptions['work'];
 }
 
 /** An order the system should deliver: which guard, what task. */
@@ -580,7 +583,7 @@ function rallyFor(m: CampMind, from: ReadonlyArray<{ x: number; z: number }>, th
     cz += p.z / from.length;
   }
   const start = a.near(cx, cz, 8);
-  if (start < 0 || !a.way(a.px[start]!, a.pz[start]!, th.x, th.z, huntWay) || huntWay.length > H.farthest) return null;
+  if (start < 0 || !a.way(a.px[start]!, a.pz[start]!, th.x, th.z, huntWay, m.work) || huntWay.length > H.farthest) return null;
   // The first stop past the wire; or, for men already out there (a section being sent on), where they are.
   let rally = 0;
   const out = (k: number): boolean => (huntWay.stops[2 * k]! - site.x) * (huntWay.stops[2 * k]! - site.x) + (huntWay.stops[2 * k + 1]! - site.z) * (huntWay.stops[2 * k + 1]! - site.z) > site.radius * site.radius;
@@ -589,7 +592,7 @@ function rallyFor(m: CampMind, from: ReadonlyArray<{ x: number; z: number }>, th
   const z = huntWay.stops[2 * rally + 1]!;
   let far = 0;
   for (const p of from) {
-    const r = nav.find(p.x, p.z, x, z, {}, rallyRoute);
+    const r = nav.find(p.x, p.z, x, z, { work: m.work }, rallyRoute);
     if (r !== 'found') return null;
     far = Math.max(far, routeLength(rallyRoute, p.x, p.z));
   }

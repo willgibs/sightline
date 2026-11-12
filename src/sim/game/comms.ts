@@ -449,7 +449,7 @@ export const campCommander: System = {
     const every = Math.max(1, Math.round((officer ? T.planEvery : T.noOfficerEvery) * hz));
     if (ctx.tick - camp.planned >= every) {
       camp.planned = ctx.tick;
-      const mind: CampMind = { camp, world: ctx.world, tuning: ctx.tuning, tick: ctx.tick, time: ctx.tick / hz, officer };
+      const mind: CampMind = { camp, world: ctx.world, tuning: ctx.tuning, tick: ctx.tick, time: ctx.tick / hz, officer, work: ctx.work };
       plan(mind, orders);
       for (const o of orders) sendOrder(ctx, c, o.guard, o.task);
     }

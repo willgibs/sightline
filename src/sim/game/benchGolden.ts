@@ -182,6 +182,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       "a fight’s worst tick: grid cells the brains expand": 7824,
       "a fight’s worst tick: rays the brains cast": 558,
       "a fight’s worst tick: grid cells sounds flood": 13313,
+      "a fight’s worst tick: grid cells the commander expands": 2567,
       "routes between a camp’s posts: found (of 56)": 56,
       "routes between a camp’s posts: grid cells a search looks at, on average": 459,
       "routes between a camp’s posts: the most one search looks at": 2716,
@@ -197,6 +198,7 @@ export const BENCH_GOLDEN: PinnedBench = {
           "perception-hearing": { "rays": 75, "nodes": 45808, "bodies": 0 },
           "perception-spotting": { "rays": 8866, "nodes": 0, "bodies": 0 },
           "perception-awareness": { "rays": 0, "nodes": 75045, "bodies": 0 },
+          "camp-commander": { "rays": 0, "nodes": 3005, "bodies": 0 },
           "guard-brains": { "rays": 290, "nodes": 14061, "bodies": 0 }
         }
       }

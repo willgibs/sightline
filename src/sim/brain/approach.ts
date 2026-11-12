@@ -1,7 +1,7 @@
 import type { Tuning } from '../../config/tuning';
 import { dtanDeg } from '../kernel/core/detmath';
 import { Cell, Edge, type GridLayer } from '../kernel/world/grid';
-import { GridSearch, components, type MoveCost } from '../kernel/world/search';
+import { GridSearch, components, type MoveCost, type SearchOptions } from '../kernel/world/search';
 import type { Ground } from './mind';
 
 /**
@@ -473,9 +473,10 @@ export class Approach {
   /**
    * The way from one place to another that keeps out of the view aimed at, as bounds: each
    * stop is where a bound ends, at the edge of cover, at a turn, or when it's gone far
-   * enough. False if there's no way, or none within the search's budget.
+   * enough. False if there's no way, or none within the search's budget. `work` is where
+   * the places it looked at are counted, for a system that counts its tick's.
    */
-  way(fromX: number, fromZ: number, toX: number, toZ: number, out: Way): boolean {
+  way(fromX: number, fromZ: number, toX: number, toZ: number, out: Way, work?: SearchOptions['work']): boolean {
     out.stops.length = 0;
     out.lit.length = 0;
     out.length = 0;
@@ -484,7 +485,7 @@ export class Approach {
     const goal = this.near(toX, toZ);
     if (start < 0 || goal < 0) return false;
     const path = this.path;
-    if (!this.search.path(start, goal, { maxExpansions: this.cells, cost: this.cost }, path).found) return false;
+    if (!this.search.path(start, goal, { maxExpansions: this.cells, cost: this.cost, work }, path).found) return false;
     const B = this.bound;
     out.stops.push(this.px[start]!, this.pz[start]!);
     out.lit.push(0);
