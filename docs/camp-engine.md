@@ -363,6 +363,19 @@ So the job of step 2 is that the camp comes after him, in a way he can see comin
 | Moving 100 m right after the shot (`relocate`) | Changes nothing | Clearly better than staying, on the nearest hunter and on being found |
 | Shoot and relocate (`ladder`) | 10 of 48 | Better than shooting once and leaving |
 
+**Where those stand** (Nov 12, `npm run experiment -- ladder`, 16 camps, one roll each, with the firefight, the hunt and buried targets on `main`):
+
+| Plan | Wins | The target shot | Shot dead himself | Men he put down |
+| --- | --- | --- | --- | --- |
+| Careless: walks in shooting | 0 of 16 | 0 | 2 | 3.6 |
+| Shoot once and leave | 1 of 16 | 2 | 1 | 0.2 |
+| Perfect and static | 0 of 16 | 2 | 0 | 5.9 |
+| Shoot and relocate | 1 of 16 | 2 | 3 | 2.4 |
+
+No plan from a perch wins any more, and the reason is the generator's more than the camp's reactions: a camp buries its target, so he can be shot from a perch on 2 camps of 16. The mission is won by going in or by making him run, and this ladder has no plan that does either: that is what it lacks.
+
+Two things about the instrument, found on the way. Since the walled camps landed, the careless walker couldn't find a way in to 4 of these 16 camps: the valley's map has no way through a gate narrower than its cells, so he stood at the valley's edge for the whole run, and asked for a route on every step, which made those runs take hours. He now takes the navigator's way in, as the camp's own men would, and a walk with nowhere to go asks again every five seconds.
+
 **What you play:** a real perch (`?scene=live-camp&params=seed=LEB-2534%26perch=1&lab`), one shot, then get out. It should feel like being hunted, and the way out should be something you have to think about before you fire.
 
 ### The owner's brief for what comes next (Nov 10)

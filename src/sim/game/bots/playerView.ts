@@ -9,6 +9,7 @@ import { Cell, cellIndex, type GridLayer } from '../../kernel/world/grid';
 import { emptyHit, raycast, type QueryBody } from '../../kernel/world/query';
 import { COST_PER_METRE, GridSearch } from '../../kernel/world/search';
 import { emptyShape } from '../../kernel/world/shape';
+import { emptyRoute, navigatorOf, type Route } from '../../brain';
 import { commanderOf } from '../comms';
 import { player } from '../entities';
 import type { Simulation } from '../sim';
@@ -143,6 +144,8 @@ export class LiveView implements PlayerView {
   seen: Man[] = [];
   private sim: Simulation | null = null;
   private search: GridSearch | null = null;
+  /** The navigator's route, when the map has none: kept for reuse. */
+  private way: Route | null = null;
   private readonly bodies: QueryBody[] = [];
   private readonly path: number[] = [];
   readonly you = {
@@ -327,8 +330,16 @@ export class LiveView implements PlayerView {
       return Math.round(length * (1 + shy + steep));
     };
     const r = this.search.path(start, goal, { maxExpansions: L.nx * L.nz, cost }, this.path);
-    if (!r.found) return null;
-    return this.path.map((c) => ({ x: centreX(c), z: centreZ(c) }));
+    if (r.found) return this.path.map((c) => ({ x: centreX(c), z: centreZ(c) }));
+    // The valley's map has no way through a gate narrower than its cells, so a place inside a walled camp can't be
+    // reached on it. Someone walking straight in takes the way the camp's own men would: the navigator's, which
+    // knows the gate. A walk that keeps away from the camp, or shuns somewhere, has no business in there.
+    if (keepAway > 0 || shun.length > 0) return null;
+    const way = navigatorOf(world, sim.tuning).find(this.you.x, this.you.z, x, z, {}, (this.way ??= emptyRoute()));
+    if (way !== 'found') return null;
+    const points: Array<{ x: number; z: number }> = [];
+    for (let k = 0; k + 1 < this.way.points.length; k += 2) points.push({ x: this.way.points[k]!, z: this.way.points[k + 1]! });
+    return points;
   }
 }
 

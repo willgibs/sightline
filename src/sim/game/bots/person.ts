@@ -335,6 +335,8 @@ class Walker {
   private reached = -1;
   private reachedAt = 0;
   private lastStep = -Infinity;
+  /** With no way found from where he stands: when he'll ask again. A search that finds nothing has looked at the whole valley, and asking every step made a walk with nowhere to go take hours to run. */
+  private askAt = -Infinity;
   /** Places on the route that stopped him: the next route keeps clear of them. */
   private readonly shun: Array<{ x: number; z: number }> = [];
   private sideUntil = -1;
@@ -358,6 +360,8 @@ class Walker {
     if (view.time - this.lastStep > 1) this.reachedAt = view.time;
     this.lastStep = view.time;
     if (!this.route) {
+      // No way from here a moment ago, and he hasn't moved: the answer is the same.
+      if (view.time < this.askAt) return true;
       this.route = view.routeTo(this.x, this.z, this.keepAway, this.shun);
       if (!this.route && this.shun.length > 0) {
         // Everything he'd shunned has closed him in. He'd try it again.
@@ -368,8 +372,11 @@ class Walker {
       this.lastX = y.x;
       this.lastZ = y.z;
       this.checkAt = view.time + 2;
-      // Nowhere to go from here: as far as this walk can take him.
-      if (!this.route) return true;
+      // Nowhere to go from here: as far as this walk can take him. He thinks again in a while, in case something has opened.
+      if (!this.route) {
+        this.askAt = view.time + NO_WAY_AGAIN;
+        return true;
+      }
     }
     while (this.next_ < this.route.length) {
       const p = this.route[this.next_]!;
@@ -472,6 +479,9 @@ abstract class Plan implements ViewBot {
 
   protected abstract act(view: PlayerView, out: InputFrame): void;
 }
+
+/** Seconds before a walk with no way to go asks for one again. */
+const NO_WAY_AGAIN = 5;
 
 /** Walks in standing up, shoots whoever he sees, loudly. */
 export class Careless extends Plan {
