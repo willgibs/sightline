@@ -67,10 +67,6 @@ const BOUNDS: ReadonlyArray<readonly [path: string, min: number, max: number, in
   ['perception.awareness.shots.crack.clearAt', 1.01, 10000],
   ['perception.awareness.shots.impact.clearAt', 1.01, 10000],
   ['perception.awareness.shots.bolt.clearAt', 1.01, 10000],
-  ['modes.takedown.shots.report.clearAt', 1.01, 10000],
-  ['modes.takedown.shots.crack.clearAt', 1.01, 10000],
-  ['modes.takedown.shots.impact.clearAt', 1.01, 10000],
-  ['modes.takedown.shots.bolt.clearAt', 1.01, 10000],
   // Budgets that size searches inside a tick (rule 18), so a hostile recording can't hang a guard's brain.
   ['brain.nav.siteExpansions', 1, 500000, true],
   ['brain.nav.mapExpansions', 1, 500000, true],

@@ -318,7 +318,7 @@ export const perceptionSpotting: System = {
   phase: 'perception',
   after: ['perception-hearing'],
   reads: ['commander.camp.fights', '*.body', 'remains.remains', 'player.rifle', 'input', 'guard.guard', 'guard.senses', 'solid.solid', 'generator.generator', 'radio.radio', 'door.door'],
-  writes: ['guard.senses.bodies', 'guard.senses.spotted', 'guard.senses.flashed', 'guard.senses.noticed'],
+  writes: ['guard.senses.bodies', 'guard.senses.afar', 'guard.senses.spotted', 'guard.senses.flashed', 'guard.senses.noticed'],
   emits: ['spotted'],
   run(ctx) {
     const T = ctx.tuning;
@@ -356,12 +356,23 @@ export const perceptionSpotting: System = {
         remainsShape(r.remains, t, T, target.shape);
         exposure(view, env, t, T, eye, target, seen);
         if (seen.rate <= 0) continue;
-        s.bodies.push(r.id);
+        // A man still going down is seen by whoever would see him drop: within the ranges the camp's web of
+        // watchers was built by (generation/field.ts, seesDrop). The law of sight alone has a standing, moving
+        // body out to 150 m, and a man 85 m off across a camp doesn't notice a figure on a tower fold up.
+        if (c < 1 && seen.distance > (seen.zone === 'core' || seen.zone === 'far' ? S.fall.core : S.fall.peripheral)) continue;
         const chest = seen.rays[1];
         // Seen as he fell, this is the same tick's death; found later, nothing else says why.
         const death = ctx.events.find((e) => e.type === 'death' && e.remains === r.id);
+        // What he can tell: a man he watched go down, or one he's near enough to see, is a body. Farther off it's someone
+        // lying where he shouldn't be: news once as that, and again when he has walked over and can see what happened.
+        const sure = death !== undefined || seen.distance <= S.bodyNear;
+        if (!sure && s.afar?.includes(r.id)) continue;
+        if (sure) s.bodies.push(r.id);
+        else (s.afar ??= []).push(r.id);
         const cause = ctx.emit({ type: 'spotted', source: g.id, cause: death?.id ?? 0, what: 'body', x: chest.x, y: chest.y, z: chest.z, distance: seen.distance });
-        s.spotted.push({ what: 'body', cause, x: chest.x, y: chest.y, z: chest.z, radius: 0.5, strength: 1 });
+        // In his sight when the round struck: that's watching a man fall. A man who looks round at the thud or the snap gets
+        // there a moment later, to a man folding up or lying still, and has found a body, which tells him less (brain/grounds.ts).
+        s.spotted.push({ what: 'body', cause, x: chest.x, y: chest.y, z: chest.z, radius: 0.5, strength: 1, ...(death ? { fell: true as const } : {}), ...(sure ? {} : { far: true as const }) });
       }
       for (const o of amiss) {
         if (s.noticed?.includes(o.id)) continue;
@@ -484,20 +495,23 @@ export const perceptionAwareness: System = {
         }
         s.heard.splice(k, 1);
         const id = ctx.emit({ type: 'heard', source: g.id, cause: h.cause, kind: h.kind, clarity: h.clarity, x: h.x, y: h.y, z: h.z, radius: h.radius });
+        const level = soundLevel(h, T);
+        // One of a shot's sounds that tells him nothing (a thud a long way off): he heard it, and it leaves nothing in his mind.
+        if (h.kind === 'shot' && a.floor + level < T.perception.awareness.levels.curious) continue;
         const p: Percept = { kind: h.kind, x: h.x, y: h.y, z: h.z, radius: h.radius, strength: h.clarity, tick, expires: tick + Math.round(T.perception.hearing.keep * hz), cause: id, sound: h.sound };
         s.percepts.push(p);
         if (h.kind !== 'voice') believe(s, p, false, tick, T);
         const reason = h.kind === 'shot' ? 'shot' : h.kind === 'voice' ? 'voice' : 'heard';
-        stimulate(a, { kind: h.kind, level: soundLevel(h, T), x: h.x, y: h.y, z: h.z, cause: id, reason }, tick, T, draw);
+        stimulate(a, { kind: h.kind, level, x: h.x, y: h.y, z: h.z, cause: id, reason }, tick, T, draw);
       }
       // What he has just caught sight of: a body, a flash.
       for (const sp of s.spotted) {
         const keep = sp.what === 'body' || sp.what === 'outage' ? T.perception.awareness.keepBody : T.perception.hearing.keep;
-        const p: Percept = { kind: sp.what, x: sp.x, y: sp.y, z: sp.z, radius: sp.radius, strength: sp.strength, tick, expires: tick + Math.round(keep * hz), cause: sp.cause };
+        const p: Percept = { kind: sp.what, x: sp.x, y: sp.y, z: sp.z, radius: sp.radius, strength: sp.strength, tick, expires: tick + Math.round(keep * hz), cause: sp.cause, ...(sp.fell ? { fell: true as const } : {}), ...(sp.far ? { far: true as const } : {}) };
         s.percepts.push(p);
         // A flash says exactly where.
         if (sp.what === 'muzzle') believe(s, p, false, tick, T);
-        stimulate(a, { kind: sp.what, level: T.perception.awareness[sp.what], x: sp.x, y: sp.y, z: sp.z, cause: sp.cause, reason: sp.what }, tick, T, draw);
+        stimulate(a, { kind: sp.what, level: sp.far ? T.perception.awareness.bodyFar : T.perception.awareness[sp.what], x: sp.x, y: sp.y, z: sp.z, cause: sp.cause, reason: sp.what }, tick, T, draw);
       }
       s.spotted.length = 0;
       prunePercepts(s.percepts, tick);

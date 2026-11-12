@@ -102,7 +102,7 @@ function run(seed: string, arm: Arm, t: Tuning): Record<string, number> {
   const mover = new ShootAndMove();
   const moved = play(seed, arm, t, '', mover);
   // The marksman who shoots at what he sees, by the mission's rules.
-  const sc = { ...(ladder(`seed=${seed}&plan=static&ready=alert${arm.off ? `&off=${arm.off}` : ''}`) as Scene<Simulation>), playOn: true };
+  const sc = { ...(ladder(`seed=${seed}&plan=static${arm.off ? `&off=${arm.off}` : ''}`) as Scene<Simulation>), playOn: true };
   const sim = startScene(sc, t, keptWorld(`live-camp:${seed}`, t, sc.world));
   const driver = sc.driver!();
   const raw = sc.game.still(sim);

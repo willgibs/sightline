@@ -455,10 +455,17 @@ export function raiseAlarm(ctx: TickContext, g: GuardEntity): void {
   if (!c || !b) return;
   const box = c.camp.devices.alarms[b.box];
   if (!box) return;
-  if (box.raised) return;
+  // The siren is going: a second box adds nothing to it. A man who gets to one and finds the alarm already up knows it now,
+  // whether or not he heard it: through enough walls he may not have.
+  if (c.camp.devices.alarms.some((a) => a.raised)) {
+    if (b.sirenAt < 0) b.sirenAt = ctx.tick;
+    return;
+  }
   if (!box.powered) {
     const dead = ctx.emit({ type: 'alarm', source: g.id, cause: b.event, box: b.box, stage: 'dead' });
     reportOutage(ctx, c, g, box.x, g.body.y, box.z, dead);
+    // He knows now, and knows where the others are: the next run is for one of those.
+    if (!b.deadBoxes?.includes(b.box)) (b.deadBoxes ??= []).push(b.box);
     return;
   }
   box.raised = true;

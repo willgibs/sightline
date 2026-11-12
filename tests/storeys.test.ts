@@ -209,7 +209,7 @@ describe('a two-storey building', () => {
     const target = world.camp.guards.find((g) => g.role === 'target')!;
     const room = hardRoom(world, target);
     expect(room.y).toBeCloseTo(target.y, 5);
-    const scene = { ...(compound('seed=LAS-1274&attack=sniper&ready=alert') as Scene<Simulation>), world: () => world };
+    const scene = { ...(compound('seed=LAS-1274&attack=sniper') as Scene<Simulation>), world: () => world };
     const sim = startScene(scene, T, world);
     const driver = scene.driver!();
     const raw = scene.game.still(sim);

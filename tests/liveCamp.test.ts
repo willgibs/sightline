@@ -28,8 +28,8 @@ function play(seed: string, seconds: number): { sim: Simulation; events: SimEven
 
 describe('a live camp (E13)', () => {
   for (const seed of SEEDS) {
-    it(`answers shots from its best overview, ${seed}: a reaction inside 2 s, an alarm at its own box, and the target away`, () => {
-      const { sim, events } = play(seed, 120);
+    it(`answers shots from its best overview, ${seed}: a reaction inside 2 s, an alarm at its own box, and the target in his room`, () => {
+      const { sim, events } = play(seed, 60);
       expect(sim.fault).toBeFalsy();
       const shot = events.find((e) => e.type === 'shot' && e.source === sim.playerId)!;
       expect(shot).toBeDefined();
@@ -38,14 +38,31 @@ describe('a live camp (E13)', () => {
       expect((reaction!.tick - shot.tick) / T.sim.tickHz).toBeLessThanOrEqual(2);
       const raised = events.find((e) => e.type === 'alarm' && e.stage === 'raised') as Extract<SimEvent, { type: 'alarm' }> | undefined;
       expect(raised, 'no alarm raised').toBeDefined();
+      // It takes more than the first shot: a man who watched one of his own go down, or fire that has come again.
+      expect(raised!.tick).toBeGreaterThan(shot.tick);
       // The box the commander knows is lab D's entity, raised with it.
       expect(sim.index.of('alarm').filter((a) => a.alarm.raised).length).toBe(1);
-      expect(commanderOf(sim)!.camp.level).toBe('lockdown');
-      expect(events.some((e) => e.type === 'act' && e.to === 'flee'), 'the target never ran').toBe(true);
-      expect(sim.state.outcome).toMatchObject({ status: 'failed', reason: expect.stringMatching(/^the target got away/) });
-      expect(sim.index.of('objective')[0]!.objective.status).toBe('escaped');
+      const camp = commanderOf(sim)!.camp;
+      expect(camp.level).toBe('lockdown');
+      // Every camp protects its target: at the first sign of trouble he goes to his room, and the siren doesn't send him running.
+      const target = camp.objective!.target;
+      expect(events.some((e) => e.type === 'act' && e.source === target && e.to === 'shelter'), 'the target never went to his room').toBe(true);
+      const ran = events.find((e) => e.type === 'act' && e.source === target && e.to === 'flee');
+      if (ran) expect((ran.tick - raised!.tick) / T.sim.tickHz, 'he ran at the siren').toBeGreaterThan(T.brain.protect.answer.prep / 2);
     }, 180_000);
   }
+
+  it('with its protection switched off, runs him for his vehicle at the siren and loses him: lab E’s chain, whole', () => {
+    const scene = shooterScene(SEEDS[0]!, 120, 8, 6, '&off=protect');
+    const sim = startScene(scene, T);
+    const driver = scene.driver!();
+    const raw = scene.game.still(sim);
+    const events: SimEvent[] = [];
+    for (let t = 0; t < 120 * T.sim.tickHz && sim.state.outcome.status === 'playing'; t++) events.push(...sim.step(driver.next(sim, raw)).map((e) => ({ ...e })));
+    expect(events.some((e) => e.type === 'act' && e.to === 'flee'), 'the target never ran').toBe(true);
+    expect(sim.state.outcome).toMatchObject({ status: 'failed', reason: expect.stringMatching(/^the target got away/) });
+    expect(sim.index.of('objective')[0]!.objective.status).toBe('escaped');
+  }, 180_000);
 
   it('explains every reaction, back to something sensed', () => {
     const { events } = play(SEEDS[0]!, 90);

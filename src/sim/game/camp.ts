@@ -301,7 +301,8 @@ export function vehicleSolid(v: VehicleSpec): Collider {
  */
 export interface GeneratorEntity extends EntityBase {
   kind: 'generator';
-  generator: { device: number; running: boolean };
+  /** `hits`: the rounds that have struck it, in a game where rounds stop one (game/sabotage.ts). Absent until the first. */
+  generator: { device: number; running: boolean; hits?: number };
 }
 
 export interface LightEntity extends EntityBase {
@@ -311,8 +312,8 @@ export interface LightEntity extends EntityBase {
 
 export interface AlarmEntity extends EntityBase {
   kind: 'alarm';
-  /** Powered by its generator; raised by a guard who reaches it (lab E), which sets lockdown. */
-  alarm: { device: number; powered: boolean; raised: boolean };
+  /** Powered by its generator; raised by a guard who reaches it (lab E), which sets lockdown. `broken` once a round has gone through it (game/sabotage.ts): it has no power from then on. */
+  alarm: { device: number; powered: boolean; raised: boolean; broken?: true; hits?: number };
 }
 
 export interface RadioEntity extends EntityBase {
@@ -385,7 +386,7 @@ export const campPower: System = {
     if (generators.length === 0) return;
     const devices = ctx.world.camp.devices ?? [];
     for (const l of ctx.index.of('light')) l.light.on = poweredBy(generators, l.light.device, devices);
-    for (const a of ctx.index.of('alarm')) a.alarm.powered = poweredBy(generators, a.alarm.device, devices);
+    for (const a of ctx.index.of('alarm')) a.alarm.powered = !a.alarm.broken && poweredBy(generators, a.alarm.device, devices);
     for (const r of ctx.index.of('radio')) r.radio.powered = poweredBy(generators, r.radio.device, devices);
   },
 };

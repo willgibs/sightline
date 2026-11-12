@@ -208,7 +208,7 @@ export const circling: Experiment = {
   run(seed, arm, tuning) {
     const t = tuned(arm as CirclingArm, tuning);
     // The target getting away ends a mission, not the walk: what's asked here is what the walk hands you.
-    const sc = { ...(ladder(`seed=${seed}&plan=circle&ready=alert`) as Scene<Simulation>), playOn: true };
+    const sc = { ...(ladder(`seed=${seed}&plan=circle`) as Scene<Simulation>), playOn: true };
     const sim = startScene(sc, t, keptWorld(`live-camp:${seed}`, t, sc.world));
     const shape = fromOutside(sim);
     const men = sim.guards.length;

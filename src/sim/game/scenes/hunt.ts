@@ -6,7 +6,6 @@ import { parseSwitches, switchedOff, type CampSwitch } from '../switches';
 import type { World } from '../../kernel/world/world';
 import type { Scene } from '.';
 import { bestOverview, liveCamp } from './liveCamp';
-import { takedownTuning } from './takedown';
 
 /**
  * The hunt (brain/hunt.ts, brain/commander.ts; docs/camp-engine.md, section 9): someone on
@@ -140,7 +139,7 @@ export function watchHunt(sim: Simulation, events: ReturnType<Simulation['step']
 
 export function hunt(params?: string): Scene {
   const p = parseHunt(params);
-  const base = liveCamp(`seed=${p.seed}&perch=1&ready=alert`);
+  const base = liveCamp(`seed=${p.seed}&perch=1`);
   const seen = emptyHuntSeen();
   return switchedOff(
     {
@@ -148,7 +147,6 @@ export function hunt(params?: string): Scene {
       name: 'hunt',
       version: 1,
       params: `seed=${p.seed}${p.shots !== 1 ? `&shots=${p.shots}` : ''}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}`,
-      tune: takedownTuning,
       title: `The hunt (${p.seed})`,
       description: 'Someone on the best overview fires, loudly, and then lies where he is. The camp places him by what its men heard, and sends two of them out after him: by cover, watching the place before one goes on to it.',
       setup: (sim) => {

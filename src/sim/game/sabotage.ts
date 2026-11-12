@@ -16,9 +16,54 @@ import type { PlayerEntity } from './entities';
  * What it does is lab D's to say (game/camp.ts): a stopped generator takes its circuit
  * down with it, and a broken radio is broken. Nobody is told; the camp finds out when
  * someone passes it or needs it (perception-spotting, and game/comms.ts).
+ *
+ * A rifle does it too, to what a round can break (`struckEquipment`; the owner, Nov 12:
+ * "there's no way to disable any of the sirens or generators without actually physically
+ * reaching them"). A round through an alarm box kills that box, and the camp has others:
+ * a man who throws a dead one goes for the next. The camp finds out as it finds out about
+ * a hand's work, and hears the round strike metal as it hears any strike. What a round
+ * breaks, and how many it takes, is data (`ballistics.breaks`): the generator is in the
+ * table, at none, until a camp has an answer to losing its power from a ridge.
  */
 
 export type SabotageKind = 'generator' | 'radio' | 'vehicle';
+
+/**
+ * A round has struck a collider: if it's the camp's generator, running, or one of its alarm
+ * boxes, whole, and it has now taken as many rounds as it takes, that is put out of action.
+ * Returns what, with where it stands, or null if the round broke nothing.
+ */
+export function struckEquipment(ctx: TickContext, collider: number): { what: 'generator' | 'alarm'; x: number; z: number } | null {
+  const camp = ctx.world.camp;
+  const devices = camp.devices ?? [];
+  const B = ctx.tuning.ballistics.breaks;
+  const hit = (device: number): { x: number; z: number } | null => {
+    const d = devices[device];
+    return d && camp.structures[d.structure]?.colliders.includes(collider) ? d : null;
+  };
+  if (B.generator > 0) {
+    for (const e of ctx.index.of('generator')) {
+      const d = e.generator.running ? hit(e.generator.device) : null;
+      if (!d) continue;
+      e.generator.hits = (e.generator.hits ?? 0) + 1;
+      if (e.generator.hits < B.generator) return null;
+      e.generator.running = false;
+      return { what: 'generator', x: d.x, z: d.z };
+    }
+  }
+  if (B.alarm > 0) {
+    for (const e of ctx.index.of('alarm')) {
+      const d = e.alarm.broken ? null : hit(e.alarm.device);
+      if (!d) continue;
+      e.alarm.hits = (e.alarm.hits ?? 0) + 1;
+      if (e.alarm.hits < B.alarm) return null;
+      e.alarm.broken = true;
+      e.alarm.powered = false;
+      return { what: 'alarm', x: d.x, z: d.z };
+    }
+  }
+  return null;
+}
 
 /** Something that can be sabotaged, and where a hand reaches it. */
 interface Spot {

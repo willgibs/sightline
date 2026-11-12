@@ -54,5 +54,12 @@ export const GEN_VERSION = 9;
  * once the siren has sounded, the relief knows the alarm is up, and an order doesn't take a
  * man off bringing the target out. No pinned run has a vehicle on the move or a protecting
  * camp at its siren, so no behaviour fingerprint moved.
+ * 20: a camp goes by what it has seen and heard (brain/grounds.ts, game/perception.ts): a
+ * shot's sounds are read by how clearly each was heard, in every camp; a thud or a snap a
+ * long way off leaves nothing in a man's mind; a falling man is seen within the generator's
+ * witness ranges, and a man lying farther off than a few metres is something to walk over
+ * to; the siren takes a man who knows the camp is under attack, or a camp that has counted
+ * two of its dead; every live camp protects its target; and a round breaks an alarm box.
+ * The camp-fight run is a camp under fire, so its fingerprints moved.
  */
-export const SIM_VERSION = 19;
+export const SIM_VERSION = 20;

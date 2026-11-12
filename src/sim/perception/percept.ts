@@ -36,6 +36,10 @@ export interface Percept {
   cause: number;
   /** A heard percept's sound: the event type, or 'crack' (E8 takes a bearing from a report, not from an impact). */
   sound?: string;
+  /** A body seen going down: he watched one of his own fall, which is more than finding him (brain/grounds.ts). Absent for a body found later. */
+  fell?: true;
+  /** A body seen from too far off to tell what has happened to him: a man lying where he shouldn't be. It's a reason to go and see, and nothing to report as a body, until he's near enough to be sure. */
+  far?: true;
 }
 
 /**

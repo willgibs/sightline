@@ -39,6 +39,7 @@ import { SURFACE_NAMES, Surface } from '../kernel/world/surfaces';
 import { hurtPlayer, nearMiss } from './combat';
 import { player, type GuardEntity, type PlayerEntity } from './entities';
 import { bodiesAt } from './remains';
+import { struckEquipment } from './sabotage';
 
 /**
  * Shooting, in a tick: the ballistics lane's rifle and bullets (sim/ballistics), wired to
@@ -92,8 +93,8 @@ const rifleSystem: System = {
   phase: 'commands',
   after: ['player-commands'],
   reads: ['input', 'player.body', 'player.rifle', '*.body', 'guard.guard.spawn', 'remains.remains', 'solid.solid'],
-  writes: ['player.rifle', 'entities', 'bullet.bullet', 'thrown.thrown', 'rng.unaimed', 'rng.wound'],
-  emits: ['shot', 'report', 'ranged', 'impact', 'death', 'cry', 'clatter'],
+  writes: ['player.rifle', 'entities', 'bullet.bullet', 'thrown.thrown', 'rng.unaimed', 'rng.wound', 'generator.generator', 'alarm.alarm'],
+  emits: ['shot', 'report', 'ranged', 'impact', 'death', 'cry', 'clatter', 'sabotage'],
   run(ctx) {
     const p = player(ctx.index);
     for (const c of ctx.input.commands) if (c.kind === 'shotDrop') dropShot(ctx, p, c);
@@ -345,6 +346,11 @@ function struck(ctx: TickContext, bullet: BulletEntity, s: Strike, now: number):
   });
   if (target?.kind === 'guard') kill(ctx, target, s, bullet, impact, now);
   else if (target?.kind === 'player') hurtPlayer(ctx, target, s.part ?? 'torso', b.shooter, impact);
+  else if (s.what === 'collider') {
+    // A round through the generator or an alarm box puts it out of action (game/sabotage.ts).
+    const broke = struckEquipment(ctx, s.id);
+    if (broke) ctx.emit({ type: 'sabotage', source: b.shooter, cause: impact, what: broke.what, x: broke.x, z: broke.z });
+  }
 }
 
 /** A guard struck: he may cry out, falls where he was hit, and leaves his body. */
@@ -421,8 +427,8 @@ const bulletsSystem: System = {
   name: 'bullets',
   phase: 'projectiles',
   reads: ['bullet.bullet', '*.body', 'guard.guard.spawn', 'remains.remains', 'solid.solid'],
-  writes: ['bullet.bullet', 'entities', 'rng.wound', 'player.health', 'player.rifle', 'player.vitals'],
-  emits: ['impact', 'death', 'cry', 'hurt', 'passed'],
+  writes: ['bullet.bullet', 'entities', 'rng.wound', 'player.health', 'player.rifle', 'player.vitals', 'generator.generator', 'alarm.alarm'],
+  emits: ['impact', 'death', 'cry', 'hurt', 'passed', 'sabotage'],
   run(ctx) {
     const now = ctx.tick / ctx.tuning.sim.tickHz;
     // Bullets in id order; striking despawns them, so go through a copy.

@@ -84,6 +84,8 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   // Someone has him in sight, or saw his flash: a place to act on.
   if (camp.hunts && r.kind === 'contact') seenThreat(camp, r, tick, tuning, world);
   if (r.kind === 'shot' || r.kind === 'contact') camp.lastShot = tick;
+  // Word from a man who knows the camp is under attack (grounds.ts): what the camp's own order to the siren goes on (plan, below).
+  if (r.attack) camp.attack = tick;
   injectBelief(camp.map, r.x, r.z, Math.max(r.radius, M.injectRadius), 1);
   camp.lastPercept = tick;
   camp.lastCause = r.cause;
@@ -101,6 +103,12 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   }
   // A body, in a camp that keeps count of its men: whoever should have been standing there is down.
   if (r.kind === 'body' && camp.hunts) accountFor(camp, r, tick, tuning, world);
+  // And every camp counts its dead (plan, below): the same body called in again is nobody new.
+  if (r.kind === 'body') {
+    const same = tuning.brain.hunt.body.same;
+    const bodies = (camp.bodies ??= []);
+    if (!bodies.some((b) => (b.x - r.x) * (b.x - r.x) + (b.z - r.z) * (b.z - r.z) <= same * same)) bodies.push({ x: r.x, z: r.z });
+  }
   // A post gone quiet is a job for someone: walk over and see (E6).
   if (r.kind === 'missing' || r.kind === 'outage') {
     const t = addTask(camp, 'check', r.x, r.z, 2, 1, tick, r.y);
@@ -238,6 +246,12 @@ export function plan(m: CampMind, out: CampOrder[]): void {
     const quiet = (m.tick - camp.lastPercept) / hz;
     if (quiet >= T.search.minSeconds && (quiet >= T.search.maxSeconds || mapMass(camp.map) < T.search.lowMass || mapSpread(camp.map) > T.search.wideArea)) endSearch(camp, m.tick);
   }
+  // A man sent to the siren whose order has run out with no siren: he isn't going to throw it (he may be dead, for all the
+  // camp knows), and the next order goes to someone else.
+  for (const t of camp.tasks) {
+    if (t.kind !== 'alarm' || (m.tick - t.issued) / hz < m.tuning.brain.camp.keepOrder) continue;
+    for (const id of t.assigned) if (!camp.noAnswer?.includes(id)) (camp.noAnswer ??= []).push(id);
+  }
   // Orders in force lapse when nothing renews them. A section's stands until it's called home (planHunt).
   camp.tasks = camp.tasks.filter((t) => t.kind === 'hunt' || (m.tick - t.issued) / hz < m.tuning.brain.camp.keepOrder);
   if (camp.hunts) planHunt(m, out);
@@ -256,6 +270,21 @@ export function plan(m: CampMind, out: CampOrder[]): void {
   if (shot) camp.tasks = camp.tasks.filter((t) => t.kind !== 'sweep' || t.issued >= camp.shots.tick);
   if (shot && m.tick - camp.shots.tick < T.keepOrder * m.tuning.sim.tickHz && camp.tasks.filter((t) => t.kind === 'sweep').length === 0) {
     addTask(camp, 'sweep', shot.x, shot.z, 3, m.world.camp.guards.filter((g) => g.role === 'marksman').length, m.tick);
+  }
+  // The camp's own grounds for the siren (grounds.ts has a man's): enough of its men reported down, or word on the net from
+  // a man who knows it's under attack and can't get to a box himself: he's on a tower, or too far off. Someone still has to
+  // reach one (E7), so it sends whoever can soonest, to one it believes is working.
+  const A = m.tuning.brain.alarm;
+  const told = camp.attack !== undefined && (m.tick - camp.attack) / hz <= A.grounds.keep;
+  if (camp.level !== 'lockdown' && ((camp.bodies?.length ?? 0) >= A.casualties || told) && !camp.tasks.some((t) => t.kind === 'alarm')) {
+    const to = nearestBox(m);
+    if (to) {
+      // It comes before whatever else he was sent to do: he's taken off it.
+      for (const t of camp.tasks) t.assigned = t.assigned.filter((id) => id !== to.man);
+      const task = addTask(camp, 'alarm', to.x, to.z, 5, 1, m.tick);
+      task.assigned.push(to.man);
+      out.push({ guard: to.man, task });
+    }
   }
   // Bringing the target out (protect.ts): once the relief is at the gate, men are sent to
   // his door, and others after a while if his vehicle still hasn't moved. The camp knows its
@@ -281,6 +310,29 @@ export function plan(m: CampMind, out: CampOrder[]): void {
     searches++;
   }
   assign(m, out);
+}
+
+/** The working alarm box that one of the camp's men can get to soonest, and that man, going by where it believes each of them is. Null if it has no such box, or nobody to send. */
+function nearestBox(m: CampMind): { x: number; z: number; man: number } | null {
+  const camp = m.camp;
+  const can = m.tuning.brain.alarm.role;
+  let best: { x: number; z: number; man: number } | null = null;
+  let bestD = Infinity;
+  for (const a of camp.devices.alarms) {
+    if (a.raised || !a.powered) continue;
+    for (const g of camp.roster) {
+      const post = m.world.camp.guards[g.post]!;
+      if (g.status !== 'ok' || g.keeps || post.elevated || can[post.role] <= 0 || camp.noAnswer?.includes(g.id)) continue;
+      const at = whereIs(m, g);
+      const d = (at.x - a.x) * (at.x - a.x) + (at.z - a.z) * (at.z - a.z);
+      // The boxes in the order the camp keeps them, and its men in roster order: the first of equals.
+      if (d < bestD) {
+        bestD = d;
+        best = { x: a.x, z: a.z, man: g.id };
+      }
+    }
+  }
+  return best;
 }
 
 function endSearch(camp: CampState, tick: number): void {
@@ -327,8 +379,9 @@ function assign(m: CampMind, out: CampOrder[]): void {
         // With the alarm up, the man on the target's door is sent nowhere but in for him (protect.ts).
         if (camp.level === 'lockdown' && post.holdsDoor && t.kind !== 'fetch') continue;
         if (post.elevated && t.kind !== 'sweep') continue;
+        if (t.kind === 'alarm' && camp.noAnswer?.includes(g.id)) continue;
         const role = roles[post.role];
-        const suit = t.kind === 'sweep' ? (post.role === 'marksman' ? 1 : 0) : t.kind === 'cover' ? 1 : t.kind === 'fetch' ? (role.fight > 0 ? 1 : 0) : t.kind === 'search' ? role.search : role.investigate;
+        const suit = t.kind === 'sweep' ? (post.role === 'marksman' ? 1 : 0) : t.kind === 'cover' ? 1 : t.kind === 'fetch' ? (role.fight > 0 ? 1 : 0) : t.kind === 'alarm' ? (m.tuning.brain.alarm.role[post.role] > 0 ? 1 : 0) : t.kind === 'search' ? role.search : role.investigate;
         if (suit <= 0) continue;
         const pos = whereIs(m, g);
         const dx = pos.x - t.x;

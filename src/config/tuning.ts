@@ -15,6 +15,10 @@
 
 /** How much a conifer's crown dims a line, per metre of it: a 4 m crown lets through about a twentieth. */
 const CROWN_DENSITY = 0.7;
+// How far off a guard sees a comrade go down: looking that way, and out of the side of his eye. The generator builds a camp's
+// web of who watches whom by these (gen.sight.witness), and a guard's eyes go by the same (perception.sight.fall), so a camp
+// is watched in play as it was built to be.
+const WITNESS = { core: 80, peripheral: 30 };
 
 export const defaultTuning = {
   sim: {
@@ -400,7 +404,7 @@ export const defaultTuning = {
       still: 0.4, // a still body fills a guard's meter at this share of a moving one's rate
       // A guard seeing a comrade drop: a standing body, falling. Lab D's own, until lab E's
       // brain says how guards take it.
-      witness: { core: 80, peripheral: 30 },
+      witness: WITNESS,
       eye: 1.7, // a standing guard's eye
       chest: 1.35, // where a standing body is seen, and shot
       crouchHead: 1.05, // the crouched intruder's head and chest: what a guard sees of him
@@ -662,6 +666,10 @@ export const defaultTuning = {
       // through at least `through`, with nothing solid in the way.
       glint: { min: 0.5, range: 600, through: 0.15 },
       notice: { range: 30, stop: 1.2, through: 0.15 }, // equipment stopped or a door out of place: how far, how near the line may end, and how much foliage it sees through
+      // A man going down is seen by whoever would see him drop: this far off, looking that way and out of the side of his eye.
+      // Once he's down he's a body lying still, and the law of sight has him as it has anyone lying still.
+      fall: WITNESS,
+      bodyNear: 10, // metres: this near a man on the ground, he can see what has happened to him. Farther off it's someone lying down, and worth walking over for
       skylineReach: 1500, // a line on past the body that hits nothing this far ends in open sky
       skylineRampDeg: 0.5, // it counts as sky from this far below level to this far above, ramping
       groundLift: 0.05, // light is taken this far above the ground beneath the body (owner)
@@ -707,21 +715,34 @@ export const defaultTuning = {
       sound: { faint: 0.3, clear: 0.62 },
       // A shot heard, by which of its sounds it was: the muzzle's report, the crack of the bullet
       // passing, its strike, the bolt. Each is read as any sound is, from the edge of hearing
-      // (clarity 1) to clear (its own `clearAt`, since a strike is a far duller thing than a
-      // report). The design doc's searching takes "a close shot": with every pair at 0.8, any
-      // shot heard at all is one, which is how this began.
+      // (clarity 1) to clear (its own `clearAt`), and counts for what it tells a man. One law
+      // says what he hears (kernel/sound.ts); this says what he can tell from it.
+      // - A report is a shot wherever it's heard clearly. Fainter it has him wary, and at the
+      //   edge of hearing it only makes him look up: a suppressed one a long way off.
+      // - A crack is a snap. Far from the round's path it's lost in the camp's own noise and
+      //   tells him nothing; nearer it turns his head, and within about 20 m it has him wary
+      //   and looking for where it came from. There was no bang to go with it, so it isn't a
+      //   shot to him unless the round passed within a few metres (`closeAt`): a near miss he
+      //   can't mistake.
+      // - A strike is a thud. Close by it makes him look, and what he then sees is what tells
+      //   him. Far off it tells him nothing, though it carries (you hear your own hit land).
+      // - The bolt is a shot to anyone near enough to hear it.
+      // The design doc's searching takes "a close shot". With every pair at 0.8 any sound of a
+      // shot heard at all was one, which is how this began: a body's thud carries 650 m, so
+      // one suppressed hit had the whole camp searching (docs/decisions.md, Nov 9 and Nov 12).
       shots: {
-        report: { faint: 0.8, clear: 0.8, clearAt: 4 },
-        crack: { faint: 0.8, clear: 0.8, clearAt: 4 },
-        impact: { faint: 0.8, clear: 0.8, clearAt: 4 },
-        bolt: { faint: 0.8, clear: 0.8, clearAt: 4 },
+        report: { faint: 0.3, clear: 0.8, clearAt: 2 },
+        crack: { faint: 0, clear: 0.62, clearAt: 8, close: 0.8, closeAt: 40 },
+        impact: { faint: 0, clear: 0.62, clearAt: 26 },
+        bolt: { faint: 0.3, clear: 0.8, clearAt: 2 },
       },
       glimpse: 0.8, // having seen you at 100%: searching, once he loses you
       cry: 0.8, // a comrade's cry heard: searching
-      body: 0.8, // a body seen: searching (design doc: the strongest stimulus)
+      body: 0.8, // a body seen, and no mistaking it: searching (design doc: the strongest stimulus)
+      bodyFar: 0.62, // a man lying where he shouldn't be, too far off to see what has happened to him: suspicious. He goes to see
       glint: 0.55, // a flash from a lens: suspicious
       muzzle: 0.8, // a muzzle flash, seen: searching
-      whistle: 0.8, // the camp's whistle: searching
+      whistle: 0.3, // the camp's whistle: curious. He looks up, and stands to (brain/protect.ts). It doesn't hand him the alarm of the man who blew it
       outage: 0.55, // equipment stopped, that was running: suspicious
       door: 0.3, // a door not as it was left: curious
       keepBody: 120, // seconds a body stays in his mind (a sound or a shot: hearing.keep)
@@ -799,6 +820,15 @@ export const defaultTuning = {
       retry: 10, // seconds before he'll try the alarm again, after a run that came to nothing
       claimWithin: 3, // metres from the box for someone's shout to count as claiming it
       sirenHeight: 3, // metres above the box's foot that the horn sounds from
+      // What a man has to know before he goes for the siren (brain/grounds.ts): that the camp is under attack, by his own eyes
+      // and ears. An intruder in his sight, or one of his own seen going down, is enough at once. Short of those it takes this
+      // many shots he took for shots, no more than `within` seconds apart (sounds closer together than `apart` are one shot's):
+      // one shot gets the whistle and the stand-to, and fire that goes on gets the siren. Once he knows, he knows for `keep` seconds.
+      grounds: { shots: 2, within: 60, apart: 2, keep: 30 },
+      // And the camp's own count (commander.ts): with this many of its men reported down, wherever and however they were found,
+      // it orders the nearest man who can to a box. One body could be anything. Two is an attack. (It gives the same order on
+      // word from a man who has grounds and no box within reach.)
+      casualties: 2,
     },
     // Doors (E7, A9): they stand open until someone shuts one.
     doors: {
@@ -1141,7 +1171,7 @@ export const defaultTuning = {
       raiseTime: 0.3, // seconds to bring the scope to the eye; until it's there the shot isn't where you look
       zero: { min: 100, max: 600, step: 100, start: 100 }, // metres: the dial clicks in 100 m steps
       load: 'match', // the load the rifle starts with (a key of loads)
-      carries: { match: true, subsonic: false }, // which loads are in the kit, for the load key to change between: with one, the key does nothing (the takedown carries the subsonic too)
+      carries: { match: true, subsonic: true }, // which loads are in the kit, for the load key to change between: with one, the key does nothing
       suppressed: false, // the suppressor fitted at the start
       fitTime: 3, // seconds to fit or take off the suppressor; no shooting meanwhile
       loadTime: 2.5, // seconds to change the load in the magazine; no shooting meanwhile
@@ -1169,6 +1199,12 @@ export const defaultTuning = {
       // A bullet's strike, by what it hits: the thump of a body carries back to the shooter.
       impact: { body: 650, metal: 900, rock: 320, wood: 260, ground: 160, water: 140 },
     },
+    // What a round puts out of action (game/sabotage.ts), as the rounds it takes to do it; 0 for something a rifle doesn't
+    // stop. An alarm box is sheet metal and a switch: one round kills that box, and the camp has others. The generator is a
+    // rifle's to stop only if this says so. It feeds every alarm box and the radio, so one round from a ridge would take the
+    // siren and the net out of the whole mission, and the camp has no answer to that yet (the owner, Nov 12: "we shouldn't
+    // allow for any sort of perfect combo that solves all takedown problems"). Cutting the power stays a job for hands.
+    breaks: { generator: 0, alarm: 1 },
     // What a hit does (design doc · Hits).
     hits: {
       cryChance: 0.35, // a torso shot kills an unarmored guard, but this often he cries out first
@@ -1245,27 +1281,6 @@ export const defaultTuning = {
     recoverTime: 6, // seconds to get the breath back after a full hold
     minAir: 0.25, // a breath can't be held again until this much of it is back
     closeCall: 28, // beats a minute a close call adds at once (a crack past the head, a near miss)
-  },
-
-  // A mode's numbers: what a scene sets over the game's when it's played as that mode
-  // (kernel/scene.ts, `tune`). They're here with every other number, so they hot-reload and a
-  // recording carries them.
-  modes: {
-    // The takedown (game/scenes/takedown.ts): how a camp that protects its target reads what
-    // it hears, and what's in the kit.
-    takedown: {
-      // Each sound of a shot, by how clearly it was heard (perception.awareness.shots has the
-      // reading). A crack is a shot to someone within about 40 m of the bullet's path and a
-      // snap beyond; a strike is a thud that makes a man look, and what he then sees tells him.
-      shots: {
-        report: { faint: 0.55, clear: 0.8, clearAt: 2 },
-        crack: { faint: 0.4, clear: 0.8, clearAt: 4 },
-        impact: { faint: 0.3, clear: 0.62, clearAt: 26 },
-        bolt: { faint: 0.55, clear: 0.8, clearAt: 2 },
-      },
-      whistle: 0.3, // what the camp's whistle raises a man who hears it to: curious. He looks up, and stands to
-      subsonic: true, // the kit carries the subsonic load as well as the match one
-    },
   },
 
   view: {

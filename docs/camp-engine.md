@@ -575,12 +575,94 @@ So the three kinds of camp now end three ways under the same attack, and where h
 **What it doesn't do yet, and where each belongs.**
 
 - **Nobody has played it, or heard it.** The engine's voice is checked for being one unbroken sound that fades with distance (`tests/browser/engine.test.ts`). Whether it sounds like an engine, and whether a person reads it in time, is a sitting's to say.
-- **Where his vehicle stands tells you nothing.** The generator puts it by his door on every camp, so on a camp that holds it's a getaway that is never used. It can't simply go to the motor pool: a camp that isn't ready for trouble still runs him to it at the siren, and standing by his door is what keeps that run out of a perch's view. It moves when those camps take an answer of their own (preparedness, step 3). Until then the things to read before a shot are the men on his door and whether he walks out.
+- **Where his vehicle stands tells you nothing.** The generator puts it by his door on every camp, so on a camp that holds it's a getaway that is never used. It stood there because a camp that wasn't ready for trouble ran him to it at the siren, and standing by his door kept that run out of a perch's view. Since Nov 12 no camp does that (step 3b), so a holding camp's vehicle can go to the motor pool, and where it stands will then say something. That is a change to what the generator builds, and goes with its next one. Until then the things to read before a shot are the men on his door and whether he walks out.
 - **He does nothing about someone who comes into his room.** He crouches there. What he and the men on his door do about an intruder inside his building is close protection, the next of step 3's means.
-- **A camp that isn't ready for trouble is as it was:** he runs for his vehicle at the siren, and is in it a median of 4 to 10 s later with nothing to hear first (the table's third column). These answers are a protecting camp's (`ready=alert`, the takedown). Giving the other kind an answer of its own, slower and sloppier, is the open call on preparedness (section 10, 4 and 10).
+- **A camp that wasn't marked ready for trouble ran him at the siren,** in his vehicle a median of 4 to 10 s later with nothing to hear first (the table's third column). On Nov 12 that ended: every camp answers by its problem (step 3b), and `off=protect` plays the old way.
 - **Nine camps in forty never sounded the siren** under this sniper in five minutes, and on those nothing happens to him either way.
 
 **Dials a person should set by playing,** in `tuning.brain.protect.answer` and `tuning.brain.engine`: how long the engine runs before he's sent for (`prep`, 60 s: the length of the warning), how much longer before he comes by himself (`own`), how long before another man takes over starting it (`takeOver`, `perMetre`), how many of the relief go to his doors (`keepers`), how far a man on his door will go for a position (`firefight.spot.doorRun`), and how far an engine carries starting, standing and driving.
+
+### Step 3b, built: a first move that isn't the last (Nov 12)
+
+`brain/grounds.ts`, `game/perception.ts`, `brain/commander.ts`, `game/sabotage.ts`. The owner, from playing: "if I'm shooting with a suppressor from a distance and hit a guard in a tower, the siren would go off immediately", though the shot is quiet, the strike is negligible, and nobody on the ground is likely to see a man in a tower drop. And every other opening ended the same way: "If I take a shot at the siren, everyone hears it and panics. If I take a shot at the generator, everyone hears it and panics. If I try to go into the camp to disable those, I get seen, everyone panics, and the siren goes off. If I shoot a guard first, the siren goes off. How do I win here without the target escaping the second everyone knows I'm attacking."
+
+**The standard it's built to** (the owner, the same day): "the goal of the camp's reactive intelligence is fair realism... The core question is: what would someone actually do here, and how would the camp actually react? Then, using your discretion, build that into a good video game version." A suppressed shot from the right distance "may not even catch my attention, especially with other sounds going on around me". Near me it would. Having noticed, "I might be more confused than immediately sprint to cover, depending on how likely I can confirm an attacking gunshot... as well as the reactions (or lack thereof) of those around me." A man dropped unseen: "I may or may not hear a thud... but likely wouldn't immediately assume that somebody was just shot from a hidden sniper or sprint to cover/hit a siren on a light assumption. Sometimes... I may have to find a body to know something's happening." And no kit is a perfect answer: "It shouldn't be so easy to go suppressor plus subsonic camo and be deadly quiet for every single kill, regardless of distance."
+
+**What was wrong, measured** (`npm run experiment -- second-step`, 24 camps: one round, into one thing, and four minutes of what the camp makes of it). One suppressed round through the head of a man on a raised post, from the best overview:
+
+| | A plain camp | A camp marked ready (the takedown) |
+| --- | --- | --- |
+| The camp whistled | 20 of 20 | 19 of 20 |
+| Of the rest, searching 5 s later | 98% | 66% |
+| The siren sounded | 9 of 20, 3.9 s after he fell | 8 of 20, 4.9 s after |
+| Thrown by a man who had seen nobody and no body | 8 of the 9 | 7 of the 8 |
+| The target was gone | 9 of 20, 34 s after the shot | 4 of 20, 144 s after |
+
+A round into the generator or an alarm box did nothing to it, and whistled the camp up every time. Three causes:
+
+1. **Any sound of a shot was a shot.** A body's thud carries 650 m, so that you hear your own hit land. Every man in the camp took it for a shot, and turned to look at the man who had made it.
+2. **A worker ran for the siren on any of them.** The design doc has a worker raise the alarm "if he sees you", and the reaction window open on "something alarming, like a comrade dropping". The code had him go on anything he heard.
+3. **A camp that wasn't marked ready ran its target at the siren.** Gone in half a minute, with nothing to hear first.
+
+**A camp's alarm is a ladder, and each rung takes its own evidence.** The rules are the same for every camp: the takedown's separate numbers are the game's, and `ready=` is gone.
+
+| What a man does | What it takes | What tells you |
+| --- | --- | --- |
+| Nothing | A snap or a thud a long way off. He hears it, and it's lost in the camp's own noise | |
+| He looks up | A snap within about 35 m of the round's path, a thud within about 50 m, a suppressed report at the edge of hearing | "Hm?", a head turning |
+| He's wary, and may go and see | A snap within about 20 m, a thud within about 28 m, a report heard faintly. Or a man he can see lying where he shouldn't be, more than 10 m off: he walks over | "Who's there?", "Is that... a body?", a man walking over |
+| He gets down, shouts, and blows his whistle; the camp stands to and the target goes to his room | Fire he's sure of: a report heard clearly, a near miss within 4 m, a flash. Or a body near enough to see what happened to it | "That was a shot!", "Man down!", the whistle |
+| He runs for an alarm box | He knows the camp is under attack: an intruder in his sight; one of his own in his sight when the round struck; a body come on after a shot he took for a shot; or fire that has come again inside a minute | A man running for a wall, then the siren |
+| The camp orders someone to a box | Two of its men reported dead, however they were found. Or word on the net from a man who knows and can't reach a box himself | The same, a little later |
+| The target leaves | Only by a way the camp has ready (step 3a) | An engine in the camp, or a truck on the road |
+
+What each of those is, in the code:
+
+- **A sound tells a man what it sounds like** (`perception.awareness.shots`). One law says what he hears; this says what he can tell from it. A sound of a shot that tells him nothing leaves nothing in his mind: no percept, no belief, no look. So the strike still carries 650 m and you still hear your own hit land.
+- **A man going down is seen by whoever would see him drop**: within 80 m looking that way, 30 m out of the side of his eye. Those are the ranges the generator builds a camp's web of watchers by (`gen.sight.witness`), and a guard's eyes now go by the same number (`perception.sight.fall`). They had gone by the law for a standing, walking man, which reaches 150 m.
+- **He watched him go down only if he had him in sight when the round struck.** A man who whips round at the thud gets there a moment later, to a man folding up or lying still. And a man lying more than 10 m off is someone lying down (`perception.sight.bodyNear`): he goes over, and it's a body when he's near enough to see.
+- **Grounds for the siren** (`brain/grounds.ts`), and the camp's own (`brain/commander.ts`): the last two rows but one. Once a man knows, he knows for 30 s. A man sent by the camp who never throws the box isn't sent again: for all it knows he's dead.
+- **Men who are down keep saying so.** A man in cover calls in each new shot, unless he has heard someone else do it, so the camp knows the rifle hasn't stopped, and sends nobody out under it (step 2b).
+- **Every camp protects its target** (step 3a's answers, on every camp). No camp runs him at the siren. `off=protect` plays one that does, for measuring against.
+- **A round breaks an alarm box** (`game/sabotage.ts`, `ballistics.breaks`). One round, one box, and the camp has others: a man who throws a dead one goes for the next. The generator is in the same table at none. It feeds every box and the radio, so one round from a ridge would take the siren and the net out of the whole mission, and a camp has no answer to that yet. Cutting the power stays a job for hands, as the design doc has it.
+
+**Measured after** (the same bench, same camps). "Careful" is a man nobody has had in sight for ten seconds, on a line 12 m clear of everyone else: the shot of someone who has watched first.
+
+| One round | It landed on | Whistled | Searching at +5 s | Siren | Target gone |
+| --- | --- | --- | --- | --- | --- |
+| Suppressed, careful, from the overview | 20 camps | 1 | 2% | **0** | **0** |
+| The same from 80 m | 21 | 9 | 17% | 0 | 0 |
+| Subsonic and suppressed, careful, from 90 m | 22 | 3 | 3% | 0 | 0 |
+| The same from 40 m | 24 | 19 | 42% | 2, at 50 s | 1 |
+| Suppressed, at whoever is on a watchtower | 13 | 6 | 23% | 4, at 11 s | 3, at 109 s |
+| Suppressed, at whoever is on the ground | 23 | 12 | 29% | 13, at 7.7 s | 5, at 125 s |
+| Loud, at whoever is on a watchtower | 13 | 13 | 92% | 5, at 10 s | 4, at 109 s |
+| Suppressed, at an alarm box | 11 | 4 | 16% | 0 | 0; the box was dead on 11 |
+| Suppressed, at the generator | 13 | 1 | 3% | 0 | 0; it does nothing to it |
+| Five suppressed rounds half a minute apart, each careful | 20 | 14 | | 5, at 135 s, with 3 men down | 2, at 181 s |
+
+One siren in the table was thrown by a man who had seen nobody and no body: in the run of five rounds, a man for whom it was fire that goes on. Before, it was 37 of 48. What the table says:
+
+- **A careful first shot is quiet.** One camp in twenty whistles, and none sounds its siren. It was nine in twenty, with the target gone half a minute later.
+- **It isn't a perfect answer, and neither is the subsonic load.** The suppressor does less the nearer you are: from 80 m the camp whistles on 9 of 21. The subsonic load buys you in to about 90 m, and at 40 m it's heard on 19 camps of 24. And a camp counts its dead: five careful rounds bring the siren on 5 camps of 20, with three men down.
+- **Where it sounds on one round, someone was watching the man who fell.** That is the sightline puzzle the generator builds, and the difference between the first row and the fifth is the game.
+
+**What else it moved.** One loud shot no longer brings the siren, so a shooter who fires once from the overview and stays is now found on 5 camps of 12, where step 2b had 9: a section still goes out after him on 10, but (my reading) no relief joins the search. One who fires four times is found on 9, with enough rounds on him to kill on 6, as one shot used to do. Under the sniper who fires every 8 s the siren comes 12 s after his first shot, from 7. And the brain bench's overlook has 24 guards of 32 down to a perfect shooter on one perch, from 18: its camps ran for cover at any sound of a shot, and now stand to where they are at the whistle, as the takedown's camps did. A man on the best overview sees men who have only got down, and that is the next thing a static shooter should lose.
+
+**How you win, then.** Watch before you fire. A man nobody is looking at, on a line that passes nobody, falls unseen, and the camp finds him by a check-in he doesn't answer or by walking past. If a man sees you, or sees one fall, he has to reach a box: drop him on the way (the design doc's reaction window, about a second and a half before he sets off). A second body found, or a second loud shot, and the siren comes anyway. But it starts the camp's answer and doesn't end the mission: a camp you have to go into keeps its target to the end, a camp built to be flushed gives a minute of engine before he runs, and an escort's waits for its relief.
+
+**What it doesn't do yet, and where each belongs.**
+
+- **Nobody has played it.** The numbers say a careful opening is quiet. Whether a person can tell from a ridge who is being watched is a sitting's to say, and it's the thing to find out.
+- **The honest view doesn't show who hears a snap or who is watching whom.** A player has guards' facings and nothing else. The tactical map (design doc) is where routes and watchers would draw themselves in.
+- **Nothing on the honest screen says who raised the siren, or on what.** `npm run sitting -- <link> --why` and the debug view's WHY line do. The end screen should.
+- **A man still makes up his mind alone.** The owner's "the reactions (or lack thereof) of those around me" is in only as shouts and the whistle. A man who looks to his neighbours before he believes his own ears would be the next step in the same direction.
+- **News by voice and radio still raises every man who hears it** to searching, though he then only holds where he is. The review's "two dials" (what a man knows apart from what he's told to do) is still the piece that would stop that. A careful kill now has 2% of the camp searching, so it's no longer what decides a first shot.
+- **A camp finds its dead by its radio or by walking past.** A post that doesn't answer its check-in is looked for. Reliefs of posts, so that a camp with no radio still finds a man at the end of his watch, aren't built (the owner: "something like camp rotations may help discover dead bodies").
+- **A camp has no answer to losing its power.** Nobody restarts a generator or mends a box, and with the power cut by hand it can't sound a siren or call relief at all. Until it has one (a second alarm that needs no power, a runner), a rifle doesn't stop the generator.
+- **A vehicle can't be shot dead.** It would hand a ridge the way to stop a bolting camp's getaway, and that sitting hasn't been played.
+
+**Dials a person should set by playing:** `perception.awareness.shots` (how near a snap is a shot, how near a thud makes a man look), `perception.sight.bodyNear`, `perception.sight.fall` with `gen.sight.witness` (how far off a falling man is seen: one number), `brain.alarm.grounds` (how many shots make fire that goes on, and how long a man goes on knowing), `brain.alarm.casualties` (how many dead before the camp orders the siren), and `ballistics.breaks`.
 
 ## 10. Decisions
 

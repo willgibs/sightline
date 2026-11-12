@@ -53,7 +53,7 @@ export interface Task {
 }
 
 /** `fetch` and `escort` are the two halves of bringing the target out (protect.ts): to his door, then to his vehicle. `hunt` is a section's (hunt.ts). */
-export type TaskKind = 'investigate' | 'search' | 'check' | 'sweep' | 'cover' | 'fetch' | 'escort' | 'hunt' | 'start' | 'post';
+export type TaskKind = 'investigate' | 'search' | 'check' | 'sweep' | 'cover' | 'fetch' | 'escort' | 'hunt' | 'start' | 'post' | 'alarm';
 
 /**
  * How a camp answers for its target under attack, by the problem it's built round
@@ -152,6 +152,12 @@ export interface CampState {
   lastShot: number;
   /** Bodies it has put a name to, and where each lies: the same one called in again is nobody new. */
   fallen: Array<{ x: number; z: number; who: number }>;
+  /** Every body reported to it, named or not, and where: what it counts before it orders the siren (commander.ts). Absent until the first. */
+  bodies?: Array<{ x: number; z: number }>;
+  /** The tick it last had word, on the net, from a man who knew the camp was under attack (grounds.ts): he couldn't get to a box, so it sends someone who can. Absent until it has. */
+  attack?: number;
+  /** Men it has ordered to the siren who never threw it: it sends someone else. Absent until one hasn't. */
+  noAnswer?: number[];
   /**
    * A camp that protects its target (protect.ts): where his hard room is. At the first sign
    * of trouble he goes there, and he leaves only when someone comes for him. Absent for a

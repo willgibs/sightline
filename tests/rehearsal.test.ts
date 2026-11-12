@@ -23,7 +23,7 @@ const SEED = 'LEB-2534';
 /** The state's hash and the events of the first 40 s of a sniper on the camp. */
 function fight(): { hash: string; events: number } {
   const world = worldOf(SEED);
-  const scene = { ...(compound(`seed=${SEED}&attack=sniper&ready=alert`) as Scene<Simulation>), world: () => world };
+  const scene = { ...(compound(`seed=${SEED}&attack=sniper`) as Scene<Simulation>), world: () => world };
   const sim = startScene(scene, T, world);
   const driver = scene.driver!() as AttackDriver;
   const raw = scene.game.still(sim);

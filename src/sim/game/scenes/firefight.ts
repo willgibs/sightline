@@ -13,7 +13,6 @@ import type { Simulation } from '../sim';
 import { parseSwitches, switchedOff, type CampSwitch } from '../switches';
 import type { Scene } from '.';
 import { liveCamp } from './liveCamp';
-import { takedownTuning } from './takedown';
 
 /**
  * The firefight's own scene (brain/firefight.ts): the thing the owner did, walking into a
@@ -129,7 +128,7 @@ const FAR = 45;
 
 export function firefight(params?: string): Scene {
   const p = parseFirefight(params);
-  const base = liveCamp(`seed=${p.seed}&ready=alert`);
+  const base = liveCamp(`seed=${p.seed}`);
   // What the run has shown so far: kept by the scene, and begun again by its setup.
   const seen = { sure: -1, hidden: -1, found: -1, going: 0, closed: new Set<number>(), far: new Set<number>(), went: new Set<number>() };
   return switchedOff(
@@ -138,7 +137,6 @@ export function firefight(params?: string): Scene {
       name: 'firefight',
       version: 1,
       params: `seed=${p.seed}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}`,
-      tune: takedownTuning,
       title: `The firefight (${p.seed})`,
       description: 'Someone stands in front of a guard until he is seen, then goes behind the nearest thing that hides him and stays there. What comes after him?',
       setup: (sim) => {

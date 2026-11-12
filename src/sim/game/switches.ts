@@ -16,7 +16,7 @@ import type { Simulation } from './sim';
  * differently draws differently, as he should.
  */
 
-export const CAMP_SWITCHES = ['commander', 'radio', 'alarm', 'truck', 'reinforce', 'fight', 'firefight', 'hunt', 'answer', 'power'] as const;
+export const CAMP_SWITCHES = ['commander', 'radio', 'alarm', 'truck', 'reinforce', 'fight', 'firefight', 'hunt', 'answer', 'protect', 'power'] as const;
 
 export type CampSwitch = (typeof CAMP_SWITCHES)[number];
 
@@ -82,6 +82,11 @@ export function takeAway(sim: Simulation, off: readonly CampSwitch[]): void {
   if (has('fight') || has('firefight') || has('hunt')) delete camp.hunts;
   // The target's answer by the camp's problem (brain/protect.ts): every protecting camp waits for its relief to bring him out, as before it.
   if (has('answer')) delete camp.answer;
+  // A camp that protects nobody: at the siren he runs for his vehicle, as every camp's target once did.
+  if (has('protect')) {
+    delete camp.protects;
+    delete camp.answer;
+  }
   // Already called, as far as the commander knows: it never calls them again, and any on their way don't come.
   if (has('reinforce')) {
     camp.reinforceCalled = 0;

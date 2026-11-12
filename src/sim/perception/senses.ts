@@ -48,6 +48,9 @@ export interface PendingSpot {
   radius: number;
   /** How strong: 1 for a body; a flash, its glint (0–1). */
   strength: number;
+  /** A body seen going down (percept.ts, `fell`), or from too far off to be sure of (`far`). */
+  fell?: true;
+  far?: true;
 }
 
 /** A sound on its way to a listener: heard when it arrives (sound travels about 11 m a tick). */
@@ -110,8 +113,10 @@ export interface Senses {
   heard: PendingSound[];
   /** What he has sensed and not yet forgotten, oldest first. */
   percepts: Percept[];
-  /** Bodies he has already seen (their entity ids): each one is news once. */
+  /** Bodies he has already seen for what they are (their entity ids): each one is news once. */
   bodies: number[];
+  /** Bodies he has seen only from too far off to be sure of: each is news once at that, and once more when he's near enough to see. Absent until the first. */
+  afar?: number[];
   /** What he caught sight of this tick, taken by the ladder ('perception-awareness'). */
   spotted: PendingSpot[];
   /** Equipment and doors he has already noticed out of place (E7). Absent until the first. */

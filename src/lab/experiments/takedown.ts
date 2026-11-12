@@ -16,15 +16,11 @@ import { keptWorld } from '../worlds';
  * timed from his first shot, and only the runs where the siren sounds have stages to time.
  */
 
-interface TakedownArm extends Arm {
-  ready: 'relaxed' | 'alert';
-}
-
-const ARMS: readonly TakedownArm[] = [
-  { name: 'relaxed: he runs at the siren', ready: 'relaxed' },
-  { name: 'alert: he shelters, and is sent for', ready: 'alert' },
-  { name: 'alert, no radio', ready: 'alert', off: 'radio' },
-  { name: 'alert, no vehicle', ready: 'alert', off: 'truck' },
+const ARMS: readonly Arm[] = [
+  { name: 'protecting nobody: he runs at the siren', off: 'protect' },
+  { name: 'he shelters, and leaves by the way his camp has ready' },
+  { name: 'no radio', off: 'radio' },
+  { name: 'no vehicle', off: 'truck' },
 ];
 
 const WATCH = 420;
@@ -47,8 +43,7 @@ export const takedownStages: Experiment = {
     { key: 'goneAt', label: 'gone after (s)', kind: 'median' },
   ],
   run(seed, arm, tuning) {
-    const a = arm as TakedownArm;
-    const scene = compound(`seed=${seed}&attack=sniper${a.off ? `&off=${a.off}` : ''}${a.ready === 'alert' ? '&ready=alert' : ''}`) as Scene<Simulation>;
+    const scene = compound(`seed=${seed}&attack=sniper${arm.off ? `&off=${arm.off}` : ''}`) as Scene<Simulation>;
     const sim = startScene(scene, tuning, keptWorld(`live-camp:${seed}`, tuning, scene.world));
     const driver = scene.driver!() as AttackDriver;
     const raw = scene.game.still(sim);

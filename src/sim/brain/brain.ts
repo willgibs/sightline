@@ -4,6 +4,7 @@ import { routinePose, type RoutinePose } from '../generation';
 import type { HuntOrder, TaskKind } from './camp';
 import { beginFirefight, noteFirefight, offerFirefight, performFight, performPush, seesHim, type Firefight } from './firefight';
 import { groundSpot } from './ground';
+import { hasGrounds, noteGrounds } from './grounds';
 import { beginHunt, offerHunt, performHunt, type Hunt } from './hunt';
 import type { GuardMind } from './mind';
 import { focusOf, lookAround, sameGoal, stand, standToward, walk } from './moves';
@@ -123,6 +124,14 @@ export interface BrainState {
   calling: Report | null;
   /** The tick he first heard the siren, or −1: he knows the alarm is up (E7). */
   sirenAt: number;
+  /** The fire he has taken for fire (grounds.ts): how many shots, a while apart, and when the last. Absent until the first. */
+  shots?: { count: number; at: number };
+  /** The tick he last knew the camp was under attack, by his own eyes and ears (grounds.ts): what a run for the siren takes. Absent until he does. */
+  knows?: number;
+  /** The alarm boxes he has thrown and found dead: he doesn't run to those again, and goes for the next. Absent until one is. */
+  deadBoxes?: number[];
+  /** The tick he last finished going to look at something: a man he saw lying a long way off before then has been looked at. Absent until he has. */
+  lookedAt?: number;
   /** In a camp that protects its target (protect.ts): the whistle he last took note of, and how long it has him standing to. Absent until he hears one. */
   whistledAt?: number;
   standToUntil?: number;
@@ -213,6 +222,7 @@ export function decide(m: GuardMind, out: Order): ActChange | null {
   if (b.sirenAt < 0 && heardSiren(m)) b.sirenAt = m.tick;
   noteProtection(m);
   noteFirefight(m);
+  noteGrounds(m);
   // A hunt he's been taken off, by another order or by none: there's nothing of it to remember.
   if (b.hunt && b.task?.kind !== 'hunt') delete b.hunt;
   if (b.done || m.tick >= b.thinkAt || a.state !== b.state || newest !== b.percept) {
@@ -220,10 +230,14 @@ export function decide(m: GuardMind, out: Order): ActChange | null {
     b.percept = newest;
     b.thinkAt = m.tick + Math.max(1, Math.round(T.think * m.tuning.sim.tickHz));
     const running = b.done ? null : b.act;
-    if (b.done) b.ended[b.act] = m.tick;
+    if (b.done) {
+      b.ended[b.act] = m.tick;
+      if (b.act === 'investigate') b.lookedAt = m.tick;
+    }
     // An order that was never taken up lapses; one he's carrying out lasts as long as the walk does. A section's stands for as
     // long as it says (hunt.ts): a man called away from it by a fight takes it up again.
-    if (b.task && b.task.kind !== 'hunt' && b.act !== 'task' && (m.tick - b.task.issued) / m.tuning.sim.tickHz >= T.camp.keepOrder) b.task = null;
+    // And an order to the siren lasts as long as the run for it does.
+    if (b.task && b.task.kind !== 'hunt' && b.act !== 'task' && !(b.task.kind === 'alarm' && b.act === 'alarm') && (m.tick - b.task.issued) / m.tuning.sim.tickHz >= T.camp.keepOrder) b.task = null;
     fillOptions(m, options);
     const best = running && !outranked(options, running, T.switchRatio) ? running : (choose(options, T.pickShare, m.draw)?.act ?? 'routine');
     if (best !== b.act || b.done) change = begin(m, best, b.done);
@@ -302,9 +316,11 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
   // Why: what his senses gave him, while something drives him; calm or nothing when it doesn't.
   const reacting = act !== 'routine' && act !== 'return';
   const ordered = act === 'task' && b.task !== null;
-  const reason: ActWhy = ordered || act === 'hunt' ? 'ordered' : act === 'flee' || (act === 'shelter' && b.sirenAt >= 0) ? 'siren' : act === 'push' ? 'lost' : act === 'fight' && seesHim(m) ? 'seen' : reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
+  // Sent to the siren by the camp (commander.ts), not by anything he saw.
+  const sent = act === 'alarm' && b.task?.kind === 'alarm' && !hasGrounds(m);
+  const reason: ActWhy = ordered || sent || act === 'hunt' ? 'ordered' : act === 'flee' || (act === 'shelter' && b.sirenAt >= 0) ? 'siren' : act === 'push' ? 'lost' : act === 'fight' && seesHim(m) ? 'seen' : reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
   // A reaction traces to what he sensed; if that memory is gone, to the act that led here.
-  const cause = (ordered || act === 'hunt') && b.task ? b.task.cause : reacting ? perceptCause(m) || b.event : b.event;
+  const cause = (ordered || sent || act === 'hunt') && b.task ? b.task.cause : reacting ? perceptCause(m) || b.event : b.event;
   b.cause = cause;
   if (ordered) {
     b.x = b.task!.x;
@@ -385,7 +401,7 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   const task = b.task;
   const fetching = task !== null && (task.kind === 'fetch' || task.kind === 'escort' || task.kind === 'start' || task.kind === 'post');
   const order =
-    task && task.kind !== 'hunt' && (!elevated || task.kind === 'sweep') && (b.act === 'task' || (m.tick - task.issued) / hz < T.camp.keepOrder) ? (task.kind === 'sweep' || task.kind === 'cover' || fetching ? 1 : task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
+    task && task.kind !== 'hunt' && task.kind !== 'alarm' && (!elevated || task.kind === 'sweep') && (b.act === 'task' || (m.tick - task.issued) / hz < T.camp.keepOrder) ? (task.kind === 'sweep' || task.kind === 'cover' || fetching ? 1 : task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
   // At a whistle, in a camp that protects its target, a man with nothing better to do gets down and watches (protect.ts).
   const standing = standingTo(m) && !elevated && m.post.role !== 'target';
   // Worth calling in: something he sensed himself (what he was only told is already on the
@@ -397,11 +413,19 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   // Nor does a man on the target's door walk off it once the siren has sounded: he fights from it, and leaves it only by his camp's drill (protect.ts).
   const far = (m.hunts && beyondTheWire(m, focus.x, focus.z)) || (m.post.holdsDoor === true && b.sirenAt >= 0);
   out.push({ act: 'routine', rank: 0, weight: 1 });
+  // A man lying where he shouldn't be, too far off to see what has happened to him: he goes to see, ahead of anything else his
+  // unease offers, unless someone has said he's going, or it's off the camp's ground, or his place is the target's door.
+  const lying = lyingMan(m);
+  if (lying && !elevated && state !== 'combat' && m.post.role !== 'target' && !(m.hunts && beyondTheWire(m, lying.x, lying.z)) && !(m.post.holdsDoor === true && b.sirenAt >= 0) && claimed(m, lying) === 1) {
+    out.push({ act: 'investigate', rank: state === 'searching' ? 4.2 : state === 'suspicious' ? 3.2 : state === 'curious' ? 2.2 : 1.6, weight: 1 });
+  }
   // The target, at lockdown: for the vehicle, ahead of everything (design doc: he flees first),
   // unless his camp protects him: then to his room, and out of it when he's sent for.
   if (!offerProtection(m, out) && m.post.role === 'target' && m.escape && b.sirenAt >= 0) out.push({ act: 'flee', rank: 7, weight: 1 });
   // Sent to bring him out: ahead of anything but a fight in front of him.
   if (order && fetching && state !== 'combat') out.push({ act: 'task', rank: 4.8, weight: 1 });
+  // Sent to the siren (commander.ts): the camp has counted its dead, and he goes whatever he has seen for himself.
+  if (task && task.kind === 'alarm' && b.sirenAt < 0 && !elevated && m.alarms.length > 0 && state !== 'combat') out.push({ act: 'alarm', rank: 4.8, weight: 1 });
   const off = offRoutine(m);
   // Someone close, and he knows where: a trained man's fight, ahead of the answers below (firefight.ts).
   // It has its own clock: he doesn't wander off because his alarm has worn down to unease.
@@ -430,8 +454,9 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       // Rounds landing near him: he gets behind something first (design doc: uses cover).
       if (!elevated && underFire(m)) out.push({ act: 'cover', rank: 4.5, weight: role.fight > 0 ? 1 : W.coverNoFight });
       if (m.fights) fightOptions(m, out);
-      // A worker runs for the alarm when he has seen something (design doc: still raises the alarm).
-      if (m.post.role === 'worker' && own) out.push({ act: 'alarm', rank: 4, weight: alarmWeight(m) * W.workerAlarm });
+      // Whoever knows the camp is under attack, and can reach a box, goes for the siren (grounds.ts): ahead of getting out of
+      // the line, in a camp that does that. What stopped alarm runs is what lost us the first attempt at a camp that fights.
+      if (hasGrounds(m)) out.push({ act: 'alarm', rank: m.fights ? 4.6 : 4, weight: alarmWeight(m) * (m.post.role === 'worker' ? W.workerAlarm : 1) });
       if (order) out.push({ act: 'task', rank: 4, weight: order });
       out.push({ act: 'report', rank: 4, weight: callable });
       out.push({ act: 'hold', rank: 4, weight: W.holdSearching });
@@ -455,6 +480,24 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       break;
     }
   }
+}
+
+/**
+ * A man he has seen lying where he shouldn't be, from too far off to tell what has happened
+ * to him (perception: a body seen `far`), and hasn't yet been to look at or come near enough
+ * to see: the newest such, or null.
+ */
+function lyingMan(m: GuardMind): Percept | null {
+  const looked = m.brain!.lookedAt ?? -1;
+  let best: Percept | null = null;
+  for (const p of m.percepts) {
+    if (p.kind !== 'body' || !p.far || p.tick <= looked || (best && p.tick <= best.tick)) continue;
+    // Near enough since to see for himself: that one is a body to him now.
+    let sure = false;
+    for (const q of m.percepts) if (q.kind === 'body' && !q.far && (q.x - p.x) * (q.x - p.x) + (q.z - p.z) * (q.z - p.z) < 4) sure = true;
+    if (!sure) best = p;
+  }
+  return best;
 }
 
 /** True if a place is off the camp's own ground: past its pad, where the walls and the fine grid end. */
@@ -490,8 +533,6 @@ function fightOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   // Once he's gone to ground he stays until the stand-to ends: only a fresh shot starts it, but it outlasts the news.
   const down = m.brain!.act === 'cover' && !m.brain!.done;
   if (age > F.drill.within && !down) return;
-  // Whoever can raise the alarm goes for it first: what stopped alarm runs is what lost us the last attempt at this.
-  if (m.post.role === 'worker' && alarmWeight(m) > 0) out.push({ act: 'alarm', rank: 4.6, weight: alarmWeight(m) });
   // And the operator stays on the net: somebody has to tell the camp.
   if (m.post.role === 'radio-operator') out.push({ act: 'report', rank: 4.7, weight: T.roles[m.post.role].report > 0 && (m.brain!.ended.report === undefined || (m.tick - m.brain!.ended.report) / m.tuning.sim.tickHz >= T.comms.reportEvery) ? 1 : 0 });
   out.push({ act: 'cover', rank: 4.5, weight: 1 });
@@ -556,7 +597,10 @@ function alarmWeight(m: GuardMind): number {
 function nearestAlarm(m: GuardMind): number {
   let best = -1;
   let bestD = Infinity;
+  const dead = m.brain!.deadBoxes;
   for (let i = 0; i < m.alarms.length; i++) {
+    // One he has tried and found dead is no use to him: the next nearest is.
+    if (dead?.includes(i)) continue;
     const a = m.alarms[i]!;
     const dx = a.x - m.self.x;
     const dz = a.z - m.self.z;
@@ -694,17 +738,20 @@ function currentReport(m: GuardMind): Report {
     // A body beats a shot, a muzzle's report beats a crack or a strike, and a voice says the
     // least. Equipment found dead is worth saying only with nothing fresher: he remembers it
     // for minutes, and someone in front of him is news.
-    const r = p.kind === 'body' ? 6 : p.kind === 'muzzle' ? 5.5 : p.kind === 'outage' ? 0.5 : p.kind === 'shot' ? (p.sound === 'report' ? 5 : p.sound === 'crack' ? 4 : 3) : p.kind === 'sight' ? 2 : p.kind === 'sound' || p.kind === 'glint' ? 1 : 0;
+    // A man lying a long way off is worth a word, and no more than any odd sight is: he hasn't seen what happened to him.
+    const r = p.kind === 'body' ? (p.far ? 2.5 : 6) : p.kind === 'muzzle' ? 5.5 : p.kind === 'outage' ? 0.5 : p.kind === 'shot' ? (p.sound === 'report' ? 5 : p.sound === 'crack' ? 4 : 3) : p.kind === 'sight' ? 2 : p.kind === 'sound' || p.kind === 'glint' ? 1 : 0;
     if (r <= rank) continue;
     rank = r;
     own = p;
-    kind = p.kind === 'body' ? 'body' : p.kind === 'outage' ? 'outage' : p.kind === 'sight' || p.kind === 'muzzle' ? 'contact' : p.kind === 'shot' ? 'shot' : 'heard';
+    kind = p.kind === 'body' ? (p.far ? 'heard' : 'body') : p.kind === 'outage' ? 'outage' : p.kind === 'sight' || p.kind === 'muzzle' ? 'contact' : p.kind === 'shot' ? 'shot' : 'heard';
   }
   const f = own && rank > 0 ? own : focusOf(m);
   const y = own && rank > 0 ? own.y : m.belief ? m.belief.y : a.focus ? a.fy : m.self.y;
   const base = own && rank > 0 ? own.radius : m.belief ? m.belief.radius : C.radius[kind];
   const radius = Math.max(base, C.radius[kind]);
   const out: Report = { kind, x: f.x, y, z: f.z, radius, tick: m.tick, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: own?.cause ?? perceptCause(m) };
+  // A man who knows the camp is under attack says so: he may be on a tower, or too far from a box to run for one.
+  if (hasGrounds(m)) out.attack = true;
   // A bearing comes from a report at the muzzle; a crack points the wrong way and says so.
   if (kind === 'shot' && own?.sound === 'report') bearingError(m, out, false);
   else if (kind === 'shot' && own?.sound === 'crack') bearingError(m, out, true);
@@ -893,6 +940,7 @@ function performAlarm(m: GuardMind, out: Order): void {
   if (b.box < 0 || b.box >= m.alarms.length) b.box = nearestAlarm(m);
   if (b.box < 0) {
     b.done = true;
+    if (b.task?.kind === 'alarm') b.task = null; // the order is carried out, or can't be
     stand(m, out, false);
     return;
   }
@@ -903,6 +951,7 @@ function performAlarm(m: GuardMind, out: Order): void {
       b.raise = b.box;
       b.useUntil = -1;
       b.done = true;
+      if (b.task?.kind === 'alarm') b.task = null; // the order is carried out, or can't be
     }
     return;
   }
@@ -912,6 +961,7 @@ function performAlarm(m: GuardMind, out: Order): void {
     stand(m, out, false);
   } else if (w === 'stuck') {
     b.done = true;
+    if (b.task?.kind === 'alarm') b.task = null; // the order is carried out, or can't be
     stand(m, out, false);
   }
 }
@@ -969,6 +1019,15 @@ function performCover(m: GuardMind, out: Order): void {
   if (w === 'arrived' || w === 'stuck') {
     if (b.coverStance) b.down = b.coverStance;
     stand(m, out, false);
+    // Still down, and the rifle has spoken again since he last called it in: he says so, once enough time has gone by. The camp
+    // sends nobody out while it's still being fired on (hunt.ts), and it knows that only from men who are out of the line.
+    if (m.hunts && !b.calling && b.until < 0 && m.tuning.brain.roles[m.post.role].report > 0) {
+      const again = shotFrom(m);
+      const said = b.ended.report ?? -1;
+      // Unless he has heard someone else say it already: one voice on the net is enough.
+      const calledIn = again !== null && b.told.some((t) => t.via === 'radio' && (t.kind === 'shot' || t.kind === 'contact') && t.heard >= again.tick);
+      if (again && !calledIn && again.tick > said && (m.tick - said) / hz >= m.tuning.brain.hunt.quiet / 2) b.calling = shotCall(m);
+    }
     // Down, and out of the line: the call he had ready. Killed before it's finished, the net never carries it.
     if (b.calling) {
       const K = m.tuning.brain.comms;
@@ -1017,6 +1076,7 @@ function shotCall(m: GuardMind): Report | null {
   const C = m.tuning.brain.comms;
   const kind: ReportKind = p.kind === 'muzzle' ? 'contact' : 'shot';
   const out: Report = { kind, x: p.x, y: p.y, z: p.z, radius: Math.max(p.radius, C.radius[kind]), tick: m.tick, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: p.cause };
+  if (hasGrounds(m)) out.attack = true;
   if (kind === 'shot') bearingError(m, out, false);
   return out;
 }
@@ -1098,8 +1158,8 @@ function performInvestigate(m: GuardMind, out: Order): void {
     if (m.tick >= b.linger) b.done = true;
     return;
   }
-  // He goes to where he believes it was; a fresher belief moves the goal.
-  const focus = focusOf(m);
+  // He goes to where he believes it was; a fresher belief moves the goal. A man he has seen lying somewhere is where he's going.
+  const focus = lyingMan(m) ?? focusOf(m);
   if (!sameGoal(b.x, b.z, focus.x, focus.z, T.goalMoved)) {
     b.x = focus.x;
     b.z = focus.z;
