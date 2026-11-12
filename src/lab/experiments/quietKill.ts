@@ -3,13 +3,11 @@ import { commanderOf } from '../../sim/game/comms';
 import { stimulus, type StimulusName } from '../../sim/game/drops';
 import { compound } from '../../sim/game/scenes/compound';
 import type { Simulation } from '../../sim/game/sim';
-import { dcos, dsin } from '../../sim/kernel/core/detmath';
 import { rung } from '../../sim/perception';
 import type { StimulusCommand } from '../../sim/kernel/commands';
 import { startScene, type Scene } from '../../sim/kernel/scene';
-import { Blocks } from '../../sim/kernel/world/colliders';
-import { sightLine } from '../../sim/kernel/world/query';
 import type { Experiment } from '../experiment';
+import { clearLine, closeTo, overviewEye, type Point } from '../vantage';
 import { keptWorld } from '../worlds';
 
 /**
@@ -43,11 +41,9 @@ export const GRADED: Shots = defaultTuning.modes.takedown.shots;
 const withShots = (tuning: Tuning, shots: Shots, subsonic: boolean, whistle = tuning.perception.awareness.whistle): Tuning => ({
   ...tuning,
   perception: { ...tuning.perception, awareness: { ...tuning.perception.awareness, shots, whistle } },
-  ballistics: subsonic ? { ...tuning.ballistics, rifle: { ...tuning.ballistics.rifle, load: 'subsonic' } } : tuning.ballistics,
+  // The kit has to carry the load it starts with (config/validate.ts).
+  ballistics: subsonic ? { ...tuning.ballistics, rifle: { ...tuning.ballistics.rifle, load: 'subsonic', carries: { ...tuning.ballistics.rifle.carries, subsonic: true } } } : tuning.ballistics,
 });
-
-/** How far round from the overview's bearing a close firing point is looked for, a step at a time, one side then the other. */
-const ROUND = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8, 9, -9];
 
 interface QuietArm {
   name: string;
@@ -78,45 +74,13 @@ const GIVE_UP = 70;
 /** Seconds watched after he falls. */
 const WATCH = 150;
 
-interface Point {
-  x: number;
-  y: number;
-  z: number;
-}
-
-/** The camp's best overview, with a prone shooter's eye on it. */
-function overview(sim: Simulation): Point {
-  const list = [...(sim.world.report.camp!.perches as ReadonlyArray<{ x: number; z: number; coverage: number }>)].sort((a, b) => b.coverage - a.coverage || a.x - b.x || a.z - b.z);
-  const p = list[0]!;
-  return { x: p.x, y: sim.world.terrain.heightAt(p.x, p.z) + sim.tuning.bodies.player.eyeHeight.prone, z: p.z };
-}
-
 /** The first guard, in id order, who is standing still with his head in a clear line from there, and isn't the target. */
 function victim(sim: Simulation, from: Point): { id: number; head: Point } | null {
-  const view = { world: sim.world, solids: sim.solids, bodies: [] };
   for (const g of sim.guards) {
     if (sim.world.camp.guards[g.guard.spawn]?.role === 'target') continue;
     if (g.body.vx * g.body.vx + g.body.vz * g.body.vz > 0.0025 || g.body.stance !== 'stand') continue;
     const head = { x: g.body.x, y: g.body.y + g.body.eyeHeight, z: g.body.z };
-    if (sightLine(view, from.x, from.y, from.z, head.x, head.y, head.z, Blocks.Sight | Blocks.Bullet)) return { id: g.id, head };
-  }
-  return null;
-}
-
-/** A prone shooter's eye `range` metres from a man's head with a clear line to it: toward the overview if that's open, else the nearest bearing round from it that is. */
-function closeTo(sim: Simulation, head: Point, toward: Point, range: number): Point | null {
-  const view = { world: sim.world, solids: sim.solids, bodies: [] };
-  const dx = toward.x - head.x;
-  const dz = toward.z - head.z;
-  const d = Math.sqrt(dx * dx + dz * dz) || 1;
-  for (const k of ROUND) {
-    const a = (k * 20 * Math.PI) / 180;
-    const c = dcos(a);
-    const s = dsin(a);
-    const x = head.x + ((dx * c - dz * s) / d) * range;
-    const z = head.z + ((dx * s + dz * c) / d) * range;
-    const from = { x, y: sim.world.terrain.heightAt(x, z) + sim.tuning.bodies.player.eyeHeight.prone, z };
-    if (sightLine(view, from.x, from.y, from.z, head.x, head.y, head.z, Blocks.Sight | Blocks.Bullet)) return from;
+    if (clearLine(sim, from, head)) return { id: g.id, head };
   }
   return null;
 }
@@ -144,7 +108,7 @@ export const quietKill: Experiment = {
     const sim = startScene(scene, T, keptWorld(`live-camp:${seed}`, T, scene.world));
     const raw = scene.game.still(sim);
     const hz = T.sim.tickHz;
-    const from = overview(sim);
+    const from = overviewEye(sim);
     const out: Record<string, number> = { killed: 0, searching5: NaN, wary5: NaN, searching20: NaN, siren: NaN, sirenAt: NaN, away: NaN, awayAt: NaN };
     let chosen = -1;
     let fired = -1;
