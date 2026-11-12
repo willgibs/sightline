@@ -38,6 +38,15 @@ import type { DebugDraw } from '../kernel/debugDraw';
  *   colliders and entities' shapes, world/solids.ts) always beats other bodies, which can
  *   shove it but never through a wall. Entities' shapes hold this only because whatever
  *   moves one never moves it into a body;
+ * - a move that can't end clear is refused (resolveMove), and a refused move keeps the
+ *   body's place and its footing: it ends the tick where it began, standing on what it
+ *   stood on, or falling if it was falling or that has gone from under it, and never
+ *   higher. Settling looks a step up for the ground only where a move was resolved to,
+ *   because only there was the body's headroom checked at the height that ground gives it
+ *   (isClear). The first promise rests on this: the place and the height a body ended the
+ *   last tick at were clear, and a refused move keeps them, or lets it fall. It promises
+ *   nothing about getting anywhere: a ledge with no room over it to stand in stops a body
+ *   that walks into it, as the ground rising under a ceiling does;
  * - on the ground, the body never gains height on ground steeper than maxSlopeDeg, from
  *   any angle of approach. Exactly: from such ground it ends a tick no higher, wherever it
  *   ends; onto such ground it ends no higher either; and it gains nothing on the steep
@@ -255,11 +264,13 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
   const vz = b.vz;
   const toX = b.x + vx * dt;
   const toZ = b.z + vz * dt;
-  if (!resolveMove(b, toX, toZ, spec, ctx, dest)) {
+  // Whether the last move asked for was refused: `dest` is then where the body began.
+  let refused = !resolveMove(b, toX, toZ, spec, ctx, dest);
+  if (refused) {
     if (grew) {
       // No room to grow into: it stays as long as it was.
       b.lying = was;
-      resolveMove(b, b.x, b.z, spec, ctx, dest);
+      refused = !resolveMove(b, b.x, b.z, spec, ctx, dest);
     } else if (b.lying < was) {
       // No room at the shorter length. If the move works at the length it has, it keeps
       // that length, so a body held down in a tight place can still crawl out of it.
@@ -267,7 +278,8 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
       b.lying = was;
       b.vx = vx;
       b.vz = vz;
-      if (!resolveMove(b, toX, toZ, spec, ctx, dest)) b.lying = shorter;
+      refused = !resolveMove(b, toX, toZ, spec, ctx, dest);
+      if (refused) b.lying = shorter;
     }
   }
   const nx = dest.x;
@@ -277,7 +289,15 @@ function moveBody(b: BodyState, i: MoveIntent, spec: BodySpec, ctx: MotorContext
   const movedDist = Math.sqrt(mdx * mdx + mdz * mdz);
 
   // --- Settle: follow the ground, fall or land. ----------------------------------
-  const under = groundBelow(world, ctx.solids, nx, nz, feet + spec.stepHeight, restRadius(b, spec));
+  // Where a move was resolved to, the ground a step up was counted into the body's height
+  // when its headroom was checked (isClear). A refused move was checked nowhere, so it keeps
+  // the body's footing along with its place: it finds what it stands on, or what's left
+  // under it, and nothing higher. A box it only touches, whose top its feet have come
+  // within a step of (it walked up a slope along the box's side), is not ground to be lifted
+  // onto: the move onto it was refused for a shelf with no room under it for a body standing
+  // on the box, and the lift put the body's head in that shelf (the fuzz run's tower
+  // SWP-1085-0, Nov 12).
+  const under = groundBelow(world, ctx.solids, nx, nz, refused ? feet : feet + spec.stepHeight, restRadius(b, spec));
   const ground = { height: under.height, surface: under.surface, collider: under.collider };
   // Lying, the pivot steps down off a ledge only once the circles still on it could rest
   // where they are from the lower height: until then it comes down only as far as they allow.
@@ -566,9 +586,12 @@ function driveAir(b: BodyState): void {
  * height on ground too steep to stand on, and no rising faster than a walkable slope
  * allows), and colliders, the world's and entities' (hard, always win). A ceiling the body is deep under but
  * no longer fits beneath (the ground rose) is never pushed out of sideways; a shallow
- * overlap at its edge is. If anything still overlaps after the passes, the body stays
- * where it was. That keeps every tick's end position clear, by induction from a clear
- * spawn.
+ * overlap at its edge is. If anything still overlaps after the passes, the move is refused:
+ * this returns false with `out` where the body was, and settling keeps the body on what it
+ * stood on there (moveBody). That keeps every tick's end pose clear, by induction from a
+ * clear spawn: a move that is resolved ends where its headroom was checked, at the height
+ * the ground there gives it, and a move that is refused ends in the pose the last tick
+ * left clear, or below it.
  */
 export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec, ctx: MotorContext, out: { x: number; z: number }): boolean {
   const { world, solids } = ctx;

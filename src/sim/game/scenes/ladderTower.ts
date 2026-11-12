@@ -26,15 +26,24 @@ import type { Scene } from '.';
 
 /**
  * Towers that broke a promise, played as the long invariant run plays one, kept after the
- * default tower. All three are one mistake: a body on the ladder took a pose that was
- * clear, and in the same tick a guard walking under it rose into its feet. A path now
- * moves after everything that walks, and whoever walks is shoved from under feet he
- * would rise into (body/system.ts, motor.ts).
+ * default tower.
+ *
+ * Three are one mistake: a body on the ladder took a pose that was clear, and in the same
+ * tick a guard walking under it rose into its feet. A path now moves after everything that
+ * walks, and whoever walks is shoved from under feet he would rise into (body/system.ts,
+ * motor.ts).
  * - RES-2063-3 (the long run, Nov 12): coming down, as he stepped up onto a box (tick 855);
  * - SWP-1295-0: going up, as he stepped up onto a box (tick 1260);
  * - SWP-1381-1: coming down, as he walked up a slope, by a millimetre (tick 1791).
+ *
+ * One is a refused move that was lifted. A guard walked up a slope along the side of a box,
+ * under a shelf with room for him on the ground and none on the box. When the box's top
+ * came within a step of his feet his move onto it was refused, for the shelf, and settling
+ * lifted him onto the box where he stood, his head 0.28 m into the shelf. A refused move
+ * now keeps its footing (body/motor.ts).
+ * - SWP-1085-0: tick 1273.
  */
-export const TOWER_FINDS: readonly string[] = ['seed=TOWER-0', 'seed=RES-2063-3', 'seed=SWP-1295-0', 'seed=SWP-1381-1'];
+export const TOWER_FINDS: readonly string[] = ['seed=TOWER-0', 'seed=RES-2063-3', 'seed=SWP-1295-0', 'seed=SWP-1381-1', 'seed=SWP-1085-0'];
 
 /** How long a tower is played, seconds: the long run's length for one, so whatever it finds on a tower the scene finds too. */
 export const TOWER_SECONDS = 240;

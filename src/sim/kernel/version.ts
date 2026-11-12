@@ -73,5 +73,9 @@ export const GEN_VERSION = 9;
  * or falls, so the pose it takes is clear of where they end the tick; and a body is shoved
  * from under feet just over its head when the tick would lift it into them (a step up, a
  * slope). No pinned run has a body under a ladder or a mantle, so no fingerprint moved.
+ * 23: a refused move keeps the body's footing along with its place: settling looks a step
+ * up for the ground only where a move was resolved to, so a body whose move is refused is
+ * no longer lifted onto a ledge it only touches, into what is over it (body/motor.ts). No
+ * pinned run has a refused body touching a ledge within a step, so no fingerprint moved.
  */
-export const SIM_VERSION = 22;
+export const SIM_VERSION = 23;
