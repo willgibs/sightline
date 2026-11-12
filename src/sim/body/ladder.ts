@@ -19,7 +19,10 @@ import type { Tuning } from '../../config/tuning';
  *
  * Promises (motor.ts, and the invariant run): every pose on the ladder is re-checked
  * every tick against everything solid and every other body, with no step allowance; the
- * body rises no faster than the ladder's rate, and leaves only by a checked way off.
+ * body rises no faster than the ladder's rate, and leaves only by a checked way off. The
+ * other bodies are where this tick has left them: a body on a ladder moves after every
+ * body that walks or falls (system.ts), so it never comes down onto a head that has just
+ * walked or stepped up under it.
  */
 
 /** A ladder in the world: its foot, the height it reaches, and the direction away from what it's fixed to. */

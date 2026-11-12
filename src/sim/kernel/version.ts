@@ -61,5 +61,9 @@ export const GEN_VERSION = 9;
  * to; the siren takes a man who knows the camp is under attack, or a camp that has counted
  * two of its dead; every live camp protects its target; and a round breaks an alarm box.
  * The camp-fight run is a camp under fire, so its fingerprints moved.
+ * 21: a body on a path of its own (a mantle, a ladder) moves after every body that walks
+ * or falls, so the pose it takes is clear of where they end the tick; and a body is shoved
+ * from under feet just over its head when the tick would lift it into them (a step up, a
+ * slope). No pinned run has a body under a ladder or a mantle, so no fingerprint moved.
  */
-export const SIM_VERSION = 20;
+export const SIM_VERSION = 21;

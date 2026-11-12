@@ -1,6 +1,6 @@
 import type { Scene as KernelScene } from '../../kernel/scene';
 import type { Simulation } from '../sim';
-import { ladderTower } from './ladderTower';
+import { TOWER_FINDS, ladderTower } from './ladderTower';
 import { campBrain } from './campBrain';
 import { compound } from './compound';
 import { firefight } from './firefight';
@@ -65,4 +65,5 @@ export const SCENARIOS: Readonly<Record<string, readonly string[]>> = {
   sight: SIGHT_TABLE,
   'camp-scenario': CAMP_SCENARIOS,
   overlook: OVERLOOK_TABLE,
+  'ladder-tower': TOWER_FINDS,
 };
