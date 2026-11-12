@@ -44,7 +44,7 @@ export const GOLDEN = {
     'spawn-tick': { behaviour: 'f5e93112e48134bb', state: '6ab878853932c270' },
     'kernel-alone': { behaviour: '0698e581024f5b35', state: '214299248461a21b' },
     'camp-systems': { behaviour: 'ee2f1f13c3740683', state: '6f8dd9ab26b02562' },
-    'camp-fight': { behaviour: 'f0f03c11de3b8858', state: '37221613dc05157e' },
+    'camp-fight': { behaviour: 'e4b1399d4cf58e68', state: '6da586304b479349' },
   },
 } as const;
 

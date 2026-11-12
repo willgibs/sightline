@@ -164,9 +164,9 @@ export const BENCH_GOLDEN: PinnedBench = {
       "ellipse: contains the shooter at 2 sigma (%)": 88.5,
       "relocation: 26–30 m across the line of fire, outside 2 sigma (%)": 50.5,
       "relocation: 26–30 m in any direction, outside 2 sigma (%)": 29.5,
-      "ellipse in the world: contains the perch at 1 sigma (%)": 36.7816092,
+      "ellipse in the world: contains the perch at 1 sigma (%)": 32.183908,
       "ellipse in the world: contains the perch at 2 sigma (%)": 87.3563218,
-      "ellipse in the world: mean bearings fused per shot": 5.12643678,
+      "ellipse in the world: mean bearings fused per shot": 6.98850575,
       "re-found within 60 s (of 16): honest": 15,
       "re-found within 60 s (of 16): random": 2,
       "re-found within 60 s (of 16): plain": 13,
@@ -175,7 +175,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       "re-found within 60 s (of 16): honest, unpaced": 16,
       "reactions (in the scripted scenarios)": 63,
       "reactions unexplained": 0,
-      "overlook: guards down from one perch, of 32": 27,
+      "overlook: guards down from one perch, of 32": 26,
       "overlook: camps cleared (of 3)": 0,
       "overlook: the target got away (of 3)": 2,
       "timed shot on an escort's camp: target down (of 3)": 3,
@@ -193,13 +193,13 @@ export const BENCH_GOLDEN: PinnedBench = {
     "runs": {
       "camp-fight": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 14005 },
-          "bullets": { "rays": 81, "nodes": 0, "bodies": 0 },
-          "perception-hearing": { "rays": 75, "nodes": 30706, "bodies": 0 },
-          "perception-spotting": { "rays": 3107, "nodes": 0, "bodies": 0 },
-          "perception-awareness": { "rays": 0, "nodes": 86392, "bodies": 0 },
+          "motor": { "rays": 0, "nodes": 0, "bodies": 13965 },
+          "bullets": { "rays": 67, "nodes": 0, "bodies": 0 },
+          "perception-hearing": { "rays": 64, "nodes": 27644, "bodies": 0 },
+          "perception-spotting": { "rays": 4387, "nodes": 0, "bodies": 0 },
+          "perception-awareness": { "rays": 0, "nodes": 85859, "bodies": 0 },
           "camp-commander": { "rays": 0, "nodes": 3005, "bodies": 0 },
-          "guard-brains": { "rays": 359, "nodes": 34813, "bodies": 0 }
+          "guard-brains": { "rays": 525, "nodes": 35259, "bodies": 0 }
         }
       }
     }

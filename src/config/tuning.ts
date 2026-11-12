@@ -743,8 +743,10 @@ export const defaultTuning = {
       // snap, a strike, a voice, a man down, a flash. Two that come by different ways within `within` seconds, or the same
       // sound again between `apart` and `again` seconds later, count `step` more than the stronger does alone. Two that are
       // each a puzzle (a snap, a thud, "Was that a shot?") stop at `cap`: wary. It takes something plain among them (a report
-      // heard well, a flash, a cry, a body, the word of a man who is sure) to make him sure.
-      agree: { within: 4, step: 0.25, cap: 0.7, apart: 2, again: 60 },
+      // heard well, a flash, a cry, a body, the word of a man who is sure) to make him sure. A voice has `word` seconds where
+      // a sound has `within`: a man on the net has to get the words out, and they answer what a listener heard for as long as
+      // he is still wary of it (about `rampDown.suspicious`). A tower man who heard one bang learns what it was by radio.
+      agree: { within: 4, word: 10, step: 0.25, cap: 0.7, apart: 2, again: 60 },
       glimpse: 0.8, // having seen you at 100%: searching, once he loses you
       cry: 0.62, // a comrade's cry heard: wary, and looking for him. With a snap or a thud to go with it, it's a man shot
       body: 0.8, // a body seen, and no mistaking it: searching (design doc: the strongest stimulus)

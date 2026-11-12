@@ -5,7 +5,7 @@ import type { AwarenessName, SimEvent } from '../src/sim/kernel/events';
 import { neutralInput } from '../src/sim/kernel/input';
 import { withSystem, type System } from '../src/sim/kernel/systems';
 import { Surface } from '../src/sim/kernel/world/surfaces';
-import { createSenses, cuesInMind, plainShot, soundLevel, stepLadder, stimulate, type Awareness, type Cue, type Stimulus } from '../src/sim/perception';
+import { createSenses, cuesInMind, plainShot, prunePercepts, soundLevel, stepLadder, stimulate, type Awareness, type Cue, type Percept, type Stimulus } from '../src/sim/perception';
 import { giveSenses } from '../src/sim/game/perception';
 import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
@@ -322,6 +322,20 @@ describe('cues of a shooting that agree', () => {
     expect(after([10, sure()], [10 + hz, sure()], [10 + 2 * hz, sure()]).state).toBe('suspicious');
   });
 
+  it('a word answers what he heard for longer than a sound does: a man has to get it out', () => {
+    const sure = (): Stimulus => cue('voice', T.brain.comms.level.shot, { plain: true });
+    const soon = 10 + Math.round((G.within + 2) * hz);
+    const late = 10 + Math.round((G.word + 2) * hz);
+    expect(G.word).toBeGreaterThan(G.within);
+    // A bang, and the net saying "shots!" six seconds on: that's what it was. A snap six seconds after a bang is two questions.
+    expect(after([10, bang()], [soon, sure()]).state).toBe('searching');
+    expect(after([10, bang()], [soon, snap()]).state).toBe('suspicious');
+    // In either order.
+    expect(after([10, sure()], [soon, snap()]).state).toBe('searching');
+    // And not for ever.
+    expect(after([10, bang()], [late, sure()]).state).toBe('suspicious');
+  });
+
   it('a man he can see is down, with a snap, is a man shot', () => {
     const a = after([10, thud()], [10 + hz, cue('body', A.body, { plain: true })]);
     expect(a.state).toBe('searching');
@@ -335,11 +349,40 @@ describe('cues of a shooting that agree', () => {
     expect(cuesInMind(a, 10 + Math.round((G.within + 0.5) * hz), T)).toEqual(['report']);
     expect(cuesInMind(a, 10 + Math.round((G.within + 2) * hz), T)).toEqual([]);
     expect(cuesInMind(fresh(), 10, T)).toEqual([]);
+    // With a voice among them, each is in mind for as long as the voice can answer it.
+    const told = after([10, bang()], [10 + 2 * hz, cue('voice', T.brain.comms.level.shot, { plain: true })]);
+    expect(cuesInMind(told, 10 + Math.round((G.within + 2) * hz), T)).toEqual(['report', 'voice']);
+    expect(cuesInMind(told, 10 + Math.round((G.word + 3) * hz), T)).toEqual([]);
   });
 
   it('anything that is no cue of a shooting is weighed as it always was', () => {
     const a = after([10, snap()], [10 + hz, sound(A.shots.impact.clear)]);
     expect(a.state).toBe('suspicious');
     expect(a.evidence).toBeCloseTo(A.shots.crack.clear, 12);
+  });
+});
+
+describe('what a man keeps in mind', () => {
+  const percept = (kind: Percept['kind'], tick: number, lasts = 600): Percept => ({ kind, x: 0, y: 0, z: 0, radius: 1, strength: 1, tick, expires: tick + lasts, cause: tick });
+
+  it('is what hasn’t gone stale', () => {
+    const list = [percept('shot', 1, 10), percept('voice', 2), percept('body', 3)];
+    prunePercepts(list, 50);
+    expect(list.map((p) => p.kind)).toEqual(['voice', 'body']);
+  });
+
+  it('loses talk before what he sensed himself: the men round him asking don’t push out the shot he heard', () => {
+    const list = [percept('shot', 1), percept('voice', 2), percept('body', 3), ...Array.from({ length: 8 }, (_, k) => percept('voice', 4 + k))];
+    prunePercepts(list, 20);
+    expect(list).toHaveLength(8);
+    expect(list.filter((p) => p.kind !== 'voice').map((p) => p.kind)).toEqual(['shot', 'body']);
+    // The oldest talk went, and the newest stayed.
+    expect(list.filter((p) => p.kind === 'voice').map((p) => p.tick)).toEqual([6, 7, 8, 9, 10, 11]);
+  });
+
+  it('with nothing but his own senses in it, loses the oldest', () => {
+    const list = Array.from({ length: 10 }, (_, k) => percept(k % 2 ? 'shot' : 'sound', 1 + k));
+    prunePercepts(list, 20);
+    expect(list.map((p) => p.tick)).toEqual([3, 4, 5, 6, 7, 8, 9, 10]);
   });
 });

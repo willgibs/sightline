@@ -668,7 +668,7 @@ One siren in the table was thrown by a man who had seen nobody and no body: in t
 
 `perception/awareness.ts` (`agree`), `game/perception.ts`, `game/comms.ts`, `brain/grounds.ts`. Step 3b left a man making up his mind alone, and news raising every man who heard it. The owner's standard has both in one sentence: having noticed something, a man is "more confused than immediately sprint to cover, depending on how likely I can confirm an attacking gunshot versus a mix of personal confusion and curiosity, as well as the reactions (or lack thereof) of those around me".
 
-**The rule.** What a man sees he believes: one of his own down, a flash, an intruder. So does whoever he tells, if he's sure of it. What a man hears is a question, and he's wary until something else answers it. The cues of a shooting reach him by different ways: a rifle's report, the snap of its round, its strike, a voice, a man seen down, a flash. Two that come by different ways within 4 s bear each other out, and so does the same sound again inside a minute. But two puzzles are still a puzzle: one of the two has to be plain.
+**The rule.** What a man sees he believes: one of his own down, a flash, an intruder. So does whoever he tells, if he's sure of it. What a man hears is a question, and he's wary until something else answers it. The cues of a shooting reach him by different ways: a rifle's report, the snap of its round, its strike, a voice, a man seen down, a flash. Two that come by different ways within 4 s bear each other out, and so does the same sound again inside a minute. A voice has 10 s, because a man has to get the words out. But two puzzles are still a puzzle: one of the two has to be plain.
 
 | What reaches him | Alone | With something to bear it out |
 | --- | --- | --- |
@@ -684,7 +684,7 @@ One siren in the table was thrown by a man who had seen nobody and no body: in t
 What each of those is, in the code:
 
 - **Cues** (`CUES`, `Stimulus.cue`): report, crack, impact, bolt, voice, body, muzzle. A man's awareness keeps the last of each that reached him, at its own level (`Awareness.cues`), so agreement never compounds: three sounds of one shot count as two do.
-- **The numbers** (`perception.awareness.agree`): two cues within 4 s by different ways, or the same sound again between 2 and 60 s later, count 0.25 more than the stronger does alone. With nothing plain among them they stop at 0.7, which is wary. A clear report is 0.7 where it was 0.8, and a cry 0.62 where it was 0.8: each is one step short of sure.
+- **The numbers** (`perception.awareness.agree`): two cues within 4 s by different ways (10 s if one is a voice), or the same sound again between 2 and 60 s later, count 0.25 more than the stronger does alone. With nothing plain among them they stop at 0.7, which is wary. A clear report is 0.7 where it was 0.8, and a cry 0.62 where it was 0.8: each is one step short of sure.
 - **Plain** (`plainShot`, `Stimulus.plain`): a report or a bolt heard well enough to know it for a gun, a near miss, a flash, a cry, the camp's whistle or siren, a body he is sure of, and the word of a man who is sure. A snap and a thud are never plain, however near.
 - **A man says what he says as one who is sure or one who is asking** (`Report.sure`, `PendingSound.word`). A line said on becoming wary carries no alarm of its own and bears out what a listener heard himself. There's a new one for a shot he isn't sure of: "Was that a shot?". On the net, the word of a man who is only asking never has a listener more than wary (`brain.comms.asking`), whatever it's about.
 - **Word about a sound is hearsay; word about a sight is news.** "Shots!" leaves a listener wary (0.62, from 0.8). "Contact!" and "Man down!" from a man who is sure raise him as they did.
@@ -695,34 +695,47 @@ What each of those is, in the code:
 
 | One round | Whistled | Searching at +5 s | Searching at +20 s | Siren |
 | --- | --- | --- | --- | --- |
-| Loud, at whoever is on a watchtower | 13 of 13, as before | 90%, from 92% | **68%, from 91%** | 5 of 13, as before |
-| Suppressed, at whoever is on a watchtower | 5 of 13, from 6 | 25%, from 23% | 28%, from 38% | 5, from 4 |
-| Suppressed, at whoever is on the ground | 13 of 23, from 12 | 38%, from 29% | 46%, as before | 13, as before |
+| Loud, at whoever is on a watchtower | 13 of 13, as before | 92%, as before | 85%, from 91% | 5 of 13, as before |
+| Suppressed, at whoever is on a watchtower | 5 of 13, from 6 | 28%, from 23% | 32%, from 38% | 5, from 4 |
+| Suppressed, at whoever is on the ground | 15 of 23, from 12 | 39%, from 29% | 56%, from 46% | 13, as before |
 | Suppressed, careful, from the overview | 1 of 20, as before | 2%, as before | 11%, as before | 0, as before |
-| The same from 80 m | 8 of 21, from 9 | 19%, from 17% | 21%, from 28% | 0 |
+| The same from 80 m | 8 of 21, from 9 | 18%, from 17% | 20%, from 28% | 0 |
 | Subsonic and suppressed, careful, from 90 m | 1 of 22, from 3 | 1%, from 3% | 11%, from 12% | 0 |
 | The same from 40 m | 19 of 24, as before | 45%, from 42% | 47%, as before | 3, from 2 |
 | Suppressed, at the generator | 0 of 13, from 1 | 0 | 0 | 0 |
-| Five suppressed careful rounds, half a minute apart | 15 of 20, from 14 | | | 8, from 5, at 157 s with three men down |
+| Five suppressed careful rounds, half a minute apart | 15 of 20, from 14 | | | 7, from 5, at 114 s with three men down |
 
-What the table says:
+And the flaw report (`npm run experiment -- flaws --camps 24`: every attack script against 24 camps, counting the moments a camp does what a defender plainly wouldn't):
 
-- **A first shot is read much as it was.** Step 3b had already graded what each sound tells a man, so who gets down in the first seconds barely moves. What moves is why: a man is sure because two things agreed, and the trace says which (`npm run sitting -- <link> --why`).
-- **One loud shot no longer holds a camp down.** Twenty seconds on, 68% of it is still searching where 91% was. The men who heard a bang and nothing else were wary, asked, and went back to it.
-- **A camp finds its dead a little sooner.** After five careful rounds the siren comes on 8 camps of 20, from 5, about two and a half minutes in with three men down. I traced the three that changed: in each the camp ordered it, having had a second body reported. No man ran for a box on anything less than he would have before.
+| | Before | After |
+| --- | --- | --- |
+| A tower man with a loud shot in his range and no answer, per run (one shot, a sniper, a relocating one, two fronts) | 0.25, 0.25, 0.33, 0.25 | **0 on all four** |
+| A man outdoors still unaware 5 s after a loud shot | 0.04 to 0.29 by attack | The same |
+| Standing in the shooter's clear line, stuck, piled up, chattering | | Level, within the noise of 24 camps |
+
+What the tables say:
+
+- **A first shot is read much as it was.** Step 3b had already graded what each sound tells a man, so who gets down in the first seconds barely moves, and the siren on a first shot is where it was. What moves is why: a man is sure because two things agreed, and the trace says which (`npm run sitting -- <link> --why`).
+- **A loud shot still has a camp down.** A rifle is a rifle: the whistle and the net carry it to every man who heard the bang, and 20 s on 85% of the camp is searching. A man who heard only the bang gets there a beat later, by asking.
+- **A man shot where others are near is known for what it is a little more often** (the whistle on 15 camps of 23, from 12): a thud, and then "Man down!" from the man who looked.
+- **A camp finds its dead a little sooner.** After five careful rounds the siren comes on 7 camps of 20, from 5, about two minutes in with three men down. I traced the two that changed. In one the camp ordered it on a second body reported, with four men down. In the other the overview is 117 m off, near enough that a suppressed rifle is still a gun, and a man came on a body having heard it. Nobody ran for a box on less than he would have before.
+- **Tower men answer a loud shot.** On `main` one run in four had a tower man who didn't: his mind had lost the shot to the talk about it (below, *Talk doesn't push out what a man sensed himself*).
 
 **Decided along the way.**
 
 - **Two puzzles are still a puzzle.** The first version let any two cues agree. A snap and a thud are two sounds of one round, so every quiet shot was "borne out": the careful shot whistled 9 camps of 20, and a round into the generator 12 of 13. So one of the two has to be plain.
 - **The siren takes his own plain evidence of a gun.** With "sure" meaning two things agreed, a snap and a body near enough to see had a man sure, and the old rule read that as "a body come on after a shot": the siren on a suppressed first shot went to 17 camps of 23, from 13. A real man would be sure his mate was shot, and he is: he shouts and gets down. Whether the camp is under attack is the next rung, and it takes a gun.
 - **What a sure man has seen is believed.** For a while every report left a listener wary. The camp then re-found a lost intruder on 13 runs of 16, from 15 (`npm run bench`, the brain lane), because "Contact!" on the net no longer had anyone searching. The owner's sentence is about sounds, and the fix is about sounds: a sighting called in by a man who is sure counts as it did.
+- **A voice has longer than a sound.** With 4 s for everything, a third of a camp still wasn't sure 20 s after a loud shot (68% searching, where 91% had been), because the word that would have settled it reached them five or six seconds after the bang. That read as deaf more than careful. A man who is still wary of a bang when the net says "shots!" knows what he heard, so a voice answers a sound for 10 s, which is as long as he stays wary of it.
+- **Talk doesn't push out what a man sensed himself.** The flaw report found tower men giving no answer to one loud shot on 11 camps of 24, where `main` had 6. A man's mind holds eight things. With every wary man saying "Was that a shot?", eight voices in two seconds pushed the report out of a tower man's mind, and he stopped answering it half a second after he started. What he was told now goes before what he sensed (`prunePercepts`). No tower man is silent after a loud shot on any of the 24, so this was costing `main` too.
+- **A camp that hunts sends nobody out alone to a sound.** The hunt's bench counts men who go past the camp's edge unsent, and it had one, 250 m out on the shooter's ridge. A wary man's late call had put the bang there while the camp was only uneasy, and at that level the camp sends one man to look wherever the last report said. Off its own ground that's a section's job once it has placed someone, so the camp now makes no errand of it (`brain/commander.ts`).
 - **Counting them up was the wrong way to weigh them.** The ladder's old rule (three weak stimuli inside a grace period count as a stronger one) turned one shot's sounds into "Again. Same place." Cues of a shooting skip it: they have been weighed already.
 
 **What it leaves.**
 
 - **A man hears his neighbours. He doesn't watch them.** A mate who carries on unbothered doesn't calm him, and a mate who dives for cover in silence doesn't alarm him. "The reactions (or lack thereof)" count only as a second cue arriving or not. Seeing what the men round you are doing is the next step, and it wants the sight lane to say what a man can make of another's posture.
-- **The camp is easier to shoot up from one perch.** The brain bench's overlook has 27 guards of 32 down to a perfect shooter who stays put, from 24: a wary man stands a moment longer than a man who took every bang for fire. Getting down behind something at a whistle (step 3b's list) is what answers that, and it's the next thing I'd build.
-- **The numbers are the owner's by playing:** `perception.awareness.agree` (how long two cues have to agree, how much it adds, where two puzzles stop), the readings in `perception.awareness.shots`, `perception.awareness.cry` and `brain.comms.level`.
+- **The camp is a little easier to shoot up from one perch.** The brain bench's overlook has 26 guards of 32 down to a perfect shooter who stays put, from 24: a wary man stands a moment longer than a man who took every bang for fire. Getting down behind something at a whistle (step 3b's list) is what answers that, and it's the next thing I'd build.
+- **The numbers are the owner's by playing:** `perception.awareness.agree` (how long two cues have to agree, how long a voice has, how much it adds, where two puzzles stop), the readings in `perception.awareness.shots`, `perception.awareness.cry` and `brain.comms.level`.
 
 ## 10. Decisions
 

@@ -30,7 +30,9 @@ import { AWARENESS, rung, type Awareness, type AwarenessState, type PendingSound
  *   The cues of a shooting come by different ways: a rifle's report, the snap of its round,
  *   its strike, a voice, a man seen down, a flash. Two that come by different ways within a
  *   few seconds bear each other out, and so does the same sound again inside a minute:
- *   together they count a step more than the stronger does alone (`agree`). But two that
+ *   together they count a step more than the stronger does alone (`agree`). A voice has
+ *   longer: a man on the net has to get the words out, and they answer what a listener
+ *   heard for as long as he is still wary of it (`agree.word`). But two that
  *   are each a puzzle are still a puzzle. A snap and a thud, or a snap and a mate saying
  *   "Was that a shot?", leave him wary and no more (`agree.cap`). He is sure only when one
  *   of the two is plain: a gun's report heard well, a flash, a man crying out, a man he can
@@ -189,9 +191,10 @@ export function stimulate(a: Awareness, s: Stimulus, tick: number, tuning: Tunin
 
 /**
  * What a cue counts for with whatever bears it out: its own level, or, if another cue has
- * reached him by a different way within `agree.within` seconds, or the same way again
- * between `agree.apart` and `agree.again` seconds ago, a step more than the stronger of the
- * two. Each is weighed at its own level, so agreement never compounds. Remembers the cue.
+ * reached him by a different way within `agree.within` seconds (`agree.word`, if either is
+ * a voice), or the same way again between `agree.apart` and `agree.again` seconds ago, a
+ * step more than the stronger of the two. Each is weighed at its own level, so agreement
+ * never compounds. Remembers the cue.
  */
 function agreed(a: Awareness, s: Stimulus, tick: number, tuning: Tuning): number {
   if (!s.cue) return s.level;
@@ -211,7 +214,9 @@ function agreed(a: Awareness, s: Stimulus, tick: number, tuning: Tuning): number
       // Two voices of noticing bear nothing out: somebody has to have something of his own.
       if (s.level < A.levels.curious && c.level < A.levels.curious) continue;
       const age = (tick - c.tick) / hz;
-      const other = k !== s.cue && age <= G.within;
+      // Sounds of one event reach him within moments of each other. Someone's word about it comes when he has got it out, and
+      // answers the question for as long as a man is still asking it.
+      const other = k !== s.cue && age <= (k === 'voice' || s.cue === 'voice' ? G.word : G.within);
       const again = k === s.cue && OF_A_SHOT.includes(k) && age >= G.apart && age <= G.again;
       if (!other && !again) continue;
       borne = true;
@@ -232,16 +237,21 @@ function agreed(a: Awareness, s: Stimulus, tick: number, tuning: Tuning): number
 }
 
 /**
- * The cues of a shooting that have reached him lately enough to bear each other out, in
- * `CUES` order: what he is going on, for the debug view and for explaining a run. With two
- * or more of them, and something plain among them, he is sure.
+ * The cues of a shooting that have reached him lately enough for something to bear them
+ * out still, in `CUES` order: what he is going on, for the debug view and for explaining a
+ * run. With two or more of them, and something plain among them, he is sure.
  */
 export function cuesInMind(a: Awareness, tick: number, tuning: Tuning): Cue[] {
-  const within = tuning.perception.awareness.agree.within * tuning.sim.tickHz;
+  const G = tuning.perception.awareness.agree;
+  const hz = tuning.sim.tickHz;
+  // A voice counts for as long as it can answer a sound, and a sound for as long as another sound can bear it out.
+  let voiced = false;
+  const fresh = a.cues?.voice;
+  if (fresh && tick - fresh.tick <= G.word * hz) voiced = true;
   const out: Cue[] = [];
   for (const k of CUES) {
     const c = a.cues?.[k];
-    if (c && tick - c.tick <= within) out.push(k);
+    if (c && tick - c.tick <= (k === 'voice' || voiced ? G.word : G.within) * hz) out.push(k);
   }
   return out;
 }
@@ -299,11 +309,21 @@ export function stepLadder(a: Awareness, meter: number, seenCause: number, tick:
   return null;
 }
 
-/** Keeps a percept list to its live entries and at most `max`, oldest dropped first. */
+/**
+ * Keeps a percept list to its live entries and at most `max`. Talk goes first, oldest
+ * first, and then the oldest of what he sensed himself: a man doesn't lose the shot he
+ * heard to the men round him asking about it. (With every wary man saying "Was that a
+ * shot?", eight voices in two seconds pushed the report out of a tower man's mind, and he
+ * stopped answering it.)
+ */
 export function prunePercepts(list: Percept[], tick: number, max = 8): void {
   let w = 0;
   for (let r = 0; r < list.length; r++) if (list[r]!.expires >= tick) list[w++] = list[r]!;
   list.length = w;
+  for (let r = 0; list.length > max && r < list.length; ) {
+    if (list[r]!.kind === 'voice') list.splice(r, 1);
+    else r++;
+  }
   if (list.length > max) list.splice(0, list.length - max);
 }
 

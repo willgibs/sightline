@@ -47,6 +47,43 @@ function campOf(world: World): CampState {
 
 const report = (kind: Report['kind'], x: number, z: number, from = 2, tick = 100): Report => ({ kind, x, y: 0, z, radius: 5, tick, from, fromX: x, fromZ: z, cause: 77 });
 
+describe('a camp that hunts, told of a sound off its own ground', () => {
+  const world = worldWith(guards([0, 0], [20, 0], [-20, 0], [0, 20, 'marksman']));
+  const site = world.camp.site;
+  const out = { x: site.x + site.radius + 60, z: site.z };
+
+  it('is uneasy, and sends nobody out alone to look: that ground is a section’s, once it has placed someone there', () => {
+    const camp = campOf(world);
+    camp.hunts = true;
+    digest(camp, report('heard', out.x, out.z), 100, T, world);
+    expect(camp.level).toBe('uneasy');
+    const orders: CampOrder[] = [];
+    plan(campMind(camp, world, 110), orders);
+    expect(orders.filter((o) => o.task.kind === 'investigate')).toEqual([]);
+    // Nor does it make an errand of a man's word that he's on his way to look.
+    digest(camp, { ...report('heard', out.x, out.z, 1), checking: true }, 120, T, world);
+    expect(camp.tasks.filter((t) => t.kind === 'investigate')).toEqual([]);
+  });
+
+  it('on its own ground, still sends one man', () => {
+    const camp = campOf(world);
+    camp.hunts = true;
+    digest(camp, report('heard', site.x + site.radius / 2, site.z), 100, T, world);
+    const orders: CampOrder[] = [];
+    plan(campMind(camp, world, 110), orders);
+    expect(orders.filter((o) => o.task.kind === 'investigate')).toHaveLength(1);
+  });
+
+  it('a camp that doesn’t hunt goes and looks wherever it was, as it always did', () => {
+    const camp = campOf(world);
+    expect(camp.hunts).not.toBe(true);
+    digest(camp, report('heard', out.x, out.z), 100, T, world);
+    const orders: CampOrder[] = [];
+    plan(campMind(camp, world, 110), orders);
+    expect(orders.filter((o) => o.task.kind === 'investigate')).toHaveLength(1);
+  });
+});
+
 describe('alert levels', () => {
   const world = worldWith(guards([0, 0], [20, 0], [-20, 0], [0, 20, 'marksman']));
 
