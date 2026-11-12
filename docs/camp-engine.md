@@ -535,7 +535,7 @@ So staying put after a loud shot now gets a shooter found on three camps in four
 - Kill the vehicle, and he stays, with a man on his door: a camp that holds, the hard way.
 - While that man is at the vehicle, for a minute, nobody is on the target's door.
 
-The second of those came from playing the sitting's own link headless. The man on the target's door is the guard a perch sees best, so a shooter who takes whoever he sees first shot him before the siren, and the camp's whole answer went with him, without a sound. A camp that means to bolt wouldn't hang it on one sentry.
+The first of those came from playing the sitting's own link headless (`npm run sitting`). The man on the target's door is the guard a perch sees best, so a shooter who takes whoever he sees first shot him before the siren, and the camp's whole answer went with him, without a sound. A camp that means to bolt wouldn't hang it on one sentry.
 
 **What there is to read.** Before a shot: who stands on his doors (nobody, on a camp that holds), and whether he ever walks out (only on an escort's). After one: an engine. A vehicle's engine is a sound now (the `engine` event, every two seconds while it runs, by the law every sound obeys): heard to 500 m as it starts or drives and to 320 m standing. The camp's own starting up seconds after the siren means he's going. No engine in the camp and a truck on the road means the relief is coming for him. Neither means he's staying. And a run that loses him says so at the end: "his vehicle's engine had been running for 79 s when he got to it".
 
@@ -565,7 +565,7 @@ So the three kinds of camp now end three ways under the same attack, and where h
 - **Where his vehicle stands tells you nothing.** The generator puts it by his door on every camp, so on a camp that holds it's a getaway that is never used. It can't simply go to the motor pool: a camp that isn't ready for trouble still runs him to it at the siren, and standing by his door is what keeps that run out of a perch's view. It moves when those camps take an answer of their own (preparedness, step 3). Until then the things to read before a shot are the men on his door and whether he walks out.
 - **He does nothing about someone who comes into his room.** He crouches there. What he and the men on his door do about an intruder inside his building is close protection, the next of step 3's means.
 - **A camp that isn't ready for trouble is as it was:** he runs for his vehicle at the siren. These answers are a protecting camp's (`ready=alert`, the takedown).
-- **Three camps in forty never sounded the siren** under this sniper in five minutes, and on those nothing happens to him either way.
+- **Nine camps in forty never sounded the siren** under this sniper in five minutes, and on those nothing happens to him either way.
 
 **Dials a person should set by playing,** in `tuning.brain.protect.answer` and `tuning.brain.engine`: how long the engine runs before he's sent for (`prep`, 60 s: the length of the warning), how much longer before he comes by himself (`own`), how long before another man takes over starting it (`takeOver`, `perMetre`), how many of the relief go to his doors (`keepers`), how far a man on his door will go for a position (`firefight.spot.doorRun`), and how far an engine carries starting, standing and driving.
 
