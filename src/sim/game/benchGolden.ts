@@ -149,8 +149,8 @@ export const BENCH_GOLDEN: PinnedBench = {
       "perception-crowd": {
         "work": {
           "motor": { "rays": 0, "nodes": 0, "bodies": 45900 },
-          "perception-sight": { "rays": 91778, "nodes": 0, "bodies": 0 },
-          "perception-awareness": { "rays": 0, "nodes": 371126, "bodies": 0 }
+          "perception-sight": { "rays": 102084, "nodes": 0, "bodies": 0 },
+          "perception-awareness": { "rays": 0, "nodes": 441336, "bodies": 0 }
         }
       }
     }
@@ -164,25 +164,25 @@ export const BENCH_GOLDEN: PinnedBench = {
       "ellipse: contains the shooter at 2 sigma (%)": 88.5,
       "relocation: 26–30 m across the line of fire, outside 2 sigma (%)": 50.5,
       "relocation: 26–30 m in any direction, outside 2 sigma (%)": 29.5,
-      "ellipse in the world: contains the perch at 1 sigma (%)": 41.2371134,
-      "ellipse in the world: contains the perch at 2 sigma (%)": 86.5979381,
-      "ellipse in the world: mean bearings fused per shot": 5.01030928,
+      "ellipse in the world: contains the perch at 1 sigma (%)": 32.183908,
+      "ellipse in the world: contains the perch at 2 sigma (%)": 87.3563218,
+      "ellipse in the world: mean bearings fused per shot": 6.98850575,
       "re-found within 60 s (of 16): honest": 15,
       "re-found within 60 s (of 16): random": 2,
       "re-found within 60 s (of 16): plain": 13,
       "re-found within 60 s (of 16): staleness": 13,
       "re-found within 60 s (of 16): omniscient": 16,
       "re-found within 60 s (of 16): honest, unpaced": 16,
-      "reactions (in the scripted scenarios)": 62,
+      "reactions (in the scripted scenarios)": 63,
       "reactions unexplained": 0,
-      "overlook: guards down from one perch, of 32": 24,
+      "overlook: guards down from one perch, of 32": 26,
       "overlook: camps cleared (of 3)": 0,
       "overlook: the target got away (of 3)": 2,
       "timed shot on an escort's camp: target down (of 3)": 3,
       "a fight’s worst tick: grid cells the brains expand": 11988,
-      "a fight’s worst tick: rays the brains cast": 638,
-      "a fight’s worst tick: grid cells sounds flood": 13318,
-      "a fight’s worst tick: grid cells the commander expands": 3277,
+      "a fight’s worst tick: rays the brains cast": 560,
+      "a fight’s worst tick: grid cells sounds flood": 18334,
+      "a fight’s worst tick: grid cells the commander expands": 2489,
       "routes between a camp’s posts: found (of 56)": 56,
       "routes between a camp’s posts: grid cells a search looks at, on average": 459,
       "routes between a camp’s posts: the most one search looks at": 2716,
@@ -193,13 +193,13 @@ export const BENCH_GOLDEN: PinnedBench = {
     "runs": {
       "camp-fight": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 12800 },
-          "bullets": { "rays": 68, "nodes": 0, "bodies": 0 },
-          "perception-hearing": { "rays": 64, "nodes": 40556, "bodies": 0 },
-          "perception-spotting": { "rays": 5516, "nodes": 0, "bodies": 0 },
-          "perception-awareness": { "rays": 0, "nodes": 93021, "bodies": 0 },
+          "motor": { "rays": 0, "nodes": 0, "bodies": 13965 },
+          "bullets": { "rays": 67, "nodes": 0, "bodies": 0 },
+          "perception-hearing": { "rays": 64, "nodes": 27644, "bodies": 0 },
+          "perception-spotting": { "rays": 4387, "nodes": 0, "bodies": 0 },
+          "perception-awareness": { "rays": 0, "nodes": 85859, "bodies": 0 },
           "camp-commander": { "rays": 0, "nodes": 3005, "bodies": 0 },
-          "guard-brains": { "rays": 325, "nodes": 29089, "bodies": 0 }
+          "guard-brains": { "rays": 525, "nodes": 35259, "bodies": 0 }
         }
       }
     }

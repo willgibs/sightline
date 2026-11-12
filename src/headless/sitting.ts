@@ -42,7 +42,7 @@ import { placePlayer } from '../sim/game/setup';
 import type { Simulation } from '../sim/game/sim';
 import { EventLog } from '../sim/kernel/eventlog';
 import { sceneTuning, startScene, type Scene } from '../sim/kernel/scene';
-import { AWARENESS, BARKS, explainChain } from '../sim/perception';
+import { AWARENESS, BARKS, CUE_WORDS, cuesInMind, explainChain } from '../sim/perception';
 import { parseArgs } from './args';
 
 const argv = process.argv.slice(2);
@@ -203,7 +203,10 @@ for (let k = 0; k < seconds * hz && sim.state.outcome.status === 'playing'; k++)
     } else if (why && e.type === 'alert' && e.to === 'searching' && e.reason !== 'voice' && sure.size < 6 && !sure.has(e.source)) {
       // With --why: the first few men to take it for the real thing by their own senses, and on what.
       sure.add(e.source);
-      say(`${who(e.source)} is sure of it`);
+      // What he was going on: the cues of a shooting that reached him inside a few seconds of each other (perception/awareness.ts, `agree`).
+      const senses = sim.guards.find((g) => g.id === e.source)?.senses;
+      const cues = senses ? cuesInMind(senses.awareness, sim.tick, sim.tuning) : [];
+      say(`${who(e.source)} is sure of it${cues.length ? `: ${cues.map((c) => CUE_WORDS[c]).join(' and ')}` : ''}`);
       because(e.id);
     } else if (e.type === 'engine' && e.load === 'start') say(escape && e.source === escape.id ? 'his vehicle’s engine starts' : 'an engine starts: a truck on the road');
     else if (e.type === 'reinforce') say(`the relief is at the gate (${e.count} men)`);

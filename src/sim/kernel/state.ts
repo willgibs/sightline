@@ -37,8 +37,11 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * went to look at something; a camp keeps the bodies reported to it, the word of a man who
  * knew, and the men who didn't answer its order to the siren; a report can carry that word;
  * and a generator and an alarm box keep the rounds that have struck them.
+ * 15: a man's awareness keeps the last cue of a shooting that reached him by each way, a
+ * voice on its way to him keeps what kind of word it is, and a report keeps whether the
+ * man saying it is sure (perception/awareness.ts, `agree`).
  */
-export const STATE_SCHEMA = 14;
+export const STATE_SCHEMA = 15;
 
 export type EntityId = number;
 

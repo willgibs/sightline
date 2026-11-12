@@ -119,10 +119,11 @@ export function pursuit(policy: Policy, seed: number, tuning: Tuning, seconds = 
   if (policy === 'honest') giveBrains(sim);
   giveCommander(sim);
   // Every guard starts out believing the intruder is at the last known position: a radio
-  // report in hand, as if a contact had just been called in and lost.
+  // report in hand, as if a contact had just been called in, by a man who had him in sight,
+  // and lost.
   const ctx = (sim as unknown as { ctx: Parameters<typeof tell>[0] }).ctx;
   for (const g of sim.guards) {
-    const report = { kind: 'contact' as const, x: lkp.x, y: 0.8, z: lkp.z, radius: 10, tick: 0, from: 0, fromX: lkp.x, fromZ: lkp.z, cause: 0 };
+    const report = { kind: 'contact' as const, x: lkp.x, y: 0.8, z: lkp.z, radius: 10, tick: 0, from: 0, fromX: lkp.x, fromZ: lkp.z, cause: 0, sure: true as const };
     if (g.brain) tell(ctx, g, report, 'radio', 0);
   }
   commanderOfSim(sim)?.camp.inbox.push({ kind: 'contact', x: lkp.x, y: 0.8, z: lkp.z, radius: 10, tick: 0, from: 0, fromX: lkp.x, fromZ: lkp.z, cause: 0 });

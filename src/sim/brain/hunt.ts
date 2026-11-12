@@ -474,7 +474,7 @@ export function performHunt(m: GuardMind, out: Order): void {
     if (until > h.pinned) h.pinned = until;
     h.unheard = Math.max(h.unheard, H.bound.giveUp - 1);
     const C = T.brain.comms;
-    const report: Report = { kind: 'body', x: p.x, y: p.y, z: p.z, radius: Math.max(p.radius, C.radius.body), tick: p.tick, from: m.id, fromX: self.x, fromZ: self.z, cause: p.cause };
+    const report: Report = { kind: 'body', x: p.x, y: p.y, z: p.z, radius: Math.max(p.radius, C.radius.body), tick: p.tick, from: m.id, fromX: self.x, fromZ: self.z, cause: p.cause, sure: true };
     b.say = { report, radius: C.shoutRadius, radio: false };
     b.radio = { ...report };
   }

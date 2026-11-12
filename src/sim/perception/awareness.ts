@@ -19,12 +19,44 @@ import { AWARENESS, rung, type Awareness, type AwarenessState, type PendingSound
  *   by `spread` from his own stream.
  * - **Grace:** for a moment after a stimulus raises him, weaker ones are ignored, unless one
  *   beats it by `graceBeat`, or `graceCount` arrive, which counts as a stronger one.
+ * - **One thing is a question, and two that agree are an answer** (the owner, Nov 12: a man
+ *   is "more confused than immediately sprint to cover, depending on how likely I can
+ *   confirm an attacking gunshot... as well as the reactions (or lack thereof) of those
+ *   around me"). What a man sees he believes: one of his own down, a flash, an intruder. So
+ *   does whoever he tells, if he's sure of it. What a man hears is a question: a bang is a
+ *   gun somewhere, a snap is something sharp, a thud is a thud, a cry is someone hurt, and
+ *   "shots!" on the net is someone else's ears. Any one of those alone leaves him wary at
+ *   most. (A round that all but hits him is the one sound nobody has to ask about.)
+ *   The cues of a shooting come by different ways: a rifle's report, the snap of its round,
+ *   its strike, a voice, a man seen down, a flash. Two that come by different ways within a
+ *   few seconds bear each other out, and so does the same sound again inside a minute:
+ *   together they count a step more than the stronger does alone (`agree`). A voice has
+ *   longer: a man on the net has to get the words out, and they answer what a listener
+ *   heard for as long as he is still wary of it (`agree.word`). But two that
+ *   are each a puzzle are still a puzzle. A snap and a thud, or a snap and a mate saying
+ *   "Was that a shot?", leave him wary and no more (`agree.cap`). He is sure only when one
+ *   of the two is plain: a gun's report heard well, a flash, a man crying out, a man he can
+ *   see is down, the word of someone who is sure. So a bang with the snap of its round is
+ *   fire, a snap with the whistle is fire, a bang with a mate who heard it too is fire, and
+ *   one man alone with one sound is still asking.
  * - **Sharper after a search:** once he has searched and settled, his floor rises and his
  *   eyes quicken (design doc: a raised baseline).
  *
  * Pure functions over a guard's senses, so the ladder is the same wherever it runs, and
  * every change it makes is returned for its system to emit and explain.
  */
+
+/**
+ * The ways the cues of a shooting reach a man, for telling whether two of them agree: a
+ * rifle's report, the crack of its round, its strike, the bolt; a voice (a comrade's word,
+ * a cry, the camp's whistle or siren); a body he is sure of; a flash. In a fixed order.
+ */
+export const CUES = ['report', 'crack', 'impact', 'bolt', 'voice', 'body', 'muzzle'] as const;
+export type Cue = (typeof CUES)[number];
+/** The ones a single shot makes: the same one again, a while later, is another shot. */
+const OF_A_SHOT: readonly Cue[] = ['report', 'crack', 'impact', 'bolt'];
+/** Each in a word or two, for saying what a man is going on (the debug view, `npm run sitting -- --why`). */
+export const CUE_WORDS: Readonly<Record<Cue, string>> = { report: 'a report', crack: 'a snap', impact: 'a strike', bolt: 'a bolt', voice: 'a voice', body: 'a man down', muzzle: 'a flash' };
 
 /** A stimulus other than the meter, as the ladder takes it: the level it raises him to, where, and why. */
 export interface Stimulus {
@@ -37,6 +69,12 @@ export interface Stimulus {
   /** The event behind it, for the alert it causes. */
   cause: number;
   reason: AlertReason;
+  /** Which way it came, if it's a cue of a shooting: it may bear out, or be borne out by, another (`agree`). Absent for anything else: a footstep, a door, a glint. */
+  cue?: Cue;
+  /** A voice with something to say: it bears out what a listener has noticed himself whatever level it has of its own, and "Was that a shot?" has none. */
+  notice?: boolean;
+  /** A cue there's no mistaking for what it is: a gun's report heard well, a flash, a cry, a man he can see is down, the word of someone who is sure. Borne out by one of these, or bearing one out, a man is sure; two that are both puzzles leave him wary (`agree.cap`). */
+  plain?: boolean;
 }
 
 /** A change of state, for its system to emit as an 'alert'. */
@@ -94,6 +132,17 @@ export function shotLevel(sound: string | undefined, clarity: number, tuning: Tu
   return ramp(S.faint, S.clear, (clarity - 1) / (S.clearAt - 1));
 }
 
+/**
+ * Whether one of a shot's sounds is plain to a man as a gun's: a report, or a bolt, heard
+ * well enough to know it for one, or a round that all but hit him. A snap or a thud is a
+ * puzzle, however near: it takes something else to say what it was (`agree`).
+ */
+export function plainShot(sound: string | undefined, clarity: number, tuning: Tuning): boolean {
+  const L = tuning.perception.awareness.levels;
+  if (sound === 'impact') return false;
+  return shotLevel(sound, clarity, tuning) >= (sound === 'crack' ? L.searching : L.suspicious);
+}
+
 function ramp(faint: number, clear: number, t: number): number {
   return faint + (clear - faint) * (t <= 0 ? 0 : t >= 1 ? 1 : t);
 }
@@ -112,10 +161,12 @@ function rampDown(state: AwarenessState, A: Tuning['perception']['awareness'], u
 export function stimulate(a: Awareness, s: Stimulus, tick: number, tuning: Tuning, draw: () => number): boolean {
   const A = tuning.perception.awareness;
   const hz = tuning.sim.tickHz;
-  let level = a.floor + s.level;
+  let level = a.floor + agreed(a, s, tick, tuning);
   if (level <= 0) return false;
   const inGrace = a.riseTick >= 0 && (tick - a.riseTick) / hz < A.grace;
   if (inGrace && level < a.riseLevel * A.graceBeat) {
+    // A cue of a shooting has been weighed already with whatever bears it out: a weaker one adds nothing, however many come.
+    if (s.cue) return false;
     // Weaker than the last rise, inside its grace: counted, and enough of them count as stronger.
     a.graceCount++;
     if (a.graceCount < A.graceCount) return false;
@@ -136,6 +187,73 @@ export function stimulate(a: Awareness, s: Stimulus, tick: number, tuning: Tunin
   if (held) a.fallAt = tick + Math.round(rampDown(a.state === 'unaware' ? 'curious' : a.state, A, draw()) * hz);
   a.reason = s.reason;
   return true;
+}
+
+/**
+ * What a cue counts for with whatever bears it out: its own level, or, if another cue has
+ * reached him by a different way within `agree.within` seconds (`agree.word`, if either is
+ * a voice), or the same way again between `agree.apart` and `agree.again` seconds ago, a
+ * step more than the stronger of the two. Each is weighed at its own level, so agreement
+ * never compounds. Remembers the cue.
+ */
+function agreed(a: Awareness, s: Stimulus, tick: number, tuning: Tuning): number {
+  if (!s.cue) return s.level;
+  const A = tuning.perception.awareness;
+  const G = A.agree;
+  const hz = tuning.sim.tickHz;
+  const counts = (level: number, notice: boolean): boolean => level >= A.levels.curious || notice;
+  let level = s.level;
+  let borne = false;
+  let shot = OF_A_SHOT.includes(s.cue);
+  let body = s.cue === 'body';
+  let plain = s.plain === true;
+  if (counts(s.level, s.notice === true)) {
+    for (const k of CUES) {
+      const c = a.cues?.[k];
+      if (!c || !counts(c.level, c.notice === true)) continue;
+      // Two voices of noticing bear nothing out: somebody has to have something of his own.
+      if (s.level < A.levels.curious && c.level < A.levels.curious) continue;
+      const age = (tick - c.tick) / hz;
+      // Sounds of one event reach him within moments of each other. Someone's word about it comes when he has got it out, and
+      // answers the question for as long as a man is still asking it.
+      const other = k !== s.cue && age <= (k === 'voice' || s.cue === 'voice' ? G.word : G.within);
+      const again = k === s.cue && OF_A_SHOT.includes(k) && age >= G.apart && age <= G.again;
+      if (!other && !again) continue;
+      borne = true;
+      if (c.level > level) level = c.level;
+      if (OF_A_SHOT.includes(k)) shot = true;
+      if (k === 'body') body = true;
+      if (c.plain) plain = true;
+    }
+  }
+  (a.cues ??= {})[s.cue] = { level: s.level, tick, ...(s.notice ? { notice: true as const } : {}), ...(s.plain ? { plain: true as const } : {}) };
+  if (!borne) return s.level;
+  // Two puzzles are still a puzzle: without something plain among them he's wary, and no more.
+  if (!plain) return Math.max(s.level, Math.min(level + G.step, G.cap));
+  // Borne out, it's what the two of them point to, whichever came last: a man down, or a shot.
+  if (body) s.reason = 'body';
+  else if (shot) s.reason = 'shot';
+  return level + G.step;
+}
+
+/**
+ * The cues of a shooting that have reached him lately enough for something to bear them
+ * out still, in `CUES` order: what he is going on, for the debug view and for explaining a
+ * run. With two or more of them, and something plain among them, he is sure.
+ */
+export function cuesInMind(a: Awareness, tick: number, tuning: Tuning): Cue[] {
+  const G = tuning.perception.awareness.agree;
+  const hz = tuning.sim.tickHz;
+  // A voice counts for as long as it can answer a sound, and a sound for as long as another sound can bear it out.
+  let voiced = false;
+  const fresh = a.cues?.voice;
+  if (fresh && tick - fresh.tick <= G.word * hz) voiced = true;
+  const out: Cue[] = [];
+  for (const k of CUES) {
+    const c = a.cues?.[k];
+    if (c && tick - c.tick <= (k === 'voice' || voiced ? G.word : G.within) * hz) out.push(k);
+  }
+  return out;
 }
 
 /**
@@ -191,11 +309,21 @@ export function stepLadder(a: Awareness, meter: number, seenCause: number, tick:
   return null;
 }
 
-/** Keeps a percept list to its live entries and at most `max`, oldest dropped first. */
+/**
+ * Keeps a percept list to its live entries and at most `max`. Talk goes first, oldest
+ * first, and then the oldest of what he sensed himself: a man doesn't lose the shot he
+ * heard to the men round him asking about it. (With every wary man saying "Was that a
+ * shot?", eight voices in two seconds pushed the report out of a tower man's mind, and he
+ * stopped answering it.)
+ */
 export function prunePercepts(list: Percept[], tick: number, max = 8): void {
   let w = 0;
   for (let r = 0; r < list.length; r++) if (list[r]!.expires >= tick) list[w++] = list[r]!;
   list.length = w;
+  for (let r = 0; list.length > max && r < list.length; ) {
+    if (list[r]!.kind === 'voice') list.splice(r, 1);
+    else r++;
+  }
   if (list.length > max) list.splice(0, list.length - max);
 }
 

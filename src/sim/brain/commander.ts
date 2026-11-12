@@ -122,8 +122,10 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
   if (alertRung(wanted) > alertRung(camp.level)) raise(camp, wanted, tick);
   // A body in the open (E9): guards near it get off exposed ground.
   if (r.kind === 'body') addTask(camp, 'cover', r.x, r.z, 2, 3, tick);
-  // An unverified report from someone already on his way there: the camp knows, and he has it.
-  if (r.kind === 'heard' && r.checking && !camp.tasks.some((t) => t.kind === 'investigate')) {
+  // An unverified report from someone already on his way there: the camp knows, and he has it. In a camp that hunts, not
+  // if the place is off its own ground: what a man says he heard out there is where the sound seemed to come from, and
+  // the camp doesn't make an errand of it that walks him out alone (below, and planHunt).
+  if (r.kind === 'heard' && r.checking && (camp.hunts !== true || ownGround(world, r.x, r.z)) && !camp.tasks.some((t) => t.kind === 'investigate')) {
     const t = addTask(camp, 'investigate', r.x, r.z, 2, 1, tick, r.y);
     t.assigned.push(r.from);
     t.cause = r.cause;
@@ -260,8 +262,10 @@ export function plan(m: CampMind, out: CampOrder[]): void {
   const slots = camp.level === 'uneasy' ? T.slots.uneasy : camp.level === 'alert' ? T.slots.alert : T.slots.lockdown;
   // Someone placed off the camp's own ground is a section's to find (planHunt): nobody else is sent walking about in his view to look for him.
   const hunting = camp.hunts === true && camp.threat !== null;
-  // Investigate where the last report said.
-  if (!hunting && camp.search && !camp.search.cleared && slots.investigate > 0 && camp.tasks.filter((t) => t.kind === 'investigate').length === 0 && camp.level === 'uneasy') {
+  // Investigate where the last report said. In a camp that hunts, only on its own ground: a place past it is a section's to
+  // look at once the camp has placed someone there, and until then nobody is sent out alone on a wary man's word of a sound.
+  const within = camp.hunts !== true || (camp.search !== null && ownGround(m.world, camp.search.x, camp.search.z));
+  if (!hunting && within && camp.search && !camp.search.cleared && slots.investigate > 0 && camp.tasks.filter((t) => t.kind === 'investigate').length === 0 && camp.level === 'uneasy') {
     addTask(camp, 'investigate', camp.search.x, camp.search.z, 2, investigators(camp, camp.search.x, camp.search.z, T.slots.lockdown.investigate + 1, m.tuning), m.tick, camp.search.y);
   }
   // A shooter the camp has fixed: the marksmen sweep where it believes he is (E8).

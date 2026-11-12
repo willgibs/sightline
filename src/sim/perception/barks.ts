@@ -9,7 +9,10 @@ import type { AlertReason, AwarenessName } from '../kernel/events';
  * specific line that fits why he changed, unless he said it within its cooldown, then a
  * more generic one, so the player learns the cause without hearing a memorable line twice.
  * Each line is a voice, which the others hear by the law of sound; a shout carries farther,
- * and raises the guards who hear it to the level it names.
+ * and raises the guards who hear it to the level it names. A line said on noticing
+ * something, whatever its level, also bears out what a listener has noticed himself
+ * (awareness.ts, `agree`): as a question does if the man saying it is asking, and as
+ * something plain does if he is sure.
  *
  * Lines are only ever added, at the end: a recording stores a line by its index.
  */
@@ -47,6 +50,8 @@ export const BARKS: readonly BarkLine[] = [
   { text: "Why's that off?", to: 'curious', reason: 'outage', shout: false, level: 0 },
   { text: 'Something cut this.', to: 'suspicious', reason: 'outage', shout: false, level: 0 },
   { text: 'Who shut that?', to: 'curious', reason: 'door', shout: false, level: 0 },
+  // A bang or a snap he isn't sure of yet: said to whoever is near, and it bears out what they heard themselves (awareness.ts, `agree`).
+  { text: 'Was that a shot?', to: 'suspicious', reason: 'shot', shout: false, level: 0 },
 
 ];
 
