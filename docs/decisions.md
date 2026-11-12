@@ -2,6 +2,30 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-12 · A ladder is the last thing to move
+
+**What broke.** The long invariant run broke a body's promise on a tower's ladder, the same way every time, on `main` and on every branch: `tower:RES-2063-3`, tick 855, `entity 1 · ladder inside body 3 by 0.1311 m`. Entity 1 is the player, coming down the ladder. Body 3 is a guard walking past its foot, who in that scene has no senses and no brain, so it was the motor alone.
+
+**What happened.** The motor moved bodies in entity order, each against where the others were at that moment, and the player is the first of them. Coming down at 2.2 m/s, the player took a pose with feet 33 mm over the guard's head, which was clear. The guard then took his own step, which was up onto a box at the ladder's foot, 0.22 m, and his head ended the tick 0.19 m into the player's feet. Three things were wrong.
+- **A path asked where the others had been.** A body on a mantle or a ladder can't be shoved aside, so it takes a pose only where that pose is clear of every other body. Moved in its turn among the walkers, it was asking about bodies that hadn't moved yet.
+- **A walker was resolved against other bodies at the height it began the tick at.** Against colliders the motor already took a body as high as the tick could leave it. Against bodies it didn't, so the guard was never shoved from under the feet he was about to step up into.
+- **The watch measured neither.** It judged the player against where the guard had been before the tick and how high he stood after it. The 0.1311 m is that mixture: at the end of the tick the two overlapped by 0.108 m across and 0.19 m deep.
+
+**Decision.**
+- **A path is the last thing to move** (`body/system.ts`). Every body that walks or falls moves first, in entity order; then every body on a path of its own, in entity order. The pose a mantle or a ladder takes is then clear of every other body where the tick leaves it. That is exact, it doesn't depend on who has which id, and the watch checks it against where bodies are and never where they were.
+- **A body is taken over the band the tick leaves it in** (`resolveMove`). When feet are within a step over its head and over its circle, it asks what ground settling will find where it's going, and if that lifts it into them it is shoved from under them, as it would be from beside them. It asks only then, so nothing else pays for it.
+- **The motor's header says what is promised and what isn't.** A path never moves into another body. A body that walks or falls into one on a path is shoved, softly, as it is by anybody: held there by a wall, or fallen onto it, it can end a tick overlapping it, and the path holds still until it is clear. Making that half exact means bodies that stand on each other, which nothing has asked for.
+
+Either change to the motor holds RES-2063-3 on its own. The order is what makes the promise exact; the band is what keeps the guard's head out of the feet at all. With neither, the watch as it now measures reports the overlap that was really there, 0.1078 m.
+
+**Not done instead.** Correcting only the watch, to judge a pose by where each body stood when it was taken, passes this run and leaves the promise depending on entity ids, with the player always the one to go first and a guard's head in the player's feet for a tick. A step of clearance kept over every head would stop a climber half a metre short of anyone below, for no reason a player could see.
+
+**The long run names what it plays.** A failing tower couldn't be played again: `--seed NAME` skipped a valley's towers and stairs. It now plays all of one valley (both bots, its five towers, every flight of its stairs), `--run NAME` plays one run again by the name its line began with (`tower:RES-2063-3`, `stairs:RES-2063 --bot flight2`, `scene:movement-lab --bot chaos`, a valley), and a run that breaks a promise prints that command. The `ladder-tower` scene holds its own run to the motor's promises and is driven by the long run's bot for that tower, so `npm run scene -- ladder-tower --params seed=RES-2063-3` is the same run. Towers the long run broke a promise on are kept in the scene's table (`TOWER_FINDS`) and played with the tests.
+
+**Tests** (`tests/ladder.test.ts`), each failing on the motor as it was: the player holds still over a guard who walks under the ladder in the same tick, and comes down once he's past, the guard never shoved off his line; a body walking onto a box under feet just over its head steps up beside them, not into them; the watch calls a ladder lowered into a body a broken promise, and one that holds still while overlapped not; and RES-2063-3 holds.
+
+**Versions.** `SIM_VERSION` 21. No pinned run has a body under a ladder or a mantle, so no fingerprint and no bench number moved. The golden recording is rewritten for the version.
+
 ## 2026-11-12 · A first move that isn't the last: what a camp knows, and what it does about it
 
 **Why.** The owner, from playing: a suppressed round at a tower guard from a distance set the siren off at once, and so did everything else a person tries first. "How do I win here without the target escaping the second everyone knows I'm attacking." Measured before anything was changed (`npm run experiment -- second-step`, 24 camps): one suppressed round through the head of a man on a raised post whistled up every camp, had 98% of its men searching in 5 s, and sounded the siren on 9 of 20 a median 3.9 s later, thrown 8 times of 9 by a man who had seen nobody and no body. The target was gone 34 s after the shot. A camp marked ready (the takedown) was a little better and the same in kind. A round into the generator or an alarm box did nothing to it.

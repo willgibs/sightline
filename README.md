@@ -193,7 +193,7 @@ tests/                 Vitest
 | `npm run sim -- --replay file.slrec` | Re-simulates a recording saved from the browser, and says where a run diverged. |
 | `npm run scene` | Every scene headless, by its own driver, checking its expectations. |
 | `npm run seeds -- --count 100` | Generates many camps and reports how many pass validation first time, what repair did, and how long they took. |
-| `npm run fuzz -- --seeds 20 --minutes 60` | Bots play fresh valleys while every body's promises are checked every tick; `--synctest` also saves, restores and re-steps every 30 ticks. |
+| `npm run fuzz -- --seeds 20 --minutes 60` | Bots play fresh valleys, their towers and their stairs while every body's promises are checked every tick; `--synctest` also saves, restores and re-steps every 30 ticks. A failing run prints the command that plays it again (`--run tower:RES-2063-3`). |
 | `npm run playtest` | Re-simulates and summarizes the runs kept in `playtests/`. |
 | `npm run selftest` | The golden values, in this JavaScript engine. |
 | `npm run golden` | Rewrites the golden recording after a deliberate behaviour change. |
