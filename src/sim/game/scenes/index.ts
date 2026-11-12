@@ -4,6 +4,7 @@ import { ladderTower } from './ladderTower';
 import { campBrain } from './campBrain';
 import { compound } from './compound';
 import { firefight } from './firefight';
+import { outTheGate } from './outTheGate';
 import { hunt } from './hunt';
 import { CAMP_SCENARIOS, campScenario } from './campScenario';
 import { campSystems } from './campSystems';
@@ -42,6 +43,7 @@ export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   'camp-systems': campSystems,
   'live-camp': liveCamp,
   firefight,
+  'out-the-gate': outTheGate,
   hunt,
   overlook,
   ladder,

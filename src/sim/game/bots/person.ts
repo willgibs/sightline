@@ -429,13 +429,15 @@ export class WalkTo implements ViewBot {
     x: number,
     z: number,
     private readonly stance: Stance,
+    /** At a run. */
+    private readonly sprint = false,
   ) {
     this.walker = new Walker(x, z, 0, 1.5);
   }
 
   next(view: PlayerView, out: InputFrame): InputFrame {
     this.hands.begin(view, out);
-    if (this.walker.step(view, this.hands, out, this.stance, false)) this.arrived = true;
+    if (this.walker.step(view, this.hands, out, this.stance, this.sprint)) this.arrived = true;
     return this.hands.end(view, out);
   }
 }
