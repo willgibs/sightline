@@ -47,5 +47,12 @@ export const GEN_VERSION = 9;
  * 18: the hunt (brain/hunt.ts, brain/commander.ts): a camp that hunts places a shooter from
  * what its men heard, says so from cover, sends a section out after him, and has its
  * marksmen cover the crossing; nobody else walks off its ground to look for him.
+ * 19: a vehicle's engine is heard while it runs (the 'engine' event, game/escape.ts), so
+ * every run with a vehicle on the move has new events in it. A protecting camp answers for
+ * its target by the problem it's built round (brain/protect.ts): it holds him, or readies
+ * his vehicle and bolts, or waits for its relief. A man on the target's door stays on it
+ * once the siren has sounded, the relief knows the alarm is up, and an order doesn't take a
+ * man off bringing the target out. No pinned run has a vehicle on the move or a protecting
+ * camp at its siren, so no behaviour fingerprint moved.
  */
-export const SIM_VERSION = 18;
+export const SIM_VERSION = 19;

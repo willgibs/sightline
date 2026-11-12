@@ -28,6 +28,8 @@ export const HEARD_AS: Readonly<Partial<Record<EventType, PendingSound['kind']>>
   call: 'voice',
   siren: 'voice',
   whistle: 'voice',
+  // The camp's own vehicles: something its men hear and know, like a voice, and nothing to be alarmed at.
+  engine: 'voice',
   report: 'shot',
   impact: 'shot',
   bolt: 'shot',

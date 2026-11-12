@@ -335,7 +335,7 @@ These are scored with the person-limited shooter, not the perfect one, and every
 | **0 · The bench** | Done: experiments, switches, gauges, the panel, the way out, forking a run, re-rolling the dice on one camp, a shooter limited to what a person can do, a fight pinned on the bench | Today's camp with the panel on: the "before" | Medium |
 | **1 · The first fight** | Built: a whistle you can hear, men who leave the line and come back, tower men who fire back, near misses that knock you off your rest, a muzzle flash anyone looking can see. The compound simulator and its flaw detectors. So far: a perfect shooter's kills fall from 8.7 to 7.0 of 9.6, and the share of guards in his line 20 s after a shot from 61% to 41% | The compound simulator first, then a real perch. Fifteen minutes, three questions: what did the camp do, why did you move, what would you do next? | Medium |
 | **2 · The camp hunts** | Done: stance for guards, routes that reach the ridges, the firefight (2a, below) and the hunt (2b, below): the camp places a shooter and sends a section after him. Still to come: cut-offs on the road, the relief as a second section, a hunt without the radio | Getting out, with someone coming | Large |
-| **3 · The camp has means** | The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels | Break the Chain, The Duel | Large |
+| **3 · The camp has means** | Built: the target's answer by the camp's problem, and engines you can hear (3a, below). To come: the counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels | Break the Chain, The Duel | Large |
 | **4 · If play asks for it** | Mortar, smoke, hardening, Memory, decoys, Second Front, Be the Camp, the tournament | | Large |
 
 Step 4 waits for evidence. The owner named artillery, so the mortar stays on the list, but building it before anyone has felt step 1 would be guessing.
@@ -375,7 +375,7 @@ From playing the takedown and the live camp, and two answers on the desk. It was
 - **Never a ring.** Once the attacker's position is known, the camp doesn't converge on one spot. Men fight from established cover, work out the problem and improve their positions: "a more realistic, methodical response than blindly running into the fire". That gives the player time to make a push.
 - It's the other half of the owner's shoot-and-circle note, and has to answer it on the person-limited shooter and in a sitting.
 
-**2. The target answers by the camp's problem** (the owner's call on `core-challenge`). Some camps keep the target inside and others make the target run, so that play "can't be reduced to always cutting a radio or disabling a vehicle". A leader expecting to win from a stronghold hunkers down. The condition: "there needs to be a clear method to the madness". A player who lost has to be able to say what they should have read, so the tells are designed with it, and read before the end of a run. The takedown's stages (`?scene=takedown`) are the parts to build from.
+**2. The target answers by the camp's problem** (the owner's call on `core-challenge`; built Nov 11, *Step 3a* below). Some camps keep the target inside and others make the target run, so that play "can't be reduced to always cutting a radio or disabling a vehicle". A leader expecting to win from a stronghold hunkers down. The condition: "there needs to be a clear method to the madness". A player who lost has to be able to say what they should have read, so the tells are designed with it, and read before the end of a run. The takedown's stages (`?scene=takedown`) are the parts to build from.
 
 **3. Levels (two storeys).** The second half of compound types (`docs/compound-types.md`, *Where this stands*: built and measured on Nov 11, ahead of the other two, and waiting on the owner's sitting). Taller buildings hide men from a perch and add vertical range to read. The limit: "I don't want to have to go clear every corner of every building to claim success."
 
@@ -449,7 +449,7 @@ And the walk in itself (`npm run scene -- firefight`): someone stands in front o
 | Circling: rounds at him | 19.7 | | 29.4 |
 | Men shot by their own side | 0.19 | 0 | 0 |
 
-A camp that hunts sends nobody out alone to look for a shooter, so the men a walker used to pick off one at a time as they came are still in their positions, shooting.
+A camp that hunts sends nobody out alone to look for a shooter, so the men a walker used to pick off one at a time as they came are still in their positions, shooting. Measured again with the target's answer on (step 3a): 14 and 1 again, and 1.1 men down from the walk.
 
 ### Step 2b, built: the hunt (Nov 11)
 
@@ -512,6 +512,62 @@ So staying put after a loud shot now gets a shooter found on three camps in four
 - **Inside the wire nothing changed.** A search of the camp's own ground waits while someone is placed outside.
 
 **Dials a person should set by playing,** all in `tuning.brain.hunt`: how long after your last shot they come (`quiet`, `after`), how long they watch before closing in (`watch.for`), how long the marksmen cover a crossing (`fix`), how many men go and how many stay (`size`, `keep`), and how much longer a way they'll take for cover (`ground.price`, `ground.priceOn`).
+
+### Step 3a, built: the target's answer, by the camp's problem (Nov 11)
+
+`brain/protect.ts`, `game/protection.ts`, `game/escape.ts`. The owner's call (`core-challenge`, Nov 10): what the target does under attack depends on the camp, so that play "can't be reduced to always cutting a radio or disabling a vehicle", and with "a clear method to the madness", so that nobody is left asking "how could I have possibly known that without getting near the end then losing".
+
+**What was wrong.** Every camp that protected its target gave the one answer: he waits in his room for the relief, and two of its men bring him out to his vehicle about two minutes after the siren. Cutting the radio or the vehicle beat every camp. And the vehicles were silent, the relief's truck included, so the one thing that said he was about to go made no sound.
+
+**The method is one sentence: he leaves only by a way the camp has ready.** A camp is built round one problem (`generation/crux.ts`), and its answer follows from it (`off=answer` gives every camp the old one):
+
+| The camp's problem | Its answer | Under attack | What stops it |
+| --- | --- | --- | --- |
+| He's buried in it, with a way in kept open | **It holds him** | He goes to his room and stays there to the end. The relief comes to his doors, two men, and those are their posts from then on | Nothing makes him leave: someone has to go in. Cutting the radio means fewer men at his doors |
+| It's built to be flushed | **It bolts** | At the siren the man on his door runs to his vehicle and starts it. When it has run a minute he goes back in for him, and he runs for it | Killing the vehicle: nothing starts, nobody is sent, and he stays. The radio makes no difference |
+| He walks out with an escort (and any camp built by hand) | **It waits for its relief** | As before: the radio calls the relief, and its men bring him out | The radio, the men sent for him and the vehicle, in turn |
+
+**A bolt is a drill, so every step of it is something a man does on what he himself hears.** The siren sends the man on his door to the vehicle. An engine heard running where the vehicle stands, for 60 s, sends whoever started it back in. The target comes out when he's told, or by himself once he has heard it for 80 s. Nothing in it needs an order. So what you do to it shows:
+
+- Kill the man on his door before he starts it, and the nearest man left goes instead, 20 s after the siren and 0.8 s more for each metre he has to come. Each man counts for himself, so nobody has to be told whose turn it is. On LEB-2534 the engine then starts 35 s after the siren, where it starts after 3.
+- Kill whoever started it once it's running, and the target comes out late and alone.
+- Kill every man who goes to it, and it's a camp that waits for its relief: now the radio matters.
+- Kill the vehicle, and he stays, with a man on his door: a camp that holds, the hard way.
+- While that man is at the vehicle, for a minute, nobody is on the target's door.
+
+The second of those came from playing the sitting's own link headless. The man on the target's door is the guard a perch sees best, so a shooter who takes whoever he sees first shot him before the siren, and the camp's whole answer went with him, without a sound. A camp that means to bolt wouldn't hang it on one sentry.
+
+**What there is to read.** Before a shot: who stands on his doors, and whether he ever walks out. After one: an engine. A vehicle's engine is a sound now (the `engine` event, every two seconds while it runs, by the law every sound obeys): heard to 500 m as it starts or drives and to 320 m standing. The camp's own starting up seconds after the siren means he's going. No engine in the camp and a truck on the road means the relief is coming for him. Neither means he's staying. And a run that loses him says so at the end: "his vehicle's engine had been running for 79 s when he got to it".
+
+**Men on his door stay on it.** Once the siren has sounded, a man posted on the target's door doesn't walk off to look into something: he fights from there, and leaves only by the drill. The relief knows the alarm is up when it arrives. And an order from the commander doesn't take a man off bringing the target out, or off his way to hold a door.
+
+**The camp knows what has become of its vehicle.** Once he has driven off in it, or once a man has gone to start it and found it dead, there is no vehicle as far as anyone in the camp is concerned: nobody else runs to it, and nobody is sent to bring him out to it. Before that, the first version had every man in the camp taking his turn to go and start a vehicle that had left, and the fight stopped. The firefight's own test caught it.
+
+**Measured** (`npm run experiment -- answer --camps 40`: camps that protect their targets, under a sniper on the best overview for five minutes; 20 built to be gone into, 13 to be flushed, 7 an escort's; the siren sounded on 31):
+
+| | One answer for every camp | By the camp's problem |
+| --- | --- | --- |
+| He left, of the 31 | 31 | 15 |
+| Built to be gone into: he left | 16 of 16, 120 s after the siren | 0 of 16 |
+| Its relief on his doors at the end | 0 | 1.9 men |
+| Built to be flushed: he left | 10 of 10, 121 s after | 10 of 10, 84 s after |
+| Its engine ran before he was in it | he started it himself | 79 s |
+| He came out with nobody telling him | 0 | 4 of 10: the sniper had shot the man on his door |
+| An escort's: he left | 5 of 5, 114 s after | the same |
+| He left: something to hear of it from the overview first | 28 of 31 | 14 of 15 |
+| For how long before he was in his vehicle | 50 s | 78 s |
+
+So the three kinds of camp now end three ways under the same attack, and where he leaves there is more than a minute of something to hear first, from where a player most likely is.
+
+**What it doesn't do yet, and where each belongs.**
+
+- **Nobody has played it, or heard it.** The engine's voice is checked for being one unbroken sound that fades with distance (`tests/browser/engine.test.ts`). Whether it sounds like an engine, and whether a person reads it in time, is a sitting's to say.
+- **A camp that holds still has a vehicle standing at his door.** The generator puts one there on every camp, and on these it's now a getaway that is never used: a false tell. Moving it to the motor pool changes those camps, so it comes with the generator's next change, with a man posted at the vehicle on the camps that bolt.
+- **He does nothing about someone who comes into his room.** He crouches there. What he and the men on his door do about an intruder inside his building is close protection, the next of step 3's means.
+- **A camp that isn't ready for trouble is as it was:** he runs for his vehicle at the siren. These answers are a protecting camp's (`ready=alert`, the takedown).
+- **Three camps in forty never sounded the siren** under this sniper in five minutes, and on those nothing happens to him either way.
+
+**Dials a person should set by playing,** in `tuning.brain.protect.answer` and `tuning.brain.engine`: how long the engine runs before he's sent for (`prep`, 60 s: the length of the warning), how much longer before he comes by himself (`own`), how long before another man takes over starting it (`takeOver`, `perMetre`), how many of the relief go to his doors (`keepers`), and how far an engine carries starting, standing and driving.
 
 ## 10. Decisions
 

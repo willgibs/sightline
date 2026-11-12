@@ -266,14 +266,28 @@ export function protectionOf(sim: Simulation): string {
   const near = sim.tuning.brain.protect.near;
   const inRoom = distance(him.body.x, him.body.z, camp.protects.x, camp.protects.z) <= near;
   const where = b.act === 'flee' ? 'running for his vehicle' : inRoom ? 'in his room' : b.act === 'shelter' ? 'going to his room' : 'about his day';
-  if (b.sirenAt < 0) return (b.standToUntil ?? -1) > sim.tick ? `stand-to · ${where}` : where;
+  // What the camp means to do about him, which is the truth of it, not what a player on a ridge can know: holds, bolts, or neither.
+  const plan = camp.answer === 'hold' ? ' · a camp that holds him' : camp.answer === 'bolt' ? ' · a camp that bolts' : '';
+  if (b.sirenAt < 0) return `${(b.standToUntil ?? -1) > sim.tick ? `stand-to · ${where}` : where}${plan}`;
+  if (camp.answer === 'hold') {
+    const kept = camp.roster.filter((g) => g.keeps && g.status === 'ok').length;
+    const help = camp.relief ? `${kept} of its relief on his doors` : camp.reinforceCalled >= 0 ? `relief called ${((sim.tick - camp.reinforceCalled) / hz).toFixed(0)} s ago` : 'no relief called';
+    return `${where} · holds him there · ${help}`;
+  }
+  if (camp.answer === 'bolt') {
+    const v = sim.index.of('vehicle').find((x) => x.vehicle.escape);
+    const A = sim.tuning.brain.protect.answer;
+    const engine = v?.vehicle.disabled ? (camp.devices.escape ? 'his vehicle is dead, and nobody has found out' : 'his vehicle is dead, and the camp knows') : !v || !camp.devices.escape ? 'no vehicle' : v.vehicle.running === undefined || v.vehicle.running > sim.tick ? 'his vehicle not started' : `engine running ${((sim.tick - v.vehicle.running) / hz).toFixed(0)} s, he's sent for at ${A.prep}`;
+    const word = b.releasedAt !== undefined ? (b.releasedBy === 'told' ? 'told to come' : b.releasedBy === 'engine' ? 'came out by himself' : 'gave up waiting') : 'waiting for the word';
+    return `${where} · bolts · ${engine} · ${word}`;
+  }
   const relief = camp.relief
     ? `relief at the gate ${((sim.tick - camp.relief.at) / hz).toFixed(0)} s ago, sent for him ${camp.relief.fetches}×`
     : camp.reinforceCalled >= 0
       ? `relief called ${((sim.tick - camp.reinforceCalled) / hz).toFixed(0)} s ago`
       : 'no relief called';
   const left = sim.tuning.brain.protect.giveUp - (sim.tick - b.sirenAt) / hz;
-  const word = b.releasedAt !== undefined ? (b.told.some((t) => t.kind === 'escort') ? 'told to come' : 'gave up waiting') : `waits ${Math.max(0, left).toFixed(0)} s more`;
+  const word = b.releasedAt !== undefined ? (b.releasedBy === 'told' ? 'told to come' : 'gave up waiting') : `waits ${Math.max(0, left).toFixed(0)} s more`;
   const way = camp.devices.escape ? '' : ' · no vehicle';
   return `${where} · ${relief} · ${word}${way}`;
 }

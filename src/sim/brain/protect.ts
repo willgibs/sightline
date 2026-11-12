@@ -26,8 +26,36 @@ import type { Option } from './utility';
  * vehicle and he gets to it and is stranded. A man left waiting long enough loses his nerve
  * and runs for it alone: the last step, and the only one nobody carries.
  *
+ * **Which of those happen depends on the camp** (the owner's call, Nov 10: "it doesn't
+ * always make sense to make a vehicle exfil into the unknown over hunker down and defend",
+ * and "there needs to be a clear method to the madness"). A camp is built round one problem
+ * (generation/crux.ts), and its answer for its target follows from it:
+ *
+ *   holds    A camp he's buried in, with a way in kept open. He goes to his room and stays
+ *            there to the end. Its relief comes to his doors, not for him. Someone has to
+ *            go in.
+ *   bolts    A camp built to be flushed. At the siren one of the men on his doors goes to
+ *            his vehicle and starts it, and that engine is the warning: when it has run a
+ *            while the other goes in for him, and he runs for it. Nobody needs the radio.
+ *   neither  The stages above: he waits for the relief to bring him out.
+ *
+ * The method is one sentence: he leaves only by a way the camp has ready. What it has
+ * ready can be seen before a shot (who stands on his doors, where his vehicle is, whether
+ * he walks out) and heard after one (an engine in the camp, or on the road).
+ *
+ * The bolt is a drill, so every step of it is something a man does on what he himself
+ * hears. The siren sends the man on the target's door to the vehicle, to start it. If no
+ * engine is running a while later, the nearest man left goes: each counts for himself, the
+ * longer the farther off he is, so nobody has to be told. An engine heard for long enough
+ * sends the man who started it in for the target, and the target comes out when he's told,
+ * or by himself once he has heard it for longer still. Kill the man on the door and it
+ * starts later. Kill whoever started it, and the target comes out late, alone. Kill every
+ * man who goes to it, and it's a camp that waits for its relief. Kill the vehicle and
+ * nothing starts, nobody is sent, and he stays.
+ *
  * Nothing here knows more than a mind holds (rule 13): the target acts on the whistle and
- * the siren he heard and on what he was told at his door; the men sent act on an order.
+ * the siren he heard and on what he was told at his door; the men sent act on an order; and
+ * a camp's drill is something each of its men knows, like where its alarm boxes are.
  */
 
 /** The tick a whistle last reached him, or −1: it's what he's hearing now, so it lasts only as long as he remembers a sound. */
@@ -58,9 +86,88 @@ export function noteProtection(m: GuardMind): void {
     const S = m.tuning.brain.fight.drill.standTo;
     b.standToUntil = heard + Math.round((S.min + (S.max - S.min) * m.draw()) * hz);
   }
+  if (m.answer === 'bolt') noteEngine(m);
   if (m.post.role === 'target' && b.sirenAt >= 0 && b.releasedAt === undefined) {
-    if (toldToCome(b) || (m.tick - b.sirenAt) / hz >= m.tuning.brain.protect.giveUp) b.releasedAt = m.tick;
+    const P = m.tuning.brain.protect;
+    // He knows the drill too: an engine that has run this long with nobody come for him means nobody is going to.
+    const heardEnough = b.engine !== undefined && (m.tick - b.engine.since) / hz >= P.answer.prep + P.answer.own;
+    // In a camp that holds there's nothing to wait for and nowhere to go: he stays.
+    if (m.answer !== 'hold' && (toldToCome(b) || heardEnough || (m.tick - b.sirenAt) / hz >= P.giveUp)) {
+      b.releasedAt = m.tick;
+      b.releasedBy = toldToCome(b) ? 'told' : heardEnough ? 'engine' : 'nerve';
+    }
   }
+  // The drill is for the alarm's first minutes: after that, whatever it came to, he's a man on a door again.
+  if (m.answer === 'bolt' && drilled(m) && b.sirenAt >= 0 && (m.tick - b.sirenAt) / hz < m.tuning.brain.protect.giveUp) drill(m);
+}
+
+/** Whether a camp's drill for getting its target out is this man's business: the man on the door, and anyone who fights on the ground. Not the target, and not a man on a tower. */
+function drilled(m: GuardMind): boolean {
+  if (m.post.role === 'target' || m.post.elevated) return false;
+  return m.post.holdsDoor === true || m.tuning.brain.roles[m.post.role].fight > 0;
+}
+
+/**
+ * The engine a man hears running where his camp's vehicle stands: since when, and when
+ * last. A sound is forgotten in seconds, and a drill has to count a minute of it.
+ */
+function noteEngine(m: GuardMind): void {
+  const b = m.brain!;
+  const A = m.tuning.brain.protect.answer;
+  const at = m.escape;
+  let last = -1;
+  if (at) {
+    for (const p of m.percepts) {
+      if (p.kind !== 'voice' || p.sound !== 'engine' || p.tick <= last) continue;
+      if ((p.x - at.x) * (p.x - at.x) + (p.z - at.z) * (p.z - at.z) <= A.near * A.near) last = p.tick;
+    }
+  }
+  const lapse = Math.round(A.lapse * m.tuning.sim.tickHz);
+  if (last >= 0) {
+    if (!b.engine || last - b.engine.last > lapse) b.engine = { since: last, last };
+    else b.engine.last = last;
+  } else if (b.engine && m.tick - b.engine.last > lapse) delete b.engine;
+}
+
+/**
+ * A camp that bolts, for one of its men who has heard the siren: his part of the drill, as
+ * an order he gives himself.
+ *
+ * - No engine running, and it's his turn: he goes and starts it. The man on the target's
+ *   door goes at once. Anyone else who fights on the ground counts first, the longer the
+ *   farther he is from the vehicle, so the nearest man left is the one who goes, and nobody
+ *   has to be told who that is.
+ * - An engine running that he didn't start, while he's on his way to it: someone has it,
+ *   and he leaves it to him.
+ * - An engine that has run long enough: the man on the door, and whoever started it, go in
+ *   for the target.
+ */
+function drill(m: GuardMind): void {
+  const b = m.brain!;
+  const at = m.escape;
+  const room = m.protects;
+  if (!at || !room || b.stranded) return;
+  const A = m.tuning.brain.protect.answer;
+  const hz = m.tuning.sim.tickHz;
+  const holds = m.post.holdsDoor === true;
+  const mine = (kind: 'start' | 'fetch', x: number, z: number, y?: number): void => {
+    b.task = { id: 0, kind, x, z, ...(y === undefined ? {} : { y }), issued: m.tick, cause: m.awareness.cause };
+  };
+  if (b.engine) {
+    if (b.task?.kind === 'start' && b.drilled !== 'start' && !holds) {
+      b.task = null;
+      b.done = true;
+    } else if ((holds || b.drilled === 'start') && (m.tick - b.engine.since) / hz >= A.prep && b.task?.kind !== 'fetch' && b.task?.kind !== 'escort') {
+      b.drilled = 'fetch';
+      mine('fetch', room.x, room.z, room.y);
+    }
+    return;
+  }
+  if (b.drilled === 'fetch' || b.task?.kind === 'start') return;
+  const dx = at.x - m.self.x;
+  const dz = at.z - m.self.z;
+  const turn = holds ? 0 : A.takeOver + Math.sqrt(dx * dx + dz * dz) * A.perMetre;
+  if ((m.tick - b.sirenAt) / hz >= turn) mine('start', at.x, at.z);
 }
 
 /** True while a whistle has him standing to. */
@@ -116,13 +223,52 @@ export function performStandTo(m: GuardMind, out: Order): void {
  * the order isn't one of these.
  */
 export function performFetch(m: GuardMind, out: Order, task: Tasking): boolean {
-  if (task.kind !== 'fetch' && task.kind !== 'escort') return false;
+  if (task.kind !== 'fetch' && task.kind !== 'escort' && task.kind !== 'start' && task.kind !== 'post') return false;
   const b = m.brain!;
   const T = m.tuning.brain;
   const P = T.protect;
   const hz = m.tuning.sim.tickHz;
   b.x = task.x;
   b.z = task.z;
+  if (task.kind === 'post') {
+    // A camp that holds: to a door of the target's building at a run. It's his post from then on, and he keeps it as any man keeps his.
+    const w = walk(m, out, task.x, task.z, T.paces.run, 'sprint', task.x, task.z);
+    if (w !== 'walking') {
+      stand(m, out, true);
+      b.task = null;
+      b.done = true;
+    }
+    return true;
+  }
+  if (task.kind === 'start' && !m.escape) {
+    // It's gone from where it stood: there's nothing to start.
+    b.task = null;
+    b.done = true;
+    stand(m, out, false);
+    return true;
+  }
+  if (task.kind === 'start') {
+    // To the vehicle at a run, a hand on the starter (its system starts it, or finds it dead), and then by it, watching, until the drill sends him in.
+    const dx = task.x - m.self.x;
+    const dz = task.z - m.self.z;
+    const F = T.alarm.flee;
+    const there = dx * dx + dz * dz < F.arrive * F.arrive;
+    const w = there ? 'arrived' : walk(m, out, task.x, task.z, T.paces.run, 'sprint', task.x, task.z);
+    if (w === 'arrived') {
+      if (!b.engine) {
+        b.start = true;
+        b.drilled = 'start';
+      }
+      b.down = 'crouch';
+      stand(m, out, true);
+    } else if (w === 'stuck') stand(m, out, false);
+    // It won't start, or he has waited by it long enough for the others to have acted: back to his own business.
+    if (b.stranded || (m.tick - task.issued) / hz > P.answer.prep + P.answer.own + T.camp.keepOrder) {
+      b.task = null;
+      b.done = true;
+    }
+    return true;
+  }
   if (task.kind === 'escort') {
     // To his vehicle, and stay by it while he gets away: the order lapses with the commander's.
     const w = walk(m, out, task.x, task.z, T.paces.run, 'sprint', task.x, task.z);

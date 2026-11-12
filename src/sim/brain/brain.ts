@@ -126,8 +126,15 @@ export interface BrainState {
   /** In a camp that protects its target (protect.ts): the whistle he last took note of, and how long it has him standing to. Absent until he hears one. */
   whistledAt?: number;
   standToUntil?: number;
-  /** The target, in such a camp: the tick he was told to come out, or lost his nerve waiting. */
+  /** The target, in such a camp: the tick he was told to come out, or lost his nerve waiting; and which it was, or that he came by himself on hearing his vehicle run (a camp that bolts). */
   releasedAt?: number;
+  releasedBy?: 'told' | 'engine' | 'nerve';
+  /** In a camp that bolts (protect.ts): the engine he hears running where the vehicle stands, since when and when last. Absent while he hears none. */
+  engine?: { since: number; last: number };
+  /** The part of that camp's drill he has taken on since the siren: starting the vehicle, or going in for the target. */
+  drilled?: 'start' | 'fetch';
+  /** He's at the vehicle with his hand on the starter this tick, for its system to start it. */
+  start?: boolean;
   /** The firefight he's in (firefight.ts): where he believes the intruder is, his position, and what he's doing at it. Absent until he's in one. */
   ff?: Firefight;
   /** The hunt he's on (hunt.ts): the way out, the stop he's at, and what he's doing there. Absent until he's ordered out with a section. */
@@ -376,7 +383,7 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   };
   // Worth calling in: something to report, a radio in his hands, and he hasn't just called it in.
   const task = b.task;
-  const fetching = task !== null && (task.kind === 'fetch' || task.kind === 'escort');
+  const fetching = task !== null && (task.kind === 'fetch' || task.kind === 'escort' || task.kind === 'start' || task.kind === 'post');
   const order =
     task && task.kind !== 'hunt' && (!elevated || task.kind === 'sweep') && (b.act === 'task' || (m.tick - task.issued) / hz < T.camp.keepOrder) ? (task.kind === 'sweep' || task.kind === 'cover' || fetching ? 1 : task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
   // At a whistle, in a camp that protects its target, a man with nothing better to do gets down and watches (protect.ts).
@@ -387,7 +394,8 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   const own = ownEvidence(m) || b.act === 'investigate' || b.act === 'search';
   const callable = own ? role.report * cool('report') : 0;
   // In a camp that hunts, somewhere off its own ground is a section's to go and look at (hunt.ts): nobody walks out there alone.
-  const far = m.hunts && beyondTheWire(m, focus.x, focus.z);
+  // Nor does a man on the target's door walk off it once the siren has sounded: he fights from it, and leaves it only by his camp's drill (protect.ts).
+  const far = (m.hunts && beyondTheWire(m, focus.x, focus.z)) || (m.post.holdsDoor === true && b.sirenAt >= 0);
   out.push({ act: 'routine', rank: 0, weight: 1 });
   // The target, at lockdown: for the vehicle, ahead of everything (design doc: he flees first),
   // unless his camp protects him: then to his room, and out of it when he's sent for.

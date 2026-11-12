@@ -6,7 +6,7 @@ import type { AmbientSource } from '../sim/generation';
 import { emptyRoute, type RouteFn, type SteadyFn } from './hearing';
 import { footstep, humLoop, makeNoiseBuffers, makeRand, murmur, rustle, waterLoop, windBed, type Loop, type NoiseBuffers, type Rand } from './voices';
 import { BARKS } from '../sim/perception';
-import { bolt, clatter, crack, cry, door, impact, report, siren, whistle } from './shotVoices';
+import { bolt, clatter, crack, cry, door, impact, motor, report, siren, whistle } from './shotVoices';
 import { crackAt, type Crack, type Flight } from '../sim/ballistics';
 import { Surface, surfaceName } from '../sim/kernel/world/surfaces';
 
@@ -277,6 +277,9 @@ export class SoundEngine {
       } else if (e.type === 'siren') {
         // The camp's alarm: a wail anyone in the valley can hear.
         this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => siren(this.ctx, out, when, amp), lead);
+      } else if (e.type === 'engine') {
+        // A vehicle's engine, running: each event is a stretch of it, from where the vehicle then is.
+        this.spatial(e.x, e.y, e.z, e.radius, (out, when, amp) => motor(this.ctx, out, this.noise, this.rand, when, amp, e.load, this.tuning.brain.engine.every), lead);
       } else if (e.type === 'report') {
         // A shot's blast: at your own ears, loud (the suppressor makes it a cough); anyone else's, placed and late.
         const suppressed = e.suppressed === 1;

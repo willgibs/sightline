@@ -1,4 +1,5 @@
 import { createBrain, standStill } from '../brain';
+import { Surface } from '../kernel/world/surfaces';
 import type { Collider } from '../kernel/world/colliders';
 import { Faction } from '../kernel/state';
 import type { System, TickContext } from '../kernel/systems';
@@ -22,7 +23,38 @@ import type { GuardEntity } from './entities';
  * holds it up for long enough (you, standing in the road) ends the escape: the target gets
  * out beside it and goes back on foot, the vehicle is left where it stopped, and the camp
  * has no other. A mission can't hang on a vehicle that never arrives and never gives up.
+ *
+ * An engine running is heard (the 'engine' event): as it starts, and every couple of
+ * seconds while it runs, from where the vehicle is. A vehicle on the move is running; so is
+ * one a man has started and left standing (startEngine), which is how a camp that means to
+ * get its target out says so before he goes (brain/protect.ts). The sounds are made here,
+ * ahead of perception in the tick, so the camp's men hear them as they hear anything.
  */
+
+/**
+ * Starts a parked vehicle's engine, from the next tick: it runs until the vehicle is driven
+ * off, or someone kills it. False if it won't start, which is what sabotage does to it.
+ */
+export function startEngine(ctx: TickContext, v: VehicleEntity): boolean {
+  if (v.vehicle.disabled) return false;
+  if (v.vehicle.running === undefined) v.vehicle.running = ctx.tick + 1;
+  return true;
+}
+
+/** The sound of a vehicle's engine this tick, if it makes one: at the start, and at every `engine.every` after. */
+function engineSound(ctx: TickContext, v: VehicleEntity): void {
+  const E = ctx.tuning.brain.engine;
+  // A dead engine doesn't run, whoever started it.
+  if (v.vehicle.disabled) delete v.vehicle.running;
+  else if (v.vehicle.driving && v.vehicle.running === undefined) v.vehicle.running = ctx.tick;
+  const since = v.vehicle.running;
+  if (since === undefined || ctx.tick < since) return;
+  const every = Math.max(1, Math.round(E.every * ctx.tuning.sim.tickHz));
+  if ((ctx.tick - since) % every !== 0) return;
+  const load = ctx.tick === since ? 'start' : v.vehicle.driving ? 'drive' : 'idle';
+  const radius = E[load];
+  ctx.emit({ type: 'engine', source: v.id, x: v.solid.x, y: (v.solid.y0 + v.solid.y1) / 2, z: v.solid.z, surface: Surface.Metal, loudness: radius / ctx.tuning.noise.radiusPerUnit, radius, load });
+}
 
 function place(v: VehicleEntity, x: number, z: number, ux: number, uz: number, ctx: TickContext): void {
   const s = v.solid as Collider & { ux: number; uz: number };
@@ -67,10 +99,11 @@ export const vehicleDrive: System = {
   after: ['camp-devices'],
   reads: ['vehicle.vehicle', 'vehicle.solid', 'guard.body', 'player.body', 'commander.camp'],
   writes: ['vehicle.vehicle', 'vehicle.solid', 'objective.objective', 'commander.camp.objective', 'commander.camp.roster', 'commander.camp.nextTask', 'commander.camp.relief', 'commander.camp.devices.escape', 'guard.brain.task', 'guard.guard.aside', 'entities'],
-  emits: ['reinforce'],
+  emits: ['reinforce', 'engine'],
   run(ctx) {
     const F = ctx.tuning.brain.alarm.flee;
     for (const v of ctx.index.of('vehicle')) {
+      engineSound(ctx, v);
       const d = v.vehicle.driving;
       if (!d) continue;
       const target = d.route[d.leg];
@@ -80,6 +113,8 @@ export const vehicleDrive: System = {
         if (d.then === 'escape') finish(ctx);
         else dismount(ctx, v, d.cause);
         delete v.vehicle.driving;
+        // Where it was going: the engine is switched off.
+        delete v.vehicle.running;
         continue;
       }
       const dx = target.x - v.solid.x;

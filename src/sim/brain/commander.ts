@@ -259,11 +259,12 @@ export function plan(m: CampMind, out: CampOrder[]): void {
   }
   // Bringing the target out (protect.ts): once the relief is at the gate, men are sent to
   // his door, and others after a while if his vehicle still hasn't moved. The camp knows its
-  // own vehicle has gone; it doesn't know why a man hasn't come.
+  // own vehicle has gone; it doesn't know why a man hasn't come. A camp that holds him sends nobody.
+  // One that bolts has its own drill for it, and this is what's left if that came to nothing.
   const P = m.tuning.brain.protect;
   const relief = camp.relief;
   const going = camp.objective?.status === 'escaping' || camp.objective?.status === 'escaped';
-  if (camp.protects && camp.devices.escape && relief && !going && relief.fetches < P.fetches && (relief.fetches === 0 || (m.tick - relief.last) / hz >= P.fetchEvery) && !camp.tasks.some((t) => t.kind === 'fetch')) {
+  if (camp.protects && camp.answer !== 'hold' && camp.devices.escape && relief && !going && relief.fetches < P.fetches && (relief.fetches === 0 || (m.tick - relief.last) / hz >= P.fetchEvery) && !camp.tasks.some((t) => t.kind === 'fetch')) {
     addTask(camp, 'fetch', camp.protects.x, camp.protects.z, 4, P.fetchers, m.tick, camp.protects.y);
     relief.fetches++;
     relief.last = m.tick;
@@ -321,8 +322,10 @@ function assign(m: CampMind, out: CampOrder[]): void {
       if (t.assigned.length >= t.capacity) continue;
       if (t.priority < bestPrio) continue;
       for (const g of camp.roster) {
-        if (busy.has(g.id) || g.status !== 'ok') continue;
+        if (busy.has(g.id) || g.status !== 'ok' || g.keeps) continue;
         const post = m.world.camp.guards[g.post]!;
+        // With the alarm up, the man on the target's door is sent nowhere but in for him (protect.ts).
+        if (camp.level === 'lockdown' && post.holdsDoor && t.kind !== 'fetch') continue;
         if (post.elevated && t.kind !== 'sweep') continue;
         const role = roles[post.role];
         const suit = t.kind === 'sweep' ? (post.role === 'marksman' ? 1 : 0) : t.kind === 'cover' ? 1 : t.kind === 'fetch' ? (role.fight > 0 ? 1 : 0) : t.kind === 'search' ? role.search : role.investigate;
@@ -655,7 +658,7 @@ function form(m: CampMind, th: Threat, out: CampOrder[]): void {
   const busy = new Set<number>();
   for (const t of camp.tasks) if (t.priority >= HUNT_PRIORITY) for (const id of t.assigned) busy.add(id);
   // Who fights on the ground, as far as the camp knows; and of them, who goes after people and has nothing better to do.
-  const fighters = camp.roster.filter((g) => g.status === 'ok' && !m.world.camp.guards[g.post]!.elevated && roles[m.world.camp.guards[g.post]!.role].fight > 0);
+  const fighters = camp.roster.filter((g) => g.status === 'ok' && !g.keeps && !(camp.level === 'lockdown' && m.world.camp.guards[g.post]!.holdsDoor) && !m.world.camp.guards[g.post]!.elevated && roles[m.world.camp.guards[g.post]!.role].fight > 0);
   const able = fighters
     .filter((g) => roles[m.world.camp.guards[g.post]!.role].flank > 0 && !busy.has(g.id))
     .sort((a, b) => roles[m.world.camp.guards[b.post]!.role].flank - roles[m.world.camp.guards[a.post]!.role].flank || a.id - b.id); // the keenest first, and the id breaks a tie

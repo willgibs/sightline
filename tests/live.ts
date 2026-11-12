@@ -20,8 +20,8 @@ export function worldOf(seed: string): World {
   return w;
 }
 
-/** A live camp with a marksman on its best overview, firing every `every` seconds from `from` at what he sees best. */
-export function shooterScene(seed: string, seconds: number, from = 8, every = 6): Scene<Simulation> {
+/** A live camp with a marksman on its best overview, firing every `every` seconds from `from` at what he sees best. `params` are the camp's (`&ready=alert`, `&off=radio`). */
+export function shooterScene(seed: string, seconds: number, from = 8, every = 6, params = ''): Scene<Simulation> {
   const world = worldOf(seed);
   const perch = [...world.report.camp!.perches].sort((x, y) => y.coverage - x.coverage || x.x - y.x)[0]!;
   const order = perch.guards
@@ -31,7 +31,7 @@ export function shooterScene(seed: string, seconds: number, from = 8, every = 6)
     .map(([, i]) => i);
   const steps: Step[] = [{ at: 0.2, act: 'prone' }, { at: 3, act: 'scope' }];
   order.slice(0, 8).forEach((post, i) => steps.push({ at: from + i * every, act: 'fire', target: { post }, breath: 1.5 }));
-  const base = liveCamp(`seed=${seed}`) as Scene<Simulation>;
+  const base = liveCamp(`seed=${seed}${params}`) as Scene<Simulation>;
   return {
     ...base,
     world: () => world,

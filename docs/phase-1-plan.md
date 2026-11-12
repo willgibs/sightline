@@ -312,6 +312,7 @@ The [Sightline Desk](https://claude.ai/artifact/RB4pjU2qNsYE3zCuBYYb7f), which o
   | Any time | F, the takedown | `?scene=takedown&params=seed=LEB-2534%26perch=1&lab`, and without `perch=1` to walk in. Is this the contest? Do the stages read as a camp thinking? | 20 min |
   | Any time | F, the firefight | `?scene=takedown&params=seed=LEB-2534&lab`: walk in, get seen, break away behind something, and listen for "Moving!". Then circle it. `%26off=firefight` is the camp as it was. Do they fight like trained men, and is there time to make a push? | 15 min |
   | Any time | F, the hunt | `?scene=takedown&params=seed=LEB-2534%26perch=1&lab`: fire one loud shot from the perch and stay; then again, and move a hundred metres along the ridge. `?scene=hunt&lab` plays it with a scripted shooter, to watch. `%26off=hunt` is the camp as it was. Does it feel like being hunted, and is there time to do something about it? | 20 min |
+  | Any time | F, the target's answer | Scout first and say what he'll do when the camp is shaken; then shake it. `?scene=takedown&params=seed=LEB-2534%26perch=1&lab` (built to be flushed), `seed=HOT-7106` (built to be gone into) and `seed=NUT-4776` (an escort's). `%26off=answer` is the one answer every camp gave. Could you tell before? Did the engine give you time? | 25 min |
   | Any time | D, taller camps (two storeys) | `?scene=takedown&params=seed=VIH-9105%26perch=1`, then `KAT-3755`, `MUD-8412` and `LUL-8783`, and without `perch=1` to walk in. Does a taller camp make you scout? Did you have to clear any room but his? Is it plain which building is his? | 15 min |
 
   What each sitting asks is in its lab's section. Lab A's questions wait until after its first sitting.
@@ -1043,7 +1044,9 @@ Added on Nov 8, the owner's call. *Labs pass* requires it. Design and reasoning:
   - [ ] What the hunt leaves: cut-offs on the road and the relief as a second section, a hunt called by voice when the radio is cut, and an answer to a marksman who shoots every man he sees (step 3's means).
   - [ ] The owner's sitting on the firefight.
   - [ ] The owner's sitting on the hunt.
-  - [ ] The target answers by the camp's problem, with tells a player can read (the owner's call, Nov 10).
+  - [x] The target answers by the camp's problem, with tells a player can read (the owner's call, Nov 10; `docs/camp-engine.md`, section 9, *Step 3a*): a camp he's buried in holds him to the end, a camp built to be flushed starts his vehicle at the siren and bolts a minute later, and any other waits for its relief. Engines are heard. On 40 camps he leaves 15 of 31 where he left all 31, and where he leaves there are 78 s of something to hear first (`npm run experiment -- answer`).
+  - [ ] What it leaves: on a camp that holds, the vehicle moved from his door to the motor pool, and on one that bolts a man posted at it (both the generator's); and what he does about someone in his room.
+  - [ ] The owner's sitting on the three answers.
   - [x] Levels: two storeys, the second half of compound types (lab D's *Two-storey buildings*, above). A guard who hears something upstairs goes up, a target who keeps upstairs shelters there, and the men sent for him climb to him. A search the commander orders still keeps to the ground.
 - [ ] F3 · The camp has means. The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels.
 - [ ] F4 · If play asks for it. Mortar, smoke, hardening, Memory, decoys, and the rest of the sandboxes.

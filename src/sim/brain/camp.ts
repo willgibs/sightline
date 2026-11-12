@@ -29,6 +29,8 @@ export interface RosterEntry {
   heard?: number;
   /** A reinforcement's own place, where the camp expects him when he's not heard from. */
   reserve?: { x: number; z: number };
+  /** Posted on a door of the target's building, in a camp that holds him (protect.ts): not a man to send anywhere else. */
+  keeps?: true;
 }
 
 /** An order the commander has given (E5): where, and why. */
@@ -51,7 +53,15 @@ export interface Task {
 }
 
 /** `fetch` and `escort` are the two halves of bringing the target out (protect.ts): to his door, then to his vehicle. `hunt` is a section's (hunt.ts). */
-export type TaskKind = 'investigate' | 'search' | 'check' | 'sweep' | 'cover' | 'fetch' | 'escort' | 'hunt';
+export type TaskKind = 'investigate' | 'search' | 'check' | 'sweep' | 'cover' | 'fetch' | 'escort' | 'hunt' | 'start' | 'post';
+
+/**
+ * How a camp answers for its target under attack, by the problem it's built round
+ * (generation/crux.ts; protect.ts): it holds him in his room to the end, or it readies his
+ * vehicle and brings him out to it. A protecting camp with neither waits for its relief to
+ * come for him.
+ */
+export type CampAnswer = 'hold' | 'bolt';
 
 /** What a section's order says beyond where to go (hunt.ts): who's in it, where it gathers, and where the shooter may be watching from. */
 export interface HuntOrder {
@@ -148,11 +158,19 @@ export interface CampState {
    * camp that runs him to his vehicle the moment the siren sounds.
    */
   protects?: { x: number; z: number; y?: number };
+  /** How such a camp answers for him (protect.ts): absent for one that waits for its relief to bring him out. */
+  answer?: CampAnswer;
   /** The tick the relief got down at the gate, and how many times, and when last, men have been sent for the target since. */
   relief?: { at: number; fetches: number; last: number };
   /** The tick of the last blast on the whistle. */
   whistled?: number;
-  objective: { target: number; status: 'open' | 'done' | 'escaping' | 'escaped'; getOut?: { x: number; z: number } } | null;
+  objective: {
+    target: number;
+    status: 'open' | 'done' | 'escaping' | 'escaped';
+    getOut?: { x: number; z: number };
+    /** How he left, once he's in his vehicle: the tick he got to it, and the ticks of what came before (−1 for what didn't): its engine started by someone else, the relief at the gate, the siren. For saying afterwards what there was to read (game/combat.ts). */
+    left?: { tick: number; engine: number; relief: number; siren: number };
+  } | null;
   /** The camp's devices (E7): where they are and whether they work. On a generated camp, kept current from lab D's entities (`game/comms.ts`, campDevices). */
   devices: CampDevices;
   /** A shooter the camp has triangulated (E8): the bearings it fuses, and its estimate. */

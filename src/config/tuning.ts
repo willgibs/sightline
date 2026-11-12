@@ -972,6 +972,26 @@ export const defaultTuning = {
       near: 4, // metres from his door at which they've reached him
       wait: 6, // seconds they give him to hear it and come
       call: 2.5, // seconds between telling him again
+      // What a camp does about its target depends on the problem it's built round (generation/crux.ts; brain/protect.ts).
+      // A camp that holds keeps him in his room and posts its relief on his doors. A camp that bolts readies his
+      // vehicle at the siren and brings him out to it. Any other waits for the relief to come for him, as above.
+      answer: {
+        prep: 60, // seconds his vehicle's engine runs before his door's men go in for him: the warning a camp that bolts gives
+        own: 20, // seconds beyond `prep` after which he comes out by himself, having heard it running all that time
+        takeOver: 20, // seconds after the siren with no engine heard before anyone but the man on his door goes to start it,
+        perMetre: 0.8, // and the seconds more for each metre he is from it: the nearest man left goes first, and each counts for himself
+        near: 40, // metres from where his vehicle stands within which an engine heard is taken for it
+        lapse: 8, // seconds without hearing it after which it's taken to have stopped
+        keepers: 2, // men of the relief posted on his doors, in a camp that holds
+        doorPost: 1.6, // metres out from a door that one of them stands
+      },
+    },
+    // An engine running (game/escape.ts): heard across the valley, by the camp and by you. A vehicle on the move is one, and so is one started and waiting.
+    engine: {
+      every: 2, // seconds between the sounds it makes, each of which lasts a little longer
+      start: 500, // metres it's heard at as it's started: the turn of the starter and the first rev
+      idle: 320, // standing with it running
+      drive: 500, // on the move
     },
     // Sabotage (E7): held at arm's length, with nothing but your hands.
     sabotage: {

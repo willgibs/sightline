@@ -1,4 +1,5 @@
-import type { GuardSpawn } from '../generation';
+import type { CampAnswer } from '../brain';
+import type { CruxKind, GuardSpawn } from '../generation';
 import { Cell, cellIndex } from '../kernel/world/grid';
 import type { World } from '../kernel/world/world';
 import { commanderOf } from './comms';
@@ -6,9 +7,20 @@ import type { Simulation } from './sim';
 
 /**
  * A camp that protects its target (brain/protect.ts): the game's side of it. The camp's
- * memory gets the one fact the brains need, where his hard room is, and from then on the
- * whistle, the siren, the relief and the men sent for him do the rest.
+ * memory gets the two facts the brains need, where his hard room is and how the camp
+ * answers for him, and from then on the whistle, the siren, the relief and the men sent for
+ * him do the rest.
  */
+
+/**
+ * A camp's answer for its target, from the problem it was built round (generation/crux.ts).
+ * One he's buried in, with a way in kept open, holds him. One built to be flushed bolts,
+ * if it has a vehicle to bolt in. Any other waits for its relief to bring him out: an
+ * escort's camp, and a camp built by hand.
+ */
+export function answerOf(crux: CruxKind | undefined, vehicle: boolean): CampAnswer | null {
+  return crux === 'inside' ? 'hold' : crux === 'flush' && vehicle ? 'bolt' : null;
+}
 
 /** How far from his post his room is looked for, metres. */
 const REACH = 40;
@@ -52,10 +64,12 @@ export function hardRoom(world: World, post: GuardSpawn): { x: number; z: number
   return best ?? { x: post.x, z: post.z };
 }
 
-/** Makes a camp one that protects its target, before a run starts: it learns where his room is. A camp with no target stays as it is. */
+/** Makes a camp one that protects its target, before a run starts: it learns where his room is, and takes the answer its problem gives it. A camp with no target stays as it is. */
 export function giveProtection(sim: Simulation): void {
   const camp = commanderOf(sim)?.camp;
   const target = camp?.objective ? sim.index.get(camp.objective.target) : undefined;
   if (!camp || !target || target.kind !== 'guard') return;
   camp.protects = hardRoom(sim.world, sim.world.camp.guards[target.guard.spawn]!);
+  const answer = answerOf(sim.world.camp.crux, camp.devices.escape !== null);
+  if (answer) camp.answer = answer;
 }

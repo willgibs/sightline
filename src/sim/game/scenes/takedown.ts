@@ -8,6 +8,8 @@ import { formatLiveCamp, liveCamp, parseLiveCamp } from './liveCamp';
  * It changes it, a stage at a time, and each stage can be seen or heard and worked against:
  * the whistle and the stand-to, the siren and the target in his hard room, the relief on the
  * road, the men sent to his door, and only then his run for the vehicle (brain/protect.ts).
+ * Which stages a camp goes through depends on the problem it's built round: it holds him,
+ * it bolts with him, or it waits for that relief (game/protection.ts, `answerOf`).
  *
  * It is a mode: the live camp with `ready=alert`, and numbers of its own over the game's
  * (kernel/scene.ts, `tune`; the numbers are `modes.takedown` in tuning). They are how a camp
@@ -46,7 +48,7 @@ export function takedown(params?: string): Scene {
     version: 1,
     title: `The takedown (${p.seed})`,
     description:
-      'A camp that protects its target. At a whistle its men get down and he goes to his hard room. At the siren the relief is called, and he leaves only when they have come for him: cut the radio, stop the men sent to his door, or take his vehicle, and he stays. Y changes the load: the subsonic one, with the suppressor (T), is the quiet one.',
+      'A camp that protects its target, by the problem it is built round. At a whistle its men get down and he goes to his hard room. At the siren, a camp you have to go into keeps him there to the end; a camp built to be flushed starts his vehicle, and he runs for it a minute later; any other calls its relief, and he leaves when they have come for him. Listen for the engine. Y changes the load: the subsonic one, with the suppressor (T), is the quiet one.',
     tune: takedownTuning,
   };
 }

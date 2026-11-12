@@ -6,6 +6,7 @@ import type { AwarenessState, Belief, Percept } from '../perception';
 import type { AlertReason } from '../kernel/events';
 import type { SearchOptions } from '../kernel/world/search';
 import type { BrainState } from './brain';
+import type { CampAnswer } from './camp';
 
 /**
  * The perception boundary. A guard's brain (anything in the brain lane) decides from a
@@ -70,6 +71,8 @@ export interface GuardMind {
   readonly hunts: boolean;
   /** Where his camp's hard room is, if it protects its target (protect.ts): another fact about the camp, and null if it doesn't. */
   readonly protects: Readonly<{ x: number; z: number; y?: number }> | null;
+  /** How his camp answers for its target (protect.ts): its drill, which every man of it knows. Null for a camp that waits for its relief, or protects nobody. */
+  readonly answer: CampAnswer | null;
   /** Where the camp's escape vehicle stands, if it has one (static, like the alarm boxes): the target's way out at lockdown. */
   readonly escape: Readonly<{ x: number; z: number }> | null;
   /** A number in [0, 1) from his own stream: the only way a brain rolls dice (rule 3). */
