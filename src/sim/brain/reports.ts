@@ -7,15 +7,17 @@
  * across the camp after a delay, if the speaker got his words out and the set and operator
  * are working). A guard knows only what reached him; the commander knows only its inbox.
  */
-export type ReportKind = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear' | 'claim' | 'outage' | 'escort' | 'moving';
+export type ReportKind = 'contact' | 'heard' | 'shot' | 'body' | 'missing' | 'clear' | 'claim' | 'outage' | 'escort' | 'moving' | 'set';
 
 /**
  * In the order events store them: only ever added to at the end. `escort` is what the men
  * sent to bring the target out say to him at his door (protect.ts). `moving` is what a man
  * shouts as he goes after an intruder in a firefight (firefight.ts): the place he's going to
- * look at, for whoever is in earshot to watch, and to leave to him.
+ * look at, for whoever is in earshot to watch, and to leave to him. `set` is what a man on
+ * the hunt says when he's down at the end of his bound (hunt.ts): where he is, for the other
+ * half of his section, whose turn it is to move.
  */
-export const REPORT_KINDS: readonly ReportKind[] = ['contact', 'heard', 'shot', 'body', 'missing', 'clear', 'claim', 'outage', 'escort', 'moving'];
+export const REPORT_KINDS: readonly ReportKind[] = ['contact', 'heard', 'shot', 'body', 'missing', 'clear', 'claim', 'outage', 'escort', 'moving', 'set'];
 
 export interface Report {
   kind: ReportKind;
@@ -36,6 +38,8 @@ export interface Report {
   sigma?: number;
   /** He is on his way to see it himself: the camp needn't send anyone (E5). */
   checking?: boolean;
+  /** Who it's about, when it's about one of the camp's own: the man of his section who never came to the rally (hunt.ts). */
+  about?: number;
 }
 
 /** How a report reached someone. */

@@ -1,5 +1,5 @@
 import type { Tuning } from '../../config/tuning';
-import { emptyRoute, navigatorOf } from '../brain';
+import { approachOf, emptyRoute, navigatorOf } from '../brain';
 import { startScene } from '../kernel/scene';
 import { Cell } from '../kernel/world/grid';
 import type { World } from '../kernel/world/world';
@@ -36,6 +36,8 @@ export function rehearse(world: World, tuning: Tuning, seconds = REHEARSAL_SECON
   const ticks = Math.round(seconds * tuning.sim.tickHz);
   for (let i = 0; i < ticks; i++) sim.step(driver.next(sim, raw));
   rehearseFloors(world, tuning);
+  // What each listed firing point sees of the valley, read now and kept: otherwise the tick a section is first sent out reads three of them.
+  approachOf(world, tuning).prepare();
   return ticks;
 }
 

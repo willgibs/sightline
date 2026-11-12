@@ -898,12 +898,44 @@ export const defaultTuning = {
       paces: { careful: 2.4, bound: 5.2, shift: 1.8 }, // m/s: out of the intruder's sight, across ground he can see, and between hiding and firing
       near: 0.45, // metres: close enough to a spot to be on it
     },
-    // The hunt (Lab F, step 2b; brain/approach.ts): a section that goes out after someone the camp has placed.
+    // The hunt (Lab F, step 2b; brain/approach.ts, brain/hunt.ts, brain/commander.ts): a section that goes out after someone the
+    // camp has placed, by the way that keeps most out of his view, one half moving while the other watches. Only camps with `hunts` do this.
     hunt: {
+      after: 20, // seconds from the camp first placing someone outside its men's reach to a section's orders: long enough for the men to have got out of the line
+      fresh: 150, // seconds the camp's fix on him stays worth sending men after
+      eyes: 15, // seconds a man's sight of him, or of his flash, outweighs what the camp works out from what it hears
+      sure: 60, // metres: how sure of a place off its list of firing points the camp has to be to send men to it
+      size: 2, // men in a section
+      keep: 2, // fighting men who stay on the camp's own ground whatever else: it doesn't empty itself to chase one man
+      beside: 2, // listed firing points beside the one it's sent to that are taken to be watching too: a shooter believed to be at one may as well be at the next
+      shift: 40, // metres the believed place has to move before a section that's out is sent after it
+      legs: 3, // places a section will look at before it's called home
+      next: 90, // metres from a place found empty to the next one worth a look: he hasn't gone far
+      again: 40, // seconds after a section comes home, or is lost, before another is sent
+      lifetime: 420, // seconds a section's orders stand: after that its men come home whatever they've found
+      forget: 240, // seconds a place found empty stays crossed off
+      rally: { wait: 25 }, // seconds a man waits at the rally for the rest of his section before he says who hasn't come
+      body: { within: 12, beat: 60, every: 10, same: 4, down: 4 }, // a body found this near a man's beat is taken for him (metres), his beat being where his routine had him over this many seconds back, looked at this often; one this near a body already named is the same body; and the seconds a man on the hunt stays flat when he sees one of his own fall
+      bound: { wait: 22, settle: 0.8, spread: 3, apart: 8, giveUp: 3 }, // seconds a man waits for the other half's "Set!" before he goes anyway; seconds down before he says it himself; metres between two men at one stop, and where they watch from; and how many times running he'll go unheard before he turns for home
+      // Watching the place from short of it, and closing in on it.
+      watch: {
+        near: 55, // metres: no nearer the place than this to watch it from,
+        far: 130, // and no farther: a rifle's reach, and near enough to see a man get up
+        for: 20, // seconds they watch before the leader's half goes on
+        look: { min: 3, max: 4.5 }, // seconds up, looking
+        down: { min: 1.5, max: 3 }, // seconds down between looks
+        pause: 1.5, // seconds down between the dashes of the last stretch
+        cover: { hold: 7, every: 2.2, range: 150, height: 0.4 }, // covering a man who's said he's moving on the place: for this many seconds after he says it, a round this often, at a place no farther than this, this high off the ground there
+      },
+      paces: { covered: 4.4, lit: 5.4, home: 2.4 }, // m/s out of the believed shooter's view (a run), across it (flat out), and on the way back
+      arrive: 12, // metres from the place at which a man has reached it
+      look: 8, // seconds a man takes to look all round the place, turning once, before he calls it clear
+      hold: 12, // seconds a section waits on a place it's cleared for its next orders
+      pin: { within: 6, min: 2.5, max: 5 }, // a round striking this close puts a man on the hunt down for this long (metres, seconds)
       // The valley at the scale a section moves on: which ground a believed firing point can see, and the way that keeps out of it.
       ground: {
         every: 10, // metres between the places the valley is judged at; its relief is read at the map's own spacing
-        head: 1.7, // metres: the top of a man on his feet, which is what has to be out of view
+        head: 1.85, // metres: the top of a man on his feet, which is what has to be out of view
         eye: 1.3, // metres above the ground that a shooter's eyes are taken to be
         tall: 1.5, // metres something solid has to stand to stop a line
         price: 2, // how many times its length a step out onto ground in view adds to a way's cost,
@@ -1010,8 +1042,8 @@ export const defaultTuning = {
       keep: 25, // seconds a guard remembers what he's been told
       maxTold: 8, // reports a guard's memory holds
       reportEvery: 20, // seconds between his calls about the same thing
-      level: { contact: 0.8, heard: 0.32, shot: 0.8, body: 0.82, missing: 0.4, clear: 0, claim: 0, outage: 0.32, escort: 0, moving: 0 }, // what a report raises him to
-      radius: { contact: 4, heard: 18, shot: 22, body: 6, missing: 8, clear: 12, claim: 8, outage: 6, escort: 2, moving: 8 }, // metres of uncertainty each kind adds to the speaker's
+      level: { contact: 0.8, heard: 0.32, shot: 0.8, body: 0.82, missing: 0.4, clear: 0, claim: 0, outage: 0.32, escort: 0, moving: 0, set: 0 }, // what a report raises him to
+      radius: { contact: 4, heard: 18, shot: 22, body: 6, missing: 8, clear: 12, claim: 8, outage: 6, escort: 2, moving: 8, set: 2 }, // metres of uncertainty each kind adds to the speaker's
       clearRadius: 18, // metres a searcher's "clear" report wipes from the map
       // Claims (Blacklist): "I've got it": one guard goes, those who hear him don't all pile in.
       claimWithin: 14, // metres between a claim's spot and his own for it to count

@@ -125,6 +125,7 @@ const CALL_LINES: Readonly<Record<ReportCode, string>> = {
   claim: "I'll take a look.",
   escort: 'Time to go. Move!',
   moving: 'Moving! Cover me!',
+  set: 'Set!',
   outage: "Something's dead over here.",
 };
 

@@ -1,9 +1,10 @@
 import { dcos, dlog, dsin } from '../kernel/core/detmath';
 import type { AwarenessName } from '../kernel/events';
 import { routinePose, type RoutinePose } from '../generation';
-import type { TaskKind } from './camp';
+import type { HuntOrder, TaskKind } from './camp';
 import { beginFirefight, noteFirefight, offerFirefight, performFight, performPush, seesHim, type Firefight } from './firefight';
 import { groundSpot } from './ground';
+import { beginHunt, offerHunt, performHunt, type Hunt } from './hunt';
 import type { GuardMind } from './mind';
 import { focusOf, lookAround, sameGoal, stand, standToward, walk } from './moves';
 import { emptyRoute, navigatorOf, type Route } from './nav';
@@ -30,7 +31,7 @@ import { choose, response, type Option } from './utility';
  * percept, an awareness, a belief.
  */
 
-export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee', 'suppress', 'shelter', 'stand-to', 'fight', 'push'] as const;
+export const ACTS = ['routine', 'return', 'look', 'investigate', 'search', 'hold', 'report', 'task', 'engage', 'cover', 'alarm', 'flank', 'flee', 'suppress', 'shelter', 'stand-to', 'fight', 'push', 'hunt'] as const;
 export type ActName = (typeof ACTS)[number];
 
 /** Why a guard changed what he's doing: A's reasons for a change of state, and the brain's own. */
@@ -129,6 +130,8 @@ export interface BrainState {
   releasedAt?: number;
   /** The firefight he's in (firefight.ts): where he believes the intruder is, his position, and what he's doing at it. Absent until he's in one. */
   ff?: Firefight;
+  /** The hunt he's on (hunt.ts): the way out, the stop he's at, and what he's doing there. Absent until he's ordered out with a section. */
+  hunt?: Hunt;
 }
 
 /** An order as it reached a guard: what to do, where, when it was given, and the event behind it. */
@@ -141,6 +144,8 @@ export interface Tasking {
   y?: number;
   issued: number;
   cause: number;
+  /** A section's order (hunt.ts): who's in it, where it gathers, and where the shooter may be watching from. */
+  hunt?: HuntOrder;
 }
 
 export function createBrain(): BrainState {
@@ -207,8 +212,9 @@ export function decide(m: GuardMind, out: Order): ActChange | null {
     b.thinkAt = m.tick + Math.max(1, Math.round(T.think * m.tuning.sim.tickHz));
     const running = b.done ? null : b.act;
     if (b.done) b.ended[b.act] = m.tick;
-    // An order that was never taken up lapses; one he's carrying out lasts as long as the walk does.
-    if (b.task && b.act !== 'task' && (m.tick - b.task.issued) / m.tuning.sim.tickHz >= T.camp.keepOrder) b.task = null;
+    // An order that was never taken up lapses; one he's carrying out lasts as long as the walk does. A section's stands for as
+    // long as it says (hunt.ts): a man called away from it by a fight takes it up again.
+    if (b.task && b.task.kind !== 'hunt' && b.act !== 'task' && (m.tick - b.task.issued) / m.tuning.sim.tickHz >= T.camp.keepOrder) b.task = null;
     fillOptions(m, options);
     const best = running && !outranked(options, running, T.switchRatio) ? running : (choose(options, T.pickShare, m.draw)?.act ?? 'routine');
     if (best !== b.act || b.done) change = begin(m, best, b.done);
@@ -287,15 +293,16 @@ function begin(m: GuardMind, act: ActName, ended: boolean): ActChange {
   // Why: what his senses gave him, while something drives him; calm or nothing when it doesn't.
   const reacting = act !== 'routine' && act !== 'return';
   const ordered = act === 'task' && b.task !== null;
-  const reason: ActWhy = ordered ? 'ordered' : act === 'flee' || (act === 'shelter' && b.sirenAt >= 0) ? 'siren' : act === 'push' ? 'lost' : act === 'fight' && seesHim(m) ? 'seen' : reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
+  const reason: ActWhy = ordered || act === 'hunt' ? 'ordered' : act === 'flee' || (act === 'shelter' && b.sirenAt >= 0) ? 'siren' : act === 'push' ? 'lost' : act === 'fight' && seesHim(m) ? 'seen' : reacting ? perceptWhy(m) : ended ? 'nothing' : 'calm';
   // A reaction traces to what he sensed; if that memory is gone, to the act that led here.
-  const cause = ordered ? b.task!.cause : reacting ? perceptCause(m) || b.event : b.event;
+  const cause = (ordered || act === 'hunt') && b.task ? b.task.cause : reacting ? perceptCause(m) || b.event : b.event;
   b.cause = cause;
   if (ordered) {
     b.x = b.task!.x;
     b.z = b.task!.z;
   }
   if (act === 'fight' || act === 'push') beginFirefight(m, act);
+  if (act === 'hunt') beginHunt(m);
   // Going to look, or running for the alarm: he says so, and whoever hears it leaves it to him.
   if (act === 'investigate') {
     // He says so aloud, and calls it in unverified: the camp knows, and he has it.
@@ -369,7 +376,7 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   const task = b.task;
   const fetching = task !== null && (task.kind === 'fetch' || task.kind === 'escort');
   const order =
-    task && (!elevated || task.kind === 'sweep') && (b.act === 'task' || (m.tick - task.issued) / hz < T.camp.keepOrder) ? (task.kind === 'sweep' || task.kind === 'cover' || fetching ? 1 : task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
+    task && task.kind !== 'hunt' && (!elevated || task.kind === 'sweep') && (b.act === 'task' || (m.tick - task.issued) / hz < T.camp.keepOrder) ? (task.kind === 'sweep' || task.kind === 'cover' || fetching ? 1 : task.kind === 'search' ? role.search : role.investigate) * T.taskWeight : 0;
   // At a whistle, in a camp that protects its target, a man with nothing better to do gets down and watches (protect.ts).
   const standing = standingTo(m) && !elevated && m.post.role !== 'target';
   // Worth calling in: something he sensed himself (what he was only told is already on the
@@ -377,6 +384,8 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   // (Once he's on his way, he finishes: a percept lapsing doesn't call him back mid-walk.)
   const own = ownEvidence(m) || b.act === 'investigate' || b.act === 'search';
   const callable = own ? role.report * cool('report') : 0;
+  // In a camp that hunts, somewhere off its own ground is a section's to go and look at (hunt.ts): nobody walks out there alone.
+  const far = m.hunts && beyondTheWire(m, focus.x, focus.z);
   out.push({ act: 'routine', rank: 0, weight: 1 });
   // The target, at lockdown: for the vehicle, ahead of everything (design doc: he flees first),
   // unless his camp protects him: then to his room, and out of it when he's sent for.
@@ -387,6 +396,8 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   // Someone close, and he knows where: a trained man's fight, ahead of the answers below (firefight.ts).
   // It has its own clock: he doesn't wander off because his alarm has worn down to unease.
   offerFirefight(m, out, state === 'combat' ? 5.2 : 4.9);
+  // Ordered out with a section (hunt.ts): ahead of getting out of the line, which is how he goes, and behind a fight in front of him.
+  offerHunt(m, out, state === 'combat' ? 5.1 : 4.75);
   switch (state) {
     case 'unaware':
       if (off && !elevated) out.push({ act: 'return', rank: 1, weight: 1 });
@@ -401,7 +412,7 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       if (order) out.push({ act: 'task', rank: 3, weight: order });
       out.push({ act: 'report', rank: 3, weight: callable * W.reportSuspicious });
       out.push({ act: standing ? 'stand-to' : 'look', rank: 3, weight: T.lookWeight });
-      if (!elevated && own) out.push({ act: 'investigate', rank: 3, weight: role.investigate * near * fresh * cool('investigate') * claimed(m, focus) });
+      if (!elevated && own && !far) out.push({ act: 'investigate', rank: 3, weight: role.investigate * near * fresh * cool('investigate') * claimed(m, focus) });
       break;
     case 'searching': {
       // Rounds landing near him: he gets behind something first (design doc: uses cover).
@@ -412,7 +423,7 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       if (order) out.push({ act: 'task', rank: 4, weight: order });
       out.push({ act: 'report', rank: 4, weight: callable });
       out.push({ act: 'hold', rank: 4, weight: W.holdSearching });
-      if (!elevated && own) {
+      if (!elevated && own && !far) {
         out.push({ act: 'investigate', rank: 4, weight: role.investigate * near * fresh * cool('investigate') * claimed(m, focus) });
         out.push({ act: 'search', rank: 4, weight: role.search * (W.searchStale + (1 - W.searchStale) * fresh) * near * cool('search') });
       }
@@ -427,11 +438,17 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
       out.push({ act: 'engage', rank: 5, weight: sees && dist <= m.tuning.brain.combat.range[m.post.role] ? role.fight : 0 });
       out.push({ act: 'cover', rank: 5, weight: sees || elevated ? 0 : role.fight });
       // Having held cover without a sight of him, he works round to where he can.
-      out.push({ act: 'flank', rank: 5, weight: !sees && !elevated && b.ended.cover !== undefined ? role.flank : 0 });
+      out.push({ act: 'flank', rank: 5, weight: !sees && !elevated && !far && b.ended.cover !== undefined ? role.flank : 0 });
       out.push({ act: 'hold', rank: 5, weight: W.holdCombat });
       break;
     }
   }
+}
+
+/** True if a place is off the camp's own ground: past its pad, where the walls and the fine grid end. */
+function beyondTheWire(m: GuardMind, x: number, z: number): boolean {
+  const site = m.world.camp.site;
+  return (x - site.x) * (x - site.x) + (z - site.z) * (z - site.z) > site.radius * site.radius;
 }
 
 /** How long ago the freshest shot or flash reached him, in seconds; Infinity if none is in mind. */
@@ -605,6 +622,9 @@ function perform(m: GuardMind, out: Order): void {
       break;
     case 'push':
       performPush(m, out);
+      break;
+    case 'hunt':
+      performHunt(m, out);
       break;
   }
 }

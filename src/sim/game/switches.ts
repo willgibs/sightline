@@ -16,7 +16,7 @@ import type { Simulation } from './sim';
  * differently draws differently, as he should.
  */
 
-export const CAMP_SWITCHES = ['commander', 'radio', 'alarm', 'truck', 'reinforce', 'fight', 'firefight', 'power'] as const;
+export const CAMP_SWITCHES = ['commander', 'radio', 'alarm', 'truck', 'reinforce', 'fight', 'firefight', 'hunt', 'power'] as const;
 
 export type CampSwitch = (typeof CAMP_SWITCHES)[number];
 
@@ -75,6 +75,8 @@ export function takeAway(sim: Simulation, off: readonly CampSwitch[]): void {
   if (has('fight')) delete camp.fights;
   // Step 2 (brain/firefight.ts): men who hide from a close threat and don't follow, as they were before it.
   if (has('fight') || has('firefight')) delete camp.firefight;
+  // Step 2b (brain/hunt.ts): nobody goes out after a shooter the camp has placed. A hunt ends in a firefight, so without that there's none.
+  if (has('fight') || has('firefight') || has('hunt')) delete camp.hunts;
   // Already called, as far as the commander knows: it never calls them again, and any on their way don't come.
   if (has('reinforce')) {
     camp.reinforceCalled = 0;

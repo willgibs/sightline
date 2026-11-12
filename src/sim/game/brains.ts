@@ -1,4 +1,4 @@
-import { createBrain, firefightPhase } from '../brain';
+import { createBrain, firefightPhase, huntPhase } from '../brain';
 import type { DebugDraw } from '../kernel/debugDraw';
 import type { TickContext } from '../kernel/systems';
 import type { GuardEntity } from './entities';
@@ -21,7 +21,7 @@ export function drawBrain(draw: DebugDraw, ctx: TickContext, g: GuardEntity): vo
   const ground = (x: number, z: number): number => h(x, z) + 0.15;
   const a = g.senses?.awareness.state ?? 'unaware';
   const tone = a === 'combat' ? 'bad' : a === 'searching' ? 'warn' : a === 'unaware' ? 'muted' : 'info';
-  const phase = firefightPhase(b, ctx.tick);
+  const phase = firefightPhase(b, ctx.tick) ?? huntPhase(b, ctx.tick);
   draw.label(body.x, body.y + body.eyeHeight + 0.95, body.z, phase ? `${b.act} · ${phase}` : b.act, tone, `${b.act}${phase ? ` (${phase})` : ''} · ${a}${b.linger >= 0 ? ' · looking around' : ''}`);
   // A firefight: where he believes the intruder is, and his position: where he hides, and where he fires from.
   const ff = b.ff;
@@ -34,6 +34,17 @@ export function drawBrain(draw: DebugDraw, ctx: TickContext, g: GuardEntity): vo
       if (s.fx !== s.hx || s.fz !== s.hz) draw.line(s.hx, ground(s.hx, s.hz), s.hz, s.fx, ground(s.fx, s.fz), s.fz, s.line ? 'good' : 'muted');
       draw.point(s.fx, ground(s.fx, s.fz) + (s.fs === 'stand' ? 1.2 : 0.6), s.fz, 0.15, s.line ? 'good' : 'muted');
     }
+  }
+  // A hunt: the way out as its stops, in view (warn) or out of it, the one he's on or making for, and the place.
+  const hunt = b.hunt;
+  if (hunt && b.act === 'hunt') {
+    for (let k = 0; k < hunt.lit.length; k++) {
+      const x = hunt.stops[2 * k]!;
+      const z = hunt.stops[2 * k + 1]!;
+      if (k > 0) draw.line(hunt.stops[2 * k - 2]!, ground(hunt.stops[2 * k - 2]!, hunt.stops[2 * k - 1]!), hunt.stops[2 * k - 1]!, x, ground(x, z), z, hunt.lit[k] === 1 ? 'warn' : 'good');
+      draw.point(x, ground(x, z), z, k === hunt.at ? 0.4 : 0.2, k === hunt.at ? 'info' : hunt.lit[k] === 1 ? 'warn' : 'good');
+    }
+    draw.circle(hunt.ox, ground(hunt.ox, hunt.oz), hunt.oz, ctx.tuning.brain.hunt.arrive, 'bad');
   }
   // The route: from him through what's left of it.
   let px = body.x;
