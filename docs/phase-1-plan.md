@@ -278,7 +278,7 @@ The design is `docs/camp-engine.md`, section 8. Scored with a shooter limited to
 The [Sightline Desk](https://claude.ai/artifact/RB4pjU2qNsYE3zCuBYYb7f), which only the owner's account can open, is the working list of what's waiting on the owner; this section is its public record.
 
 - **Each lab ends** with:
-  - a playable link on the deployment (`?scene=<name>`, or `?explore`);
+  - a playable link on the deployment (`?scene=<name>`, or `?explore`), played headless first under the mission's rules (`npm run sitting -- '<the link>'`): what the camp does and when, and when and why the run ends. A scene built for measuring and the scene a person plays can differ in what ends a run, and on Nov 11 that put a sitting on the desk whose run stopped before the thing it was about;
   - a short note of what to try;
   - its bench numbers against its seed;
   - one to three questions.
