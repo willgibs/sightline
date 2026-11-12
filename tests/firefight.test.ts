@@ -40,6 +40,9 @@ interface Fight {
   left: Set<number>;
   /** Men shot by their own side. */
   ownGoals: number;
+  /** Men someone counted as gone out of the walls after him, and men who did go for an opening (the chase). */
+  counted: Set<number>;
+  chased: Set<number>;
   hash: string;
 }
 
@@ -52,7 +55,7 @@ function circle(params: string, seconds: number): Fight {
   const bot = circleOf(sim);
   const driver = new ViewDriver(bot);
   const raw = sc.game.still(sim);
-  const out: Fight = { sim, fought: new Set(), pushers: 0, rounds: 0, wild: [], upUnderFire: [], left: new Set(), ownGoals: 0, hash: '' };
+  const out: Fight = { sim, fought: new Set(), pushers: 0, rounds: 0, wild: [], upUnderFire: [], left: new Set(), ownGoals: 0, counted: new Set(), chased: new Set(), hash: '' };
   const began = new Map<number, { x: number; z: number }>();
   const dead = (): boolean => (player(sim.index).health?.hits ?? 0) >= tuning.brain.combat.playerHits;
   while (sim.tick < seconds * HZ && !bot.lapped && !dead()) {
@@ -60,6 +63,10 @@ function circle(params: string, seconds: number): Fight {
     let pushing = 0;
     for (const g of sim.guards) {
       const b = g.brain!;
+      if (b.ff) {
+        for (const id of b.ff.out) out.counted.add(id);
+        if (b.ff.gate) out.chased.add(g.id);
+      }
       if (b.act !== 'fight' && b.act !== 'push') continue;
       const ff = b.ff;
       out.fought.add(g.id);
@@ -185,6 +192,12 @@ describe('a firefight', () => {
   it('sends one man at a time after him, and the camp keeps its ground', () => {
     expect(fight.pushers).toBeLessThanOrEqual(2);
     expect(fight.left.size).toBeLessThanOrEqual(3);
+  });
+
+  it('counts nobody as gone out of the walls who is only going after someone outside them all along: that is the chase, and this is not', () => {
+    // He circles the camp from outside, and men do go after him, saying so. None of that is anyone following him out of an
+    // opening, and it mustn't hold the rest of the camp to its walls as a chase does (brain/firefight.ts, `keepsTo`).
+    expect([...fight.counted].filter((id) => !fight.chased.has(id))).toEqual([]);
   });
 
   it('ends the same way twice', () => {

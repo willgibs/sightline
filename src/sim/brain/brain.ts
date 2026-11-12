@@ -468,7 +468,8 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
     }
     case 'combat': {
       const sees = seesTarget(m);
-      const alarmW = alarmWeight(m);
+      // A man already out after someone who has left the walls doesn't turn back for a box he happens to pass: he said he was going, and the men who heard him are counting on it (firefight.ts, the chase).
+      const alarmW = b.act === 'push' && !b.done && b.ff?.gate ? 0 : alarmWeight(m);
       out.push({ act: 'alarm', rank: 6, weight: alarmW });
       if (m.fights) fightOptions(m, out);
       out.push({ act: 'report', rank: 5, weight: callable > 0 ? 1 : 0 });

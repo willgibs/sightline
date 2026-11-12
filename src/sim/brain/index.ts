@@ -15,6 +15,7 @@ export { groundSpot, type GroundSpot } from './ground';
 export { exposedAt, eyesAt, fightingSpot, lineFrom, type FightingSpot, type SpotAsk } from './positions';
 export { Approach, approachOf, emptyWay, eyesOn, type Eyes, type Way } from './approach';
 export { firefightPhase, type Firefight, type Position } from './firefight';
+export { openingNear, openingThrough, outsideWalls, type Opening } from './walls';
 export { huntPhase, type Hunt } from './hunt';
 export { Navigator, emptyRoute, emptySteering, followRoute, navigatorOf, routeLength, type Route, type RouteResult, type Steering, type Walk } from './nav';
 export { ACTS, ACT_WHYS, createBrain, decide, type ActChange, type ActName, type ActWhy, type BrainState, type Tasking } from './brain';

@@ -6,6 +6,7 @@ import { giveProtection } from '../protection';
 import { player } from '../entities';
 import { truckRoute } from '../camp';
 import { vehicleDrive } from '../escape';
+import { gateStart } from '../leaving';
 import { arm } from '../shooting';
 import { parseSwitches, switchedOff, type CampSwitch } from '../switches';
 import { SIGHTLINE } from '../sim';
@@ -24,6 +25,8 @@ import type { World } from '../../kernel/world/world';
  * Parameters (`?scene=live-camp&params=seed=LEB-2534`, with `&difficulty=0.5` inside params
  * as `seed=LEB-2534%26difficulty=0.7`): which camp, and how hard. `perch=1` starts you on
  * the camp's best overview, for a sitting that's about the fight and not the walk there.
+ * `gate=1` starts you a short way outside an opening in its wall, facing it, for a sitting
+ * about going in and what follows you out (game/leaving.ts).
  *
  * Every camp protects its target (game/protection.ts; the owner, Nov 12: "the target should
  * not get rushed out of the camp the second" the siren sounds). He goes to his hard room at
@@ -40,9 +43,11 @@ export interface LiveCampParams {
   off: CampSwitch[];
   /** Start on the camp's best overview. */
   perch: boolean;
+  /** Start a short way outside an opening in the camp's wall, facing it. */
+  gate: boolean;
 }
 
-const DEFAULTS: LiveCampParams = { seed: 'LEB-2534', difficulty: defaultCampSpec().difficulty, off: [], perch: false };
+const DEFAULTS: LiveCampParams = { seed: 'LEB-2534', difficulty: defaultCampSpec().difficulty, off: [], perch: false, gate: false };
 
 export function parseLiveCamp(text: string | undefined): LiveCampParams {
   const p: LiveCampParams = { ...DEFAULTS };
@@ -56,13 +61,14 @@ export function parseLiveCamp(text: string | undefined): LiveCampParams {
       p.difficulty = d;
     } else if (key === 'off') p.off = parseSwitches(value ?? '');
     else if (key === 'perch') p.perch = value !== '0';
+    else if (key === 'gate') p.gate = value !== '0';
     else throw new Error(`A live camp doesn't know '${part}'`);
   }
   return p;
 }
 
 export function formatLiveCamp(p: LiveCampParams): string {
-  return `seed=${p.seed}&difficulty=${p.difficulty}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}${p.perch ? '&perch=1' : ''}`;
+  return `seed=${p.seed}&difficulty=${p.difficulty}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}${p.perch ? '&perch=1' : ''}${p.gate ? '&gate=1' : ''}`;
 }
 
 /** The camp's best overview: the perch that sees the most guard time. */
@@ -88,6 +94,7 @@ export function liveCamp(params?: string): Scene {
       commanderOf(sim)!.camp.fights = true;
       commanderOf(sim)!.camp.firefight = true;
       commanderOf(sim)!.camp.hunts = true;
+      commanderOf(sim)!.camp.chases = true;
       giveProtection(sim);
       // Here, as in the missions to come, the job isn't done until you're out: at the end of the road.
       const road = truckRoute(sim.world, sim.tuning);
@@ -99,6 +106,9 @@ export function liveCamp(params?: string): Scene {
         const at = bestOverview(sim.world);
         const site = sim.world.camp.site;
         placePlayer(sim, at.x, at.z, site.x - at.x, site.z - at.z);
+      } else if (p.gate) {
+        const at = gateStart(sim.world, sim.tuning);
+        if (at) placePlayer(sim, at.x, at.z, at.faceX, at.faceZ);
       }
     },
     seconds: 30,

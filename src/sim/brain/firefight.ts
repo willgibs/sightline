@@ -8,6 +8,7 @@ import type { Order } from './orders';
 import { dangerOf, exposedAt, fightingSpot, lineFrom, type FightingSpot } from './positions';
 import type { Report } from './reports';
 import type { Option } from './utility';
+import { openingNear, openingThrough, outsideWalls, type Opening } from './walls';
 
 /**
  * The firefight (Lab F, step 2; docs/camp-engine.md, section 9): how a trained man fights
@@ -27,6 +28,18 @@ import type { Option } from './utility';
  *             bound at a time, to where he can see the place; whoever heard him keeps
  *             watching it. If it's empty he goes on the way the intruder was heading, a few
  *             bounds and no farther than his leash, then calls it lost.
+ *
+ *   chase     Gone out of the camp's walls, with this man watching him go (he saw him inside
+ *             them, and then outside by an opening or going out through one): no holding the
+ *             angle and no covered way, because a man who is leaving isn't waiting for
+ *             anyone. One or two go after him at a run, to the opening and a step out of
+ *             it, and look each way along the wall. The owner, Nov 12: leaving by a gate
+ *             and following the wall "gives a slight impression of 'he walked out that
+ *             door, must be gone forever'", and what they'd expect is "a guard or two maybe
+ *             continue pursuit to fire from behind me as I escape, but if I can shoot them
+ *             down as they expose themselves outside of the camp... the rest are still
+ *             defending within". So no more than a few go in one fight, and none past the
+ *             camp's own ground: the target is what the rest are there for.
  *
  * Nobody runs across the camp. A man's position is within a short run of where he stands,
  * so the camp fights from where it is, and only the one who said so closes in. That's the
@@ -60,10 +73,14 @@ export interface Firefight {
   own: boolean;
   /** The tick he came into this fight. */
   since: number;
-  /** The last tick he had him in sight, or −1, and the way the intruder was going then, m/s. */
+  /** The last tick he had him in sight, or −1; where that was; and the way the intruder was going then, m/s. */
   seen: number;
+  sx: number;
+  sz: number;
   vx: number;
   vz: number;
+  /** The last tick he had him in sight inside the camp's walls, or −1 (the chase): a man can watch someone go out only if he saw him in. */
+  inside: number;
   /** An older sighting to tell that from: where and when, or −1. */
   ox: number;
   oz: number;
@@ -93,10 +110,24 @@ export interface Firefight {
   lost: boolean;
   /** The bound he's found a covered way to and means to make: he goes once he has one, and says so. Null otherwise. */
   bound: Position | null;
+  /** The chase: the men he's heard say they're going out of the walls after the intruder, himself among them once he has, and the tick each said it. A camp sends only so many in one fight, and the first to say so are the ones who go. */
+  out: number[];
+  outAt: number[];
+  /** Chasing: the opening he's going out by. Null when he isn't. */
+  gate: Opening | null;
+  /** The sighting (its tick) after which he last called out that the intruder had gone out of the walls, or −1: said once for each time he watches him go. */
+  cried: number;
+  /** Out of it: which way he's looking (0 one way along the wall, 1 the other, 2 out across the ground), and the tick he began to, or −1. */
+  sweep: number;
+  swept: number;
+  /** The last word he had that the intruder had gone out of the walls: when he heard it and the place it named, or −1. Word of where he was a moment before, arriving later, doesn't unsay it. */
+  heardOut: number;
+  outX: number;
+  outZ: number;
 }
 
 function createFirefight(): Firefight {
-  return { x: 0, y: 0, z: 0, r: 0, news: -1, own: false, since: -1, seen: -1, vx: 0, vz: 0, ox: 0, oz: 0, ot: -1, spot: null, there: false, up: false, until: -1, rounds: 0, pinned: -1, shouted: -1, calling: -1, improved: 0, exposed: true, bounds: 0, clear: -1, lost: false, bound: null };
+  return { x: 0, y: 0, z: 0, r: 0, news: -1, own: false, since: -1, seen: -1, sx: 0, sz: 0, vx: 0, vz: 0, inside: -1, ox: 0, oz: 0, ot: -1, spot: null, there: false, up: false, until: -1, rounds: 0, pinned: -1, shouted: -1, calling: -1, improved: 0, exposed: true, bounds: 0, clear: -1, lost: false, bound: null, out: [], outAt: [], gate: null, cried: -1, sweep: 0, swept: -1, heardOut: -1, outX: 0, outZ: 0 };
 }
 
 /**
@@ -166,10 +197,15 @@ export function noteFirefight(m: GuardMind): void {
     ff.news = sight.tick;
     ff.own = true;
     ff.seen = sight.tick;
+    ff.sx = sight.x;
+    ff.sz = sight.z;
+    if (m.chases && !outsideWalls(m.world, sight.x, sight.z)) ff.inside = sight.tick;
     ff.bounds = 0;
     ff.clear = -1;
     ff.lost = false;
     ff.bound = null;
+    // In his sights again: whatever he was going out to look for, it's a fight now.
+    ff.gate = null;
   } else {
     // Otherwise the newest thing that says where: a flash, a report close by, or a contact someone called.
     let news = ff ? ff.news : -1;
@@ -213,6 +249,42 @@ export function noteFirefight(m: GuardMind): void {
   }
   if (!ff) return;
   if (ff.since < 0) ff.since = m.tick;
+  // He watched him go out of the walls: he says so, once, aloud and on the net, whatever he's doing about it himself. The
+  // men nearest the opening may not have seen, and the man with a box in reach is on his way to it.
+  if (m.chases && !sight && ff.seen >= 0 && ff.cried !== ff.seen) {
+    const went = wentOut(m, ff);
+    if (went && went.at === ff.seen) {
+      ff.cried = ff.seen;
+      const C = m.tuning.brain.comms;
+      const step = F.chase.step;
+      const x = went.gate.x + went.gate.nx * step;
+      const z = went.gate.z + went.gate.nz * step;
+      const report: Report = { kind: 'contact', x, y: m.world.terrain.heightAt(x, z) + F.spot.eye, z, radius: C.radius.contact, tick: m.tick, from: m.id, fromX: self.x, fromZ: self.z, cause: b.cause, sure: true, out: true };
+      b.say = { report, radius: C.shoutRadius, radio: false };
+      if (m.tuning.brain.roles[m.post.role].report > 0) b.radio = { ...report };
+    }
+  }
+  // Word that he's gone out of the walls, from a man who watched him go: kept apart from where he's believed to be, which the net's older news may overwrite.
+  if (m.chases) {
+    for (const t of b.told) {
+      if (t.kind !== 'contact' || t.out !== true || t.from === m.id || t.heard <= ff.heardOut) continue;
+      ff.heardOut = t.heard;
+      ff.outX = t.x;
+      ff.outZ = t.z;
+    }
+    // In his own sight, inside them: whatever he heard, he's back.
+    if (sight && !outsideWalls(m.world, sight.x, sight.z)) ff.heardOut = -1;
+  }
+  // Who has said he's going out of the walls after him: heard aloud or on the net, and counted for as long as this fight
+  // lasts (the chase). Only a man who says so: one going after somebody who was outside all along says "moving" too, and
+  // that's the firefight's business, which this leaves as it was.
+  if (m.chases) {
+    for (const t of b.told) {
+      if (t.kind !== 'moving' || t.out !== true || t.from === m.id || ff.out.includes(t.from)) continue;
+      ff.out.push(t.from);
+      ff.outAt.push(t.tick);
+    }
+  }
   // Rounds striking close, or cracking past: his head stays down a while.
   for (const p of m.percepts) {
     if (p.kind !== 'shot' || (p.sound !== 'impact' && p.sound !== 'crack') || m.tick - p.tick > 1) continue;
@@ -280,6 +352,99 @@ function dueToGo(m: GuardMind): boolean {
   return lx * lx + lz * lz <= P.leash * P.leash;
 }
 
+/**
+ * The opening the intruder has just gone out of the camp's walls by, as this man knows it,
+ * and the tick he knew. Either he watched him go, or someone who did has just said so.
+ *
+ * Watching him go takes having seen him inside the walls: a man at the gate on his way in
+ * was outside them when he was last seen too, and he hasn't gone anywhere. Then it's where
+ * he had him last, a moment ago: outside, near an opening, or inside and going out through
+ * one (a second more of the way he was going is through it, and not into a wall beside it).
+ *
+ * Null if he hasn't gone out, or not by a way this man could follow him at once: someone
+ * seen far out in the open is no business of the chase's.
+ */
+function wentOut(m: GuardMind, ff: Firefight): { gate: Opening; at: number } | null {
+  const C = m.tuning.brain.firefight.chase;
+  const hz = m.tuning.sim.tickHz;
+  const near = (g: Opening | null, x: number, z: number): Opening | null => (g && (g.x - x) * (g.x - x) + (g.z - z) * (g.z - z) <= C.near * C.near ? g : null);
+  if (ff.inside >= 0 && ff.seen >= 0 && (m.tick - ff.seen) / hz <= C.fresh) {
+    const gate = outsideWalls(m.world, ff.sx, ff.sz) ? near(openingNear(m.world, ff.sx, ff.sz), ff.sx, ff.sz) : openingThrough(m.world, ff.sx, ff.sz, ff.sx + ff.vx, ff.sz + ff.vz, C.jamb);
+    if (gate) return { gate, at: ff.seen };
+  }
+  if (ff.heardOut >= 0 && ff.heardOut > ff.seen && (m.tick - ff.heardOut) / hz <= C.fresh) {
+    const gate = near(openingNear(m.world, ff.outX, ff.outZ), ff.outX, ff.outZ);
+    if (gate) return { gate, at: ff.heardOut };
+  }
+  return null;
+}
+
+/**
+ * Whether enough men are out after him already: a camp sends a few, and the rest hold. A man
+ * who has said he's going gives it up only to those who said so before him (or at the same
+ * moment, with the lower id, as two who say anything at once settle it): the first to go are
+ * the ones who go.
+ */
+function chaseFull(m: GuardMind): boolean {
+  const ff = m.brain!.ff!;
+  const mine = ff.out.indexOf(m.id);
+  const said = mine < 0 ? Infinity : ff.outAt[mine]!;
+  let ahead = 0;
+  for (let k = 0; k < ff.out.length; k++) {
+    const id = ff.out[k]!;
+    if (id === m.id) continue;
+    const at = ff.outAt[k]!;
+    if (at < said || (at === said && id < m.id)) ahead++;
+  }
+  return ahead >= m.tuning.brain.firefight.chase.men;
+}
+
+/**
+ * The opening he'd go out by, if the chase is his: his camp chases, he watched the intruder
+ * leave its walls, too few have gone already, and he's the nearest who hasn't said so (the
+ * nearer and the keener, the sooner his turn). Null otherwise. A man who holds the target's
+ * door never goes, alarm or none: he's what stands between them and the target.
+ */
+function dueToChase(m: GuardMind): Opening | null {
+  const b = m.brain!;
+  const ff = b.ff!;
+  const C = m.tuning.brain.firefight.chase;
+  const keen = m.tuning.brain.roles[m.post.role].flank;
+  if (!m.chases || ff.lost || ff.gate !== null || keen <= 0 || m.tick < ff.pinned || m.post.holdsDoor === true) return null;
+  // One chase a man, in one fight: once he's been out, he fights from where that got him, by the ordinary rules, and doesn't run out again each time he loses sight of him behind his own cover.
+  if (ff.out.includes(m.id) || chaseFull(m)) return null;
+  const went = wentOut(m, ff);
+  if (!went) return null;
+  const g = went.gate;
+  const dx = g.x - m.self.x;
+  const dz = g.z - m.self.z;
+  const d = Math.sqrt(dx * dx + dz * dz);
+  if (d > C.reach) return null;
+  if ((m.tick - went.at) / m.tuning.sim.tickHz < C.after + (1 - keen) * C.reluctant + d / C.perSecond) return null;
+  return g;
+}
+
+/**
+ * Where a man keeps to once someone has gone out of the walls after the intruder. Whoever
+ * went keeps to the camp's own ground: he steps out, looks and shoots, and doesn't run off
+ * into the valley, which is a section's business (hunt.ts). Everyone else keeps inside the
+ * walls, because the target is what they're there for. Nothing, before anyone has gone, or
+ * for a man who was outside already: his beat is out there.
+ */
+function keepsTo(m: GuardMind, ff: Firefight): 'walls' | 'ground' | undefined {
+  if (!m.chases || ff.out.length === 0) return undefined;
+  if (ff.out.includes(m.id)) return 'ground';
+  return outsideWalls(m.world, m.self.x, m.self.z) ? undefined : 'walls';
+}
+
+/** Where a man who chases goes: a step out of the opening, on a knee, with the ground beyond it in front of him. */
+function chaseSpot(m: GuardMind, g: Opening): Position {
+  const C = m.tuning.brain.firefight.chase;
+  const x = g.x + g.nx * C.step;
+  const z = g.z + g.nz * C.step;
+  return { hx: x, hz: z, hs: 'crouch', fx: x, fz: z, fs: 'crouch', line: true, tx: x, tz: z, tick: m.tick, careful: false };
+}
+
 /** True for a man posted on the target's door, once the siren has sounded: from then on the door is his whole job. */
 function onTheDoor(m: GuardMind): boolean {
   return m.post.holdsDoor === true && m.brain!.sirenAt >= 0;
@@ -306,7 +471,9 @@ function dashOf(m: GuardMind): number {
 function wantsPush(m: GuardMind): boolean {
   const b = m.brain!;
   const ff = b.ff!;
-  if (ff.lost || someoneMoving(m)) return false;
+  if (ff.lost) return false;
+  // Chasing: a few go at once, where one man follows.
+  if (ff.gate ? chaseFull(m) : someoneMoving(m)) return false;
   return (b.act === 'push' && !b.done) || ff.bound !== null;
 }
 
@@ -333,7 +500,20 @@ function sayMoving(m: GuardMind): void {
   const b = m.brain!;
   const ff = b.ff!;
   const C = m.tuning.brain.comms;
-  b.say = { report: { kind: 'moving', x: ff.x, y: ff.y, z: ff.z, radius: C.radius.moving, tick: m.tick, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: b.cause }, radius: C.shoutRadius, radio: false };
+  // Going out of the walls, he says where: outside the opening. Whoever hears it knows one more has gone.
+  const g = ff.gate;
+  const step = m.tuning.brain.firefight.chase.step;
+  const x = g ? g.x + g.nx * step : ff.x;
+  const z = g ? g.z + g.nz * step : ff.z;
+  if (g && !ff.out.includes(m.id)) {
+    ff.out.push(m.id);
+    ff.outAt.push(m.tick);
+  }
+  const report: Report = { kind: 'moving', x, y: ff.y, z, radius: C.radius.moving, tick: m.tick, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: b.cause };
+  if (g) report.out = true;
+  b.say = { report, radius: C.shoutRadius, radio: false };
+  // And on the net, a word as he goes: a shout doesn't carry across a camp, and the men at the far end of it are counting who has gone out.
+  if (g) b.radio = { ...report };
 }
 
 /** Starting to fight or to follow: where the act points, and what he says as he starts. */
@@ -356,6 +536,7 @@ export function beginFirefight(m: GuardMind, act: 'fight' | 'push'): void {
     return;
   }
   ff.bound = null;
+  ff.gate = null;
   const s = ff.spot;
   ff.there = s !== null && (s.hx - m.self.x) * (s.hx - m.self.x) + (s.hz - m.self.z) * (s.hz - m.self.z) <= F.near * F.near;
   ff.up = false;
@@ -465,7 +646,7 @@ function position(m: GuardMind, ff: Firefight, seen: boolean): Position | null {
     if (ff.there && !s.line && !seen && ff.improved < F.improve.times && (m.tick - s.tick) / hz >= F.improve.after && m.tick >= ff.pinned && mayLook(m)) {
       ff.improved++;
       s.tick = m.tick;
-      const better = fightingSpot(m.world, m.tuning, { ...here, maxRun: door ? far : Math.max(F.improve.run, far), needLine: true, dash: dashOf(m) }, m.nav.work);
+      const better = fightingSpot(m.world, m.tuning, { ...here, maxRun: door ? far : Math.max(F.improve.run, far), needLine: true, dash: dashOf(m), within: keepsTo(m, ff) }, m.nav.work);
       if (better) {
         s = ff.spot = { ...better, tx: ff.x, tz: ff.z, tick: m.tick, careful: true };
         ff.there = false;
@@ -477,7 +658,7 @@ function position(m: GuardMind, ff: Firefight, seen: boolean): Position | null {
   if (!mayLook(m)) return null;
   ff.exposed = exposedAt(m.world, m.tuning, m.self.x, m.self.z, m.self.stance, ff.x, ff.z, m.nav.work, ff.y, m.self.y);
   const hurry = urgent || ff.exposed;
-  const found = fightingSpot(m.world, m.tuning, { ...here, maxRun: hurry ? near : far, needLine: !hurry, dash: hurry ? 0 : dashOf(m) }, m.nav.work);
+  const found = fightingSpot(m.world, m.tuning, { ...here, maxRun: hurry ? near : far, needLine: !hurry, dash: hurry ? 0 : dashOf(m), within: keepsTo(m, ff) }, m.nav.work);
   if (found) ff.spot = { ...found, tx: ff.x, tz: ff.z, tick: m.tick, careful: !hurry };
   // Nothing in reach. In the open, he gets flat and fires from a knee. Out of sight, he stays where he is, low, with no view.
   else if (hurry) ff.spot = whereHeIs(m, ff, 'prone', 'crouch');
@@ -537,6 +718,17 @@ export function performFight(m: GuardMind, out: Order): void {
   // Rounds landing on him: down, whatever he was doing.
   const pinned = m.tick < ff.pinned;
   if (ff.up && pinned) getDown(m, ff);
+  // He went out of the walls, and it's this man's turn: after him, to the opening (the chase). The next think takes it up.
+  if (!seen && !pinned && ff.bound === null) {
+    const g = dueToChase(m);
+    if (g) {
+      ff.gate = g;
+      ff.bound = chaseSpot(m, g);
+      b.thinkAt = m.tick;
+      steer(m, out, 0, 0, 'idle', g.x, g.z, self.stance);
+      return;
+    }
+  }
   let s = position(m, ff, seen);
   if (!s) {
     steer(m, out, 0, 0, 'idle', ff.x, ff.z, 'crouch');
@@ -598,7 +790,7 @@ export function performFight(m: GuardMind, out: Order): void {
     // next think takes it up); if not, he doesn't run at a man who's waiting for him, and it's the camp's to hunt.
     if (!seen && ff.bound === null && dueToGo(m) && mayLook(m)) {
       const P = F.push;
-      const found = fightingSpot(m.world, T, { x: self.x, z: self.z, tx: ff.x, tz: ff.z, ty: ff.y, maxRun: P.maxRun, needLine: true, gain: gainOf(m), dash: dashOf(m) }, m.nav.work);
+      const found = fightingSpot(m.world, T, { x: self.x, z: self.z, tx: ff.x, tz: ff.z, ty: ff.y, maxRun: P.maxRun, needLine: true, gain: gainOf(m), dash: dashOf(m), within: keepsTo(m, ff) }, m.nav.work);
       if (found) {
         ff.bound = { ...found, tx: ff.x, tz: ff.z, tick: m.tick, careful: true };
         b.thinkAt = m.tick;
@@ -661,13 +853,17 @@ export function performPush(m: GuardMind, out: Order): void {
     steer(m, out, 0, 0, 'idle', ff.x, ff.z, 'crouch');
     return;
   }
+  if (ff.gate) {
+    performChase(m, out, ff, ff.gate);
+    return;
+  }
   let s = ff.spot;
   if (!s) {
     if (!mayLook(m)) {
       steer(m, out, 0, 0, 'idle', ff.x, ff.z, 'crouch');
       return;
     }
-    const found = fightingSpot(m.world, T, { x: self.x, z: self.z, tx: ff.x, tz: ff.z, ty: ff.y, maxRun: P.maxRun, needLine: true, gain: gainOf(m), dash: dashOf(m) }, m.nav.work);
+    const found = fightingSpot(m.world, T, { x: self.x, z: self.z, tx: ff.x, tz: ff.z, ty: ff.y, maxRun: P.maxRun, needLine: true, gain: gainOf(m), dash: dashOf(m), within: keepsTo(m, ff) }, m.nav.work);
     if (!found) {
       // No way nearer that keeps out of his view: he doesn't run at a man who's waiting for him. It's the camp's to hunt.
       ff.lost = true;
@@ -744,10 +940,65 @@ export function performPush(m: GuardMind, out: Order): void {
   ff.clear = -1;
 }
 
+/**
+ * The chase: at a run to a step outside the opening, by the quickest way, then a look each
+ * way along the wall and out across the ground. A sight of him ends it (performPush): the
+ * fight is on again, from where he's got to. With nobody to see, he gives it up and the
+ * place is the camp's to hunt.
+ */
+function performChase(m: GuardMind, out: Order, ff: Firefight, g: Opening): void {
+  const b = m.brain!;
+  const self = m.self;
+  const T = m.tuning;
+  const F = T.brain.firefight;
+  const C = F.chase;
+  const hz = T.sim.tickHz;
+  const px = g.x + g.nx * C.step;
+  const pz = g.z + g.nz * C.step;
+  if (!ff.there) {
+    const w = walk(m, out, px, pz, F.paces.bound, 'sprint', px + g.nx * C.along, pz + g.nz * C.along);
+    if (w === 'walking') return;
+    ff.there = true;
+    ff.sweep = 0;
+    ff.swept = -1;
+  }
+  // Where he's got to is where he looks from: on the spot, or short of it if something stopped him.
+  const near = (px - self.x) * (px - self.x) + (pz - self.z) * (pz - self.z) <= 4;
+  const hx = near ? px : self.x;
+  const hz2 = near ? pz : self.z;
+  // Rounds landing on him: flat, and the look begins again when they stop.
+  if (m.tick < ff.pinned) {
+    stayAt(m, out, hx, hz2, 'prone', hx + g.nx * C.along, hz2 + g.nz * C.along);
+    ff.swept = -1;
+    return;
+  }
+  // Along the wall is across the way out. Which way first is his own habit.
+  const side = m.id % 2 === 0 ? 1 : -1;
+  const ax = -g.nz * side;
+  const az = g.nx * side;
+  const lx = ff.sweep === 0 ? hx + ax * C.along : ff.sweep === 1 ? hx - ax * C.along : hx + g.nx * C.along;
+  const lz = ff.sweep === 0 ? hz2 + az * C.along : ff.sweep === 1 ? hz2 - az * C.along : hz2 + g.nz * C.along;
+  if (!stayAt(m, out, hx, hz2, 'crouch', lx, lz)) return;
+  if (ff.swept < 0) ff.swept = m.tick;
+  if ((m.tick - ff.swept) / hz < (ff.sweep < 2 ? C.look : C.hold)) return;
+  if (ff.sweep < 2) {
+    ff.sweep++;
+    ff.swept = -1;
+    return;
+  }
+  // Nobody. That's as far as he goes: the camp hears the place is empty, and he goes back in.
+  ff.lost = true;
+  ff.gate = null;
+  b.radio = { kind: 'clear', x: hx, y: self.y, z: hz2, radius: T.brain.comms.clearRadius, tick: m.tick, from: m.id, fromX: self.x, fromZ: self.z, cause: b.cause };
+  b.done = true;
+}
+
 /** What the debug view says of a man in a firefight: which phase he's in. */
 export function firefightPhase(m: { act: ActName; ff?: Firefight }, tick: number): string | null {
   const ff = m.ff;
   if (!ff || (m.act !== 'fight' && m.act !== 'push')) return null;
+  // The chase: out of the walls after him, and what he's doing about it.
+  if (ff.gate && m.act === 'push') return tick < ff.pinned ? 'pinned' : !ff.there ? 'chasing' : ff.sweep < 2 ? 'looking along the wall' : 'watching the ground';
   if (!ff.spot) return 'choosing';
   if (!ff.there) return m.act === 'push' ? 'bounding' : 'to cover';
   if (tick < ff.pinned) return 'pinned';

@@ -142,6 +142,8 @@ export interface CampState {
   firefight?: true;
   /** A camp that sends a section out after someone it has placed (hunt.ts, commander.ts). Absent for a camp whose men stay inside the wire. */
   hunts?: true;
+  /** A camp whose men go after someone they watched leave its walls (firefight.ts, the chase): one or two, to the opening and a step out of it. Absent for a camp that lets him go. */
+  chases?: true;
   /** Who it's hunting, if anyone; its sections out; the next section's id; places they've found empty; and the tick the last one came home or was lost, or −1. */
   threat: Threat | null;
   sections: Section[];

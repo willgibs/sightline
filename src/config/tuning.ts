@@ -934,6 +934,27 @@ export const defaultTuning = {
         clear: 1.2, // seconds with eyes on the place and nobody there before it counts as empty
         pause: 0.6, // seconds he gets his breath at the end of a bound before he looks
       },
+      // The chase (the owner, Nov 12: "a guard or two maybe continue pursuit to fire from behind me as I escape, but if I can
+      // shoot them down as they expose themselves outside of the camp... the rest are still defending within"). A man who
+      // watched the intruder go out of the camp's walls goes after him at once, at a run, to the opening nearest where he lost
+      // him and a step out of it, and looks each way along the wall and then out across the ground. No bounds and no covered
+      // ways: a man who is leaving isn't waiting for anyone. No more than `men` go in one fight, and none past the camp's own
+      // ground: the target is what the rest are there for. Only a camp that `chases` does it (`off=chase`). Watching him go
+      // takes having seen him inside the walls first: a man at the gate on his way in hasn't gone out of anything.
+      chase: {
+        men: 2, // how many go out after him, in all, in one fight
+        fresh: 6, // seconds since this man had him in sight, or heard he'd gone out, for the chase to be his
+        near: 14, // metres from an opening that he was last seen outside, or said to be, for it to be the way he went: farther out, he's a man in the open and no business of the chase's
+        jamb: 1.5, // metres either side of an opening that a man last seen inside, going out, may be heading for and still be going through it: a body has a width, and nobody runs through a wall
+        after: 0.4, // seconds before the nearest sets off,
+        perSecond: 25, // and a second longer for each of these metres he is from the opening: the nearest goes first
+        reluctant: 1.2, // and this much longer for the least keen role (by its `flank`)
+        reach: 70, // metres from the opening: farther than this, he isn't the one to go
+        step: 2.5, // metres outside the opening that he goes
+        look: 2.6, // seconds he looks each way along the wall: as long as a look over cover, which is as long as his eyes need to pick out a man standing still
+        along: 12, // metres along it, or out from it, that he looks at
+        hold: 5, // seconds he then watches the ground beyond with nobody in sight before he gives it up and goes back in
+      },
       improve: { after: 9, run: 16, times: 2 }, // with no view of the place: seconds before he tries for a better position, how far he'll go for one, and how many times
       contactEvery: 6, // seconds between shouts of where the intruder is
       call: 2.5, // seconds down and out of his sight before he gets on the radio about it

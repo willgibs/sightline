@@ -1,12 +1,11 @@
-import { navigatorOf } from '../../brain';
-import { routinePose, type RoutinePose } from '../../generation';
+import { navigatorOf, outsideWalls } from '../../brain';
+import { compoundDrops, stimulus } from '../drops';
 import type { InputFrame } from '../../kernel/input';
 import type { Driver } from '../../kernel/scene';
-import type { World } from '../../kernel/world/world';
-import type { Tuning } from '../../../config/tuning';
 import { WalkTo } from '../bots/person';
 import { ViewDriver } from '../bots/playerView';
 import { player } from '../entities';
+import { leavingOf, type Leaving } from '../leaving';
 import { placePlayer } from '../setup';
 import type { Simulation } from '../sim';
 import { parseSwitches, switchedOff, type CampSwitch } from '../switches';
@@ -14,18 +13,22 @@ import type { Scene } from '.';
 import { liveCamp } from './liveCamp';
 
 /**
- * Out of the gate (the owner, Nov 12): seen inside a camp, he leaves by an opening in its
+ * Out of the gate (the owner, Nov 12): someone seen inside a camp leaves by an opening in its
  * wall, turns along the outside of it and stops a few metres on, where no post can see him.
  * "It was very, very rare for a guard to even step outside the door to look around or
  * continue a gunfight... the current reaction gives a slight impression of 'he walked out
- * that door, must be gone forever'." And what he'd expect: "a guard or two maybe continue
+ * that door, must be gone forever'." And what they'd expect: "a guard or two maybe continue
  * pursuit to fire from behind me as I escape", with nobody else leaving the target.
  *
  * Someone stands a little way inside an opening, in a guard's view, until a guard is sure of
  * him and the word has had a moment to spread. Then he runs out, turns along the wall and
- * stops. `plan=run` has him go on from there, straight away from the camp. What the scene
- * asks is what comes after him: that a man or two come out and set eyes on him again, and
- * that no more than that leave the walls.
+ * stops. `plan=run` has him go on from there, straight away from the camp. `plan=fight` has
+ * him stay and shoot whoever comes out by the opening, which is the other half of what the
+ * owner asked for: "if I can shoot them down as they expose themselves outside of the camp,
+ * then I get more of that sense of security because I took out the ones that did pursue,
+ * and the rest are still defending within". What the scene asks is what comes after him:
+ * that a man or two come out and set eyes on him again, and that no more than that leave
+ * the walls, however many of them he puts down.
  *
  * It's the takedown's camp. He can't be hurt here, because the question is whether they
  * come, and a dead man can't be followed.
@@ -33,119 +36,34 @@ import { liveCamp } from './liveCamp';
 
 export interface OutTheGateParams {
   seed: string;
-  /** What he does once he's along the wall: stays there, or runs on away from the camp. */
-  plan: 'wall' | 'run';
+  /** What he does once he's along the wall: stays there, runs on away from the camp, or stays and shoots whoever comes out after him. */
+  plan: 'wall' | 'run' | 'fight';
   off: CampSwitch[];
 }
 
 export function parseOutTheGate(text: string | undefined): OutTheGateParams {
-  const p: OutTheGateParams = { seed: 'HOT-7106', plan: 'wall', off: [] };
+  const p: OutTheGateParams = { seed: 'TES-6931', plan: 'wall', off: [] };
   for (const part of (text ?? '').split('&')) {
     if (!part) continue;
     const [key, value] = part.split('=');
     if (key === 'seed' && value) p.seed = value;
-    else if (key === 'plan' && (value === 'wall' || value === 'run')) p.plan = value;
+    else if (key === 'plan' && (value === 'wall' || value === 'run' || value === 'fight')) p.plan = value;
     else if (key === 'off') p.off = parseSwitches(value ?? '');
     else throw new Error(`The out-the-gate scene doesn't know '${part}'`);
   }
   return p;
 }
 
-export interface Leaving {
-  /** Where he stands to be seen, inside, and the way he faces there. */
-  show: { x: number; z: number };
-  faceX: number;
-  faceZ: number;
-  /** The middle of the opening he leaves by, and the way out of it (a unit vector). */
-  gate: { x: number; z: number; nx: number; nz: number; width: number };
-  /** Just outside it, the place along the wall, and where he'd run on to. */
-  out: { x: number; z: number };
-  hide: { x: number; z: number };
-  away: { x: number; z: number };
-}
-
-const leavings = new WeakMap<World, Leaving | null>();
-const pose: RoutinePose = { x: 0, z: 0, yaw: 0, headYaw: 0, moving: false, vx: 0, vz: 0 };
-
-/** Metres: how far inside the opening he shows himself, how far outside the wall he walks, and how far along it he goes. */
-const INSIDE = [9, 12, 6, 15];
-const OFF_WALL = 1.6;
-const ALONG = [8, 6, 10, 12];
-/** How far he runs on, with `plan=run`. */
-const AWAY = 70;
-
 /**
- * A way out of this camp for someone seen inside it: an opening in its perimeter with a place
- * inside it in a ground guard's view, and a place a few metres along the outside of the wall
- * that no post in the camp can see. The first there is, by opening, then distances. Read off
- * the world as generated, so every run of a camp gets the same one. Null where the camp has
- * no wall to follow (chain link hides nobody).
+ * He stays where he was seen until this many guards have him in sight, or for `LINGER`
+ * seconds after the first is sure of him if a man with a rifle is among them, or for
+ * `AT_MOST` whoever they are: when the owner did it, "many guards were aware of my presence
+ * within the camp at once and actively watching me". A camp where only a worker ever saw him
+ * is a different question.
  */
-export function leavingOf(world: World, tuning: Tuning): Leaving | null {
-  const kept = leavings.get(world);
-  if (kept !== undefined) return kept;
-  const L = world.camp.layout;
-  let found: Leaving | null = null;
-  if (L) {
-    const nav = navigatorOf(world, tuning);
-    const site = world.camp.site;
-    const eye = tuning.bodies.guard.eyeHeight.stand;
-    const posts = world.camp.guards.map((g) => {
-      routinePose(g.routine, 0, pose);
-      return { x: pose.x, y: (g.elevated ? g.y : world.terrain.heightAt(pose.x, pose.z)) + eye, z: pose.z, g };
-    });
-    const seenBy = (x: number, z: number, who: (typeof posts)[number]): boolean => {
-      const ground = world.terrain.heightAt(x, z);
-      return nav.seesPoint(who.x, who.y, who.z, x, ground + 1.2, z) || nav.seesPoint(who.x, who.y, who.z, x, ground + tuning.bodies.player.height.stand, z);
-    };
-    const at = (a: number, b: number): { x: number; z: number } => ({ x: site.x + a * L.ux + b * L.vx, z: site.z + a * L.uz + b * L.vz });
-    for (const o of L.openings) {
-      if (found) break;
-      // The way out, and the way along the wall, in the camp's frame.
-      const na = o.side === 'front' ? 1 : o.side === 'back' ? -1 : 0;
-      const nb = o.side === 'left' ? -1 : o.side === 'right' ? 1 : 0;
-      const mid = at(o.a, o.b);
-      const nx = na * L.ux + nb * L.vx;
-      const nz = na * L.uz + nb * L.vz;
-      for (const d of INSIDE) {
-        if (found) break;
-        const show = at(o.a - na * d, o.b - nb * d);
-        if (!nav.standable(show.x, show.z)) continue;
-        // In the view of a man on the ground who fights: he's what the scene waits for.
-        if (!posts.some((p) => !p.g.elevated && tuning.brain.roles[p.g.role].fight > 0 && seenBy(show.x, show.z, p))) continue;
-        const out = at(o.a + na * OFF_WALL, o.b + nb * OFF_WALL);
-        if (!nav.standable(out.x, out.z)) continue;
-        for (const side of [1, -1]) {
-          if (found) break;
-          for (const r of ALONG) {
-            // Along the wall is across the way out: the frame's other axis.
-            const along = o.width / 2 + r;
-            const hide = at(o.a + na * OFF_WALL + nb * side * along, o.b + nb * OFF_WALL + na * side * along);
-            if (!nav.standable(hide.x, hide.z) || !nav.clear(out.x, out.z, hide.x, hide.z)) continue;
-            if (posts.some((p) => seenBy(hide.x, hide.z, p))) continue;
-            found = { show, faceX: -nx, faceZ: -nz, gate: { x: mid.x, z: mid.z, nx, nz, width: o.width }, out, hide, away: { x: hide.x + nx * AWAY, z: hide.z + nz * AWAY } };
-            break;
-          }
-        }
-      }
-    }
-  }
-  leavings.set(world, found);
-  return found;
-}
-
-/** True if a place is outside the camp's perimeter, by more than a step. */
-export function outsideWalls(world: World, x: number, z: number): boolean {
-  const L = world.camp.layout;
-  if (!L) return false;
-  const site = world.camp.site;
-  const a = (x - site.x) * L.ux + (z - site.z) * L.uz;
-  const b = (x - site.x) * L.vx + (z - site.z) * L.vz;
-  return Math.abs(a) > L.halfA + 1 || Math.abs(b) > L.halfB + 1;
-}
-
-/** Seconds he stays where he was seen after a guard is sure of him: the word has a moment to spread, as it had when the owner did it. */
-const LINGER = 2;
+const WATCHERS = 3;
+const LINGER = 5;
+const AT_MOST = 20;
 
 /** What the scene's driver does: stands until someone's sure of him, then runs out of the opening, along the wall, and stops (or runs on). */
 class ShowAndLeave implements Driver<Simulation> {
@@ -154,7 +72,10 @@ class ShowAndLeave implements Driver<Simulation> {
   private leg = 0;
   private driver: ViewDriver | null = null;
 
-  constructor(private readonly plan: 'wall' | 'run') {}
+  /** `plan=fight`: when he last fired. */
+  private fired = -Infinity;
+
+  constructor(private readonly plan: OutTheGateParams['plan']) {}
 
   next(sim: Simulation, out: InputFrame): InputFrame {
     const m = leavingOf(sim.world, sim.tuning);
@@ -163,7 +84,12 @@ class ShowAndLeave implements Driver<Simulation> {
       if (!sim.guards.some((g) => g.senses?.awareness.state === 'combat')) return out;
       this.sure = sim.tick;
     }
-    if ((sim.tick - this.sure) / sim.tuning.sim.tickHz < LINGER) return out;
+    if (this.legs.length === 0) {
+      const watching = sim.guards.filter((g) => g.senses?.awareness.state === 'combat');
+      const armed = watching.some((g) => sim.tuning.brain.roles[sim.world.camp.guards[g.guard.spawn]!.role].fight > 0);
+      const waited = (sim.tick - this.sure) / sim.tuning.sim.tickHz;
+      if (watching.length < WATCHERS && waited < (armed ? LINGER : AT_MOST)) return out;
+    }
     if (this.legs.length === 0) {
       this.legs = [new WalkTo(m.out.x, m.out.z, 'stand', true), new WalkTo(m.hide.x, m.hide.z, 'stand', true)];
       if (this.plan === 'run') this.legs.push(new WalkTo(m.away.x, m.away.z, 'stand', true));
@@ -173,9 +99,40 @@ class ShowAndLeave implements Driver<Simulation> {
       this.leg++;
       if (this.leg < this.legs.length) this.driver = new ViewDriver(this.legs[this.leg]!);
     }
-    return this.leg >= this.legs.length ? out : this.driver!.next(sim, out);
+    if (this.leg < this.legs.length) return this.driver!.next(sim, out);
+    out.commands = [];
+    if (this.plan === 'fight') this.shoot(sim, m, out);
+    return out;
+  }
+
+  /** At his place along the wall, a round every `EVERY` seconds at a man who has come out by the opening and is in his view: the nearest. */
+  private shoot(sim: Simulation, m: Leaving, out: InputFrame): void {
+    const hz = sim.tuning.sim.tickHz;
+    if ((sim.tick - this.fired) / hz < EVERY) return;
+    const you = player(sim.index).body;
+    const nav = navigatorOf(sim.world, sim.tuning);
+    const eye = { x: you.x, y: you.y + you.eyeHeight, z: you.z };
+    let best: { x: number; y: number; z: number } | null = null;
+    let least = Infinity;
+    for (const g of sim.guards) {
+      const b = g.body;
+      if (!outsideWalls(sim.world, b.x, b.z) || (b.x - m.gate.x) * (b.x - m.gate.x) + (b.z - m.gate.z) * (b.z - m.gate.z) > (BY_GATE + 8) * (BY_GATE + 8)) continue;
+      const chest = b.y + b.eyeHeight * 0.75;
+      if (!nav.seesPoint(eye.x, eye.y, eye.z, b.x, chest, b.z)) continue;
+      const d = (b.x - you.x) * (b.x - you.x) + (b.z - you.z) * (b.z - you.z);
+      if (d < least) {
+        least = d;
+        best = { x: b.x, y: chest, z: b.z };
+      }
+    }
+    if (!best) return;
+    this.fired = sim.tick;
+    out.commands = [stimulus('shot', best, eye)];
   }
 }
+
+/** Seconds between his rounds, with `plan=fight`: a bolt worked, and a man found in the sights. */
+const EVERY = 1.6;
 
 /** What a run has shown: ticks (−1 until it happens), and the men who did each thing. */
 export interface GateSeen {
@@ -183,13 +140,18 @@ export interface GateSeen {
   sure: number;
   left: number;
   hidden: number;
+  /** He found another way out than the opening he was put by: the run says nothing about that opening. */
+  astray: boolean;
   /** How many of the camp were in combat or searching as he crossed. */
   aware: number;
   /** Men who were outside the walls already when he crossed: a patrol on its beat isn't anyone coming after him. */
   already: Set<number>;
-  /** Men who came to the opening after he'd gone through it, and men who went out of the walls after him. */
+  /** Men who came to the opening after he'd gone through it, and men who went out of the walls after him and stayed out a moment: one who turned back on the threshold didn't go. */
   came: Set<number>;
   went: Set<number>;
+  /** Ticks each man has spent outside by the opening, and the tick the first of them stepped out. */
+  outFor: Map<number, number>;
+  outAt: number;
   cameAt: number;
   wentAt: number;
   /** A man who went out after him had him in sight; anyone at all did, once he was at his place. */
@@ -201,14 +163,25 @@ export interface GateSeen {
   most: number;
   /** The fewest men who fight and aren't on a tower left inside the walls. */
   home: number;
+  /** Of the men who came out after him, those he put down (`plan=fight`), and the men who came out once two were down already. */
+  down: Set<number>;
+  late: Set<number>;
 }
 
 export function emptyGateSeen(): GateSeen {
-  return { sure: -1, left: -1, hidden: -1, aware: 0, already: new Set(), came: new Set(), went: new Set(), cameAt: -1, wentAt: -1, found: -1, seenAgain: -1, rounds: 0, roundsOut: 0, most: 0, home: Infinity };
+  return { sure: -1, left: -1, hidden: -1, astray: false, aware: 0, already: new Set(), came: new Set(), went: new Set(), outFor: new Map(), outAt: -1, cameAt: -1, wentAt: -1, found: -1, seenAgain: -1, rounds: 0, roundsOut: 0, most: 0, home: Infinity, down: new Set(), late: new Set() };
 }
 
-/** Metres from the opening's middle that count as at it. */
+/** Metres from the opening's middle that count as at it, and as having come out by it. */
 const AT_GATE = 6;
+const BY_GATE = 12;
+/** Seconds outside that count as having gone out: less is a man who turned back on the threshold. */
+const STAYED = 1.5;
+/** Seconds from his crossing the wall by which a man has to be out after him for it to be a chase, and not the camp's search finding its way there a minute on. */
+export const SOON = 30;
+
+/** The scene's table: two camps, and on the first each thing he might do once he's out. */
+export const OUT_THE_GATE_TABLE: readonly string[] = ['seed=TES-6931', 'seed=VOP-9546', 'seed=TES-6931&plan=run', 'seed=TES-6931&plan=fight'];
 
 /** Takes one tick's events and state into what the run has shown. */
 export function watchGate(sim: Simulation, events: ReturnType<Simulation['step']>, seen: GateSeen): void {
@@ -221,10 +194,12 @@ export function watchGate(sim: Simulation, events: ReturnType<Simulation['step']
     seen.left = sim.tick;
     seen.aware = sim.guards.filter((g) => g.senses?.awareness.state === 'combat' || g.senses?.awareness.state === 'searching').length;
     for (const g of sim.guards) if (outsideWalls(sim.world, g.body.x, g.body.z)) seen.already.add(g.id);
+    seen.astray = (you.x - m.gate.x) * (you.x - m.gate.x) + (you.z - m.gate.z) * (you.z - m.gate.z) > BY_GATE * BY_GATE;
   }
   if (seen.left >= 0 && seen.hidden < 0 && (you.x - m.hide.x) * (you.x - m.hide.x) + (you.z - m.hide.z) * (you.z - m.hide.z) < 4) seen.hidden = sim.tick;
   if (seen.left < 0) return;
   for (const e of events) {
+    if (e.type === 'death' && seen.outFor.has(e.victim)) seen.down.add(e.victim);
     if (e.type !== 'shot' || e.source === sim.playerId) continue;
     seen.rounds++;
     if (seen.went.has(e.source)) seen.roundsOut++;
@@ -238,11 +213,18 @@ export function watchGate(sim: Simulation, events: ReturnType<Simulation['step']
     const out = outsideWalls(sim.world, g.body.x, g.body.z);
     const sees = g.senses?.percepts.some((q) => q.kind === 'sight' && q.tick === sim.tick) === true;
     if (sees && seen.seenAgain < 0 && seen.hidden >= 0) seen.seenAgain = sim.tick;
-    if (out && !post.elevated && !seen.already.has(g.id)) {
-      outside++;
-      if (!seen.went.has(g.id)) {
-        seen.went.add(g.id);
-        if (seen.wentAt < 0) seen.wentAt = sim.tick;
+    // Out after him: outside the walls, by the opening he left by. A man who has taken a position outside the far wall is the firefight's, as he always was.
+    if (out && !post.elevated && !seen.already.has(g.id) && (seen.went.has(g.id) || (g.body.x - m.gate.x) * (g.body.x - m.gate.x) + (g.body.z - m.gate.z) * (g.body.z - m.gate.z) <= BY_GATE * BY_GATE)) {
+      const spent = (seen.outFor.get(g.id) ?? 0) + 1;
+      seen.outFor.set(g.id, spent);
+      if (seen.outAt < 0) seen.outAt = sim.tick;
+      if (spent >= STAYED * sim.tuning.sim.tickHz) {
+        outside++;
+        if (!seen.went.has(g.id)) {
+          seen.went.add(g.id);
+          if (seen.wentAt < 0) seen.wentAt = sim.tick;
+          if (seen.down.size >= 2) seen.late.add(g.id);
+        }
       }
       if (sees && seen.found < 0) seen.found = sim.tick;
     } else if (!post.elevated && roles[post.role].fight > 0) home++;
@@ -268,13 +250,15 @@ export function outTheGate(params?: string): Scene {
       params: `seed=${p.seed}${p.plan === 'wall' ? '' : `&plan=${p.plan}`}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}`,
       title: `Out of the gate (${p.seed})`,
       description: 'Someone stands inside an opening in the camp’s wall until he is seen, then runs out, turns along the outside of the wall and stops where no post can see him. What comes after him?',
+      // `plan=fight` fires his rounds as the compound simulator drops its own: from where he stands, at a place.
+      systems: [...(base.systems ?? []), compoundDrops],
       setup: (sim) => {
         base.setup!(sim);
         seen = emptyGateSeen();
         const m = leavingOf(sim.world, sim.tuning);
         if (m) placePlayer(sim, m.show.x, m.show.z, m.faceX, m.faceZ);
-        // The question is whether they come: he can't be hurt here.
-        delete player(sim.index).health;
+        // The question is whether they come: he can't be hurt here. Running for the trees, he can: what it costs him is the question there.
+        if (p.plan !== 'run') delete player(sim.index).health;
       },
       driver: () => new ShowAndLeave(p.plan),
       seconds: 120,
@@ -292,22 +276,33 @@ export function outTheGate(params?: string): Scene {
                 ? 'nobody was ever sure of him'
                 : seen.left < 0
                   ? 'he never got out of the walls'
-                  : p.plan === 'wall' && seen.hidden < 0
+                  : seen.astray
+                    ? 'he found another way out than the opening he stood by'
+                    : p.plan !== 'run' && seen.hidden < 0
                     ? 'he never reached his place along the wall'
                     : undefined,
         },
         {
-          name: 'someone comes out after him, and sets eyes on him',
-          after: (sim) =>
-            seen.left < 0 || seen.found >= 0
-              ? undefined
-              : seen.went.size === 0
-                ? `nobody went out after him (${seen.came.size} came to the opening)`
-                : `${seen.went.size} went out after him, and none had set eyes on him ${((sim.tick - seen.left) / sim.tuning.sim.tickHz).toFixed(0)} s on`,
+          name: p.plan === 'fight' ? 'someone comes out after him, soon' : 'someone comes out after him soon, and sets eyes on him',
+          after: (sim) => {
+            if (seen.left < 0 || seen.astray) return undefined;
+            const hz = sim.tuning.sim.tickHz;
+            if (seen.outAt < 0) return `nobody went out after him (${seen.came.size} came to the opening)`;
+            if ((seen.outAt - seen.left) / hz > SOON) return `the first man out after him was ${((seen.outAt - seen.left) / hz).toFixed(0)} s behind him`;
+            if (p.plan !== 'fight' && seen.found < 0) return `${seen.outFor.size} went out after him, and none had set eyes on him ${((sim.tick - seen.left) / hz).toFixed(0)} s on`;
+            return undefined;
+          },
         },
         {
-          name: 'a man or two go, and the camp keeps the rest',
-          after: (sim) => (seen.most > 2 ? `${seen.most} men were outside the walls at once` : seen.home < sim.tuning.brain.hunt.keep ? `only ${seen.home} fighting men were left inside` : undefined),
+          name: p.plan === 'fight' ? 'once two are down, nobody else comes out, and the camp keeps the rest' : 'a man or two go, and the camp keeps the rest',
+          after: (sim) =>
+            seen.most > 2
+              ? `${seen.most} men were out after him at once`
+              : seen.late.size > 0
+                ? `${seen.late.size} more came out once two were down`
+                : seen.home < sim.tuning.brain.hunt.keep
+                  ? `only ${seen.home} fighting men were left inside`
+                  : undefined,
         },
       ],
     },

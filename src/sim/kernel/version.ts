@@ -69,5 +69,10 @@ export const GEN_VERSION = 9;
  * takes a gun he heard or saw for himself. What a man was told leaves his mind before what
  * he sensed himself, so talk doesn't push out the shot he heard; and a camp that hunts
  * sends nobody out alone to a sound off its own ground. The camp-fight run moved again.
+ * 22: the chase (brain/firefight.ts): in a camp that chases, a man who watched an intruder
+ * leave its walls by an opening, or heard it from one who did, goes after him at once, at a
+ * run, to the opening and a step out of it, and looks each way along the wall. Two at most
+ * go in one fight; they keep to the camp's own ground, and once anyone has gone the rest
+ * keep inside the walls. No pinned run has anyone inside a camp, so no fingerprint moved.
  */
-export const SIM_VERSION = 21;
+export const SIM_VERSION = 22;
