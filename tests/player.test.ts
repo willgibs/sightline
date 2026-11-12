@@ -510,7 +510,8 @@ describe('a refused move', () => {
     for (const face of [0.3, 0.317, 0.3391, 0.3573, 0.41, 0.4737]) {
       for (const deg of [8, 17, 26]) {
         // A crate along the south side of the way up, its top a step over the ground 2 m up the
-        // slope, and a shelf over all of it: 1.8 m of room on the ground under it, 1.7 m on the crate.
+        // slope, and a shelf over all of it: room for a body on the ground the whole way under
+        // it, and 1.7 m on the crate.
         const crate = box(0, 3.3, face, face + 1, -1, top);
         const shelf = box(1, 3.6, face - 1.5, face + 1, 2.45, 2.6);
         const sim = new Simulation(testWorld({ size: 40, cell: 0.5, height: (x) => slope * x, colliders: [crate, shelf], spawn: { x: -1, z: face - 0.7 } }), tuningCopy());
