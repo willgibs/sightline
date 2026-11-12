@@ -22,7 +22,7 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 **Versions.** `SIM_VERSION` 19: runs with a vehicle on the move have engine events, and protecting camps answer differently. No pinned run has either, so no behaviour fingerprint moved. `STATE_SCHEMA` 13.
 
-**Not done.** Nobody has played or heard it. A camp that holds still has a vehicle standing at his door, which reads as a getaway: moving it changes those camps, so it waits for the generator's next change, with a man posted at the vehicle on camps that bolt. What he does about someone in his room is close protection, next of step 3's means.
+**Not done.** Nobody has played or heard it. A camp that holds still has a vehicle standing at his door, which reads as a getaway. It stays there for now: a camp that isn't ready for trouble still runs him to it at the siren, and its place by his door is what hides that run from a perch. It moves when those camps take an answer of their own. What he does about someone in his room is close protection, next of step 3's means.
 
 ## 2026-11-11 · Taller camps: levels, and what a ridge gets of them
 

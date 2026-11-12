@@ -1045,7 +1045,7 @@ Added on Nov 8, the owner's call. *Labs pass* requires it. Design and reasoning:
   - [ ] The owner's sitting on the firefight.
   - [ ] The owner's sitting on the hunt.
   - [x] The target answers by the camp's problem, with tells a player can read (the owner's call, Nov 10; `docs/camp-engine.md`, section 9, *Step 3a*): a camp he's buried in holds him to the end, a camp built to be flushed starts his vehicle at the siren and bolts a minute later, and any other waits for its relief. Engines are heard. On 40 camps he leaves 15 of 31 where he left all 31, and where he leaves there are 78 s of something to hear first (`npm run experiment -- answer`).
-  - [ ] What it leaves: on a camp that holds, the vehicle moved from his door to the motor pool, and on one that bolts a man posted at it (both the generator's); and what he does about someone in his room.
+  - [ ] What it leaves: what he does about someone in his room (close protection); and an answer for a camp that isn't ready for trouble, after which a camp that holds can keep its vehicle away from his door.
   - [ ] The owner's sitting on the three answers.
   - [x] Levels: two storeys, the second half of compound types (lab D's *Two-storey buildings*, above). A guard who hears something upstairs goes up, a target who keeps upstairs shelters there, and the men sent for him climb to him. A search the commander orders still keeps to the ground.
 - [ ] F3 · The camp has means. The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels.
