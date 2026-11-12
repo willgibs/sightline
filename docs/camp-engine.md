@@ -639,13 +639,15 @@ What each of those is, in the code:
 | Loud, at whoever is on a watchtower | 13 | 13 | 92% | 5, at 10 s | 4, at 109 s |
 | Suppressed, at an alarm box | 11 | 4 | 16% | 0 | 0; the box was dead on 11 |
 | Suppressed, at the generator | 13 | 1 | 3% | 0 | 0; it does nothing to it |
-| Five suppressed rounds half a minute apart, each careful | 20 | 14 | | 6, at 144 s, with 3 men down | 2, at 180 s |
+| Five suppressed rounds half a minute apart, each careful | 20 | 14 | | 5, at 135 s, with 3 men down | 2, at 181 s |
 
 One siren in the table was thrown by a man who had seen nobody and no body: in the run of five rounds, a man for whom it was fire that goes on. Before, it was 37 of 48. What the table says:
 
 - **A careful first shot is quiet.** One camp in twenty whistles, and none sounds its siren. It was nine in twenty, with the target gone half a minute later.
-- **It isn't a perfect answer, and neither is the subsonic load.** The suppressor does less the nearer you are: from 80 m the camp whistles on 9 of 21. The subsonic load buys you in to about 90 m, and at 40 m it's heard on 19 camps of 24. And a camp counts its dead: five careful rounds bring the siren on 6 camps of 20, with three men down.
+- **It isn't a perfect answer, and neither is the subsonic load.** The suppressor does less the nearer you are: from 80 m the camp whistles on 9 of 21. The subsonic load buys you in to about 90 m, and at 40 m it's heard on 19 camps of 24. And a camp counts its dead: five careful rounds bring the siren on 5 camps of 20, with three men down.
 - **Where it sounds on one round, someone was watching the man who fell.** That is the sightline puzzle the generator builds, and the difference between the first row and the fifth is the game.
+
+**What else it moved.** One loud shot no longer brings the siren, so a shooter who fires once from the overview and stays is now found on 5 camps of 12, where step 2b had 9: a section still goes out after him on 10, but (my reading) no relief joins the search. One who fires four times is found on 9, with enough rounds on him to kill on 6, as one shot used to do. Under the sniper who fires every 8 s the siren comes 12 s after his first shot, from 7. And the brain bench's overlook has 24 guards of 32 down to a perfect shooter on one perch, from 18: its camps ran for cover at any sound of a shot, and now stand to where they are at the whistle, as the takedown's camps did. A man on the best overview sees men who have only got down, and that is the next thing a static shooter should lose.
 
 **How you win, then.** Watch before you fire. A man nobody is looking at, on a line that passes nobody, falls unseen, and the camp finds him by a check-in he doesn't answer or by walking past. If a man sees you, or sees one fall, he has to reach a box: drop him on the way (the design doc's reaction window, about a second and a half before he sets off). A second body found, or a second loud shot, and the siren comes anyway. But it starts the camp's answer and doesn't end the mission: a camp you have to go into keeps its target to the end, a camp built to be flushed gives a minute of engine before he runs, and an escort's waits for its relief.
 
