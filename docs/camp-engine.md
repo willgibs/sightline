@@ -439,6 +439,18 @@ And the walk in itself (`npm run scene -- firefight`): someone stands in front o
 
 **On the taller camps** (measured again when two storeys landed, the same experiment): circling ends with the shooter dead on 10 camps of 16, from 8 without the firefight, and he gets all the way round on 5, from 7. Men he puts down from the walk fall from 3.1 to 2.1. The effect is smaller than on one storey because a taller camp shows a walker fewer men, and fewer of them see him.
 
+**With the hunt as well** (step 2b, the same 16 taller camps and the same experiment, Nov 11):
+
+| | Before either | The firefight | The firefight and the hunt |
+| --- | --- | --- | --- |
+| Circling: shot dead on the walk | 8 of 16 | 10 | 14 |
+| Circling: got all the way round | 7 of 16 | 5 | 1 |
+| Circling: men down from the walk | 3.1 | 2.1 | 0.9 |
+| Circling: rounds at him | 19.7 | | 29.4 |
+| Men shot by their own side | 0.19 | 0 | 0 |
+
+A camp that hunts sends nobody out alone to look for a shooter, so the men a walker used to pick off one at a time as they came are still in their positions, shooting.
+
 ### Step 2b, built: the hunt (Nov 11)
 
 `brain/approach.ts`, `brain/hunt.ts`, and the hunt's half of `brain/commander.ts`. Only a camp with `hunts` does it (`off=hunt` plays the camp as it was). A hunt ends in a firefight, so `off=firefight` takes it away too.
@@ -488,7 +500,7 @@ And the walk in itself (`npm run scene -- firefight`): someone stands in front o
 | Men not sent who went past the wire | 0 | 0.08 |
 | Fewest fighting men left at home | | 3.5 |
 
-So staying put after a loud shot now gets a shooter found on three camps in four, and moving a hundred metres is worth most of that back. That is what step 2 was for.
+So staying put after a loud shot now gets a shooter found on three camps in four, and moving a hundred metres is worth most of that back. That is what step 2 was for. A shooter who circles the camp instead does worse too: shot dead on 14 camps of 16, where the firefight alone had 10 (step 2a, *With the hunt as well*).
 
 **What it doesn't do yet, and where each belongs.**
 
