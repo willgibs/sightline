@@ -60,7 +60,7 @@ function run(seed: string, arm: Arm, t: Tuning): Record<string, number> {
   const hz = t.sim.tickHz;
   const out: Record<string, number> = {
     done: 0, aware: NaN, came: NaN, cameAt: NaN, went: NaN, wentAt: NaN, soon: NaN, found: NaN, foundAt: NaN, most: NaN, men: NaN, home: NaN, rounds: NaN, own: NaN,
-    'r.done': 0, 'r.fired': NaN, 'r.struck': NaN, 'r.killed': NaN,
+    'r.done': 0, 'r.fired': NaN, 'r.struck': NaN, 'r.killed': NaN, 'r.own': NaN,
     'f.done': 0, 'f.came': NaN, 'f.down': NaN, 'f.late': NaN, 'f.most': NaN, 'f.own': NaN,
   }; // prettier-ignore
   const after = (seen: GateSeen, tick: number): number => (tick < 0 ? NaN : (tick - seen.left) / hz);
@@ -87,6 +87,7 @@ function run(seed: string, arm: Arm, t: Tuning): Record<string, number> {
     out['r.fired'] = ran.rounds;
     out['r.struck'] = ran.hits;
     out['r.killed'] = ran.killed >= 0 ? 1 : 0;
+    out['r.own'] = ran.own.size;
   }
   const fought = play(seed, arm, t, 'fight');
   if (fought) {
@@ -124,6 +125,7 @@ export const outTheGateExperiment: Experiment = {
     { key: 'r.fired', label: 'runs for the trees: rounds fired at him', kind: 'mean' },
     { key: 'r.struck', label: 'runs for the trees: rounds that hit him once he was out', kind: 'mean' },
     { key: 'r.killed', label: 'runs for the trees: enough of them to kill', kind: 'rate' },
+    { key: 'r.own', label: 'runs for the trees: men shot by their own side', kind: 'mean' },
     { key: 'f.came', label: 'shoots whoever comes out: men who came out, in all', kind: 'mean' },
     { key: 'f.down', label: 'shoots whoever comes out: of them, put down', kind: 'mean' },
     { key: 'f.late', label: 'shoots whoever comes out: men who came out once two were down', kind: 'mean' },

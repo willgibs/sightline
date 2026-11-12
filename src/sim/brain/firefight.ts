@@ -194,22 +194,26 @@ export function mateGoneOut(m: GuardMind, x: number, z: number): boolean {
 
 /**
  * True if a round from this man to a place would go through the opening one of his own said
- * he was going out by, lately, at the height of a man: the gateway is where the men who went
- * are, coming and going, and a man well behind it firing through it at someone beyond has
- * them in his line. A man at that opening himself can see who is beside him, and fires as
- * he sees fit; a tower's round at something far out passes over their heads.
+ * he was going out by, lately or in this same fight, at the height of a man: the gateway is where the men who went
+ * are, coming and going, and a man inside the walls firing through it at someone beyond has
+ * them in his line, from 30 m back or from the gateway itself. A man who is outside the
+ * walls is out there with them, and fires as he sees fit; a tower's round at something far
+ * out passes over their heads.
  */
 export function mateInLine(m: GuardMind, x: number, y: number, z: number): boolean {
-  const o = m.brain!.mateOut;
+  const b = m.brain!;
+  const o = b.mateOut;
   if (!o) return false;
   const C = m.tuning.brain.firefight.chase;
-  if ((m.tick - o.heard) / m.tuning.sim.tickHz > C.cease) return false;
+  // For as long as his own fight has men out in it: the one who came back in stands in the gateway, a minute on and more.
+  // A man with no fight of his own (a tower's) goes by how long ago he heard.
+  if (!(b.ff && b.ff.out.length > 0) && (m.tick - o.heard) / m.tuning.sim.tickHz > C.cease) return false;
   const g = openingNear(m.world, o.x, o.z);
   const lane = (g ? g.width / 2 : 0) + C.lane;
   const sx = m.self.x;
   const sz = m.self.z;
-  // At the opening himself.
-  if ((o.x - sx) * (o.x - sx) + (o.z - sz) * (o.z - sz) <= 4 * lane * lane) return false;
+  // Out there himself.
+  if (outsideWalls(m.world, sx, sz)) return false;
   const dx = x - sx;
   const dz = z - sz;
   const len = dx * dx + dz * dz;

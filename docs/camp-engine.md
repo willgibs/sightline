@@ -545,7 +545,7 @@ So staying put after a loud shot now gets a shooter found on three camps in four
 | There | Down on a knee. A look each way along the wall, 2.6 s each, then out across the ground for 5 s. A figure he glimpses out there is the man he came out for, and the fight is on from there |
 | How far | The camp's own ground. He steps out, looks and shoots. Going on into the valley is a section's job (step 2b), once the camp has placed someone out there |
 | The rest | Once anyone has gone out, every other man's position and every bound he makes keeps inside the walls |
-| The rest's fire | For a minute after a man says he's going out, nobody fires at ground he can't see into within 15 m of that place, and nobody well behind the opening fires through it at a man's height. A man at the opening himself fires as he sees fit, and a tower's round at something far out goes over their heads |
+| The rest's fire | For a minute after a man says he's going out, nobody fires at ground he can't see into within 15 m of that place. And for as long as that fight lasts, nobody inside the walls fires through that opening at a man's height. A man who is outside fires as he sees fit, and a tower's round at something far out goes over their heads |
 | If nobody's there | He says the place is empty and goes back in |
 
 In the code:
@@ -567,7 +567,7 @@ In the code:
 | Someone came out after him | 3, 66 s after | 19, 13 s after |
 | Someone was out within 25 s | 0 | **18** |
 | A man who came out set eyes on him | 2, 63 s after | **19, 16 s after** |
-| Rounds fired by the men who came out | 0.1 | 13 |
+| Rounds fired by the men who came out | 0.1 | 9 |
 | Men who came out, in all | 0.2 | 1.8 |
 | Most out at once | 0.2 | 1.3 |
 | Fewest fighting men left inside the walls | 6.3 | 5.0 |
@@ -577,9 +577,10 @@ And the two other things a person does once he's out:
 
 | | As it was | With the chase |
 | --- | --- | --- |
-| **He runs on for the trees.** Rounds fired at him | 38 | 62 |
-| Rounds that hit him once he was out | 13 | 20 |
-| Enough of them to kill | 11 of 21 | 16 of 21 |
+| **He runs on for the trees.** Rounds fired at him | 38 | 40 |
+| Rounds that hit him once he was out | 13 | 14 |
+| Enough of them to kill | 11 of 21 | 12 of 21 |
+| Men shot by their own side | 0 | 0 |
 | **He stays and shoots whoever comes out.** Men who came out | 0.2 | 1.8 |
 | Of them, put down by him | 0.2 | 1.8: all of them |
 | Men who came out once two were down | 0 | **0** |
@@ -589,7 +590,8 @@ What the tables say:
 
 - **Out of the gate isn't out of the fight.** About 13 s after you go through it, a man is out after you, and two or three seconds later he has you in sight along the wall.
 - **It's one or two, and the camp keeps its men.** Five fighting men are still inside at the worst moment, where six were.
-- **Running in a straight line was deadly already,** as the owner expected: a runner took 13 hits from the towers and from men with a line through the opening before any of this. It's more so now.
+- **Running in a straight line was deadly already, and is as deadly now,** as the owner expected: a runner took 13 hits from the towers and from men with a line through the opening before any of this, and takes 14. The men who come out shoot at him, and the men inside no longer fire through the opening those men went out by, which comes to about the same.
+- **It holds on more camps.** On 60 (49 where he was seen and got out that way), someone came out after him on 41, from 14, and a man who came out set eyes on him on 40, from 10. In those 147 runs, three plans on each camp, nobody was shot by his own side.
 - **You can correct the mistake.** A man who waits by the wall and puts down the two who come out has nobody else come out after them.
 
 **What didn't move.** No behaviour fingerprint, and nothing in any lane's bench: no pinned run or bench has anyone go out of a camp by an opening. And the wider experiments, on the same camps as `main` the day this landed:
@@ -611,7 +613,7 @@ That list, and the chase's own bench, read wrong more than once on the way. Each
 
 **Decided along the way.**
 
-- **The camp was shooting the men it sent out.** The chaser's "Moving!" went on the net so the far end of the camp could count him, and it named where he was going. A tower marksman reads a "Moving!" on the net as a section asking for fire on the place it names (step 2b), and a tower man who can't see an intruder fires at where he believes him to be, which was now "just outside the gate". On three camps of 24, four of the men who went out were killed kneeling there by their own side, and the first measurements counted such men as put down by the intruder. A chaser's word is no longer a call for fire; nobody fires blind near where a mate went out; and nobody well behind the opening fires through it. The scene now fails if any man is shot by his own side, in all three of its plans (72 runs: none).
+- **The camp was shooting the men it sent out.** The chaser's "Moving!" went on the net so the far end of the camp could count him, and it named where he was going. A tower marksman reads a "Moving!" on the net as a section asking for fire on the place it names (step 2b), and a tower man who can't see an intruder fires at where he believes him to be, which was now "just outside the gate". On three camps of 24, four of the men who went out were killed kneeling there by their own side, and the first measurements counted such men as put down by the intruder. A chaser's word is no longer a call for fire, and nobody fires blind near where a mate went out. That left aimed fire. With the rest of the camp kept to its walls, the gateway is the one place with a view out, so a man back from his chase settled in it while others fired through it from behind him: one more man down, at a minute and more after the chase. A minute's hold only moved that later, and keeping positions out of the gateway sent the chasers to fight from outside, where two were hit by each other on 60 camps. What holds is the plain rule: once men have gone out by an opening, nobody inside fires through it for the rest of that fight. The scene now fails if any man is shot by his own side, in all three of its plans (147 runs on 60 camps: none).
 - **Watching him go takes knowing he was in, and going out is through the opening.** The ladder of plans found this one, on one camp of its 16 (SIZ-0270). A man who walks in at the front gate stopped a step outside it, in a guard's view, and came on in. He was last seen outside the walls by an opening, which the first rule read as a man who had left: the guard called it, two men went out to look for him along the wall, and he walked to the target's door and shot him. Now a man chases only someone he knows was inside, and one last seen inside counts as going out only if the way he was going leaves by the opening and not into the wall beside it. That walker is fought on all 16 camps exactly as he is on `main` (`tests/chase.test.ts`).
 - **Being told he was inside counts, if the man telling saw him.** The first version of that rule took only a man's own eyes, and lost two camps: the man who saw him come out was a patrol outside the wall, who had never seen him in it and had heard that he was. A sighting someone called counts. A place someone heard doesn't: a man at the gate is within a guess of being inside it.
 - **Only a man who says he's going out of the walls counts as one.** The first count took any "Moving!" about a place outside the walls, and a man going after a shooter who was outside all along says that too. Against a shooter circling a camp, two men were counted as out who had chased nobody, and from then on the rest were held to the walls in a fight nobody had left. It moved no number on any bench, and it was wrong (`tests/firefight.test.ts`).
@@ -627,9 +629,9 @@ That list, and the chase's own bench, read wrong more than once on the way. Each
 
 - **Nobody has played it.** Whether 13 s is the right head start, and whether two is the right number, are the owner's by playing: `brain.firefight.chase`.
 - **A worker who is the only one to see him tells nobody where.** He holds or runs for a box, and the men with rifles never learn which way the intruder went. Two of the 21 camps are that (one or two men knew of him as he left, and nobody came out). What a man with no rifle says about what he sees belongs with the camp's voice, and is the next thing in this direction.
-- **A man doesn't see his own side.** He holds his fire by what a mate said and where, not by who is in front of his muzzle. That's enough for the gateway, on these camps. It also means that for a minute after a man goes out, the men well behind that opening don't fire through it whether he's still alive or not: put down the two who came out, and the gateway is quieter than it should be until the minute is up. A camp that could see its own would hold its fire for exactly as long as it should, and that's lab A's to give it.
+- **A man doesn't see his own side.** He holds his fire by what a mate said and where, not by who is in front of his muzzle. That's enough for the gateway, on these camps. It also means that once men have gone out by an opening, the men inside don't fire through it for the rest of that fight, whether those men are still alive or not: put down the two who came out, and the gateway is quieter than it should be. A camp that could see its own would hold its fire for exactly as long as it should, and that's lab A's to give it.
 - **Two men behind one wall can box each other in.** The route a man takes doesn't know about the man beside him, and stepping round him can leave him circling. It cost one camp twelve seconds here (25 s to the first man out, where the rest take 13), and it's the navigator's to fix, for every act that sets off at a run.
-- **A third man can go out, after the first two.** Three who set off in the same second haven't heard each other yet, and the third turns back when he does. On two camps of 21 three men went out in all, and no more than two were out at once on any.
+- **A third man can go out, after the first two.** Three who set off in the same second haven't heard each other yet, and the third turns back when he does. On three camps of 21 three men went out in all, and no more than two were out at once on any.
 - **He's followed to the opening, not round the corner.** A chaser who sees nobody along the wall gives it up after his look. A man who keeps going round the compound's corner is the firefight's ordinary follow, or the hunt's.
 - **Hugging the wall still hides you from a tower.** That's honest geometry: a deck 3 m inside a 3 m wall can't see the ground within about 3.5 m of its far side. The answer to it is the man who steps out, which is this.
 

@@ -956,7 +956,7 @@ export const defaultTuning = {
         hold: 5, // seconds he then watches the ground beyond with nobody in sight before he gives it up and goes back in
         spot: 25, // metres from the opening within which a figure he glimpses, out there and looking, is the man he came out for: he's expecting him
         patience: 12, // seconds after he said he was going that he keeps trying to get there, with something in his way that no map shows
-        cease: 60, // seconds after a man said he was going out that nobody fires at ground he can't see into
+        cease: 60, // seconds after a man said he was going out that nobody fires at ground he can't see into (a man in the fight himself holds for as long as it lasts)
         clearOf: 15, // within this many metres of where he said he was going,
         lane: 2.5, // or along a line that passes within this many metres of that opening's sides,
         over: 2.5, // less than this many metres above the ground there: a tower's round at something far out goes over a man's head
