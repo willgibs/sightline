@@ -163,7 +163,9 @@ function drill(m: GuardMind): void {
     }
     return;
   }
-  if (b.drilled === 'fetch' || b.task?.kind === 'start') return;
+  // Not a man who's already on it, or has been in for the target, or has been sent on another errand about him.
+  const errand = b.task?.kind;
+  if (b.drilled === 'fetch' || errand === 'start' || errand === 'fetch' || errand === 'escort' || errand === 'post') return;
   const dx = at.x - m.self.x;
   const dz = at.z - m.self.z;
   const turn = holds ? 0 : A.takeOver + Math.sqrt(dx * dx + dz * dz) * A.perMetre;

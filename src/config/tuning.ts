@@ -841,6 +841,7 @@ export const defaultTuning = {
       // Finding a place to fight from (brain/positions.ts).
       spot: {
         maxRun: 26, // metres of path to a position, for a man who has to get out of sight; one who's out of it already will go farther for a view, by his role's `flank`
+        doorRun: 8, // and for a man holding the target's door once the siren has sounded: he fights from beside it
         cells: 9000, // cells one search may walk (rule 18)
         rays: 160, // rays one search may cast (rule 18)
         cover: 0.8, // metres tall a thing has to be for the places behind it to be worth a look

@@ -539,7 +539,7 @@ The second of those came from playing the sitting's own link headless. The man o
 
 **What there is to read.** Before a shot: who stands on his doors (nobody, on a camp that holds), and whether he ever walks out (only on an escort's). After one: an engine. A vehicle's engine is a sound now (the `engine` event, every two seconds while it runs, by the law every sound obeys): heard to 500 m as it starts or drives and to 320 m standing. The camp's own starting up seconds after the siren means he's going. No engine in the camp and a truck on the road means the relief is coming for him. Neither means he's staying. And a run that loses him says so at the end: "his vehicle's engine had been running for 79 s when he got to it".
 
-**Men on his door stay on it.** Once the siren has sounded, a man posted on the target's door doesn't walk off to look into something: he fights from there, and leaves only by the drill. The relief knows the alarm is up when it arrives. And an order from the commander doesn't take a man off bringing the target out, or off his way to hold a door.
+**Men on his door stay on it.** Once the siren has sounded, a man posted on the target's door doesn't walk off to look into something, the commander sends him nowhere but in for the target, and in a firefight he takes a position within 8 m of where he stands and goes after nobody. Under a shooter circling an escort's camp, the man on the door was never more than 4.8 m from it in six minutes, 15 s of them in the fight. He leaves it only by the drill. The relief knows the alarm is up when it arrives. And an order from the commander doesn't take a man off bringing the target out, or off his way to hold a door.
 
 **The camp knows what has become of its vehicle.** Once he has driven off in it, or once a man has gone to start it and found it dead, there is no vehicle as far as anyone in the camp is concerned: nobody else runs to it, and nobody is sent to bring him out to it. Before that, the first version had every man in the camp taking his turn to go and start a vehicle that had left, and the fight stopped. The firefight's own test caught it.
 
@@ -567,7 +567,7 @@ So the three kinds of camp now end three ways under the same attack, and where h
 - **A camp that isn't ready for trouble is as it was:** he runs for his vehicle at the siren. These answers are a protecting camp's (`ready=alert`, the takedown).
 - **Three camps in forty never sounded the siren** under this sniper in five minutes, and on those nothing happens to him either way.
 
-**Dials a person should set by playing,** in `tuning.brain.protect.answer` and `tuning.brain.engine`: how long the engine runs before he's sent for (`prep`, 60 s: the length of the warning), how much longer before he comes by himself (`own`), how long before another man takes over starting it (`takeOver`, `perMetre`), how many of the relief go to his doors (`keepers`), and how far an engine carries starting, standing and driving.
+**Dials a person should set by playing,** in `tuning.brain.protect.answer` and `tuning.brain.engine`: how long the engine runs before he's sent for (`prep`, 60 s: the length of the warning), how much longer before he comes by himself (`own`), how long before another man takes over starting it (`takeOver`, `perMetre`), how many of the relief go to his doors (`keepers`), how far a man on his door will go for a position (`firefight.spot.doorRun`), and how far an engine carries starting, standing and driving.
 
 ## 10. Decisions
 

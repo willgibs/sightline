@@ -4,7 +4,9 @@ import { protectionOf } from '../src/lab/gauges';
 import type { AttackDriver } from '../src/sim/game/attacks';
 import { commanderOf } from '../src/sim/game/comms';
 import { answerOf } from '../src/sim/game/protection';
+import { ViewDriver } from '../src/sim/game/bots/playerView';
 import { compound } from '../src/sim/game/scenes/compound';
+import { circleOf, ladder } from '../src/sim/game/scenes/ladder';
 import type { Simulation } from '../src/sim/game/sim';
 import { startScene, type Scene } from '../src/sim/kernel/scene';
 import { player } from '../src/sim/game/entities';
@@ -26,6 +28,8 @@ import { shooterScene, worldOf } from './live';
  *   relief that comes for him;
  * - a camp that holds keeps him to the end, whatever his nerve, and posts its relief on his
  *   doors, where they stay;
+ * - a man on the target's door stays by it once the siren has sounded, in a fight as out of
+ *   one;
  * - a run that loses him says at the end what there was to read before he went.
  */
 
@@ -281,6 +285,44 @@ describe('a camp that holds', () => {
       expect(camp.tasks.some((task) => task.assigned.includes(k.id))).toBe(false);
     }
   });
+});
+
+describe('a man on the target’s door', () => {
+  it('stays by it once the siren has sounded: he fights from beside it, and goes after nobody', () => {
+    // An escort's camp, which has such a man, and a shooter who circles it firing at whoever he sees.
+    const ESCORT = 'NUT-4776';
+    const world = worldOf(ESCORT);
+    const sc = { ...(ladder(`seed=${ESCORT}&plan=circle&ready=alert`) as Scene<Simulation>), world: () => world, playOn: true };
+    const sim = startScene(sc, T, world);
+    const bot = circleOf(sim);
+    const driver = new ViewDriver(bot);
+    const raw = sc.game.still(sim);
+    const men = sim.guards.filter((g) => world.camp.guards[g.guard.spawn]!.holdsDoor).map((g) => g.id);
+    expect(men.length).toBeGreaterThan(0);
+    let siren = -1;
+    let fought = 0;
+    let farthest = 0;
+    const wandered: string[] = [];
+    while (sim.tick < 420 * HZ && !bot.lapped && (player(sim.index).health?.hits ?? 0) < sim.tuning.brain.combat.playerHits) {
+      for (const e of sim.step(driver.next(sim, raw))) if (e.type === 'siren' && siren < 0) siren = sim.tick;
+      if (siren < 0) continue;
+      for (const g of sim.guards) {
+        if (!men.includes(g.id) || !g.brain) continue;
+        const act = g.brain.act;
+        if (act === 'fight') fought++;
+        if (act === 'push' || act === 'investigate' || act === 'search' || act === 'flank') wandered.push(`guard ${g.id} at ${(sim.tick / HZ).toFixed(0)} s: ${act}`);
+        // Sent in for the target, he goes: that's the one errand that takes him off it.
+        if (act === 'task') continue;
+        const post = world.camp.guards[g.guard.spawn]!;
+        farthest = Math.max(farthest, Math.hypot(g.body.x - post.x, g.body.z - post.z));
+      }
+    }
+    expect(siren).toBeGreaterThan(0);
+    // The shooter came close enough for him to be in the fight, so this isn't a man nobody troubled.
+    expect(fought).toBeGreaterThan(0);
+    expect(wandered).toEqual([]);
+    expect(farthest).toBeLessThanOrEqual(T.brain.firefight.spot.doorRun + 2);
+  }, 240_000);
 });
 
 describe('a run that loses him', () => {
