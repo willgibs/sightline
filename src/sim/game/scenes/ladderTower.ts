@@ -20,17 +20,21 @@ import type { Scene } from '.';
  *
  * The scene holds its run to the motor's promises itself (body/invariants.ts), tick by
  * tick, so a tower the long run broke a promise on is that run again by its name:
- * `npm run scene -- ladder-tower --params seed=RES-2063-3`. The ones it has found are kept
+ * `npm run scene -- ladder-tower --params seed=RES-2063-3`. The ones found so far are kept
  * in TOWER_FINDS, and run with every other scene.
  */
 
 /**
- * Towers the long invariant run broke a promise on, kept, after the default tower:
- * - RES-2063-3 (Nov 12): coming down the ladder, the player took a pose just over the head
- *   of a guard walking under it, and in the same tick the guard stepped up onto a box
- *   there, into the player's feet (tick 855). A path now moves after everything that walks.
+ * Towers that broke a promise, played as the long invariant run plays one, kept after the
+ * default tower. All three are one mistake: a body on the ladder took a pose that was
+ * clear, and in the same tick a guard walking under it rose into its feet. A path now
+ * moves after everything that walks, and whoever walks is shoved from under feet he
+ * would rise into (body/system.ts, motor.ts).
+ * - RES-2063-3 (the long run, Nov 12): coming down, as he stepped up onto a box (tick 855);
+ * - SWP-1295-0: going up, as he stepped up onto a box (tick 1260);
+ * - SWP-1381-1: coming down, as he walked up a slope, by a millimetre (tick 1791).
  */
-export const TOWER_FINDS: readonly string[] = ['seed=TOWER-0', 'seed=RES-2063-3'];
+export const TOWER_FINDS: readonly string[] = ['seed=TOWER-0', 'seed=RES-2063-3', 'seed=SWP-1295-0', 'seed=SWP-1381-1'];
 
 /** How long a tower is played, seconds: the long run's length for one, so whatever it finds on a tower the scene finds too. */
 export const TOWER_SECONDS = 240;

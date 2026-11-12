@@ -313,12 +313,16 @@ describe('a ladder and whoever is under it', () => {
     expect(watch.report.first).toMatchObject({ entity: sim.playerId });
     expect(watch.report.first!.what).toMatch(/^ladder inside body \d+ by 0\.6/);
     // The same overlap with the player holding still is the guard's doing, or nobody's: the watch holds a path to its own moves.
+    // Settling onto the ladder's line by the last bit of a float, as the end of the reach for it can leave a body, is not a move.
+    sim.player.z = line.z * (1 + Number.EPSILON);
+    expect(sim.player.z).not.toBe(line.z);
     const still = new InvariantWatch(sim);
     for (let t = 0; t < 5; t++) {
       order(sim, false);
       step(sim, still, t, 0, false);
     }
     expect(sim.player.motor).toBe('ladder');
+    expect(sim.player.z).toBe(line.z);
     expect(still.report.first).toBeNull();
   });
 });
