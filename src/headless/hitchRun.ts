@@ -5,7 +5,7 @@
  *   node hitchRun.mjs <scene> <params> <warm runs> <list over ms> <rehearse: 1 or 0>
  */
 import { defaultTuning } from '../config/tuning';
-import { rehearse, rehearseFirefight } from '../sim/game/rehearsal';
+import { rehearse, rehearseFirefight, rehearseHunt } from '../sim/game/rehearsal';
 import { SCENES } from '../sim/game/scenes';
 import type { Simulation } from '../sim/game/sim';
 import { sceneOver, sceneTicks, startScene, type Scene } from '../sim/kernel/scene';
@@ -87,6 +87,7 @@ if (rehearsed === '1') {
   const t0 = performance.now();
   rehearse(world, T);
   rehearseFirefight(world, T);
+  rehearseHunt(world, T);
   rehearsalMs = performance.now() - t0;
 }
 const first = run(world);

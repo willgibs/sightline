@@ -5,6 +5,7 @@ import { Cell } from '../kernel/world/grid';
 import type { World } from '../kernel/world/world';
 import { compound } from './scenes/compound';
 import { firefight, meetingOf } from './scenes/firefight';
+import { hunt } from './scenes/hunt';
 import type { Simulation } from './sim';
 
 /**
@@ -98,6 +99,27 @@ export function rehearseFirefight(world: World, tuning: Tuning, seconds = FIREFI
 
 /** Long enough for him to be seen, to go to ground, and for someone to have come after him. */
 export const FIREFIGHT_SECONDS = 45;
+
+/**
+ * And a hunt (scenes/hunt.ts): one loud shot from the best overview, and the camp placing
+ * him, forming a section and sending it out. The attack above is the compound simulator's,
+ * whose camp doesn't hunt, so the tick a section was first formed took 5.1 ms where it
+ * takes 1.6 once that code has run (`npm run hitches -- hunt`). Thrown away like the
+ * others. Returns the ticks it ran: none where there's no overview to fire from.
+ */
+export function rehearseHunt(world: World, tuning: Tuning, seconds = HUNT_SECONDS): number {
+  if (!world.report.camp || world.report.camp.perches.length === 0 || world.camp.guards.length === 0 || !world.camp.layout) return 0;
+  const scene = hunt(`seed=${world.seed}`);
+  const sim = startScene(scene, tuning, world) as Simulation;
+  const driver = scene.driver!();
+  const raw = scene.game.still(sim);
+  const ticks = Math.round(seconds * tuning.sim.tickHz);
+  for (let i = 0; i < ticks; i++) sim.step(driver.next(sim, raw));
+  return ticks;
+}
+
+/** Long enough for his shot (at 8 s) to have been placed, a section formed and its men to have gathered and set off. */
+export const HUNT_SECONDS = 60;
 
 /** Long enough for the script's shots (from 12 s) to have run their course through the camp, and for the hurried relief to have come and the target to have been sent for. */
 export const REHEARSAL_SECONDS = 50;

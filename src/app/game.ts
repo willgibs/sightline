@@ -34,7 +34,7 @@ import { GameSound } from './sound';
 import { BrowserStore, DevInbox, PlaytestCapture, type StoredRun } from './playtest';
 import { DROP_KEYS, LabPanel, SHOOTER_VIEW_KEY } from './labPanel';
 import { CampGauges } from '../lab/gauges';
-import { rehearse, rehearseFirefight } from '../sim/game/rehearsal';
+import { rehearse, rehearseFirefight, rehearseHunt } from '../sim/game/rehearsal';
 import { commanderOf } from '../sim/game/comms';
 import { stimulus, type StimulusName } from '../sim/game/drops';
 import type { Command } from '../sim/kernel/commands';
@@ -525,6 +525,7 @@ export class Game {
       if (!this.opts.bench) {
         rehearse(world, this.tuning);
         rehearseFirefight(world, this.tuning);
+        rehearseHunt(world, this.tuning);
       }
       this.restartRun();
       const url = new URL(window.location.href);

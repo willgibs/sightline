@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import type { AttackDriver } from '../src/sim/game/attacks';
-import { FIREFIGHT_SECONDS, REHEARSAL_SECONDS, rehearse, rehearseFirefight } from '../src/sim/game/rehearsal';
+import { FIREFIGHT_SECONDS, HUNT_SECONDS, REHEARSAL_SECONDS, rehearse, rehearseFirefight, rehearseHunt } from '../src/sim/game/rehearsal';
 import { firefight, meetingOf } from '../src/sim/game/scenes/firefight';
+import { hunt } from '../src/sim/game/scenes/hunt';
 import { compound } from '../src/sim/game/scenes/compound';
 import type { Simulation } from '../src/sim/game/sim';
 import { generateWorld } from '../src/sim/generation';
@@ -55,9 +56,25 @@ describe('the rehearsal', () => {
     expect(close()).toBe(before);
   }, 240_000);
 
+  it('rehearses a hunt too, and that changes nothing either', () => {
+    const world = worldOf('LEB-2534');
+    const out = (): string => {
+      const scene = { ...(hunt('seed=LEB-2534') as Scene<Simulation>), world: () => world };
+      const sim = startScene(scene, T, world);
+      const driver = scene.driver!();
+      const raw = scene.game.still(sim);
+      for (let i = 0; i < 70 * T.sim.tickHz; i++) sim.step(driver.next(sim, raw));
+      return sim.hash();
+    };
+    const before = out();
+    expect(rehearseHunt(world, T)).toBe(HUNT_SECONDS * T.sim.tickHz);
+    expect(out()).toBe(before);
+  }, 240_000);
+
   it('has nothing to rehearse where there is no camp to attack', () => {
     expect(rehearse(testWorld(), T)).toBe(0);
     expect(rehearseFirefight(testWorld(), T)).toBe(0);
+    expect(rehearseHunt(testWorld(), T)).toBe(0);
   });
 
   it('runs on the valley’s own camp as on any other', () => {

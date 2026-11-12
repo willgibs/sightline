@@ -97,6 +97,8 @@ Four more fights on the camps of the owner's sitting have none over 4 ms either,
 
 **Not settled, so not pinned.** The seconds and the numbers are a person's to set. `tests/hunt.test.ts` holds what's settled: a section is sent, of men the camp believes are on their feet; nobody else goes; it says what it's doing, watches before closing in, and finds him or calls the place; nobody is sent while he's firing or without the radio; a man alone comes home; a camp without it does none of this; and the same hunt ends the same way twice. `tests/approach.test.ts` holds the reading of the valley.
 
+**Ticks** (`npm run hitches -- hunt`): none over 4 ms, in a fresh tab's run or warm; the worst is 1.8 ms. The tick a section is first formed took 5.1 ms until the rehearsal at load ran a hunt as well (`rehearseHunt`), which adds about 0.3 s to loading a camp.
+
 **Versions.** `SIM_VERSION` 18: the pinned camp fight behaves differently, because its camp now hunts. No other pinned run's behaviour moved. `STATE_SCHEMA` 12: a camp keeps who it's hunting, its sections and what they've crossed off, and a man on the hunt keeps his way out. The brain lane's bench is re-pinned: the fight's worst tick expands 7,824 cells where it expanded 6,503.
 
 ## 2026-11-11 · Where the firefight meets the taller camps
