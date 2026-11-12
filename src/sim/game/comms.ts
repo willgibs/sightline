@@ -70,10 +70,13 @@ export function tell(ctx: TickContext, g: GuardEntity, r: Report, via: Via, caus
   if (b.told.length > T.maxTold) b.told.splice(0, b.told.length - T.maxTold);
   // An unverified report only stirs a guard if it's near him; farther ones just know of it.
   const near = (r.x - g.body.x) * (r.x - g.body.x) + (r.z - g.body.z) * (r.z - g.body.z) <= T.heardReach * T.heardReach;
-  const level = r.kind === 'heard' && !near ? 0 : T.level[r.kind];
+  const full = r.kind === 'heard' && !near ? 0 : T.level[r.kind];
+  // Someone else's word, weighed by how he knows it: a man who is only asking has a listener wary at most, whatever it's about.
+  const level = r.sure ? full : Math.min(full, T.asking);
   if (level > 0) {
     const draw = (): number => ctx.draw(g.id, 'awareness', (rng) => rng.next());
-    stimulate(s.awareness, { kind: 'voice', level, x: r.x, y: r.y, z: r.z, cause, reason: 'voice' }, ctx.tick, ctx.tuning, draw);
+    // And it bears out what the listener has noticed himself, as something plain does if the man saying it is sure (awareness.ts).
+    stimulate(s.awareness, { kind: 'voice', level, x: r.x, y: r.y, z: r.z, cause, reason: 'voice', cue: 'voice', plain: r.sure === true }, ctx.tick, ctx.tuning, draw);
   }
   // Being told it's clear, that it's time to go, or that someone's moving or set, says nothing new about where an intruder is.
   if (r.kind !== 'clear' && r.kind !== 'escort' && r.kind !== 'moving' && r.kind !== 'set') {

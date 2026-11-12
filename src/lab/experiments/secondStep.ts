@@ -5,6 +5,7 @@ import { compound } from '../../sim/game/scenes/compound';
 import type { Simulation } from '../../sim/game/sim';
 import type { StimulusCommand } from '../../sim/kernel/commands';
 import { dcos, dsin } from '../../sim/kernel/core/detmath';
+import type { SimEvent } from '../../sim/kernel/events';
 import { sceneTuning, startScene, type Scene } from '../../sim/kernel/scene';
 import { rung } from '../../sim/perception';
 import type { Arm, Experiment } from '../experiment';
@@ -168,7 +169,8 @@ function firingPoint(sim: Simulation, m: Mark, arm: OpeningArm): Point | null {
   return closeTo(sim, m.at, over, Math.sqrt(dx * dx + dz * dz), m.own);
 }
 
-function run(seed: string, arm: Arm, tuning: Tuning): Record<string, number> {
+/** `watch`, if given, sees each tick's events as they happen, and the tick the first round landed (−1 before): for asking why one camp did what it did. */
+function run(seed: string, arm: Arm, tuning: Tuning, watch?: (sim: Simulation, events: readonly SimEvent[], landed: number) => void): Record<string, number> {
   const a = arm as OpeningArm;
   const scene = compound(`seed=${seed}&attack=quiet${a.off ? `&off=${a.off}` : ''}`) as Scene<Simulation>;
   const T = sceneTuning(scene, a.subsonic ? withSubsonic(tuning) : tuning);
@@ -214,6 +216,7 @@ function run(seed: string, arm: Arm, tuning: Tuning): Record<string, number> {
       }
     }
     const events = sim.step({ ...raw, commands });
+    watch?.(sim, events, landed);
     for (const e of events) {
       if (e.type === 'death' && victims.has(e.victim)) {
         down++;

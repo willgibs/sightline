@@ -42,6 +42,8 @@ export interface Report {
   about?: number;
   /** The man saying it knows the camp is under attack, by his own eyes and ears (grounds.ts): on the net, it's the word the camp sends someone to a box on (commander.ts). */
   attack?: true;
+  /** The man saying it is sure of it, where a man who has only noticed something is asking: his word bears out what a listener has noticed himself, as something plain does (perception/awareness.ts, `agree`). */
+  sure?: true;
 }
 
 /** How a report reached someone. */
