@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { secondStep } from '../src/lab/experiments/secondStep';
 import { createBrain, digest, hasGrounds, noteGrounds, plan, type CampMind, type CampOrder, type CampState, type GuardMind, type Report } from '../src/sim/brain';
@@ -232,8 +232,24 @@ describe('a thud a long way off', () => {
 describe('on generated camps (npm run experiment -- second-step)', () => {
   /** Camps of the bench's own series on which each of these openings has a line, so nothing here passes for want of a shot. */
   const CAMPS = ['NEB-1102', 'NEZ-8154', 'REN-5699'];
+  const OPENINGS = ['suppressed, at a man nobody is watching', 'suppressed, at a man on the ground', 'loud, at a man on a watchtower', 'suppressed, at the generator', 'suppressed, at an alarm box'];
   const arm = (name: string) => secondStep.arms.find((a) => a.name === name)!;
-  const runs = (name: string) => CAMPS.map((seed) => secondStep.run(seed, arm(name), T)).filter((r) => r.done === 1);
+  /** Every opening on every camp, once: a camp at a time, so each world is built once (src/lab/worlds.ts keeps the last). */
+  const results = new Map<string, Array<Record<string, number>>>();
+  const stopped: Array<Record<string, number>> = [];
+  beforeAll(() => {
+    const dial = structuredClone(T);
+    dial.ballistics.breaks.generator = 1;
+    for (const seed of CAMPS) {
+      for (const name of OPENINGS) {
+        const r = secondStep.run(seed, arm(name), T);
+        if (r.done === 1) results.set(name, [...(results.get(name) ?? []), r]);
+      }
+      const g = secondStep.run(seed, arm('suppressed, at the generator'), dial);
+      if (g.done === 1) stopped.push(g);
+    }
+  }, 900_000);
+  const runs = (name: string) => results.get(name) ?? [];
 
   it('a suppressed round at a man nobody is watching brings no siren, and the target stays', () => {
     const careful = runs('suppressed, at a man nobody is watching');
@@ -242,20 +258,20 @@ describe('on generated camps (npm run experiment -- second-step)', () => {
       expect(r.siren).toBe(0);
       expect(r.gone).toBe(0);
     }
-  }, 600_000);
+  });
 
   it('nobody throws the siren who has seen nobody and no body, whatever the opening', () => {
     let thrown = 0;
-    for (const a of secondStep.arms) {
-      for (const r of runs(a.name)) {
+    for (const name of OPENINGS) {
+      for (const r of runs(name)) {
         if (r.siren !== 1) continue;
         thrown++;
-        expect(r.blind, a.name).toBe(0);
+        expect(r.blind, name).toBe(0);
       }
     }
     // It does sound for some of them: a man seen going down is grounds enough.
     expect(thrown).toBeGreaterThan(0);
-  }, 900_000);
+  });
 
   it('a round into an alarm box kills that box; the generator is a rifle’s to stop only if the game says so', () => {
     const generator = runs('suppressed, at the generator');
@@ -266,10 +282,7 @@ describe('on generated camps (npm run experiment -- second-step)', () => {
     expect(T.ballistics.breaks.generator).toBe(0);
     for (const r of generator) expect(r.dead).toBe(0);
     // With the dial on, one round stops it.
-    const dial = structuredClone(T);
-    dial.ballistics.breaks.generator = 1;
-    const stopped = CAMPS.map((seed) => secondStep.run(seed, arm('suppressed, at the generator'), dial)).filter((r) => r.done === 1);
     expect(stopped.length).toBeGreaterThan(0);
     for (const r of stopped) expect(r.dead).toBe(1);
-  }, 600_000);
+  });
 });
