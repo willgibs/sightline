@@ -4,6 +4,7 @@ import { Cell, Edge, cellIndex, type GridLayer } from '../kernel/world/grid';
 import type { MoveCost, SearchOptions } from '../kernel/world/search';
 import type { Ground } from './mind';
 import { navigatorOf } from './nav';
+import { outsideWalls } from './walls';
 
 /**
  * A place to fight from (the firefight, firefight.ts; docs/camp-engine.md, section 9).
@@ -49,6 +50,8 @@ export interface SpotAsk {
   gain: number;
   /** He isn't running for his life: the way there mustn't cross more ground the intruder can see than this many metres at a stretch. 0 for any way. */
   dash: number;
+  /** Where he keeps to (firefight.ts, the chase): inside the camp's walls, or on its own ground. No place past that will do, and no way to one that leaves it. Absent for anywhere. */
+  within?: 'walls' | 'ground';
 }
 
 /**
@@ -199,6 +202,7 @@ export function fightingSpot(world: Ground, tuning: Tuning, ask: SpotAsk, work?:
   if (start < 0) return null;
   const nav = navigatorOf(world, tuning);
   const guard = tuning.bodies.guard;
+  const site = world.camp.site;
   const ty = eyesAt(world, tuning, ask.tx, ask.tz, ask.ty);
   let rays = 0;
   const sees = (x: number, y: number, z: number): boolean => {
@@ -302,6 +306,11 @@ export function fightingSpot(world: Ground, tuning: Tuning, ask: SpotAsk, work?:
       }
       const go = (n: number): void => {
         if (v.seen[n] === v.now || (L.flags[n]! & Cell.Walkable) === 0) return;
+        if (ask.within) {
+          const cx = L.x0 + ((n % L.nx) + 0.5) * L.cell;
+          const cz = L.z0 + (Math.floor(n / L.nx) + 0.5) * L.cell;
+          if (ask.within === 'walls' ? outsideWalls(world, cx, cz) : (cx - site.x) * (cx - site.x) + (cz - site.z) * (cz - site.z) > site.radius * site.radius) return;
+        }
         if (danger && runs) {
           const run = danger.lit(n) ? runs[c]! + 1 : 0;
           // Too far in the open from here. Another way may still reach it under cover, so it isn't marked.

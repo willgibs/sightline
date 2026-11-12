@@ -40,8 +40,12 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * 15: a man's awareness keeps the last cue of a shooting that reached him by each way, a
  * voice on its way to him keeps what kind of word it is, and a report keeps whether the
  * man saying it is sure (perception/awareness.ts, `agree`).
+ * 16: a camp says whether its men chase; a man in a firefight keeps where he last had the
+ * intruder in sight, who he's heard go out of the walls after him and when, the opening he's
+ * going out by and how far through his look round he is, and the last word he had that the
+ * intruder had gone out; and a contact can say so (brain/firefight.ts, the chase).
  */
-export const STATE_SCHEMA = 15;
+export const STATE_SCHEMA = 16;
 
 export type EntityId = number;
 

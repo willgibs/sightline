@@ -7,6 +7,7 @@ import { deadGround } from './deadGround';
 import { flaws } from './flaws';
 import { answerExperiment } from './answer';
 import { firefight } from './firefight';
+import { outTheGateExperiment } from './outTheGate';
 import { huntExperiment } from './hunt';
 import { ladderOfPlans } from './ladder';
 import { quietKill } from './quietKill';
@@ -19,4 +20,4 @@ import { VARIETY } from './variety';
 import { wayOut } from './wayOut';
 
 /** Every experiment on the bench, by the name `npm run experiment` takes. */
-export const EXPERIMENTS: Readonly<Record<string, Experiment>> = Object.fromEntries([friction, gallery, switchOff, deadGround, wayOut, flaws, relocate, relocateQuiet, ladderOfPlans, routes, routeCost, approach, firefight, huntExperiment, answerExperiment, quietKill, secondStep, takedownStages, circling, taller, corners, ...VARIETY].map((e) => [e.name, e]));
+export const EXPERIMENTS: Readonly<Record<string, Experiment>> = Object.fromEntries([friction, gallery, switchOff, deadGround, wayOut, flaws, relocate, relocateQuiet, ladderOfPlans, routes, routeCost, approach, firefight, outTheGateExperiment, huntExperiment, answerExperiment, quietKill, secondStep, takedownStages, circling, taller, corners, ...VARIETY].map((e) => [e.name, e]));

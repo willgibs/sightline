@@ -77,5 +77,12 @@ export const GEN_VERSION = 9;
  * up for the ground only where a move was resolved to, so a body whose move is refused is
  * no longer lifted onto a ledge it only touches, into what is over it (body/motor.ts). No
  * pinned run has a refused body touching a ledge within a step, so no fingerprint moved.
+ * 24: the chase (brain/firefight.ts): in a camp that chases, a man who knows an intruder
+ * was inside its walls and watched him leave them by an opening, or heard it from one who
+ * did, goes after him at once, at a run, to the opening and a step out of it, and looks
+ * each way along the wall. Two at most are out at a time; they keep to the camp's own
+ * ground, and once anyone has gone the rest keep inside the walls. And nobody fires at
+ * ground he can't see into near where one of his own said he was going out. No pinned run
+ * has anyone leave a camp by an opening, so no fingerprint moved.
  */
-export const SIM_VERSION = 23;
+export const SIM_VERSION = 24;

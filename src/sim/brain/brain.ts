@@ -2,7 +2,7 @@ import { dcos, dlog, dsin } from '../kernel/core/detmath';
 import type { AwarenessName } from '../kernel/events';
 import { routinePose, type RoutinePose } from '../generation';
 import type { HuntOrder, TaskKind } from './camp';
-import { beginFirefight, noteFirefight, offerFirefight, performFight, performPush, seesHim, type Firefight } from './firefight';
+import { beginFirefight, mateGoneOut, mateInLine, noteFirefight, noteMatesOut, offerFirefight, performFight, performPush, seesHim, type Firefight } from './firefight';
 import { groundSpot } from './ground';
 import { hasGrounds, noteGrounds } from './grounds';
 import { beginHunt, offerHunt, performHunt, type Hunt } from './hunt';
@@ -146,6 +146,8 @@ export interface BrainState {
   start?: boolean;
   /** The firefight he's in (firefight.ts): where he believes the intruder is, his position, and what he's doing at it. Absent until he's in one. */
   ff?: Firefight;
+  /** Where one of his own last said he was going out of the walls to (firefight.ts, the chase), and when he heard it: he puts no rounds into ground he can't see into near there. Absent until someone does. */
+  mateOut?: { x: number; z: number; heard: number };
   /** The hunt he's on (hunt.ts): the way out, the stop he's at, and what he's doing there. Absent until he's ordered out with a section. */
   hunt?: Hunt;
 }
@@ -221,6 +223,7 @@ export function decide(m: GuardMind, out: Order): ActChange | null {
   const newest = Math.max(newestPercept(m), newestTold(b));
   if (b.sirenAt < 0 && heardSiren(m)) b.sirenAt = m.tick;
   noteProtection(m);
+  noteMatesOut(m);
   noteFirefight(m);
   noteGrounds(m);
   // A hunt he's been taken off, by another order or by none: there's nothing of it to remember.
@@ -468,7 +471,8 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
     }
     case 'combat': {
       const sees = seesTarget(m);
-      const alarmW = alarmWeight(m);
+      // A man already out after someone who has left the walls doesn't turn back for a box he happens to pass: he said he was going, and the men who heard him are counting on it (firefight.ts, the chase).
+      const alarmW = b.act === 'push' && !b.done && b.ff?.gate ? 0 : alarmWeight(m);
       out.push({ act: 'alarm', rank: 6, weight: alarmW });
       if (m.fights) fightOptions(m, out);
       out.push({ act: 'report', rank: 5, weight: callable > 0 ? 1 : 0 });
@@ -872,6 +876,8 @@ function performEngage(m: GuardMind, out: Order): void {
   if (b.fireAt < 0) b.fireAt = m.tick + Math.round(C.react * hz);
   if (m.tick >= b.fireAt && seesTarget(m)) {
     const f = m.belief ?? focusOf3(m);
+    // Not through the opening one of his own has just gone out by (firefight.ts, the chase): they're in it, coming and going.
+    if (mateInLine(m, f.x, f.y, f.z)) return;
     b.fire = { x: f.x, y: f.y, z: f.z };
     b.fireAt = m.tick + Math.round(C.every * hz);
   }
@@ -1094,7 +1100,8 @@ function covering(m: GuardMind): Told | null {
   const reach = m.tuning.brain.fight.suppress.range;
   let best: Told | null = null;
   for (const t of m.brain!.told) {
-    if (t.kind !== 'moving' || t.via !== 'radio' || (m.tick - t.heard) / hz > m.tuning.brain.hunt.fix) continue;
+    // A man going out of the walls says where he's going, not where he wants fire: that word is the chase's.
+    if (t.kind !== 'moving' || t.out === true || t.via !== 'radio' || (m.tick - t.heard) / hz > m.tuning.brain.hunt.fix) continue;
     if ((t.x - m.self.x) * (t.x - m.self.x) + (t.z - m.self.z) * (t.z - m.self.z) > reach * reach) continue;
     if (!best || t.heard > best.heard) best = t;
   }
@@ -1115,7 +1122,8 @@ function performSuppress(m: GuardMind, out: Order): void {
   // His own flash or report first; then the place a section has asked for fire on; then wherever he believes the shooter is.
   const asked = covering(m);
   const at = shotFrom(m) ?? asked ?? m.belief;
-  if (m.tick >= b.fireAt && at) {
+  // Nothing into ground he can't see where one of his own has just gone out to look: the man by the gate may be his.
+  if (m.tick >= b.fireAt && at && !mateGoneOut(m, at.x, at.z) && !mateInLine(m, at.x, at.y, at.z)) {
     b.fire = { x: at.x, y: at.y, z: at.z };
     b.fireAt = m.tick + Math.round(F.every * hz);
   }

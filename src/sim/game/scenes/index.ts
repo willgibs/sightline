@@ -4,6 +4,7 @@ import { TOWER_FINDS, ladderTower } from './ladderTower';
 import { campBrain } from './campBrain';
 import { compound } from './compound';
 import { firefight } from './firefight';
+import { OUT_THE_GATE_TABLE, outTheGate } from './outTheGate';
 import { hunt } from './hunt';
 import { CAMP_SCENARIOS, campScenario } from './campScenario';
 import { campSystems } from './campSystems';
@@ -42,6 +43,7 @@ export const SCENES: Readonly<Record<string, (params?: string) => Scene>> = {
   'camp-systems': campSystems,
   'live-camp': liveCamp,
   firefight,
+  'out-the-gate': outTheGate,
   hunt,
   overlook,
   ladder,
@@ -65,5 +67,6 @@ export const SCENARIOS: Readonly<Record<string, readonly string[]>> = {
   sight: SIGHT_TABLE,
   'camp-scenario': CAMP_SCENARIOS,
   overlook: OVERLOOK_TABLE,
+  'out-the-gate': OUT_THE_GATE_TABLE,
   'ladder-tower': TOWER_FINDS,
 };

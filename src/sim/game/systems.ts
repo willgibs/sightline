@@ -190,7 +190,7 @@ const guardBrains: System = {
     const nav = navAllowance(ctx);
     const devices = commanderOf(ctx)?.camp.devices;
     // Where the boxes stand, and nothing of their state: a guard learns the alarm is up from the siren.
-    const facts = devices ? { alarms: devices.alarms.map((a) => ({ x: a.x, z: a.z })), escape: devices.escape, fights: commanderOf(ctx)?.camp.fights === true, firefight: commanderOf(ctx)?.camp.firefight === true, hunts: commanderOf(ctx)?.camp.hunts === true, protects: commanderOf(ctx)?.camp.protects ?? null, answer: commanderOf(ctx)?.camp.answer ?? null } : undefined;
+    const facts = devices ? { alarms: devices.alarms.map((a) => ({ x: a.x, z: a.z })), escape: devices.escape, fights: commanderOf(ctx)?.camp.fights === true, firefight: commanderOf(ctx)?.camp.firefight === true, hunts: commanderOf(ctx)?.camp.hunts === true, chases: commanderOf(ctx)?.camp.chases === true, protects: commanderOf(ctx)?.camp.protects ?? null, answer: commanderOf(ctx)?.camp.answer ?? null } : undefined;
     for (const g of [...ctx.index.of('guard')]) {
       const change = think(g, ctx.world, ctx.tuning, ctx.tick + 1, () => ctx.draw(g.id, 'brain', (rng) => rng.next()), nav, facts);
       if (change) {

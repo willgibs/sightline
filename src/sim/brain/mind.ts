@@ -69,6 +69,8 @@ export interface GuardMind {
   readonly firefight: boolean;
   /** Whether it sends a section out after someone it has placed (hunt.ts): then nobody goes off the camp's own ground alone to look for him. */
   readonly hunts: boolean;
+  /** Whether its men go after someone they watched leave its walls (firefight.ts, the chase). */
+  readonly chases: boolean;
   /** Where his camp's hard room is, if it protects its target (protect.ts): another fact about the camp, and null if it doesn't. */
   readonly protects: Readonly<{ x: number; z: number; y?: number }> | null;
   /** How his camp answers for its target (protect.ts): its drill, which every man of it knows. Null for a camp that waits for its relief, or protects nobody. */
