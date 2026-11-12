@@ -189,33 +189,39 @@ describe('the minimal reactions', () => {
 describe('what a shot sounds like to a listener', () => {
   const heard = (sound: string, clarity: number) => ({ arrives: 0, cause: 1, kind: 'shot' as const, sound, clarity, voice: 0, x: 0, y: 0, z: 0, radius: 1 });
 
-  it('is a shot at any clarity, as the game ships: every sound of one raises him to searching', () => {
+  it('is a shot at any clarity if the numbers say so, as the game began: every sound of one raises him to searching', () => {
+    const flat = structuredClone(T);
+    flat.perception.awareness.shots = {
+      report: { faint: 0.8, clear: 0.8, clearAt: 4 },
+      crack: { faint: 0.8, clear: 0.8, clearAt: 4, close: 0.8, closeAt: 4 },
+      impact: { faint: 0.8, clear: 0.8, clearAt: 4 },
+      bolt: { faint: 0.8, clear: 0.8, clearAt: 4 },
+    };
     for (const sound of ['report', 'crack', 'impact', 'bolt']) {
-      for (const clarity of [1, 1.5, 4, 40]) expect(soundLevel(heard(sound, clarity), T)).toBe(A.levels.searching);
+      for (const clarity of [1, 1.5, 4, 40]) expect(soundLevel(heard(sound, clarity), flat)).toBe(A.levels.searching);
     }
   });
 
-  it('can be read by how clearly each of its sounds was heard, each with its own idea of clear', () => {
-    const graded = structuredClone(T);
-    graded.perception.awareness.shots = {
-      report: { faint: 0.55, clear: 0.8, clearAt: 2 },
-      crack: { faint: 0.4, clear: 0.8, clearAt: 4 },
-      impact: { faint: 0.3, clear: 0.62, clearAt: 26 },
-      bolt: { faint: 0.55, clear: 0.8, clearAt: 2 },
-    };
-    // At the edge of hearing, each is its faint level; at its own clear and past it, its clear one.
-    expect(soundLevel(heard('crack', 1), graded)).toBeCloseTo(0.4, 12);
-    expect(soundLevel(heard('crack', 4), graded)).toBeCloseTo(0.8, 12);
-    expect(soundLevel(heard('crack', 9), graded)).toBeCloseTo(0.8, 12);
-    expect(soundLevel(heard('crack', 2.5), graded)).toBeCloseTo(0.6, 12);
-    // A strike is a thud: clear only close by, and never a shot by itself.
-    expect(soundLevel(heard('impact', 8), graded)).toBeLessThan(A.levels.suspicious);
-    expect(soundLevel(heard('impact', 26), graded)).toBeCloseTo(0.62, 12);
-    expect(soundLevel(heard('impact', 500), graded)).toBeLessThan(A.levels.searching);
-    // A report is unmistakable unless it's faint.
-    expect(soundLevel(heard('report', 1.05), graded)).toBeLessThan(A.levels.searching);
-    expect(soundLevel(heard('report', 2), graded)).toBeCloseTo(0.8, 12);
+  it('is read by how clearly each of its sounds was heard, each with its own idea of clear', () => {
+    // A crack is a snap: far from the round's path it tells him nothing, nearer it turns his head, clearly heard it has him
+    // wary, and it's a shot only as a near miss.
+    expect(soundLevel(heard('crack', 1), T)).toBeCloseTo(A.shots.crack.faint, 12);
+    expect(soundLevel(heard('crack', 1.5), T)).toBeLessThan(A.levels.curious);
+    expect(soundLevel(heard('crack', A.shots.crack.clearAt), T)).toBeCloseTo(A.shots.crack.clear, 12);
+    expect(soundLevel(heard('crack', A.shots.crack.clearAt), T)).toBeGreaterThanOrEqual(A.levels.suspicious);
+    expect(soundLevel(heard('crack', A.shots.crack.closeAt - 1), T)).toBeLessThan(A.levels.searching);
+    expect(soundLevel(heard('crack', A.shots.crack.closeAt), T)).toBeGreaterThanOrEqual(A.levels.searching);
+    // A strike is a thud: far off it tells him nothing, close by it has him wary, and it's never a shot by itself.
+    expect(soundLevel(heard('impact', 1), T)).toBeLessThan(A.levels.curious);
+    expect(soundLevel(heard('impact', 8), T)).toBeLessThan(A.levels.curious);
+    expect(soundLevel(heard('impact', A.shots.impact.clearAt), T)).toBeCloseTo(A.shots.impact.clear, 12);
+    expect(soundLevel(heard('impact', A.shots.impact.clearAt), T)).toBeGreaterThanOrEqual(A.levels.suspicious);
+    expect(soundLevel(heard('impact', 500), T)).toBeLessThan(A.levels.searching);
+    // A report is unmistakable unless it's faint: at the edge of hearing it only makes him look up.
+    expect(soundLevel(heard('report', 1.05), T)).toBeLessThan(A.levels.suspicious);
+    expect(soundLevel(heard('report', 1.05), T)).toBeGreaterThanOrEqual(A.levels.curious);
+    expect(soundLevel(heard('report', A.shots.report.clearAt), T)).toBeGreaterThanOrEqual(A.levels.searching);
     // Anything else heard as a shot is read as a report.
-    expect(soundLevel(heard('something-new', 2), graded)).toBeCloseTo(0.8, 12);
+    expect(soundLevel(heard('something-new', 2), T)).toBe(soundLevel(heard('report', 2), T));
   });
 });

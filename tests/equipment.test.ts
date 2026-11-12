@@ -250,9 +250,9 @@ describe('whoever passes it notices (E7)', () => {
 });
 
 describe('the target and his vehicle (E7)', () => {
-  /** A live camp, the alarm raised by hand, and the target running. */
+  /** A live camp that protects nobody, the alarm raised by hand, and the target running: lab E's target, who goes for his vehicle at the siren. */
   function lockdown(disabled: boolean): { sim: Simulation; events: SimEvent[] } {
-    const sim = startScene(liveCamp('seed=LEB-2534') as Scene<Simulation>, T, world);
+    const sim = startScene(liveCamp('seed=LEB-2534&off=protect') as Scene<Simulation>, T, world);
     const v = sim.index.of('vehicle').find((x) => x.vehicle.escape)!;
     if (disabled) v.vehicle.disabled = true;
     const events: SimEvent[] = [];

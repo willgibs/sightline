@@ -42,9 +42,9 @@ const args = parseArgs(argv);
 const named = argv.filter((a, i) => !a.startsWith('--') && !(i > 0 && argv[i - 1]!.startsWith('--') && !argv[i - 1]!.includes('=') && !['--no-rehearsal', '--deopts'].includes(argv[i - 1]!)));
 const STANDING: ReadonlyArray<readonly [string, string]> = [
   ['compound', 'seed=LEB-2534&attack=sniper'],
-  ['compound', 'seed=LEB-2534&attack=sniper&ready=alert'],
+  ['compound', 'seed=LEB-2534&attack=sniper'],
   ['compound', 'seed=HOT-7106&attack=relocating'],
-  ['compound', 'seed=HOT-7106&attack=relocating&ready=alert'],
+  ['compound', 'seed=HOT-7106&attack=relocating'],
 ];
 const scenes: ReadonlyArray<readonly [string, string]> = named.length > 0 ? [[named[0]!, named[1] ?? '']] : STANDING;
 

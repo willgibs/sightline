@@ -10,9 +10,8 @@ import { placePlayer } from '../setup';
 import { parseSwitches, switchedOff, type CampSwitch } from '../switches';
 import type { Simulation } from '../sim';
 import type { Scene } from '.';
-import { liveCamp, READINESS, type Readiness } from './liveCamp';
+import { liveCamp } from './liveCamp';
 import { bestOverview } from './overlook';
-import { takedownTuning } from './takedown';
 
 /**
  * The bot ladder (Lab F, docs/camp-engine.md, section 4): the same live camp, played by a
@@ -29,8 +28,7 @@ import { takedownTuning } from './takedown';
  * `circle` and `contact` aren't plans to win by: they don't leave, so they aren't on the
  * ladder's tally. They're the owner's complaints, from the takedown and from walking into a
  * camp: `npm run experiment -- circling` holds a camp's shape against the first, and
- * `-- firefight` holds what its men do against both. `ready=alert` plays any of them against
- * the takedown's camp.
+ * `-- firefight` holds what its men do against both.
  *
  * They all start on their firing point. The walk in is a separate question, and someone
  * who has found a perch has had the time to.
@@ -44,18 +42,16 @@ export interface LadderParams {
   seed: string;
   plan: AnyPlan;
   off: CampSwitch[];
-  ready: Readiness;
 }
 
 export function parseLadder(text: string | undefined): LadderParams {
-  const p: LadderParams = { seed: 'LEB-2534', plan: 'careless', off: [], ready: 'relaxed' };
+  const p: LadderParams = { seed: 'LEB-2534', plan: 'careless', off: [] };
   for (const part of (text ?? '').split('&')) {
     if (!part) continue;
     const [key, value] = part.split('=');
     if (key === 'seed' && value) p.seed = value;
     else if (key === 'plan' && ([...LADDER_PLANS, 'circle', 'contact'] as readonly string[]).includes(value ?? '')) p.plan = value as AnyPlan;
     else if (key === 'off') p.off = parseSwitches(value ?? '');
-    else if (key === 'ready' && (READINESS as readonly string[]).includes(value ?? '')) p.ready = value as Readiness;
     else throw new Error(`The ladder doesn't know '${part}'`);
   }
   return p;
@@ -193,14 +189,13 @@ class PlanDriver implements Driver<Simulation> {
 
 export function ladder(params?: string): Scene {
   const p = parseLadder(params);
-  const base = liveCamp(`seed=${p.seed}&difficulty=${defaultCampSpec().difficulty}${p.ready !== 'relaxed' ? `&ready=${p.ready}` : ''}`);
+  const base = liveCamp(`seed=${p.seed}&difficulty=${defaultCampSpec().difficulty}`);
   return switchedOff(
     {
       ...base,
       name: 'ladder',
       version: 1,
-      params: `seed=${p.seed}&plan=${p.plan}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}${p.ready !== 'relaxed' ? `&ready=${p.ready}` : ''}`,
-      ...(p.ready === 'alert' ? { tune: takedownTuning } : {}),
+      params: `seed=${p.seed}&plan=${p.plan}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}`,
       title: `The ladder: ${p.plan} (${p.seed})`,
       description: 'A live camp played by one plan of the bot ladder, with the mission\'s own rule: the target down, and you out.',
       setup: (sim) => {

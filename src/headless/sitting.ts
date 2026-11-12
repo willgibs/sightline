@@ -15,7 +15,8 @@
  *   npm run sitting -- takedown 'seed=LEB-2534&perch=1'
  *   npm run sitting -- 'https://sightline-brown.vercel.app/?scene=takedown&params=seed=LEB-2534%26perch=1&lab'
  *     --shots 3          rounds he fires, six seconds apart, at whoever the perch sees best (0: he only watches)
- *     --at tower         who he fires at: `tower` (a man on a raised post), `door` (a man on the target's door), or a role (sentry, patrol, worker, ...)
+ *     --at tower         what he fires at: `tower` (a man on a raised post), `door` (a man on the target's door), a role (sentry, patrol, worker, ...),
+ *                        or `generator` or `box` (the camp's generator, an alarm box: whether there's a line to it from where he lies is part of the answer)
  *     --suppressed       the suppressor is fitted
  *     --subsonic         the subsonic load is in the rifle (it drops heavily: give him --from)
  *     --from 90          he lies this many metres from the first man he fires at, with a clear line, and not on the overview
@@ -117,7 +118,10 @@ if (!Number.isNaN(from) && seen.length > 0) {
 }
 const onPerch = (you.body.x - perch.x) * (you.body.x - perch.x) + (you.body.z - perch.z) * (you.body.z - perch.z) < 25;
 const steps: Step[] = [{ at: 0.2, act: 'prone' }, { at: 3, act: 'scope' }];
-if (onPerch || close) seen.slice(0, shots).forEach((post, i) => steps.push({ at: 8 + i * 6, act: 'fire', target: { post }, breath: 1.5 }));
+// Equipment: the generator, or the camp's alarm boxes in turn, a round each.
+const kit = want === 'generator' || want === 'box' ? (world.camp.devices ?? []).filter((d) => d.kind === (want === 'box' ? 'alarm' : 'generator')) : [];
+if (kit.length > 0) kit.slice(0, shots).forEach((d, i) => steps.push({ at: 8 + i * 6, act: 'fire', target: { x: d.x, y: d.y, z: d.z }, breath: 1.5 }));
+else if (onPerch || close) seen.slice(0, shots).forEach((post, i) => steps.push({ at: 8 + i * 6, act: 'fire', target: { post }, breath: 1.5 }));
 const driver = new MarksmanDriver(steps);
 const raw = scene.game.still(sim);
 
@@ -150,7 +154,9 @@ console.log(`${scene.title} · ${name}${params ? ` ${params}` : ''}`);
 console.log(`  built round: ${world.camp.crux ?? 'no one problem'} · it ${camp.protects ? (camp.answer === 'hold' ? 'holds him' : camp.answer === 'bolt' ? 'bolts with him' : 'waits for its relief') : 'runs him at the siren'} · ${sim.guards.length} men`);
 const round = `${you.rifle?.suppressed ? 'suppressed ' : ''}${you.rifle?.load ?? ''}`;
 console.log(
-  onPerch || close
+  kit.length > 0
+    ? `  he lies on the best overview and fires ${Math.min(shots, kit.length)} ${round} round(s), at: ${want === 'box' ? 'an alarm box' : 'the generator'}${args.has('hurt') ? '' : ' · he can’t be hurt'}`
+    : onPerch || close
     ? `  he lies ${close ? `${from} m from the first man` : 'on the best overview'} and fires ${Math.min(shots, seen.length)} ${round} round(s), at: ${seen.slice(0, shots).map((i) => `${posts[i]!.role}${posts[i]!.elevated ? ' (raised)' : ''}${posts[i]!.holdsDoor ? ' (on the target’s door)' : ''}`).join(', ') || 'nobody'}${args.has('hurt') ? '' : ' · he can’t be hurt'}`
     : '  he isn’t on a perch: he stays where the run starts and does nothing',
 );
@@ -162,6 +168,7 @@ let hunting = '';
 let firstDown = -1;
 const runners = new Set<number>();
 const shouted = new Set<number>();
+const sure = new Set<number>();
 for (let k = 0; k < seconds * hz && sim.state.outcome.status === 'playing'; k++) {
   const events = sim.step(driver.next(sim, raw));
   log.add(events);
@@ -171,7 +178,8 @@ for (let k = 0; k < seconds * hz && sim.state.outcome.status === 'playing'; k++)
       const post = posts[postOf.get(e.victim) ?? -1];
       if (firstDown < 0) firstDown = sim.tick;
       say(e.victim === camp.objective?.target ? 'THE TARGET is down' : `a man is down${post ? `: ${post.role}${post.elevated ? ' (raised)' : ''}${post.holdsDoor ? ', the man on the target’s door' : ''}` : ''}`);
-    } else if (e.type === 'whistle' && !whistled) {
+    } else if (e.type === 'cry') say('he cries out as he falls: it wasn’t through the head');
+    else if (e.type === 'whistle' && !whistled) {
       whistled = true;
       say('the whistle');
       because(e.id);
@@ -184,11 +192,19 @@ for (let k = 0; k < seconds * hz && sim.state.outcome.status === 'playing'; k++)
       because(e.id);
     } else if (e.type === 'alarm') say(`${who(e.source)} throws the alarm: ${e.stage === 'raised' ? 'it sounds' : 'it’s dead'}`);
     else if (e.type === 'level') say(`the camp is ${e.to}, from ${e.from}`);
+    else if (e.type === 'impact' && e.source === sim.playerId && e.what !== 'body') say(`his round strikes ${e.what === 'terrain' ? 'the ground' : 'something solid'}`);
+    else if (e.type === 'sabotage') say(e.what === 'alarm' ? 'an alarm box is dead' : `the ${e.what} is out of action`);
     else if (e.type === 'checkin' && e.stage === 'silence') say(`a post doesn’t answer its check-in: ${posts[e.post]?.role ?? 'post'}`);
     else if (e.type === 'spotted' && e.what === 'body') say(`${who(e.source)} sees a body`);
     else if (e.type === 'bark' && BARKS[e.line]?.shout && !shouted.has(e.line)) {
       shouted.add(e.line);
       say(`${who(e.source)} shouts “${BARKS[e.line]!.text}”`);
+      because(e.id);
+    } else if (why && e.type === 'alert' && e.to === 'searching' && e.reason !== 'voice' && sure.size < 6 && !sure.has(e.source)) {
+      // With --why: the first few men to take it for the real thing by their own senses, and on what.
+      sure.add(e.source);
+      say(`${who(e.source)} is sure of it`);
+      because(e.id);
     } else if (e.type === 'engine' && e.load === 'start') say(escape && e.source === escape.id ? 'his vehicle’s engine starts' : 'an engine starts: a truck on the road');
     else if (e.type === 'reinforce') say(`the relief is at the gate (${e.count} men)`);
     else if (e.type === 'order' && e.task === 'hunt' && !hunted) {

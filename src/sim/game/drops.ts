@@ -80,8 +80,8 @@ export const compoundDrops: System = {
   phase: 'commands',
   after: ['player-commands', 'rifle', 'sandbox-drops', 'use'],
   reads: ['input', 'player.body', '*.body', 'guard.guard', 'solid.solid', 'generator.generator', 'radio.radio', 'commander.camp.fights', 'remains.remains'],
-  writes: ['entities', 'bullet.bullet', 'rng.wound', 'player.health', 'player.rifle', 'player.vitals', 'generator.generator.running', 'radio.radio.working'],
-  emits: ['noise', 'shot', 'report', 'impact', 'death', 'cry', 'hurt', 'passed'],
+  writes: ['entities', 'bullet.bullet', 'rng.wound', 'player.health', 'player.rifle', 'player.vitals', 'generator.generator', 'radio.radio.working', 'alarm.alarm'],
+  emits: ['noise', 'shot', 'report', 'impact', 'death', 'cry', 'hurt', 'passed', 'sabotage'],
   run(ctx) {
     for (const c of ctx.input.commands) if (c.kind === 'stimulus') apply(ctx, c);
   },

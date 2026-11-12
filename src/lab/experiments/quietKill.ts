@@ -30,13 +30,13 @@ type Shots = Tuning['perception']['awareness']['shots'];
 /** Any sound of a shot, heard at all, is a shot: how the game was built. */
 export const FLAT: Shots = {
   report: { faint: 0.8, clear: 0.8, clearAt: 4 },
-  crack: { faint: 0.8, clear: 0.8, clearAt: 4 },
+  crack: { faint: 0.8, clear: 0.8, clearAt: 4, close: 0.8, closeAt: 4 },
   impact: { faint: 0.8, clear: 0.8, clearAt: 4 },
   bolt: { faint: 0.8, clear: 0.8, clearAt: 4 },
 };
 
-/** Each sound by how clearly it was heard: the takedown's numbers (sim/game/scenes/takedown.ts). */
-export const GRADED: Shots = defaultTuning.modes.takedown.shots;
+/** Each sound by how clearly it was heard: the game's own reading (`perception.awareness.shots`). */
+export const GRADED: Shots = defaultTuning.perception.awareness.shots;
 
 const withShots = (tuning: Tuning, shots: Shots, subsonic: boolean, whistle = tuning.perception.awareness.whistle): Tuning => ({
   ...tuning,

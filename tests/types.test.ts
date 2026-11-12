@@ -191,7 +191,7 @@ describe('what its shape shows from outside (the owner: walking the outside shou
   it('still answers a sniper on every kind of place: the siren sounds', () => {
     for (const name of ['walled', 'depot', 'farm', 'keep']) {
       const w = worlds.get(`${SEEDS[0]!}/${name}`)!;
-      const scene = { ...(compound(`seed=${SEEDS[0]!}&attack=sniper&ready=alert`) as Scene<Simulation>), world: () => w };
+      const scene = { ...(compound(`seed=${SEEDS[0]!}&attack=sniper`) as Scene<Simulation>), world: () => w };
       const sim = startScene(scene, T, w);
       const driver = scene.driver!();
       const raw = scene.game.still(sim);

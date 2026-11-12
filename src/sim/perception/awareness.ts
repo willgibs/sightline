@@ -81,11 +81,17 @@ export function stateAt(level: number, A: Tuning['perception']['awareness']): Aw
 export function soundLevel(p: PendingSound, tuning: Tuning): number {
   const A = tuning.perception.awareness;
   if (p.kind === 'voice') return p.voice;
-  if (p.kind === 'shot') {
-    const S = p.sound === 'crack' ? A.shots.crack : p.sound === 'impact' ? A.shots.impact : p.sound === 'bolt' ? A.shots.bolt : A.shots.report;
-    return ramp(S.faint, S.clear, (p.clarity - 1) / (S.clearAt - 1));
-  }
+  if (p.kind === 'shot') return shotLevel(p.sound, p.clarity, tuning);
   return ramp(A.sound.faint, A.sound.clear, (p.clarity - 1) / 3);
+}
+
+/** What one of a shot's sounds tells a man, by which it was and how clearly it reached him: the level it raises him to. */
+export function shotLevel(sound: string | undefined, clarity: number, tuning: Tuning): number {
+  const A = tuning.perception.awareness;
+  // A crack has a third reading: a round that passed within a few metres is a near miss, and nobody takes that for a snap.
+  if (sound === 'crack') return clarity >= A.shots.crack.closeAt ? A.shots.crack.close : ramp(A.shots.crack.faint, A.shots.crack.clear, (clarity - 1) / (A.shots.crack.clearAt - 1));
+  const S = sound === 'impact' ? A.shots.impact : sound === 'bolt' ? A.shots.bolt : A.shots.report;
+  return ramp(S.faint, S.clear, (clarity - 1) / (S.clearAt - 1));
 }
 
 function ramp(faint: number, clear: number, t: number): number {

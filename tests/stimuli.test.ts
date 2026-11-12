@@ -71,8 +71,8 @@ function bodyAt(dx: number, dz: number, fellAt = 0): (ctx: TickContext) => void 
 }
 
 describe('a body', () => {
-  it('in plain view is spotted once, with an event, and raises him to searching', () => {
-    const sim = setup(bodyAt(0, -20), ['spotted'], ['entities']);
+  it('in plain view and near enough to see what happened to him is spotted once, with an event, and raises him to searching', () => {
+    const sim = setup(bodyAt(0, -8), ['spotted'], ['entities']);
     // The debug view's overlay runs too (rule 8).
     sim.drawDebug = true;
     const r = run(sim, 6);
@@ -83,9 +83,23 @@ describe('a body', () => {
     expect(r.states).not.toContain('combat');
     const alert = r.events.find((e) => e.type === 'alert' && e.to === 'searching')!;
     expect(alert).toMatchObject({ reason: 'body' });
-    expect(r.sim.guards[0]!.senses!.percepts.some((p) => p.kind === 'body')).toBe(true);
+    expect(r.sim.guards[0]!.senses!.percepts.some((p) => p.kind === 'body' && !p.far)).toBe(true);
     // He says so: the shouted line carries, and raises whoever hears it.
     expect(r.events.some((e) => e.type === 'bark' && e.radius === T.perception.barks.shout)).toBe(true);
+  });
+
+  it('seen from farther off is a man lying where he shouldn’t be: it has him wary, and nothing more until he’s near enough to see', () => {
+    const r = run(setup(bodyAt(0, -20), ['spotted'], ['entities']), 6);
+    const spotted = r.events.filter((e) => e.type === 'spotted');
+    expect(spotted).toHaveLength(1);
+    expect(spotted[0]).toMatchObject({ what: 'body' });
+    expect(r.states).toContain('suspicious');
+    expect(r.states).not.toContain('searching');
+    const percept = r.sim.guards[0]!.senses!.percepts.find((p) => p.kind === 'body')!;
+    expect(percept.far).toBe(true);
+    expect(percept.fell).toBeUndefined();
+    // Nobody shouts "Man down!" at a shape on the ground twenty metres off.
+    expect(r.events.some((e) => e.type === 'bark' && e.radius === T.perception.barks.shout)).toBe(false);
   });
 
   it('behind him, or too far to make out, is not', () => {
@@ -128,9 +142,9 @@ describe('the sandbox', () => {
   it('drops a body where the view points, for a guard to find', () => {
     const sim = setup(() => undefined, []);
     const p = sim.player;
-    // A point 20 m north of the sentry, on the ground, in the player's view.
+    // A point 8 m north of the sentry, on the ground, in the player's view: near enough for him to see what it is.
     const dx = 0 - p.x;
-    const dz = -20 - p.z;
+    const dz = -8 - p.z;
     const dy = 0.02 - (p.y + p.eyeHeight);
     const l = Math.hypot(dx, dy, dz);
     const yaw = Math.atan2(-dx, -dz);
@@ -161,6 +175,18 @@ describe('the crack', () => {
     expect(heard.z).toBeLessThan(0);
     expect(heard.z).toBeGreaterThan(-60);
     expect(Math.abs(heard.x - 8)).toBeLessThan(6);
+    // Eight metres off, with no bang to go with it: a snap that has him wary, and not a shot.
+    expect(r.states).toContain('suspicious');
+    expect(r.states).not.toContain('searching');
+  });
+
+  it('is a shot to a man it only just misses', () => {
+    // The same round along x = 2: it passes 2 m from him.
+    const shoot = (ctx: TickContext) => {
+      if (ctx.tick !== hz) return;
+      ctx.emit({ type: 'shot', source: 1, x: 2, y: 1.7, z: -300, dx: 0, dy: 0, dz: 1, speed: 790, drag: 0.00065, wx: 0, wz: 0 });
+    };
+    const r = run(setup(shoot, ['shot']), 3);
     expect(r.states).toContain('searching');
   });
 });

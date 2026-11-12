@@ -7,7 +7,7 @@ import { commanderOf } from '../src/sim/game/comms';
 import { player } from '../src/sim/game/entities';
 import { compound } from '../src/sim/game/scenes/compound';
 import { liveCamp } from '../src/sim/game/scenes/liveCamp';
-import { takedown, takedownTuning } from '../src/sim/game/scenes/takedown';
+import { takedown } from '../src/sim/game/scenes/takedown';
 import type { Simulation } from '../src/sim/game/sim';
 import type { Command } from '../src/sim/kernel/commands';
 import { neutralInput } from '../src/sim/kernel/input';
@@ -30,8 +30,7 @@ import { worldOf } from './live';
 
 const SEED = 'LEB-2534';
 /** A camp that protects its target, answering as every such camp did before answers went by the camp's problem. */
-const STAGED = '&ready=alert&off=answer';
-const GRADED_SHOTS = T.modes.takedown.shots;
+const STAGED = '&off=answer';
 const HZ = T.sim.tickHz;
 
 interface Timeline {
@@ -76,26 +75,28 @@ function attack(params: string, seconds: number, tuning: Tuning = T, stopAt: (t:
   return t;
 }
 
-describe('the takedown’s numbers', () => {
-  it('are set over the game’s, the same however often, and leave the game’s alone', () => {
-    const once = takedownTuning(T);
-    expect(takedownTuning(once)).toEqual(once);
-    expect(once.perception.awareness.shots).toEqual(GRADED_SHOTS);
-    expect(once.perception.awareness.whistle).toBe(T.modes.takedown.whistle);
-    expect(T.perception.awareness.shots).not.toEqual(GRADED_SHOTS);
-    expect(once.ballistics.rifle.carries).toEqual({ match: true, subsonic: true });
-    expect(T.ballistics.rifle.carries).toEqual({ match: true, subsonic: false });
-    expect({ ...once, perception: T.perception, ballistics: T.ballistics }).toEqual(T);
-  });
-
-  it('are what a takedown runs on, and what a live camp doesn’t', () => {
+describe('the takedown', () => {
+  it('is the live camp by another name: every camp protects its target, and reads what it hears the same way', () => {
     const world = worldOf(SEED);
     const mode = startScene({ ...(takedown(`seed=${SEED}`) as Scene<Simulation>), world: () => world }, T, world);
-    expect(mode.tuning.perception.awareness.shots).toEqual(GRADED_SHOTS);
-    expect(commanderOf(mode)!.camp.protects).toBeDefined();
     const plain = startScene({ ...(liveCamp(`seed=${SEED}`) as Scene<Simulation>), world: () => world }, T, world);
-    expect(plain.tuning.perception.awareness.shots).toEqual(T.perception.awareness.shots);
-    expect(commanderOf(plain)!.camp.protects).toBeUndefined();
+    expect(mode.tuning).toEqual(plain.tuning);
+    expect(commanderOf(plain)!.camp.protects).toBeDefined();
+    expect(commanderOf(mode)!.camp.protects).toEqual(commanderOf(plain)!.camp.protects);
+    expect(commanderOf(mode)!.camp.answer).toBe(commanderOf(plain)!.camp.answer);
+    // What the takedown's own numbers were is what the game's are: a thud isn't a shot, and a whistle turns heads.
+    const A = T.perception.awareness;
+    expect(A.shots.impact.faint).toBeLessThan(A.levels.curious);
+    expect(A.shots.crack.faint).toBeLessThan(A.levels.searching);
+    expect(A.whistle).toBeLessThan(A.levels.suspicious);
+    expect(T.ballistics.rifle.carries).toEqual({ match: true, subsonic: true });
+  }, 120_000);
+
+  it('protects nobody with its protection switched off, as no camp did before it', () => {
+    const world = worldOf(SEED);
+    const off = startScene({ ...(liveCamp(`seed=${SEED}&off=protect`) as Scene<Simulation>), world: () => world }, T, world);
+    expect(commanderOf(off)!.camp.protects).toBeUndefined();
+    expect(commanderOf(off)!.camp.answer).toBeUndefined();
   }, 120_000);
 });
 
@@ -109,13 +110,13 @@ describe('a camp that protects its target', () => {
     expect(t.told).toBeGreaterThanOrEqual(t.relief);
     expect(t.left).toBeGreaterThanOrEqual(t.told);
     expect(t.gone).toBeGreaterThan(t.left);
-    // A relaxed camp has him away in half a minute. This is the difference the mode is for.
+    // A camp that protects nobody has him away in half a minute. This is the difference protection is for.
     expect(t.left - t.siren).toBeGreaterThan(45);
     expect(protectionOf(t.sim)).toBe('he is gone');
   }, 240_000);
 
-  it('runs him for his vehicle at once when it isn’t ready for trouble', () => {
-    const t = attack('', 240);
+  it('runs him for his vehicle at once with its protection switched off, as every camp once did', () => {
+    const t = attack('&off=protect', 240);
     expect(t.siren).toBeGreaterThan(0);
     expect(t.left - t.siren).toBeLessThan(5);
     expect(t.gone).toBeGreaterThan(t.left);
@@ -126,7 +127,7 @@ describe('a camp that protects its target', () => {
   it('has nobody to send for with its radio out, so he waits until his nerve goes, and then runs alone', () => {
     const tuning = tuningCopy();
     tuning.brain.protect.giveUp = 60;
-    const t = attack('&ready=alert&off=radio,answer', 300, tuning);
+    const t = attack('&off=radio,answer', 300, tuning);
     expect(t.siren).toBeGreaterThan(0);
     expect(Number.isNaN(t.relief)).toBe(true);
     expect(Number.isNaN(t.told)).toBe(true);
@@ -148,7 +149,7 @@ describe('a camp that protects its target', () => {
   it('keeps him where he is when there is no vehicle to run to', () => {
     const tuning = tuningCopy();
     tuning.brain.protect.giveUp = 30;
-    const t = attack('&ready=alert&off=truck,answer', 200, tuning);
+    const t = attack('&off=truck,answer', 200, tuning);
     expect(t.siren).toBeGreaterThan(0);
     expect(Number.isNaN(t.left)).toBe(true);
     expect(Number.isNaN(t.gone)).toBe(true);
@@ -198,9 +199,9 @@ describe('a vehicle that won’t start', () => {
 });
 
 describe('a vehicle held up on its way out', () => {
-  /** A relaxed camp under the sniper, up to the moment the target is aboard and moving. */
+  /** A camp that protects nobody, under the sniper, up to the moment the target is aboard and moving. */
   function untilAboard(): { t: Timeline; truck: VehicleEntity } {
-    const t = attack('', 120, T, (x) => commanderOf(x.sim)!.camp.objective?.status === 'escaping');
+    const t = attack('&off=protect', 120, T, (x) => commanderOf(x.sim)!.camp.objective?.status === 'escaping');
     expect(commanderOf(t.sim)!.camp.objective?.status).toBe('escaping');
     return { t, truck: t.sim.index.of('vehicle').find((v) => v.vehicle.escape)! };
   }
@@ -271,9 +272,11 @@ describe('a vehicle held up on its way out', () => {
 });
 
 describe('the rifle’s load', () => {
-  it('has nothing to change to in a kit with one load: the game’s, until the owner says otherwise', () => {
+  it('has nothing to change to in a kit with one load', () => {
     const world = worldOf(SEED);
-    const sim = startScene({ ...(liveCamp(`seed=${SEED}`) as Scene<Simulation>), world: () => world }, T, world);
+    const tuning = tuningCopy();
+    tuning.ballistics.rifle.carries.subsonic = false;
+    const sim = startScene({ ...(liveCamp(`seed=${SEED}`) as Scene<Simulation>), world: () => world }, tuning, world);
     const rifle = player(sim.index).rifle!;
     sim.step({ ...neutralInput(), commands: [{ kind: 'load' }] });
     expect(rifle.load).toBe('match');
@@ -281,7 +284,7 @@ describe('the rifle’s load', () => {
     expect(rifle.swap).toBeUndefined();
   }, 120_000);
 
-  it('changes by command in the takedown’s kit, takes its time, and holds fire while it does', () => {
+  it('changes by command, takes its time, and holds fire while it does', () => {
     const world = worldOf(SEED);
     const sim = startScene({ ...(takedown(`seed=${SEED}`) as Scene<Simulation>), world: () => world }, T, world);
     const you = player(sim.index);

@@ -23,6 +23,18 @@ What that means for how we build:
 - **Fair information is the point.** Every piece of knowledge has a route: someone sensed it, someone said it, someone heard. Rule 13 is the whole game here.
 - **Generalize at the third use.** Keep the seams clean now, and don't build for multiple camps or open-world modes before they're real. `docs/research/notes/labs/camp_information.md` has the smallest interface that would let a camp later run at lower fidelity.
 
+## The engine first. What it's for comes after.
+
+The owner, Nov 12: "my initial goal here was to focus on the foundational procedurally generated camps and their reactive intelligence, so we could create effectively infinite bases that react to the world around them through the player's attack inputs. The idea was that if we could nail that, we'd have the key engine to scale this into a super dynamic game overall."
+
+The shape of that game isn't settled. They named two: a home base the player lives in, with weapon stores, an armory and a board where paid takedown contracts drop; or an open world where takedowns are a core component among exploring, hunting, an economy, building a home and upgrading weapons. They said it "isn't meant to rush us into that bigger picture". They offered it because we kept fighting over one mission rule: "maybe that context helps alleviate the 'what's the goal' problem of base takedowns, where there may be various different goals depending."
+
+What that means for how we build:
+
+- **A camp is right in itself.** It defends itself and protects what it values, whatever a contract asks of whoever attacks it. Its reactions are judged as a camp's, not as a mission's clock.
+- **A goal is a contract's.** "The target got away" is one contract's way to lose. Killing a man, taking something, breaking something or clearing the place are others, and none of them is what the engine is shaped round.
+- **None of the bigger game gets built unasked.** The seams stay clean (the kernel, the lanes, a camp that takes typed inputs), and that's all it needs from us now.
+
 ## Always look for the greatest gain
 
 Nothing here will ever be perfect. So we keep asking which pillar is weakest, measure it, and put effort there: `docs/lab-opportunities.md` is the running list, the experiments in `src/lab` keep it honest, and independent agents can improve weak areas while the main work goes on.

@@ -369,7 +369,8 @@ describe('declared data access', () => {
   it('lets every system write only what it declares, when the target boards or finds his vehicle dead', () => {
     for (const disabled of [false, true]) {
       const found = new Set<string>();
-      const base = liveCamp('seed=LEB-2534') as Scene<Simulation>;
+      // A camp that protects nobody: at the siren its target goes for his vehicle at once.
+      const base = liveCamp('seed=LEB-2534&off=protect') as Scene<Simulation>;
       const scene: Scene<Simulation> = {
         ...base,
         seconds: 6,

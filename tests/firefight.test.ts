@@ -46,7 +46,7 @@ interface Fight {
 /** The circling shooter against the camp, to the end of his lap, his life or `seconds`. */
 function circle(params: string, seconds: number): Fight {
   const world = worldOf(SEED);
-  const sc = { ...(ladder(`seed=${SEED}&plan=circle&ready=alert${params}`) as Scene<Simulation>), world: () => world, playOn: true };
+  const sc = { ...(ladder(`seed=${SEED}&plan=circle${params}`) as Scene<Simulation>), world: () => world, playOn: true };
   const tuning = sceneTuning(sc, T);
   const sim = startScene(sc, T, world);
   const bot = circleOf(sim);

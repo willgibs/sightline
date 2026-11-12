@@ -29,7 +29,7 @@ import type { Simulation } from './sim';
  */
 export function rehearse(world: World, tuning: Tuning, seconds = REHEARSAL_SECONDS): number {
   if (!world.report.camp || world.report.camp.perches.length === 0 || world.camp.guards.length === 0) return 0;
-  const scene = compound(`seed=${world.seed}&attack=sniper&ready=alert`);
+  const scene = compound(`seed=${world.seed}&attack=sniper`);
   const hurried: Tuning = { ...tuning, brain: { ...tuning.brain, reinforce: { ...tuning.brain.reinforce, delay: RELIEF_AFTER } } };
   const sim = startScene(scene, hurried, world) as Simulation;
   const driver = scene.driver!();

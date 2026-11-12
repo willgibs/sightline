@@ -166,7 +166,7 @@ export const BENCH_GOLDEN: PinnedBench = {
       "relocation: 26–30 m in any direction, outside 2 sigma (%)": 29.5,
       "ellipse in the world: contains the perch at 1 sigma (%)": 41.2371134,
       "ellipse in the world: contains the perch at 2 sigma (%)": 86.5979381,
-      "ellipse in the world: mean bearings fused per shot": 5.30927835,
+      "ellipse in the world: mean bearings fused per shot": 5.01030928,
       "re-found within 60 s (of 16): honest": 15,
       "re-found within 60 s (of 16): random": 2,
       "re-found within 60 s (of 16): plain": 13,
@@ -175,14 +175,14 @@ export const BENCH_GOLDEN: PinnedBench = {
       "re-found within 60 s (of 16): honest, unpaced": 16,
       "reactions (in the scripted scenarios)": 62,
       "reactions unexplained": 0,
-      "overlook: guards down from one perch, of 32": 18,
+      "overlook: guards down from one perch, of 32": 24,
       "overlook: camps cleared (of 3)": 0,
       "overlook: the target got away (of 3)": 2,
       "timed shot on an escort's camp: target down (of 3)": 3,
-      "a fight’s worst tick: grid cells the brains expand": 7824,
-      "a fight’s worst tick: rays the brains cast": 234,
-      "a fight’s worst tick: grid cells sounds flood": 13313,
-      "a fight’s worst tick: grid cells the commander expands": 1265,
+      "a fight’s worst tick: grid cells the brains expand": 11988,
+      "a fight’s worst tick: rays the brains cast": 638,
+      "a fight’s worst tick: grid cells sounds flood": 13318,
+      "a fight’s worst tick: grid cells the commander expands": 3277,
       "routes between a camp’s posts: found (of 56)": 56,
       "routes between a camp’s posts: grid cells a search looks at, on average": 459,
       "routes between a camp’s posts: the most one search looks at": 2716,
@@ -193,13 +193,13 @@ export const BENCH_GOLDEN: PinnedBench = {
     "runs": {
       "camp-fight": {
         "work": {
-          "motor": { "rays": 0, "nodes": 0, "bodies": 11999 },
-          "bullets": { "rays": 79, "nodes": 0, "bodies": 0 },
-          "perception-hearing": { "rays": 75, "nodes": 45808, "bodies": 0 },
-          "perception-spotting": { "rays": 8866, "nodes": 0, "bodies": 0 },
-          "perception-awareness": { "rays": 0, "nodes": 75045, "bodies": 0 },
+          "motor": { "rays": 0, "nodes": 0, "bodies": 12800 },
+          "bullets": { "rays": 68, "nodes": 0, "bodies": 0 },
+          "perception-hearing": { "rays": 64, "nodes": 40556, "bodies": 0 },
+          "perception-spotting": { "rays": 5516, "nodes": 0, "bodies": 0 },
+          "perception-awareness": { "rays": 0, "nodes": 93021, "bodies": 0 },
           "camp-commander": { "rays": 0, "nodes": 3005, "bodies": 0 },
-          "guard-brains": { "rays": 290, "nodes": 14061, "bodies": 0 }
+          "guard-brains": { "rays": 325, "nodes": 29089, "bodies": 0 }
         }
       }
     }

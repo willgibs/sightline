@@ -20,7 +20,7 @@ export function worldOf(seed: string): World {
   return w;
 }
 
-/** A live camp with a marksman on its best overview, firing every `every` seconds from `from` at what he sees best. `params` are the camp's (`&ready=alert`, `&off=radio`). */
+/** A live camp with a marksman on its best overview, firing every `every` seconds from `from` at what he sees best. `params` are the camp's (`&off=radio`). */
 export function shooterScene(seed: string, seconds: number, from = 8, every = 6, params = ''): Scene<Simulation> {
   const world = worldOf(seed);
   const perch = [...world.report.camp!.perches].sort((x, y) => y.coverage - x.coverage || x.x - y.x)[0]!;

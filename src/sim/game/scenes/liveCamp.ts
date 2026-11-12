@@ -24,15 +24,14 @@ import type { World } from '../../kernel/world/world';
  * Parameters (`?scene=live-camp&params=seed=LEB-2534`, with `&difficulty=0.5` inside params
  * as `seed=LEB-2534%26difficulty=0.7`): which camp, and how hard. `perch=1` starts you on
  * the camp's best overview, for a sitting that's about the fight and not the walk there.
- * `ready=alert` is a camp that protects its target (game/protection.ts): he goes to his hard
- * room at the first sign of trouble, and what happens then goes by the problem the camp is
- * built round: it holds him there, it starts his vehicle and bolts, or it waits for its
- * relief to bring him out. Without it the camp is relaxed, and runs him to his vehicle the
- * moment the siren sounds.
+ *
+ * Every camp protects its target (game/protection.ts; the owner, Nov 12: "the target should
+ * not get rushed out of the camp the second" the siren sounds). He goes to his hard room at
+ * the first sign of trouble, and what happens then goes by the problem the camp is built
+ * round: it holds him there, it starts his vehicle and bolts, or it waits for its relief to
+ * bring him out. `off=protect` is the camp that ran him to his vehicle the moment the siren
+ * sounded, as every camp once did, for measuring against.
  */
-
-export const READINESS = ['relaxed', 'alert'] as const;
-export type Readiness = (typeof READINESS)[number];
 
 export interface LiveCampParams {
   seed: string;
@@ -41,11 +40,9 @@ export interface LiveCampParams {
   off: CampSwitch[];
   /** Start on the camp's best overview. */
   perch: boolean;
-  /** How ready the camp is for trouble. */
-  ready: Readiness;
 }
 
-const DEFAULTS: LiveCampParams = { seed: 'LEB-2534', difficulty: defaultCampSpec().difficulty, off: [], perch: false, ready: 'relaxed' };
+const DEFAULTS: LiveCampParams = { seed: 'LEB-2534', difficulty: defaultCampSpec().difficulty, off: [], perch: false };
 
 export function parseLiveCamp(text: string | undefined): LiveCampParams {
   const p: LiveCampParams = { ...DEFAULTS };
@@ -59,16 +56,13 @@ export function parseLiveCamp(text: string | undefined): LiveCampParams {
       p.difficulty = d;
     } else if (key === 'off') p.off = parseSwitches(value ?? '');
     else if (key === 'perch') p.perch = value !== '0';
-    else if (key === 'ready') {
-      if (!(READINESS as readonly string[]).includes(value ?? '')) throw new Error(`A live camp is ${READINESS.join(' or ')}, not '${value}'`);
-      p.ready = value as Readiness;
-    } else throw new Error(`A live camp doesn't know '${part}'`);
+    else throw new Error(`A live camp doesn't know '${part}'`);
   }
   return p;
 }
 
 export function formatLiveCamp(p: LiveCampParams): string {
-  return `seed=${p.seed}&difficulty=${p.difficulty}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}${p.perch ? '&perch=1' : ''}${p.ready !== 'relaxed' ? `&ready=${p.ready}` : ''}`;
+  return `seed=${p.seed}&difficulty=${p.difficulty}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}${p.perch ? '&perch=1' : ''}`;
 }
 
 /** The camp's best overview: the perch that sees the most guard time. */
@@ -83,7 +77,7 @@ export function liveCamp(params?: string): Scene {
     version: 3,
     params: formatLiveCamp(p),
     title: `A live camp (${p.seed})`,
-    description: `A generated camp with the whole camp brain awake: guards who see, hear, talk and search, a commander, radio check-ins, alarm boxes that can be cut off at the generator, and a target who runs for his vehicle at lockdown. You have the rifle.`,
+    description: `A generated camp with the whole camp brain awake: guards who see, hear, talk and search, a commander, radio check-ins, alarm boxes that can be cut off at the generator, and a target the camp protects by the problem it is built round. You have the rifle.`,
     game: SIGHTLINE,
     world: (tuning) => generateWorld(campMission(p.seed, { ...defaultCampSpec(), difficulty: p.difficulty }), tuning),
     systems: [commsVoice, campCommander, campCheckins, campRules, campDevices, vehicleDrive],
@@ -94,7 +88,7 @@ export function liveCamp(params?: string): Scene {
       commanderOf(sim)!.camp.fights = true;
       commanderOf(sim)!.camp.firefight = true;
       commanderOf(sim)!.camp.hunts = true;
-      if (p.ready === 'alert') giveProtection(sim);
+      giveProtection(sim);
       // Here, as in the missions to come, the job isn't done until you're out: at the end of the road.
       const road = truckRoute(sim.world, sim.tuning);
       if (road) commanderOf(sim)!.camp.objective!.getOut = { x: road[0]!.x, z: road[0]!.z };

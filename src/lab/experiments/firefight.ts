@@ -41,7 +41,7 @@ const NEAR = 40;
 const LEFT = 45;
 
 function breakContact(seed: string, arm: Arm, t: Tuning): Record<string, number> {
-  const sc = { ...(ladder(`seed=${seed}&plan=contact&ready=alert${arm.off ? `&off=${arm.off}` : ''}`) as Scene<Simulation>), playOn: true };
+  const sc = { ...(ladder(`seed=${seed}&plan=contact${arm.off ? `&off=${arm.off}` : ''}`) as Scene<Simulation>), playOn: true };
   const sim = startScene(sc, t, keptWorld(`live-camp:${seed}`, t, sc.world));
   const bot = contactOf(sim);
   const driver = new ViewDriver(bot);
@@ -102,7 +102,7 @@ function breakContact(seed: string, arm: Arm, t: Tuning): Record<string, number>
 }
 
 function circle(seed: string, arm: Arm, t: Tuning): Record<string, number> {
-  const sc = { ...(ladder(`seed=${seed}&plan=circle&ready=alert${arm.off ? `&off=${arm.off}` : ''}`) as Scene<Simulation>), playOn: true };
+  const sc = { ...(ladder(`seed=${seed}&plan=circle${arm.off ? `&off=${arm.off}` : ''}`) as Scene<Simulation>), playOn: true };
   const sim = startScene(sc, t, keptWorld(`live-camp:${seed}`, t, sc.world));
   const bot = circleOf(sim);
   const driver = new ViewDriver(bot);

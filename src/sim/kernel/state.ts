@@ -31,8 +31,14 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * 13: a vehicle keeps when its engine was started; a camp keeps how it answers for its
  * target, which of its relief it has posted on his doors, and how he left; and a man keeps
  * the engine he hears and his part in the drill (brain/protect.ts).
+ * 14: a body percept keeps whether it was seen going down or only from afar, and a man's
+ * senses the bodies he has seen only from afar; a brain keeps the fire it has counted, when
+ * it last knew the camp was under attack, the alarm boxes it has found dead and when it last
+ * went to look at something; a camp keeps the bodies reported to it, the word of a man who
+ * knew, and the men who didn't answer its order to the siren; a report can carry that word;
+ * and a generator and an alarm box keep the rounds that have struck them.
  */
-export const STATE_SCHEMA = 13;
+export const STATE_SCHEMA = 14;
 
 export type EntityId = number;
 

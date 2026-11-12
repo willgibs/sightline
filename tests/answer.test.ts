@@ -59,7 +59,7 @@ interface Timeline {
 /** A sniper on the camp's best overview, watched for `seconds` or until `stopAt`; `each` runs before every tick. */
 function attack(seed: string, params: string, seconds: number, opts: { tuning?: Tuning; stopAt?: (t: Timeline) => boolean; each?: (t: Timeline) => void; before?: (sim: Simulation) => void } = {}): Timeline {
   const world = worldOf(seed);
-  const scene = { ...(compound(`seed=${seed}&attack=sniper&ready=alert${params}`) as Scene<Simulation>), world: () => world };
+  const scene = { ...(compound(`seed=${seed}&attack=sniper${params}`) as Scene<Simulation>), world: () => world };
   const sim = startScene(scene, opts.tuning ?? T, world);
   opts.before?.(sim);
   const driver = scene.driver!() as AttackDriver;
@@ -117,13 +117,15 @@ describe('a camp’s answer for its target', () => {
     };
     expect(worldOf(FLUSH).camp.crux).toBe('flush');
     expect(worldOf(INSIDE).camp.crux).toBe('inside');
-    expect(camp(FLUSH, '&ready=alert').answer).toBe('bolt');
-    expect(camp(INSIDE, '&ready=alert').answer).toBe('hold');
-    expect(camp(FLUSH, '').answer).toBeUndefined();
-    expect(camp(FLUSH, '&ready=alert&off=answer').answer).toBeUndefined();
-    expect(camp(INSIDE, '&ready=alert&off=answer').answer).toBeUndefined();
+    expect(camp(FLUSH, '').answer).toBe('bolt');
+    expect(camp(INSIDE, '').answer).toBe('hold');
+    // A camp that protects nobody has no answer to give.
+    expect(camp(FLUSH, '&off=protect').answer).toBeUndefined();
+    expect(camp(FLUSH, '&off=protect').protects).toBeUndefined();
+    expect(camp(FLUSH, '&off=answer').answer).toBeUndefined();
+    expect(camp(INSIDE, '&off=answer').answer).toBeUndefined();
     // No vehicle, nothing to bolt in.
-    expect(camp(FLUSH, '&ready=alert&off=truck').answer).toBeUndefined();
+    expect(camp(FLUSH, '&off=truck').answer).toBeUndefined();
   }, 240_000);
 });
 
@@ -144,11 +146,15 @@ describe('a camp that bolts', () => {
   });
 
   it('brings him out only once it has run its time, with no help from outside', () => {
-    expect(t.told - t.engine).toBeGreaterThanOrEqual(A.prep);
-    expect(t.left).toBeGreaterThanOrEqual(t.told);
+    // Told by the man who started it, once it had run its time; or, if the sniper got that man first, out by himself once it had run longer still.
+    if (Number.isNaN(t.told)) expect(t.left - t.engine).toBeGreaterThanOrEqual(A.prep + A.own);
+    else {
+      expect(t.told - t.engine).toBeGreaterThanOrEqual(A.prep);
+      expect(t.left).toBeGreaterThanOrEqual(t.told);
+    }
     expect(t.aboard).toBeGreaterThan(t.left);
-    // Its own man told him: the relief, if it has come at all, came after.
-    expect(Number.isNaN(t.relief) || t.relief > t.told).toBe(true);
+    // It was the camp's own doing: the relief, if it has come at all, came after he was on his way.
+    expect(Number.isNaN(t.relief) || t.relief > Math.min(t.left, Number.isNaN(t.told) ? Infinity : t.told)).toBe(true);
   });
 
   it('is over once he’s away: the camp knows its vehicle has gone, and nobody goes on trying to start it', () => {
@@ -292,7 +298,7 @@ describe('a man on the target’s door', () => {
     // An escort's camp, which has such a man, and a shooter who circles it firing at whoever he sees.
     const ESCORT = 'NUT-4776';
     const world = worldOf(ESCORT);
-    const sc = { ...(ladder(`seed=${ESCORT}&plan=circle&ready=alert`) as Scene<Simulation>), world: () => world, playOn: true };
+    const sc = { ...(ladder(`seed=${ESCORT}&plan=circle`) as Scene<Simulation>), world: () => world, playOn: true };
     const sim = startScene(sc, T, world);
     const bot = circleOf(sim);
     const driver = new ViewDriver(bot);
@@ -339,18 +345,18 @@ describe('a run that loses him', () => {
   }
 
   it('says what there was to read: the engine, in a camp that bolts', () => {
-    const reason = lost('&ready=alert');
+    const reason = lost('');
     const said = /^the target got away: his vehicle's engine had been running for (\d+) s when he got to it$/.exec(reason);
     expect(said, reason).not.toBeNull();
     expect(Number(said![1])).toBeGreaterThanOrEqual(A.prep);
   }, 240_000);
 
   it('says it was the relief, in a camp that waits for one', () => {
-    expect(lost('&ready=alert&off=answer')).toMatch(/^the target got away: the relief had been at the gate for \d+ s, and went in for him$/);
+    expect(lost('&off=answer')).toMatch(/^the target got away: the relief had been at the gate for \d+ s, and went in for him$/);
   }, 240_000);
 
-  it('says nothing held him, in a camp that isn’t ready for trouble', () => {
-    expect(lost('')).toBe('the target got away: he ran for his vehicle at the siren');
+  it('says nothing held him, in a camp that protects nobody', () => {
+    expect(lost('&off=protect')).toBe('the target got away: he ran for his vehicle at the siren');
   }, 240_000);
 });
 

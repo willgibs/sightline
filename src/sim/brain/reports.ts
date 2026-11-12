@@ -40,6 +40,8 @@ export interface Report {
   checking?: boolean;
   /** Who it's about, when it's about one of the camp's own: the man of his section who never came to the rally (hunt.ts). */
   about?: number;
+  /** The man saying it knows the camp is under attack, by his own eyes and ears (grounds.ts): on the net, it's the word the camp sends someone to a box on (commander.ts). */
+  attack?: true;
 }
 
 /** How a report reached someone. */
