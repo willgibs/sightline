@@ -104,6 +104,8 @@ export interface Readings {
   protection: string;
   /** The firefight, in words: how many men are fighting from positions, how many of them are up, and who's going after you; '' with nobody in one (brain/firefight.ts). */
   firefight: string;
+  /** The hunt, in words: where the camp has you placed and how far off that is, and what its section is doing; '' with nobody placed and nobody out (brain/hunt.ts). */
+  hunt: string;
 }
 
 const distance = (ax: number, az: number, bx: number, bz: number): number => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
@@ -199,11 +201,38 @@ export class CampGauges {
       targetStatus: c?.camp.objective?.status ?? 'none',
       protection: protectionOf(sim),
       firefight: firefightOf(sim),
+      hunt: huntOf(sim),
     };
   }
 }
 
 /** The stage a protecting camp has reached, as the lab panel says it: the truth, read off the state. */
+/** The hunt as it stands, in words: the camp's fix on you and how far off it is, and its section: how many, what they're doing, and how near the nearest is. */
+export function huntOf(sim: Simulation): string {
+  const camp = commanderOf(sim)?.camp;
+  if (!camp || (!camp.threat && camp.sections.length === 0)) return '';
+  const you = sim.player;
+  const hz = sim.tuning.sim.tickHz;
+  const th = camp.threat;
+  const placed = th ? `placed ${distance(th.x, th.z, you.x, you.z).toFixed(0)} m off (${th.seen ? 'seen' : 'heard'}${th.point >= 0 ? ', a listed firing point' : ''})` : 'not placed';
+  const s = camp.sections[0];
+  if (!s) {
+    const wait = th ? sim.tuning.brain.hunt.after - (sim.tick - th.since) / hz : 0;
+    return `${placed}${wait > 0 ? ` · a section in ${wait.toFixed(0)} s` : ' · nobody sent'}`;
+  }
+  let nearest = Infinity;
+  const doing = new Map<string, number>();
+  for (const g of sim.guards) {
+    if (!s.men.includes(g.id)) continue;
+    nearest = Math.min(nearest, distance(g.body.x, g.body.z, you.x, you.z));
+    const h = g.brain?.hunt;
+    const what = g.brain?.act === 'fight' || g.brain?.act === 'push' ? 'fighting' : !h || g.brain?.act !== 'hunt' ? 'elsewhere' : h.phase === 'out' ? (h.at === 0 ? 'gathering' : 'on the way') : h.phase === 'watch' ? 'watching the place' : h.phase === 'close' ? 'closing in' : h.phase === 'sweep' ? 'looking it over' : h.phase === 'hold' ? 'waiting for orders' : 'coming home';
+    doing.set(what, (doing.get(what) ?? 0) + 1);
+  }
+  const what = [...doing].map(([k, n]) => `${n} ${k}`).join(', ');
+  return `${placed} · section of ${s.men.length}, out ${((sim.tick - s.ordered) / hz).toFixed(0)} s: ${what || 'none left'}${nearest < Infinity ? ` · nearest ${nearest.toFixed(0)} m` : ''}`;
+}
+
 /** The firefight as it stands, in words: who's fighting from a position, who's up, who's pinned, and who's coming. */
 export function firefightOf(sim: Simulation): string {
   let fighting = 0;

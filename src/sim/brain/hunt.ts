@@ -31,6 +31,11 @@ import type { Option } from './utility';
  *            now, or a man getting up to leave, is under two rifles.
  *   close    Nothing seen: the leader's half goes on to the place by short dashes, saying so,
  *            and the half behind covers it, with fire on the place while a man is up.
+ *
+ * Fix him with fire, finish him with men. Before a section steps out onto ground he can see,
+ * its man says so on the net, and the camp's marksmen put rounds on the place for as long
+ * as the crossing should take (brain.ts, covering). He can still shoot a man in the open,
+ * with rounds landing round him as he does it.
  *   sweep    On the place: he walks a box round it, looking in, and then round each listed
  *            firing point close beside it. A man lying up a few metres off the believed
  *            spot is still found.
@@ -96,10 +101,17 @@ export interface Hunt {
   swept: number;
   corner: number;
   walked: boolean;
+  /** The tick he started on the point he's looking over; the way across to it from the last one, as stops, and the next of them (past the end once he's across); and how near the place the nearest point he couldn't get round is, metres. */
+  began: number;
+  hop: number[];
+  hopAt: number;
+  missed: number;
   /** Holding because the place is clear (true), or at the rally because the rest of his section never came. */
   cleared: boolean;
   /** The newest body he's taken note of out here: its percept's tick, or −1. */
   body: number;
+  /** The tick of the last shot he heard fired, or flash he saw, or −1: he doesn't cross ground in view while the rifle is still speaking. */
+  shotAt: number;
 }
 
 const way = emptyWay();
@@ -224,8 +236,13 @@ function renew(m: GuardMind): void {
     swept: 0,
     corner: 0,
     walked: false,
+    began: -1,
+    hop: [],
+    hopAt: 0,
+    missed: 1e9,
     cleared: false,
     body: -1,
+    shotAt: -1,
   };
   if (!findWay(m, h)) {
     // No way there on foot: nothing for him to do about it.
@@ -351,11 +368,18 @@ function getDown(m: GuardMind, h: Hunt): void {
 
 /** Leaves the stop he's on for another, saying so if it's for him to say: which stop, for whoever is covering him or coming with him. */
 function setOff(m: GuardMind, h: Hunt, to: number, announce: boolean): void {
+  const b = m.brain!;
+  // Out onto ground the shooter can see, from ground he can't, or the start of the last stretch: the net hears it, and the
+  // camp's marksmen put fire on the place while they cross. On the net it's the place that's named, not the stop.
+  if (announce && !covered(h, h.at, to) && (h.at === h.post || h.lit[h.at] === 0)) {
+    const C = m.tuning.brain.comms;
+    b.radio = { kind: 'moving', x: h.ox, y: m.world.terrain.heightAt(h.ox, h.oz) + m.tuning.brain.hunt.watch.cover.height, z: h.oz, radius: C.radius.moving, tick: m.tick, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: b.cause };
+  }
   h.from = h.at;
   h.at = to;
   h.going = true;
   h.left = m.tick;
-  m.brain!.routed = -1;
+  b.routed = -1;
   if (announce) say(m, 'moving', h.stops[2 * to]!, h.stops[2 * to + 1]!);
 }
 
@@ -377,6 +401,10 @@ function startSweep(m: GuardMind, h: Hunt): void {
   h.swept = 0;
   h.corner = 0;
   h.walked = false;
+  h.began = m.tick;
+  h.hop = [];
+  h.hopAt = 0;
+  h.missed = 1e9;
   const left: number[] = [];
   for (let k = 0; k + 1 < o.watch.length; k += 2) {
     const dx = o.watch[k]! - h.ox;
@@ -450,6 +478,9 @@ export function performHunt(m: GuardMind, out: Order): void {
     b.say = { report, radius: C.shoutRadius, radio: false };
     b.radio = { ...report };
   }
+  // A shot heard, or a flash seen: the rifle's still speaking.
+  for (const p of m.percepts) if ((p.kind === 'muzzle' || (p.kind === 'shot' && p.sound === 'report')) && p.tick > h.shotAt) h.shotAt = p.tick;
+  const hot = h.shotAt >= 0 && (m.tick - h.shotAt) / hz < H.quiet;
   const pinned = m.tick < h.pinned;
   const last = h.lit.length - 1;
   // Orders don't stand for ever.
@@ -486,27 +517,50 @@ export function performHunt(m: GuardMind, out: Order): void {
     while (2 * h.swept < h.sweep.length) {
       const cx = h.sweep[2 * h.swept]!;
       const cz = h.sweep[2 * h.swept + 1]!;
+      // Across to it first, by a way a man can climb (approach.ts): the straight line between two firing points is often a face.
+      if (2 * h.hopAt < h.hop.length) {
+        const late = (m.tick - h.began) / hz > S.per;
+        const w = late ? 'stuck' : walk(m, out, h.hop[2 * h.hopAt]!, h.hop[2 * h.hopAt + 1]!, H.paces.covered, 'sprint', cx, cz);
+        if (w === 'walking') return;
+        b.routed = -1;
+        h.hopAt = late ? h.hop.length : h.hopAt + 1;
+        continue;
+      }
       const [ox, oz] = BOX[h.corner]!;
       const x = cx + ox * S.radius * Math.SQRT1_2;
       const z = cz + oz * S.radius * Math.SQRT1_2;
-      const w = navigatorOf(m.world, T).standable(x, z) ? walk(m, out, x, z, h.corner === 0 && h.swept > 0 ? H.paces.covered : S.pace, h.corner === 0 && h.swept > 0 ? 'sprint' : 'walk', cx, cz) : 'stuck';
+      // A point he can't get round in the time it's worth is left: the far side of a face, say.
+      const late = (m.tick - h.began) / hz > S.per;
+      const w = late || !navigatorOf(m.world, T).standable(x, z) ? 'stuck' : walk(m, out, x, z, h.corner === 0 && h.swept > 0 ? H.paces.covered : S.pace, h.corner === 0 && h.swept > 0 ? 'sprint' : 'walk', cx, cz);
       if (w === 'walking') return;
       b.routed = -1;
       if ((x - self.x) * (x - self.x) + (z - self.z) * (z - self.z) <= S.near * S.near) h.walked = true;
-      if (++h.corner < BOX.length) continue;
+      if (!late && ++h.corner < BOX.length) continue;
       // The place itself, and he never got onto it: he can't call it. Back, and the camp leaves it be for a while.
       if (h.swept === 0 && !h.walked) {
         goHome(m, h);
         steer(m, out, 0, 0, 'idle', h.ox, h.oz, 'crouch');
         return;
       }
+      // One he couldn't get round isn't looked over: his call says how far out from the place he can speak for.
+      if (!h.walked) h.missed = Math.min(h.missed, Math.sqrt((cx - h.ox) * (cx - h.ox) + (cz - h.oz) * (cz - h.oz)));
       h.corner = 0;
       h.walked = false;
+      h.began = m.tick;
       h.swept++;
+      h.hop = [];
+      h.hopAt = 0;
+      if (2 * h.swept < h.sweep.length) {
+        watch.length = 0;
+        const o = task.hunt!;
+        for (let k = 0; k + 1 < o.watch.length; k += 2) watch.push({ x: o.watch[k]!, z: o.watch[k + 1]! });
+        if (approachOf(m.world, T).aim(watch).way(self.x, self.z, h.sweep[2 * h.swept]!, h.sweep[2 * h.swept + 1]!, way)) h.hop = way.stops.slice(2);
+      }
     }
     steer(m, out, 0, 0, 'idle', h.ox, h.oz, 'crouch');
+    // Clear, and how far out from the place that holds: short of the nearest point he couldn't get round.
     const report = say(m, 'clear', h.ox, h.oz);
-    report.radius = T.brain.comms.clearRadius;
+    report.radius = Math.max(1, Math.min(S.reach, h.missed - 1));
     b.radio = { ...report };
     h.phase = 'hold';
     h.cleared = true;
@@ -559,8 +613,8 @@ export function performHunt(m: GuardMind, out: Order): void {
     }
     const waited = (m.tick - h.since) / hz;
     if (leads(m)) {
-      // Watched long enough, and the other half is up beside him (or isn't coming): on to the place.
-      if (waited < W.for || pinned) return;
+      // Watched long enough, and the other half is up beside him (or isn't coming): on to the place. Not while he's firing.
+      if (waited < W.for || pinned || hot) return;
       if (h.theirs < h.at && waited < W.for + H.bound.wait) return;
       if (h.at >= last) {
         startSweep(m, h);
@@ -603,7 +657,7 @@ export function performHunt(m: GuardMind, out: Order): void {
       }
     }
     stayAt(m, out, self.x, self.z, h.stance, h.ox, h.oz);
-    if (pinned || (m.tick - h.since) / hz < H.watch.pause) return;
+    if (pinned || hot || (m.tick - h.since) / hz < H.watch.pause) return;
     setOff(m, h, h.at + 1, true);
     return;
   }
@@ -673,6 +727,12 @@ export function performHunt(m: GuardMind, out: Order): void {
   // One stop past the other half; and if that's all out of the shooter's view, on to the end of the cover, which they run together.
   let to = Math.min(h.post, Math.max(h.at + 1, theirs + 1));
   if (covered(h, h.at, to)) while (to < h.post && h.lit[to + 1] === 0) to++;
+  else if (hot) {
+    // Ground he can see, and he's just fired: not yet. The wait starts again when he's been quiet.
+    h.since = m.tick;
+    if (!due) h.unheard--;
+    return;
+  }
   setOff(m, h, to, true);
 }
 

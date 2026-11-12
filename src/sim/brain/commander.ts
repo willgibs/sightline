@@ -76,8 +76,11 @@ export function digest(camp: CampState, r: Report, tick: number, tuning: Tuning,
     return;
   }
   noteMan(camp, r);
+  // A section's word that it's moving, or down: where its man is, and nothing about an intruder.
+  if (r.kind === 'moving' || r.kind === 'set') return;
   // Someone has him in sight, or saw his flash: a place to act on.
   if (camp.hunts && r.kind === 'contact') seenThreat(camp, r, tick, tuning, world);
+  if (r.kind === 'shot' || r.kind === 'contact') camp.lastShot = tick;
   injectBelief(camp.map, r.x, r.z, Math.max(r.radius, M.injectRadius), 1);
   camp.lastPercept = tick;
   camp.lastCause = r.cause;
@@ -500,9 +503,9 @@ function heardClear(camp: CampState, r: Report, tick: number, tuning: Tuning, wo
   s.heard = 'clear';
   s.heardAt = tick;
   camp.cleared.push({ x: s.x, z: s.z, tick });
-  // And the listed firing points close beside it: a section looks those over with it (hunt.ts), and the camp knows the drill.
+  // And the listed firing points close beside it, as far out as the call says: a section looks those over with it (hunt.ts).
   const order = camp.tasks.find((t) => t.id === s.task)?.hunt;
-  const reach = tuning.brain.hunt.sweep.reach;
+  const reach = Math.min(tuning.brain.hunt.sweep.reach, r.radius);
   if (order) {
     for (let k = 0; k + 1 < order.watch.length; k += 2) {
       const d = (order.watch[k]! - s.x) * (order.watch[k]! - s.x) + (order.watch[k + 1]! - s.z) * (order.watch[k + 1]! - s.z);
@@ -542,7 +545,7 @@ function watchOf(m: CampMind, th: Threat): number[] {
     .map((p, k) => ({ k, d: (p.x - th.x) * (p.x - th.x) + (p.z - th.z) * (p.z - th.z) }))
     .filter((p) => p.k !== th.point)
     .sort((a, b) => a.d - b.d || a.k - b.k) // the index breaks a tie
-    .filter((p, i) => i < H.beside || (p.d <= reach && i < 2 * H.beside));
+    .filter((p, i) => i < H.beside || (p.d <= reach && i < H.sweep.most));
   const out = th.point >= 0 ? [perches[th.point]!.x, perches[th.point]!.z] : [th.x, th.z];
   for (const p of near) out.push(perches[p.k]!.x, perches[p.k]!.z);
   return out;
@@ -555,75 +558,42 @@ const huntWay = emptyWay();
 const watching: Array<{ x: number; z: number }> = [];
 
 /**
- * Where a section gathers: open ground that every one of its men can walk to quickly, out
- * of the watchers' view if such a place is no slower to reach, and with a way on from it
- * to the place. It's chosen by the walk, not the straight line: in a walled camp the two
- * are nothing alike. Also how long the slowest of them should take to get there, seconds.
- * Null if there's nowhere, or no way on.
+ * Where a section gathers, and whether it's worth going at all. The way out is worked from
+ * the open ground nearest its men, and they gather where that way leaves the camp's own
+ * ground: inside the wire there are walls between them, so a shout doesn't carry and nobody
+ * can see far, and each man simply makes his own way out to it. Also how long the slowest
+ * of them should take to get there, by the walk and not the straight line, seconds. Null if
+ * there's no way, or it's farther round than a section is sent.
  */
 function rallyFor(m: CampMind, from: ReadonlyArray<{ x: number; z: number }>, th: Threat, watch: readonly number[]): { x: number; z: number; eta: number } | null {
   const a = approachOf(m.world, m.tuning);
   const nav = navigatorOf(m.world, m.tuning);
   const H = m.tuning.brain.hunt;
+  const site = m.world.camp.site;
   watching.length = 0;
   for (let k = 0; k + 1 < watch.length; k += 2) watching.push({ x: watch[k]!, z: watch[k + 1]! });
   a.aim(watching);
-  const L = a.layer;
-  // Candidates: the open ground nearest the middle of them and nearest each of them; and, where one of those is in view, the nearest place to it that isn't.
-  const places: number[] = [];
-  const add = (p: number): void => {
-    if (p >= 0 && !places.includes(p)) places.push(p);
-  };
   let cx = 0;
   let cz = 0;
   for (const p of from) {
     cx += p.x / from.length;
     cz += p.z / from.length;
   }
-  add(a.near(cx, cz, 8));
-  for (const p of from) add(a.near(p.x, p.z, 8));
-  for (const c of [...places]) {
-    if (!a.lit(c)) continue;
-    let best = -1;
-    let bestD = Infinity;
-    const ci = c % L.nx;
-    const cj = (c - ci) / L.nx;
-    for (let dj = -3; dj <= 3; dj++) {
-      for (let di = -3; di <= 3; di++) {
-        const i = ci + di;
-        const j = cj + dj;
-        if (i < 0 || j < 0 || i >= L.nx || j >= L.nz) continue;
-        const p = j * L.nx + i;
-        if (a.near(a.px[p]!, a.pz[p]!, 0) !== p || a.lit(p)) continue;
-        const d = (a.px[p]! - a.px[c]!) * (a.px[p]! - a.px[c]!) + (a.pz[p]! - a.pz[c]!) * (a.pz[p]! - a.pz[c]!);
-        if (d < bestD) {
-          bestD = d;
-          best = p;
-        }
-      }
-    }
-    add(best);
+  const start = a.near(cx, cz, 8);
+  if (start < 0 || !a.way(a.px[start]!, a.pz[start]!, th.x, th.z, huntWay) || huntWay.length > H.farthest) return null;
+  // The first stop past the wire; or, for men already out there (a section being sent on), where they are.
+  let rally = 0;
+  const out = (k: number): boolean => (huntWay.stops[2 * k]! - site.x) * (huntWay.stops[2 * k]! - site.x) + (huntWay.stops[2 * k + 1]! - site.z) * (huntWay.stops[2 * k + 1]! - site.z) > site.radius * site.radius;
+  while (rally < huntWay.lit.length - 1 && !out(rally)) rally++;
+  const x = huntWay.stops[2 * rally]!;
+  const z = huntWay.stops[2 * rally + 1]!;
+  let far = 0;
+  for (const p of from) {
+    const r = nav.find(p.x, p.z, x, z, {}, rallyRoute);
+    if (r !== 'found') return null;
+    far = Math.max(far, routeLength(rallyRoute, p.x, p.z));
   }
-  let best = -1;
-  let bestCost = Infinity;
-  let slowest = 0;
-  for (const c of places) {
-    let far = 0;
-    for (const p of from) {
-      const r = nav.find(p.x, p.z, a.px[c]!, a.pz[c]!, {}, rallyRoute);
-      far = Math.max(far, r === 'found' ? routeLength(rallyRoute, p.x, p.z) : Infinity);
-    }
-    // In view costs as much as that much more walking: they'd rather gather out of it.
-    const cost = far + (a.lit(c) ? H.rally.lit : 0);
-    if (cost < bestCost) {
-      bestCost = cost;
-      best = c;
-      slowest = far;
-    }
-  }
-  if (best < 0 || bestCost === Infinity) return null;
-  if (!a.way(a.px[best]!, a.pz[best]!, th.x, th.z, huntWay)) return null;
-  return { x: a.px[best]!, z: a.pz[best]!, eta: slowest / H.paces.covered };
+  return { x, z, eta: far / H.paces.covered };
 }
 
 const rallyRoute = emptyRoute();
@@ -668,6 +638,8 @@ function planHunt(m: CampMind, out: CampOrder[]): void {
   }
   if ((tick - now.since) / hz < H.after) return;
   if (camp.huntEnded >= 0 && (tick - camp.huntEnded) / hz < H.again) return;
+  // Not while he's still firing: nobody's sent across ground under a rifle that has just spoken. The camp answers him from where it is, and waits for him to stop.
+  if (camp.lastShot >= 0 && (tick - camp.lastShot) / hz < H.quiet) return;
   form(m, now, out);
 }
 

@@ -902,19 +902,22 @@ export const defaultTuning = {
     // camp has placed, by the way that keeps most out of his view, one half moving while the other watches. Only camps with `hunts` do this.
     hunt: {
       after: 20, // seconds from the camp first placing someone outside its men's reach to a section's orders: long enough for the men to have got out of the line
+      quiet: 18, // seconds since his last shot before a section is sent, and before a man of one crosses ground in his view: nobody runs out under a rifle that has just spoken
+      fix: 12, // seconds the camp's marksmen keep the place under fire after a section says, on the net, that it's crossing ground in his view
       fresh: 150, // seconds the camp's fix on him stays worth sending men after
       eyes: 15, // seconds a man's sight of him, or of his flash, outweighs what the camp works out from what it hears
       sure: 80, // metres: how sure of a place the camp has to be, from what it's heard, to send men to it. One good bearing against the range card is enough; a bullet's crack isn't
       size: 2, // men in a section
       keep: 2, // fighting men who stay on the camp's own ground whatever else: it doesn't empty itself to chase one man
-      beside: 2, // listed firing points beside the one it's sent to that are taken to be watching too, at least, and every one near enough to be looked over with it (`sweep.reach`), up to twice as many: a shooter believed to be at one may as well be at the next
+      beside: 2, // listed firing points beside the one it's sent to that are taken to be watching too, at least, and every one near enough to be looked over with it (`sweep.reach`, up to `sweep.most`): a shooter believed to be at one may as well be at the next
       shift: 40, // metres the believed place has to move before a section that's out is sent after it
       legs: 3, // places a section will look at before it's called home
       next: 90, // metres from a place found empty to the next one worth a look: he hasn't gone far
       again: 40, // seconds after a section comes home, or is lost, before another is sent
-      lifetime: 420, // seconds a section's orders stand: after that its men come home whatever they've found
+      lifetime: 540, // seconds a section's orders stand: after that its men come home whatever they've found
+      farthest: 900, // metres: a place farther round than this by the way a section would take isn't one it's sent to
       forget: 240, // seconds a place found empty stays crossed off
-      rally: { wait: 20, lit: 30 }, // seconds past when the slowest man should have reached the rally that the rest wait before one says who hasn't come; and how many metres' more walking a rally in the shooter's view counts as
+      rally: { wait: 20 }, // seconds past when the slowest man should have reached the rally that the rest wait before one says who hasn't come
       body: { within: 12, beat: 60, every: 10, same: 4, down: 4 }, // a body found this near a man's beat is taken for him (metres), his beat being where his routine had him over this many seconds back, looked at this often; one this near a body already named is the same body; and the seconds a man on the hunt stays flat when he sees one of his own fall
       bound: { wait: 22, settle: 0.8, again: 6, spread: 3, apart: 8, giveUp: 3 }, // seconds a man waits for the other half's "Set!" before he goes anyway; seconds down before he says it himself, and between saying it again while he waits; metres between two men at one stop, and where they watch from; and how many times running he'll go unheard before he turns for home
       // Watching the place from short of it, and closing in on it.
@@ -931,7 +934,9 @@ export const defaultTuning = {
       // Looking a place over: a box walked round it, looking in, and round each listed firing point close beside it.
       sweep: {
         radius: 6, // metres from a point to the corners of the box
-        reach: 60, // metres from the place that a listed firing point beside it is looked over too
+        reach: 60, // metres from the place that a listed firing point beside it is looked over too,
+        most: 6, // and how many of them at most
+        per: 45, // seconds he'll give one point, the walk to it included, before he leaves it and goes on to the next
         pace: 2.2, // m/s round the box
         from: 8, // metres from the place: stopped farther off than this, he can't look it over, and doesn't call it
         near: 3.5, // metres from a corner at which he's walked it; a point none of whose corners he could get that near, he hasn't looked over

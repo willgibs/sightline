@@ -398,6 +398,8 @@ function fillOptions(m: GuardMind, out: Array<Option<ActName>>): void {
   offerFirefight(m, out, state === 'combat' ? 5.2 : 4.9);
   // Ordered out with a section (hunt.ts): ahead of getting out of the line, which is how he goes, and behind a fight in front of him.
   offerHunt(m, out, state === 'combat' ? 5.1 : 4.75);
+  // A section has said on the net that it's crossing ground the shooter can see: a marksman keeps the place under fire while it does (hunt.ts).
+  if (covering(m)) out.push({ act: 'suppress', rank: 5.5, weight: 1 });
   switch (state) {
     case 'unaware':
       if (off && !elevated) out.push({ act: 'return', rank: 1, weight: 1 });
@@ -1009,6 +1011,23 @@ function shotCall(m: GuardMind): Report | null {
   return out;
 }
 
+/**
+ * The place a marksman is to keep under fire for a section that's crossing ground the
+ * shooter can see: named on the net, lately, and within his reach. Null otherwise.
+ */
+function covering(m: GuardMind): Told | null {
+  if (!m.hunts || !m.post.elevated || m.post.role !== 'marksman') return null;
+  const hz = m.tuning.sim.tickHz;
+  const reach = m.tuning.brain.fight.suppress.range;
+  let best: Told | null = null;
+  for (const t of m.brain!.told) {
+    if (t.kind !== 'moving' || t.via !== 'radio' || (m.tick - t.heard) / hz > m.tuning.brain.hunt.fix) continue;
+    if ((t.x - m.self.x) * (t.x - m.self.x) + (t.z - m.self.z) * (t.z - m.self.z) > reach * reach) continue;
+    if (!best || t.heard > best.heard) best = t;
+  }
+  return best;
+}
+
 /** A tower man answers: rounds at where he believes the shooter is, whether or not he can see him (Lab F). */
 function performSuppress(m: GuardMind, out: Order): void {
   const b = m.brain!;
@@ -1020,12 +1039,14 @@ function performSuppress(m: GuardMind, out: Order): void {
     b.whistle = true;
   }
   if (b.fireAt < 0) b.fireAt = m.tick + Math.round(F.react * hz);
-  const at = shotFrom(m) ?? m.belief;
+  // His own flash or report first; then the place a section has asked for fire on; then wherever he believes the shooter is.
+  const asked = covering(m);
+  const at = shotFrom(m) ?? asked ?? m.belief;
   if (m.tick >= b.fireAt && at) {
     b.fire = { x: at.x, y: at.y, z: at.z };
     b.fireAt = m.tick + Math.round(F.every * hz);
   }
-  if (newsAge(m) > F.forget) b.done = true;
+  if (newsAge(m) > F.forget && !asked) b.done = true;
 }
 
 /** The nearest spot around him where the line from the threat, at chest height, is broken by something solid. */

@@ -138,6 +138,8 @@ export interface CampState {
   nextSection: number;
   cleared: Array<{ x: number; z: number; tick: number }>;
   huntEnded: number;
+  /** The tick it last heard of a shot fired at it, or of the shooter seen, or −1: nobody's sent out while he's still firing. */
+  lastShot: number;
   /** Bodies it has put a name to, and where each lies: the same one called in again is nobody new. */
   fallen: Array<{ x: number; z: number; who: number }>;
   /**
@@ -201,6 +203,7 @@ export function createCamp(campX: number, campZ: number, tuning: Tuning): CampSt
     nextSection: 1,
     cleared: [],
     huntEnded: -1,
+    lastShot: -1,
     fallen: [],
     objective: null,
     shots: { bearings: [], estimate: null, tick: -1, dirty: false },
