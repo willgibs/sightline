@@ -23,8 +23,9 @@ import { requestStance } from './stance';
  *
  * Promises (motor.ts, and the invariant run):
  * - every pose of the path is re-checked every tick, against everything solid (with no
- *   allowance for steps) and every other body, and the body never ends a tick in one
- *   that isn't clear: where the seed of this mode validates the endpoint once and clips
+ *   allowance for steps) and every other body where this tick has left it (a path moves
+ *   after every body that walks or falls: system.ts), and the body never takes one that
+ *   isn't clear: where the seed of this mode validates the endpoint once and clips
  *   whatever moves in afterwards, this one waits, and gives up if the way stays blocked;
  * - it rises no more than stepHeight in a tick, by the path's own rate.
  */

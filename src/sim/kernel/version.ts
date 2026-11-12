@@ -69,5 +69,9 @@ export const GEN_VERSION = 9;
  * takes a gun he heard or saw for himself. What a man was told leaves his mind before what
  * he sensed himself, so talk doesn't push out the shot he heard; and a camp that hunts
  * sends nobody out alone to a sound off its own ground. The camp-fight run moved again.
+ * 22: a body on a path of its own (a mantle, a ladder) moves after every body that walks
+ * or falls, so the pose it takes is clear of where they end the tick; and a body is shoved
+ * from under feet just over its head when the tick would lift it into them (a step up, a
+ * slope). No pinned run has a body under a ladder or a mantle, so no fingerprint moved.
  */
-export const SIM_VERSION = 21;
+export const SIM_VERSION = 22;

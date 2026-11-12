@@ -65,6 +65,8 @@ export interface InvariantReport {
 export const OVERLAP_TOLERANCE = 1e-4;
 /** Height gained on too-steep ground, allowing a hair for triangle seams. */
 export const STEEP_TOLERANCE = 0.005;
+/** A change of place smaller than this is float dust (a body settling onto its ladder's line), not a pose taken. */
+const MOVED = 1e-9;
 
 interface Before {
   y: number;
@@ -176,8 +178,8 @@ export class InvariantWatch {
         broke(`inside collider ${cid} by ${depth.toFixed(4)} m`);
       }
     }
-    // In a mode with a path of its own, every pose is clear of every other body too.
-    if ((b.motor === 'mantle' || b.motor === 'ladder') && (b.x !== was.x || b.y !== was.y || b.z !== was.z)) this.apart(id, b, spec, height, broke);
+    // In a mode with a path of its own, every pose it takes is clear of every other body too.
+    if ((b.motor === 'mantle' || b.motor === 'ladder') && (Math.abs(b.x - was.x) > MOVED || Math.abs(b.y - was.y) > MOVED || Math.abs(b.z - was.z) > MOVED)) this.apart(id, b, spec, height, broke);
     // Lying down: every circle of the chain, and every part of the shape along it (chain.ts).
     if (b.lying > 0) {
       // Each end rises no more in a tick than a body may: nothing lifts it onto a wall.
@@ -257,23 +259,27 @@ export class InvariantWatch {
   }
 
   /**
-   * Whether a body on a path of its own has moved clear of every other body, lying ones
-   * along their chains: where each was as the tick began, which is what the path was
-   * checked against, for a body that moved. (Walking into one holding still on a ladder is the walker's move.)
+   * Whether a body on a path of its own, having moved, is clear of every other body, lying
+   * ones along their chains, where this tick has left each of them. A path moves after
+   * everything that walks or falls (system.ts), so that is what its pose was checked
+   * against, and nothing here is judged by where a body used to be. A path that held still
+   * is held to nothing: walking into a body on a ladder, or stepping up under one, is the
+   * walker's move, and the walker is shoved for it as it would be by anyone.
    */
   private apart(id: EntityId, b: BodyState, spec: BodySpec, height: number, broke: (what: string) => void): void {
     for (const e of this.sim.state.entities) {
-      if (e.id === id || !hasBody(e)) continue;
+      // One that wasn't there as the tick began may not have been there for the path to see.
+      if (e.id === id || !hasBody(e) || !this.before.has(e.id)) continue;
       const o = e.body;
-      const before = this.before.get(e.id);
-      if (!before) continue;
       const ospec = this.sim.tuning.bodies[e.kind];
-      if (o.y >= b.y + height || o.y + bodyHeight(o, ospec) <= b.y) continue;
+      const tall = bodyHeight(o, ospec);
       const foot = footprint(o, ospec, this.others);
       for (let k = 0; k < foot.length; k++) {
         const C = foot[k]!;
-        const dx = b.x - (before.x + C.x);
-        const dz = b.z - (before.z + C.z);
+        const feet = o.y + C.rise;
+        if (feet >= b.y + height || feet + tall <= b.y) continue;
+        const dx = b.x - (o.x + C.x);
+        const dz = b.z - (o.z + C.z);
         const depth = spec.radius + C.r - Math.sqrt(dx * dx + dz * dz);
         if (depth > OVERLAP_TOLERANCE * 10) broke(`${b.motor} inside body ${e.id} by ${depth.toFixed(4)} m`);
       }
