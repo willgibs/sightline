@@ -957,7 +957,9 @@ export const defaultTuning = {
         spot: 25, // metres from the opening within which a figure he glimpses, out there and looking, is the man he came out for: he's expecting him
         patience: 12, // seconds after he said he was going that he keeps trying to get there, with something in his way that no map shows
         cease: 60, // seconds after a man said he was going out that nobody fires at ground he can't see into
-        clearOf: 15, // within this many metres of where he said he was going
+        clearOf: 15, // within this many metres of where he said he was going,
+        lane: 2.5, // or along a line that passes within this many metres of that opening's sides,
+        over: 2.5, // less than this many metres above the ground there: a tower's round at something far out goes over a man's head
       },
       improve: { after: 9, run: 16, times: 2 }, // with no view of the place: seconds before he tries for a better position, how far he'll go for one, and how many times
       contactEvery: 6, // seconds between shouts of where the intruder is

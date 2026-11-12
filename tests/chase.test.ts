@@ -71,6 +71,16 @@ describe('out of the gate', () => {
     }, 120_000);
   }
 
+  it('nobody is shot by his own side, on a camp whose tower was firing at the place its men went out to', () => {
+    // RUL-1023: a tower man with no sight of the intruder fires at where he believes him to be, which is the ground
+    // outside the door, and the first man to kneel there was killed by him ten seconds after the intruder left. FIH-1382:
+    // a marksman took the chasers' word on the net for a section asking for fire on that place, and killed both.
+    // Only that is asked of them here: on the first, the scene's own man stops a step short of his place along the wall.
+    for (const seed of ['RUL-1023', 'FIH-1382']) {
+      expect(runScene(outTheGate(`seed=${seed}`), T).failures.filter((f) => f.includes('shot dead by the camp'))).toEqual([]);
+    }
+  }, 240_000);
+
   it('as the camp was, the first man out is most of a minute behind him', () => {
     const before = runScene(outTheGate('seed=TES-6931&off=chase'), T);
     expect(before.failures.join('; ')).toMatch(/s behind him|nobody went out after him/);

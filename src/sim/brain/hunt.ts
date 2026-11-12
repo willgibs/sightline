@@ -2,7 +2,7 @@ import type { Stance } from '../body';
 import { approachOf, emptyWay } from './approach';
 import type { ActName } from './brain';
 import type { HuntOrder } from './camp';
-import { mateGoneOut, stayAt, steer } from './firefight';
+import { mateGoneOut, mateInLine, stayAt, steer } from './firefight';
 import type { GuardMind } from './mind';
 import { walk } from './moves';
 import { navigatorOf } from './nav';
@@ -603,7 +603,7 @@ export function performHunt(m: GuardMind, out: Order): void {
       say(m, 'set', h.stops[2 * h.at]!, h.stops[2 * h.at + 1]!);
     }
     // The half behind covers a man who's said he's moving on the place: rounds at it, while he has a line to it and it's in reach.
-    if (covering && h.looking && ready && h.line && m.tick >= b.fireAt && !mateGoneOut(m, h.ox, h.oz)) {
+    if (covering && h.looking && ready && h.line && m.tick >= b.fireAt && !mateGoneOut(m, h.ox, h.oz) && !mateInLine(m, h.ox, m.world.terrain.heightAt(h.ox, h.oz) + W.cover.height, h.oz)) {
       const dx = h.ox - self.x;
       const dz = h.oz - self.z;
       if (dx * dx + dz * dz <= W.cover.range * W.cover.range) {
