@@ -4,7 +4,7 @@ import { FixedStepClock } from '../sim/kernel/core/clock';
 import { headingDegrees, lerp, moveTowards, yawFromDirection } from '../sim/kernel/core/math';
 import { headBob } from '../sim/body';
 import type { ReportCode } from '../sim/kernel/events';
-import { BARKS, beliefRadius, explainChain, groundLight, lightName, movementVisibility, stanceVisibility } from '../sim/perception';
+import { BARKS, CUE_WORDS, beliefRadius, cuesInMind, explainChain, groundLight, lightName, movementVisibility, stanceVisibility } from '../sim/perception';
 import { EventLog } from '../sim/kernel/eventlog';
 import { Cues } from './cues';
 import { MOVEMENT_SITTING } from '../sim/game/movementTrials';
@@ -1474,7 +1474,10 @@ export class Game {
       const s = g.senses!;
       const b = s.belief;
       const believes = b ? ` ${b.x.toFixed(0)},${b.z.toFixed(0)}±${beliefRadius(b, this.sim.tick, T.sim.tickHz, T.perception.awareness.believedSpeed).toFixed(0)}${b.seen ? ' seen' : ''}` : '';
-      lines.push(`${name(g).padEnd(wide)} ${(g.brain?.act ?? '').padEnd(acts)} ${s.awareness.state} ${Math.round(s.sight.meter * 100)}%${believes}`);
+      // What he is going on, of the cues of a shooting: two that agree are an answer (perception/awareness.ts).
+      const cues = cuesInMind(s.awareness, this.sim.tick, T);
+      const going = cues.length ? ` · cues: ${cues.map((c) => CUE_WORDS[c].replace(/^an? /, '')).join(' + ')}` : '';
+      lines.push(`${name(g).padEnd(wide)} ${(g.brain?.act ?? '').padEnd(acts)} ${s.awareness.state} ${Math.round(s.sight.meter * 100)}%${believes}${going}`);
     }
     return lines;
   }

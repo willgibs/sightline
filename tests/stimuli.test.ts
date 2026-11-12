@@ -108,9 +108,9 @@ describe('a body', () => {
   });
 });
 
-/** Emits one sound, at 1 s, `d` metres north of the sentry. */
-const sound = (type: 'cry' | 'clatter' | 'report', d: number, radius: number) => (ctx: TickContext) => {
-  if (ctx.tick !== hz) return;
+/** Emits one sound, at `at` seconds (1 by default), `d` metres north of the sentry. */
+const sound = (type: 'cry' | 'clatter' | 'report', d: number, radius: number, at = 1) => (ctx: TickContext) => {
+  if (ctx.tick !== Math.round(at * hz)) return;
   const base = { source: 99, x: 0, y: 1, z: -d, surface: Surface.Gravel, loudness: radius / T.noise.radiusPerUnit, radius };
   if (type === 'cry') ctx.emit({ type, ...base });
   else if (type === 'report') ctx.emit({ type, ...base, suppressed: 0 });
@@ -118,16 +118,54 @@ const sound = (type: 'cry' | 'clatter' | 'report', d: number, radius: number) =>
 };
 
 describe('lab B\'s sounds, heard', () => {
-  it('a comrade\'s cry is a voice, and raises him to searching', () => {
+  it('a comrade\'s cry is a voice, and has him wary: someone is hurt, and he hasn\'t seen by what', () => {
     const r = run(setup(sound('cry', 15, 40), ['cry']), 5);
     expect(r.events.find((e) => e.type === 'heard')).toMatchObject({ kind: 'voice' });
+    expect(r.states).toContain('suspicious');
+    expect(r.states).not.toContain('searching');
+  });
+
+  it('a shot\'s report is a shot: a gun, somewhere, and by itself it has him wary', () => {
+    const r = run(setup(sound('report', 40, 2400), ['report']), 5);
+    expect(r.events.find((e) => e.type === 'heard')).toMatchObject({ kind: 'shot' });
+    expect(r.states).toContain('suspicious');
+    expect(r.states).not.toContain('searching');
+  });
+
+  // One thing is a question, and two that agree are an answer (perception/awareness.ts).
+  it('the report and a cry a moment after it are a man shot: he\'s sure', () => {
+    const both = (ctx: TickContext) => {
+      sound('report', 40, 2400)(ctx);
+      sound('cry', 15, 40, 2)(ctx);
+    };
+    const r = run(setup(both, ['report', 'cry']), 6);
     expect(r.states).toContain('searching');
   });
 
-  it('a shot\'s report is a shot, and raises him to searching', () => {
-    const r = run(setup(sound('report', 40, 2400), ['report']), 5);
-    expect(r.events.find((e) => e.type === 'heard')).toMatchObject({ kind: 'shot' });
+  it('the report with the snap of its round going by is fire', () => {
+    // A round from 300 m north that passes 8 m from him, and the bang that sent it.
+    const shoot = (ctx: TickContext) => {
+      if (ctx.tick !== hz) return;
+      ctx.emit({ type: 'shot', source: 1, x: 8, y: 1.7, z: -300, dx: 0, dy: 0, dz: 1, speed: 790, drag: 0.00065, wx: 0, wz: 0 });
+      ctx.emit({ type: 'report', source: 1, x: 8, y: 1.7, z: -300, surface: Surface.Gravel, loudness: 2400 / T.noise.radiusPerUnit, radius: 2400, suppressed: 0 });
+    };
+    const r = run(setup(shoot, ['shot', 'report']), 5);
+    expect(r.events.filter((e) => e.type === 'heard' && e.kind === 'shot').length).toBeGreaterThanOrEqual(2);
     expect(r.states).toContain('searching');
+    const alert = r.events.find((e) => e.type === 'alert' && e.to === 'searching');
+    expect(alert).toMatchObject({ reason: 'shot' });
+  });
+
+  it('the same report twice, half a minute apart, is fire that has come again', () => {
+    const twice = (ctx: TickContext) => {
+      sound('report', 40, 2400)(ctx);
+      sound('report', 40, 2400, 31)(ctx);
+    };
+    const r = run(setup(twice, ['report']), 36);
+    expect(r.states).toContain('searching');
+    // And not before the second.
+    const at = r.events.find((e) => e.type === 'alert' && e.to === 'searching')!;
+    expect(at.t).toBeGreaterThan(31);
   });
 
   it('a stone\'s clatter is only a sound: he looks, and doesn\'t search', () => {

@@ -12,7 +12,7 @@ import { emptyRoute, navigatorOf, type Route } from './nav';
 import type { Order } from './orders';
 import { noteProtection, offerProtection, performFetch, performShelter, performStandTo, standingTo } from './protect';
 import { keepRoutine } from './routine';
-import type { Percept } from '../perception';
+import { rung, type Percept } from '../perception';
 import type { Report, ReportKind, Told } from './reports';
 import { choose, response, type Option } from './utility';
 
@@ -752,6 +752,8 @@ function currentReport(m: GuardMind): Report {
   const out: Report = { kind, x: f.x, y, z: f.z, radius, tick: m.tick, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: own?.cause ?? perceptCause(m) };
   // A man who knows the camp is under attack says so: he may be on a tower, or too far from a box to run for one.
   if (hasGrounds(m)) out.attack = true;
+  // And a man who is sure of what he's saying says it as one who is.
+  if (rung(a.state) >= rung('searching')) out.sure = true;
   // A bearing comes from a report at the muzzle; a crack points the wrong way and says so.
   if (kind === 'shot' && own?.sound === 'report') bearingError(m, out, false);
   else if (kind === 'shot' && own?.sound === 'crack') bearingError(m, out, true);
@@ -1077,6 +1079,7 @@ function shotCall(m: GuardMind): Report | null {
   const kind: ReportKind = p.kind === 'muzzle' ? 'contact' : 'shot';
   const out: Report = { kind, x: p.x, y: p.y, z: p.z, radius: Math.max(p.radius, C.radius[kind]), tick: m.tick, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: p.cause };
   if (hasGrounds(m)) out.attack = true;
+  if (rung(m.awareness.state) >= rung('searching')) out.sure = true;
   if (kind === 'shot') bearingError(m, out, false);
   return out;
 }

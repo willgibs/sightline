@@ -4,6 +4,7 @@ import { injectBelief, mapMass, mapSpread, spreadBelief, type CampState } from '
 import { giveBrains } from '../src/sim/game/brains';
 import { campCommander, commanderOf, commsVoice, giveCommander, tell } from '../src/sim/game/comms';
 import { giveSenses } from '../src/sim/game/perception';
+import { stimulate } from '../src/sim/perception';
 import { Simulation } from '../src/sim/game/sim';
 import { SYSTEMS } from '../src/sim/game/systems';
 import { neutralInput } from '../src/sim/kernel/input';
@@ -225,19 +226,58 @@ describe('the search map', () => {
   });
 });
 
+describe('someone else’s word', () => {
+  const A = T.perception.awareness;
+  const word = (kind: 'shot' | 'contact' | 'body', sure: boolean) => ({ kind, x: 9, y: 0, z: 0, radius: 10, tick: 0, from: 99, fromX: 0, fromZ: 0, cause: 0, ...(sure ? { sure: true as const } : {}) });
+  /** A sentry told something on the net, having heard a snap himself a moment before or not: the state he settles in. */
+  function told(kind: 'shot' | 'contact' | 'body', sure: boolean, snap = false): string {
+    const sim = campy(worldWith(SENTRY));
+    const g = sim.guards[0]!;
+    const ctx = (sim as unknown as { ctx: Parameters<typeof tell>[0] }).ctx;
+    if (snap) stimulate(g.senses!.awareness, { kind: 'shot', level: A.shots.crack.clear, x: 9, y: 0, z: 0, cause: 0, reason: 'shot', cue: 'crack' }, sim.tick, T, () => 0.5);
+    tell(ctx, g, word(kind, sure), 'radio', 0);
+    run(sim, 3);
+    return g.senses!.awareness.state;
+  }
+
+  it('is believed when a man who is sure says what he has seen: an intruder, or one of their own down', () => {
+    expect(told('contact', true)).toBe('searching');
+    expect(told('body', true)).toBe('searching');
+  });
+
+  it('about a shot has a man with nothing of his own wary and looking, whoever says it', () => {
+    expect(told('shot', true)).toBe('suspicious');
+    expect(told('shot', false)).toBe('suspicious');
+  });
+
+  it('from a man who is only asking is no more than that, whatever it’s about', () => {
+    expect(told('contact', false)).toBe('suspicious');
+    expect(told('body', false)).toBe('suspicious');
+  });
+
+  it('from a man who is sure, makes fire of the snap he heard himself; from a man who is asking, it leaves him asking', () => {
+    expect(told('shot', true, true)).toBe('searching');
+    expect(told('shot', false, true)).toBe('suspicious');
+  });
+});
+
 describe('searching guards report in', () => {
   it('radios what it heard, and the camp and the other guards believe it', () => {
     const sim = campy(worldWith(SENTRY, { ...SENTRY, id: 1, x: -55, z: -55 }, OPERATOR));
     const g = sim.guards[0]!;
     const ctx = (sim as unknown as { ctx: Parameters<typeof tell>[0] }).ctx;
-    // He heard it himself, too: a report is worth calling in only from his own senses.
-    g.senses!.percepts.push({ kind: 'shot', x: 9, y: 0, z: 0, radius: 10, strength: 3, tick: 0, expires: 999, cause: 0 });
+    // He heard it himself, too, as a round that all but hit him: a report is worth calling in only from his own senses, and
+    // someone else's word alone would leave him wary and asking.
+    g.senses!.percepts.push({ kind: 'shot', x: 9, y: 0, z: 0, radius: 10, strength: T.perception.awareness.shots.crack.closeAt, tick: 0, expires: 999, cause: 0, sound: 'crack' });
+    stimulate(g.senses!.awareness, { kind: 'shot', level: T.perception.awareness.shots.crack.close, x: 9, y: 0, z: 0, cause: 0, reason: 'shot' }, sim.tick, T, () => 0.5);
     tell(ctx, g, { kind: 'shot', x: 9, y: 0, z: 0, radius: 10, tick: 0, from: 99, fromX: 0, fromZ: 0, cause: 0 }, 'voice', 0);
     const ev = run(sim, 14);
     expect(ev.some((e) => e.type === 'act' && e.to === 'report')).toBe(true);
     expect(ev.some((e) => e.type === 'radio')).toBe(true);
     const far = sim.guards[1]!;
     expect(far.brain!.told.some((t) => t.via === 'radio')).toBe(true);
+    // He was sure of it, and calls it in as a man who is.
+    expect(far.brain!.told.some((t) => t.via === 'radio' && t.kind === 'shot' && t.sure === true)).toBe(true);
     expect(commanderOf(sim)!.camp.map.p.some((v) => v > 0)).toBe(true);
     // His own report never comes back to him.
     expect(g.brain!.told.filter((t) => t.via === 'radio').length).toBe(0);

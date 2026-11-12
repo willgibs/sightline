@@ -5,7 +5,7 @@ import type { AwarenessName, SimEvent } from '../src/sim/kernel/events';
 import { neutralInput } from '../src/sim/kernel/input';
 import { withSystem, type System } from '../src/sim/kernel/systems';
 import { Surface } from '../src/sim/kernel/world/surfaces';
-import { createSenses, soundLevel, stepLadder, stimulate, type Awareness, type Stimulus } from '../src/sim/perception';
+import { createSenses, cuesInMind, plainShot, soundLevel, stepLadder, stimulate, type Awareness, type Cue, type Stimulus } from '../src/sim/perception';
 import { giveSenses } from '../src/sim/game/perception';
 import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
@@ -55,7 +55,8 @@ describe('the awareness ladder', () => {
 
   it('reacts to something alarming in about 1.5 s, telegraphed from the first instant', () => {
     const a = fresh();
-    stimulate(a, { ...sound(A.shots.report.clear), reason: 'shot' }, 100, T, draw);
+    // A round that all but hit him: the one sound of a shot nobody has to ask about.
+    stimulate(a, { ...sound(A.shots.crack.close), reason: 'shot' }, 100, T, draw);
     const changes = climb(a, () => 0, 100, 100 + 3 * hz, draw);
     expect(changes[0]).toEqual({ tick: 100, to: 'curious' });
     const searching = changes.find((c) => c.to === 'searching')!;
@@ -217,11 +218,128 @@ describe('what a shot sounds like to a listener', () => {
     expect(soundLevel(heard('impact', A.shots.impact.clearAt), T)).toBeCloseTo(A.shots.impact.clear, 12);
     expect(soundLevel(heard('impact', A.shots.impact.clearAt), T)).toBeGreaterThanOrEqual(A.levels.suspicious);
     expect(soundLevel(heard('impact', 500), T)).toBeLessThan(A.levels.searching);
-    // A report is unmistakable unless it's faint: at the edge of hearing it only makes him look up.
+    // A report at the edge of hearing only makes him look up. Heard clearly it's a gun, somewhere: it has him wary, and it
+    // isn't fire on the camp until something bears it out.
     expect(soundLevel(heard('report', 1.05), T)).toBeLessThan(A.levels.suspicious);
     expect(soundLevel(heard('report', 1.05), T)).toBeGreaterThanOrEqual(A.levels.curious);
-    expect(soundLevel(heard('report', A.shots.report.clearAt), T)).toBeGreaterThanOrEqual(A.levels.searching);
+    expect(soundLevel(heard('report', A.shots.report.clearAt), T)).toBeGreaterThanOrEqual(A.levels.suspicious);
+    expect(soundLevel(heard('report', 500), T)).toBeLessThan(A.levels.searching);
     // Anything else heard as a shot is read as a report.
     expect(soundLevel(heard('something-new', 2), T)).toBe(soundLevel(heard('report', 2), T));
+  });
+
+  it('is plain to him as a gun only by a report or a bolt heard well enough, or a near miss', () => {
+    expect(plainShot('report', A.shots.report.clearAt, T)).toBe(true);
+    expect(plainShot('report', 1.05, T)).toBe(false);
+    expect(plainShot('bolt', A.shots.bolt.clearAt, T)).toBe(true);
+    expect(plainShot('crack', A.shots.crack.clearAt, T)).toBe(false);
+    expect(plainShot('crack', A.shots.crack.closeAt, T)).toBe(true);
+    expect(plainShot('impact', 500, T)).toBe(false);
+  });
+});
+
+/**
+ * One thing is a question, and two that agree are an answer (the owner's fair realism, Nov
+ * 12): a man weighs what he hears against what else has reached him, and against the men
+ * round him, before he believes it.
+ */
+describe('cues of a shooting that agree', () => {
+  const G = A.agree;
+  const L = A.levels;
+  const rng = new Rng('AGREE', 'draws');
+  const draw = (): number => rng.next();
+  const cue = (which: Cue, level: number, more: Partial<Stimulus> = {}): Stimulus => ({ kind: which === 'voice' ? 'voice' : which === 'body' || which === 'muzzle' ? which : 'shot', level, x: 5, y: 0, z: 5, cause: 7, reason: which === 'voice' ? 'voice' : which === 'body' || which === 'muzzle' ? which : 'shot', cue: which, ...more });
+  /** A clear report: a gun, and plain. A clear snap or thud: a puzzle. */
+  const bang = (): Stimulus => cue('report', A.shots.report.clear, { plain: true });
+  const snap = (): Stimulus => cue('crack', A.shots.crack.clear);
+  const thud = (): Stimulus => cue('impact', A.shots.impact.clear);
+  /** The state he settles in, given the stimuli at their ticks. */
+  const after = (...at: Array<[tick: number, s: Stimulus]>): Awareness => {
+    const a = fresh();
+    const last = at.at(-1)![0];
+    for (let tick = 0; tick <= last + 3 * hz; tick++) {
+      for (const [when, s] of at) if (when === tick) stimulate(a, s, tick, T, draw);
+      stepLadder(a, 0, 1, tick, T, draw);
+    }
+    return a;
+  };
+
+  it('any one thing he has only heard leaves him wary at most', () => {
+    for (const s of [bang(), snap(), thud(), cue('voice', A.cry, { notice: true, plain: true }), cue('voice', T.brain.comms.level.shot, { plain: true })]) {
+      const a = after([10, s]);
+      expect(a.state, s.cue).toBe('suspicious');
+    }
+  });
+
+  it('a gun and the snap of its round are fire, in whichever order they come', () => {
+    expect(after([10, bang()], [10 + hz, snap()]).state).toBe('searching');
+    const a = after([10, snap()], [10 + hz, bang()]);
+    expect(a.state).toBe('searching');
+    expect(a.reason).toBe('shot');
+    // They count a step more than the stronger does alone, and no more: agreement doesn't compound.
+    expect(a.evidence).toBeCloseTo(A.shots.report.clear + G.step, 12);
+    const three = after([10, snap()], [10 + hz, bang()], [10 + 2 * hz, thud()]);
+    expect(three.evidence).toBeCloseTo(A.shots.report.clear + G.step, 12);
+  });
+
+  it('too far apart in time, they are two questions', () => {
+    const late = 10 + Math.round((G.within + 1) * hz);
+    expect(after([10, bang()], [late, snap()]).state).toBe('suspicious');
+  });
+
+  it('two puzzles are still a puzzle: a snap and a thud leave him wary, and no more', () => {
+    const a = after([10, snap()], [10 + hz, thud()]);
+    expect(a.state).toBe('suspicious');
+    expect(a.evidence).toBeLessThanOrEqual(G.cap);
+    expect(G.cap).toBeLessThan(L.searching);
+  });
+
+  it('a gun heard again inside the minute is fire; a snap heard again is still a snap', () => {
+    const again = 10 + Math.round((G.apart + 20) * hz);
+    expect(after([10, bang()], [again, bang()]).state).toBe('searching');
+    expect(after([10, snap()], [again, snap()]).state).toBe('suspicious');
+    // The sounds of one shot, a moment apart, are one shot's.
+    expect(after([10, bang()], [10 + Math.round((G.apart * hz) / 2), bang()]).state).toBe('suspicious');
+    // And a minute on, it's another question.
+    expect(after([10, bang()], [10 + Math.round((G.again + 5) * hz), bang()]).state).toBe('suspicious');
+  });
+
+  it('a mate who has noticed something bears out a gun, and not a snap', () => {
+    const asks = (): Stimulus => cue('voice', 0, { notice: true });
+    expect(after([10, bang()], [10 + hz, asks()]).state).toBe('searching');
+    expect(after([10, snap()], [10 + hz, asks()]).state).toBe('suspicious');
+    // With nothing of his own, a man asking tells him nothing, and nor do two of them.
+    expect(after([10, asks()]).state).toBe('unaware');
+    expect(after([10, asks()], [10 + hz, asks()]).state).toBe('unaware');
+  });
+
+  it('the word of a man who is sure makes fire of a snap, and is only word by itself', () => {
+    const sure = (): Stimulus => cue('voice', T.brain.comms.level.shot, { plain: true });
+    const a = after([10, snap()], [10 + hz, sure()]);
+    expect(a.state).toBe('searching');
+    expect(a.reason).toBe('shot');
+    // Ten men saying it is still hearsay.
+    expect(after([10, sure()], [10 + hz, sure()], [10 + 2 * hz, sure()]).state).toBe('suspicious');
+  });
+
+  it('a man he can see is down, with a snap, is a man shot', () => {
+    const a = after([10, thud()], [10 + hz, cue('body', A.body, { plain: true })]);
+    expect(a.state).toBe('searching');
+    expect(a.reason).toBe('body');
+  });
+
+  it('can say what he is going on: the cues that reached him inside a few seconds of each other', () => {
+    const a = after([10, snap()], [10 + hz, bang()]);
+    // Read at the moment the second arrived, and again once the first has gone stale.
+    expect(cuesInMind(a, 10 + hz, T)).toEqual(['report', 'crack']);
+    expect(cuesInMind(a, 10 + Math.round((G.within + 0.5) * hz), T)).toEqual(['report']);
+    expect(cuesInMind(a, 10 + Math.round((G.within + 2) * hz), T)).toEqual([]);
+    expect(cuesInMind(fresh(), 10, T)).toEqual([]);
+  });
+
+  it('anything that is no cue of a shooting is weighed as it always was', () => {
+    const a = after([10, snap()], [10 + hz, sound(A.shots.impact.clear)]);
+    expect(a.state).toBe('suspicious');
+    expect(a.evidence).toBeCloseTo(A.shots.crack.clear, 12);
   });
 });

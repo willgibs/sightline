@@ -2,6 +2,21 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-12 · One thing is a question, and two that agree are an answer
+
+**Why.** The first move (below) left a man making up his mind alone, and news raising every man who heard it. The owner's fair realism has a man who has noticed something "more confused than immediately sprint to cover, depending on how likely I can confirm an attacking gunshot versus a mix of personal confusion and curiosity, as well as the reactions (or lack thereof) of those around me".
+
+**Built** (`perception/awareness.ts`, `agree`; the table and the numbers are in `docs/camp-engine.md`, section 9, *Step 3c*). What a man sees he believes, and so does whoever he tells, if he's sure of it. What he hears leaves him wary at most until something bears it out: another cue of the same shooting by a different way within 4 s (a report, a snap, a strike, a voice, a man down, a flash), or the same sound again inside a minute. One of the two has to be plain. A man says what he says as one who is sure or one who is asking (`Report.sure`, a voice's `word`), and there's a new line for asking: "Was that a shot?".
+
+**Decided along the way.**
+- **Agreement needs something plain.** A snap and a thud are two sounds of one round, so letting any two cues agree made every quiet shot a sure one (a careful shot whistled 9 camps of 20, from 1). Two puzzles stop at wary (`agree.cap`).
+- **Agreement is weighed, not counted.** Each cue is kept at its own level and the pair counts a fixed step more than the stronger, so three sounds of one shot count as two do. The ladder's older rule, that three weak stimuli inside a grace period make a stronger one, is skipped for cues: it had one shot's sounds read as "Again. Same place."
+- **The siren didn't get easier.** "A body come on after a shot" and "fire that goes on" both start from a gun the man heard or saw for himself and was sure of (`plainShot`). Reading them off "sure" alone had a snap and a body count, and the siren on a suppressed first shot went from 13 camps of 23 to 17.
+- **Word about a sound is hearsay, and word about a sight is news.** With every report leaving a listener wary, the brain bench's camps re-found a lost intruder on 13 runs of 16, from 15. "Contact!" and "Man down!" from a man who is sure raise a listener as they did. "Shots!" leaves him wary, and the word of a man who is only asking never counts for more (`brain.comms.asking`).
+- **A report carries how sure its speaker is, set where it's made.** The brain stamps it from the man's own state. Reading the speaker's state at delivery would have been one line, and would have had a radio call carry what he came to think after he made it.
+
+**What moved.** `SIM_VERSION` 21: the camp-fight and perception-crowd runs. `STATE_SCHEMA` 15 (a man's cues, a voice's word, a report's `sure`). The first move's own numbers barely moved, since it had already graded what each sound tells a man. One loud shot leaves 68% of a camp still searching 20 s later, from 91%. The brain bench's overlook has 27 guards of 32 down to a perfect shooter on one perch, from 24: a wary man stands a moment longer.
+
 ## 2026-11-12 · A first move that isn't the last: what a camp knows, and what it does about it
 
 **Why.** The owner, from playing: a suppressed round at a tower guard from a distance set the siren off at once, and so did everything else a person tries first. "How do I win here without the target escaping the second everyone knows I'm attacking." Measured before anything was changed (`npm run experiment -- second-step`, 24 camps): one suppressed round through the head of a man on a raised post whistled up every camp, had 98% of its men searching in 5 s, and sounded the siren on 9 of 20 a median 3.9 s later, thrown 8 times of 9 by a man who had seen nobody and no body. The target was gone 34 s after the shot. A camp marked ready (the takedown) was a little better and the same in kind. A round into the generator or an alarm box did nothing to it.

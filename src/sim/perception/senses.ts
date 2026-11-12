@@ -67,6 +67,8 @@ export interface PendingSound {
   clarity: number;
   /** A voice's own level for listeners (a bark's line: perception/barks.ts); 0 for other sounds. */
   voice: number;
+  /** A voice with something to say (awareness.ts, `agree`): `notice` that its owner has noticed something, `sure` that he is sure of it, or it's a cry or one of the camp's signals. Absent for any other sound, and for a voice standing down. */
+  word?: 'notice' | 'sure';
   /** Where it seemed to come from, blurred: the guess, not the fix. */
   x: number;
   y: number;
@@ -103,6 +105,8 @@ export interface Awareness {
   reason: AlertReason;
   /** He has searched since he last settled: when he does, his floor and eyes rise. */
   searched: boolean;
+  /** The cues of a shooting that have reached him, by the way each came (awareness.ts, `Cue`): the last of each, at its own level, for telling whether the next agrees. Absent until the first. */
+  cues?: { [cue: string]: { level: number; tick: number; notice?: true; plain?: true } };
 }
 
 export interface Senses {

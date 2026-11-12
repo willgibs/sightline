@@ -325,7 +325,7 @@ function contact(m: GuardMind): Report {
   const b = m.brain!;
   const ff = b.ff!;
   const C = m.tuning.brain.comms;
-  return { kind: 'contact', x: ff.x, y: ff.y, z: ff.z, radius: Math.max(ff.r, C.radius.contact), tick: ff.news, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: b.cause };
+  return { kind: 'contact', x: ff.x, y: ff.y, z: ff.z, radius: Math.max(ff.r, C.radius.contact), tick: ff.news, from: m.id, fromX: m.self.x, fromZ: m.self.z, cause: b.cause, sure: true };
 }
 
 /** "Moving": said aloud, about the place he's going to look at. */

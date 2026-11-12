@@ -1,4 +1,4 @@
-import { shotLevel } from '../perception';
+import { plainShot, rung } from '../perception';
 import type { GuardMind } from './mind';
 
 /**
@@ -19,8 +19,9 @@ import type { GuardMind } from './mind';
  * - he has an intruder in his sight (the ladder's combat: the meter at 100%);
  * - he watched one of his own go down, or came on a body, near enough to see what had
  *   happened to it, after taking a shot for a shot;
- * - fire he took for fire has come again: a shot that was plain to him (a report heard
- *   clearly, a near miss, a flash), and then another sound of one inside the minute.
+ * - fire he took for fire has come again: a gun he heard or saw for himself (its report,
+ *   plain to him; a round that all but hit him; its flash) and was sure of, and then
+ *   another sound of one inside the minute.
  *
  * A snap overhead, a thud, a whistle, a shout or a word on the radio is none of these. They
  * make a man look, get down or go and see, and what he then sees is what tells him. So a
@@ -40,18 +41,21 @@ export function noteGrounds(m: GuardMind): void {
   const b = m.brain!;
   const G = m.tuning.brain.alarm.grounds;
   const hz = m.tuning.sim.tickHz;
-  const plain = m.tuning.perception.awareness.levels.searching;
   // Under fire he's sure of already, any sound of a shot is more of it: a report dulled by the wall he has got behind, a snap,
-  // a strike. With none, only one that's plain to him is a first: a report heard clearly, a near miss, a flash.
-  const sure = b.shots !== undefined && m.tick - b.shots.at <= Math.round(G.within * hz);
+  // a strike. With none, a first is a gun, plain to his own ears or eyes (a report he knows for one, a near miss, a flash),
+  // that he is sure of: something has borne it out (perception: one thing is a question, and two that agree are an answer),
+  // or he was sure something was wrong already. A snap and a man down, or a snap and the whistle, have him sure and are
+  // still nobody's gun: he gets down and shouts, and it's the camp that counts its dead.
+  const under = b.shots !== undefined && m.tick - b.shots.at <= Math.round(G.within * hz);
+  const sure = rung(m.awareness.state) >= rung('searching');
   // The newest of them: one shot makes several sounds, so shots are told apart by time.
   let newest = -1;
   for (const p of m.percepts) {
     if (p.tick <= newest) continue;
-    if (p.kind === 'muzzle' || (p.kind === 'shot' && (sure || shotLevel(p.sound, p.strength, m.tuning) >= plain))) newest = p.tick;
+    if (p.kind === 'muzzle' || (p.kind === 'shot' && (under || plainShot(p.sound, p.strength, m.tuning)))) newest = p.tick;
   }
-  if (newest >= 0 && (!b.shots || newest - b.shots.at > Math.round(G.apart * hz))) {
-    b.shots = { count: sure ? b.shots!.count + 1 : 1, at: newest };
+  if (newest >= 0 && (under || sure) && (!b.shots || newest - b.shots.at > Math.round(G.apart * hz))) {
+    b.shots = { count: under ? b.shots!.count + 1 : 1, at: newest };
   }
   const learned = witnessed(m);
   if (learned >= 0 && (b.knows === undefined || learned > b.knows)) b.knows = learned;

@@ -22,9 +22,11 @@ import {
   soundLevel,
   stepLadder,
   stimulate,
+  type Cue,
   type Percept,
   emptyHeard,
   inGaze,
+  plainShot,
   lineOpen,
   type Acoustics,
   type PendingSound,
@@ -211,7 +213,11 @@ export function deliverSound(ctx: TickContext, e: Extract<SimEvent, SoundFields>
     });
     const arrives = Math.max(ctx.tick, Math.ceil((e.t + heard.length / air(ctx.world.spec.env).speedOfSound) * T.sim.tickHz - 1e-9));
     const voice = e.type === 'bark' ? (BARKS[e.line]?.level ?? 0) : e.type === 'cry' ? T.perception.awareness.cry : e.type === 'whistle' ? T.perception.awareness.whistle : 0;
-    s.heard.push({ arrives, cause: e.id, kind, sound: e.type, clarity: heard.clarity, voice, x: heard.fromX + ox, y: heard.fromY, z: heard.fromZ + oz, radius });
+    // A voice with something to say: a cry or one of the camp's signals, or a line said on noticing something (sure, if it's
+    // the line of a man who is). Not a man standing down, and not an engine.
+    const to = e.type === 'bark' ? BARKS[e.line]?.to : undefined;
+    const word: PendingSound['word'] = e.type === 'cry' || e.type === 'whistle' || e.type === 'siren' || to === 'searching' || to === 'combat' ? 'sure' : to === 'curious' || to === 'suspicious' ? 'notice' : undefined;
+    s.heard.push({ arrives, cause: e.id, kind, sound: e.type, clarity: heard.clarity, voice, ...(word ? { word } : {}), x: heard.fromX + ox, y: heard.fromY, z: heard.fromZ + oz, radius });
   }
 }
 
@@ -502,7 +508,11 @@ export const perceptionAwareness: System = {
         s.percepts.push(p);
         if (h.kind !== 'voice') believe(s, p, false, tick, T);
         const reason = h.kind === 'shot' ? 'shot' : h.kind === 'voice' ? 'voice' : 'heard';
-        stimulate(a, { kind: h.kind, level, x: h.x, y: h.y, z: h.z, cause: id, reason }, tick, T, draw);
+        // The way it came, if it's a cue of a shooting: one of a shot's own sounds, or a voice that has something to say (awareness.ts).
+        const cue: Cue | undefined = h.kind === 'shot' ? (h.sound === 'crack' || h.sound === 'impact' || h.sound === 'bolt' ? h.sound : 'report') : h.kind === 'voice' && h.word ? 'voice' : undefined;
+        // And whether there's no mistaking it: a gun heard well enough to be one, a near miss, a cry, a signal, a man who is sure. A snap or a thud is a puzzle.
+        const plain = cue === 'voice' ? h.word === 'sure' : cue !== undefined && plainShot(h.sound, h.clarity, T);
+        stimulate(a, { kind: h.kind, level, x: h.x, y: h.y, z: h.z, cause: id, reason, ...(cue ? { cue, notice: cue === 'voice', plain } : {}) }, tick, T, draw);
       }
       // What he has just caught sight of: a body, a flash.
       for (const sp of s.spotted) {
@@ -511,7 +521,9 @@ export const perceptionAwareness: System = {
         s.percepts.push(p);
         // A flash says exactly where.
         if (sp.what === 'muzzle') believe(s, p, false, tick, T);
-        stimulate(a, { kind: sp.what, level: sp.far ? T.perception.awareness.bodyFar : T.perception.awareness[sp.what], x: sp.x, y: sp.y, z: sp.z, cause: sp.cause, reason: sp.what }, tick, T, draw);
+        // A man he is sure is down, or a flash, bears out a shot's sounds. A man lying a long way off bears out nothing yet.
+        const cue: Cue | undefined = sp.what === 'muzzle' ? 'muzzle' : sp.what === 'body' && !sp.far ? 'body' : undefined;
+        stimulate(a, { kind: sp.what, level: sp.far ? T.perception.awareness.bodyFar : T.perception.awareness[sp.what], x: sp.x, y: sp.y, z: sp.z, cause: sp.cause, reason: sp.what, ...(cue ? { cue, plain: true } : {}) }, tick, T, draw);
       }
       s.spotted.length = 0;
       prunePercepts(s.percepts, tick);

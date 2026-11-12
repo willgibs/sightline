@@ -100,6 +100,31 @@ describe('grounds for the siren', () => {
     expect(g.at(G.within + 11, 'searching', [shot('report', 6, later)])).toBe(false);
   });
 
+  it('take a gun he is sure of: a report with nothing to bear it out leaves him asking, and what follows isn’t more of it', () => {
+    const g = man();
+    // Wary, as a bang alone leaves him (perception: one thing is a question).
+    expect(g.at(1.5, 'suspicious', [shot('report', 6, 30)])).toBe(false);
+    expect(g.at(10, 'suspicious', [shot('crack', 10, 290)])).toBe(false);
+    // The same two, to a man who was sure of the first: fire that goes on.
+    const sure = man();
+    expect(sure.at(1.5, 'searching', [shot('report', 6, 30)])).toBe(false);
+    expect(sure.at(10, 'suspicious', [shot('crack', 10, 290)])).toBe(true);
+  });
+
+  it('aren’t a snap and a man down: he is sure of the man, and it is still nobody’s gun', () => {
+    const g = man();
+    expect(g.at(1.5, 'searching', [shot('crack', 10, 30), shot('impact', 60, 31), body(40, false)])).toBe(false);
+    // Nor are more snaps after it, or a report too faint to know for a gun's.
+    expect(g.at(20, 'searching', [body(40, false), shot('crack', 10, 590)])).toBe(false);
+    expect(g.at(40, 'searching', [body(40, false), shot('report', 1.2, 1190)])).toBe(false);
+  });
+
+  it('are a gun he is sure of once he has found a man down', () => {
+    const g = man();
+    expect(g.at(2, 'searching', [body(40, false)])).toBe(false);
+    expect(g.at(20, 'searching', [body(40, false), shot('report', 6, 590)])).toBe(true);
+  });
+
   it('count a near miss as a shot, and a snap farther off as nothing', () => {
     const near = man();
     near.at(1, 'searching', [shot('crack', A.shots.crack.closeAt + 5, 20)]);

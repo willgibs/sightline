@@ -717,8 +717,10 @@ export const defaultTuning = {
       // passing, its strike, the bolt. Each is read as any sound is, from the edge of hearing
       // (clarity 1) to clear (its own `clearAt`), and counts for what it tells a man. One law
       // says what he hears (kernel/sound.ts); this says what he can tell from it.
-      // - A report is a shot wherever it's heard clearly. Fainter it has him wary, and at the
-      //   edge of hearing it only makes him look up: a suppressed one a long way off.
+      // - A report heard clearly is a gun, somewhere: it has him wary and looking. It's fire
+      //   on the camp to him once something bears it out (`agree`, below): the snap of its
+      //   round, a strike, another man's word, or another report. Fainter, it only makes him
+      //   look up: a suppressed one a long way off.
       // - A crack is a snap. Far from the round's path it's lost in the camp's own noise and
       //   tells him nothing; nearer it turns his head, and within about 20 m it has him wary
       //   and looking for where it came from. There was no bang to go with it, so it isn't a
@@ -726,18 +728,25 @@ export const defaultTuning = {
       //   can't mistake.
       // - A strike is a thud. Close by it makes him look, and what he then sees is what tells
       //   him. Far off it tells him nothing, though it carries (you hear your own hit land).
-      // - The bolt is a shot to anyone near enough to hear it.
+      // - The bolt is read as a report is, by anyone near enough to hear it.
       // The design doc's searching takes "a close shot". With every pair at 0.8 any sound of a
       // shot heard at all was one, which is how this began: a body's thud carries 650 m, so
       // one suppressed hit had the whole camp searching (docs/decisions.md, Nov 9 and Nov 12).
       shots: {
-        report: { faint: 0.3, clear: 0.8, clearAt: 2 },
+        report: { faint: 0.3, clear: 0.7, clearAt: 2 },
         crack: { faint: 0, clear: 0.62, clearAt: 8, close: 0.8, closeAt: 40 },
         impact: { faint: 0, clear: 0.62, clearAt: 26 },
-        bolt: { faint: 0.3, clear: 0.8, clearAt: 2 },
+        bolt: { faint: 0.3, clear: 0.7, clearAt: 2 },
       },
+      // One thing is a question, and two that agree are an answer (awareness.ts). What a man sees he believes; what he hears
+      // leaves him wary at most until something bears it out. The cues of a shooting reach him by different ways: a report, a
+      // snap, a strike, a voice, a man down, a flash. Two that come by different ways within `within` seconds, or the same
+      // sound again between `apart` and `again` seconds later, count `step` more than the stronger does alone. Two that are
+      // each a puzzle (a snap, a thud, "Was that a shot?") stop at `cap`: wary. It takes something plain among them (a report
+      // heard well, a flash, a cry, a body, the word of a man who is sure) to make him sure.
+      agree: { within: 4, step: 0.25, cap: 0.7, apart: 2, again: 60 },
       glimpse: 0.8, // having seen you at 100%: searching, once he loses you
-      cry: 0.8, // a comrade's cry heard: searching
+      cry: 0.62, // a comrade's cry heard: wary, and looking for him. With a snap or a thud to go with it, it's a man shot
       body: 0.8, // a body seen, and no mistaking it: searching (design doc: the strongest stimulus)
       bodyFar: 0.62, // a man lying where he shouldn't be, too far off to see what has happened to him: suspicious. He goes to see
       glint: 0.55, // a flash from a lens: suspicious
@@ -1108,7 +1117,12 @@ export const defaultTuning = {
       keep: 25, // seconds a guard remembers what he's been told
       maxTold: 8, // reports a guard's memory holds
       reportEvery: 20, // seconds between his calls about the same thing
-      level: { contact: 0.8, heard: 0.32, shot: 0.8, body: 0.82, missing: 0.4, clear: 0, claim: 0, outage: 0.32, escort: 0, moving: 0, set: 0 }, // what a report raises him to
+      // What a report raises him to. It is someone else's word, weighed by how the man saying it knows. What a man who is
+      // sure says he has seen, an intruder or one of their own down, is as good as news gets: a listener is searching. What
+      // he says he heard (a shot) leaves a listener wary until something of his own bears it out (perception.awareness.agree).
+      // And the word of a man who is only asking never counts for more than `asking`, whatever it's about.
+      level: { contact: 0.8, heard: 0.32, shot: 0.62, body: 0.82, missing: 0.4, clear: 0, claim: 0, outage: 0.32, escort: 0, moving: 0, set: 0 },
+      asking: 0.62,
       radius: { contact: 4, heard: 18, shot: 22, body: 6, missing: 8, clear: 12, claim: 8, outage: 6, escort: 2, moving: 8, set: 2 }, // metres of uncertainty each kind adds to the speaker's
       clearRadius: 18, // metres a searcher's "clear" report wipes from the map
       // Claims (Blacklist): "I've got it": one guard goes, those who hear him don't all pile in.

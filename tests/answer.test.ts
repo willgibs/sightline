@@ -309,7 +309,8 @@ describe('a man on the target’s door', () => {
     let fought = 0;
     let farthest = 0;
     const wandered: string[] = [];
-    while (sim.tick < 420 * HZ && !bot.lapped && (player(sim.index).health?.hits ?? 0) < sim.tuning.brain.combat.playerHits) {
+    // Long enough for the fight to reach him: a camp that weighs what it hears takes longer to be sure of a man who circles it.
+    while (sim.tick < 660 * HZ && !bot.lapped && (player(sim.index).health?.hits ?? 0) < sim.tuning.brain.combat.playerHits) {
       for (const e of sim.step(driver.next(sim, raw))) if (e.type === 'siren' && siren < 0) siren = sim.tick;
       if (siren < 0) continue;
       for (const g of sim.guards) {
@@ -328,7 +329,7 @@ describe('a man on the target’s door', () => {
     expect(fought).toBeGreaterThan(0);
     expect(wandered).toEqual([]);
     expect(farthest).toBeLessThanOrEqual(T.brain.firefight.spot.doorRun + 2);
-  }, 240_000);
+  }, 360_000);
 });
 
 describe('a run that loses him', () => {
