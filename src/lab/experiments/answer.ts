@@ -14,7 +14,8 @@ import { keptWorld } from '../worlds';
  *
  * The same camps, protecting their targets, under a sniper on the best overview for five
  * minutes: once with every camp answering the one way they all did (it waits for its relief
- * to bring him out), and once by its problem. For each kind of camp, what became of him and
+ * to bring him out), and once by its problem. And once more not ready for trouble, when a
+ * camp protects nobody and runs him at the siren: the answer every camp had before either. For each kind of camp, what became of him and
  * when; and for every camp he left, how long before he was in his vehicle the thing that
  * gives it away could be heard from that overview, which is where a player most likely is:
  * his own vehicle's engine, or the relief's truck on the road.
@@ -23,13 +24,15 @@ import { keptWorld } from '../worlds';
  * to be heard.
  */
 
-const ARMS: readonly Arm[] = [{ name: 'one answer for every camp', off: 'answer' }, { name: 'by the camp’s problem' }];
+/** A camp that isn't ready for trouble protects nobody: it runs him to his vehicle at the siren, which is what every camp did before the takedown. */
+const RELAXED = 'not ready for trouble';
+const ARMS: readonly Arm[] = [{ name: 'one answer for every camp', off: 'answer' }, { name: 'by the camp’s problem' }, { name: RELAXED }];
 
 /** Seconds of each run. */
 const SECONDS = 300;
 
 function run(seed: string, arm: Arm, t: Tuning): Record<string, number> {
-  const sc = compound(`seed=${seed}&attack=sniper&ready=alert${arm.off ? `&off=${arm.off}` : ''}`) as Scene<Simulation>;
+  const sc = compound(`seed=${seed}&attack=sniper${arm.name === RELAXED ? '' : '&ready=alert'}${arm.off ? `&off=${arm.off}` : ''}`) as Scene<Simulation>;
   const sim = startScene(sc, t, keptWorld(`live-camp:${seed}`, t, sc.world));
   const driver = sc.driver!();
   const raw = sc.game.still(sim);

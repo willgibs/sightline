@@ -28,6 +28,7 @@
     "land": "tsx src/headless/land.ts",
     "bisect": "tsx src/headless/bisect.ts",
     "scene": "tsx src/headless/scene.ts",
+    "sitting": "tsx src/headless/sitting.ts",
     "experiment": "tsx src/headless/experiment.ts",
     "whatif": "tsx src/headless/whatif.ts",
     "flaws": "tsx src/headless/flaws.ts",
