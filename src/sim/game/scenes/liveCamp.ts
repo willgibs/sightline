@@ -91,6 +91,7 @@ export function liveCamp(params?: string): Scene {
       giveCampDevices(sim);
       commanderOf(sim)!.camp.fights = true;
       commanderOf(sim)!.camp.firefight = true;
+      commanderOf(sim)!.camp.hunts = true;
       if (p.ready === 'alert') giveProtection(sim);
       // Here, as in the missions to come, the job isn't done until you're out: at the end of the road.
       const road = truckRoute(sim.world, sim.tuning);

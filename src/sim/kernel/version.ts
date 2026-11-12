@@ -44,5 +44,8 @@ export const GEN_VERSION = 9;
  * 17: the firefight (brain/firefight.ts): in a camp drilled for it, men who know where
  * someone close is fight from positions, fire back at a flash, and go after him by ways out
  * of his view, one at a time. No pinned run has anyone that close, so no fingerprint moved.
+ * 18: the hunt (brain/hunt.ts, brain/commander.ts): a camp that hunts places a shooter from
+ * what its men heard, says so from cover, sends a section out after him, and has its
+ * marksmen cover the crossing; nobody else walks off its ground to look for him.
  */
-export const SIM_VERSION = 17;
+export const SIM_VERSION = 18;

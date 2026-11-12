@@ -74,8 +74,8 @@ export function tell(ctx: TickContext, g: GuardEntity, r: Report, via: Via, caus
     const draw = (): number => ctx.draw(g.id, 'awareness', (rng) => rng.next());
     stimulate(s.awareness, { kind: 'voice', level, x: r.x, y: r.y, z: r.z, cause, reason: 'voice' }, ctx.tick, ctx.tuning, draw);
   }
-  // Being told it's clear, that it's time to go, or that someone's moving, says nothing new about where an intruder is.
-  if (r.kind !== 'clear' && r.kind !== 'escort' && r.kind !== 'moving') {
+  // Being told it's clear, that it's time to go, or that someone's moving or set, says nothing new about where an intruder is.
+  if (r.kind !== 'clear' && r.kind !== 'escort' && r.kind !== 'moving' && r.kind !== 'set') {
     const p: Percept = { kind: 'voice', x: r.x, y: r.y, z: r.z, radius: r.radius, strength: level, tick: ctx.tick, expires: ctx.tick + Math.round(T.keep * hz), cause };
     believe(s, p, false, ctx.tick, ctx.tuning);
   }
@@ -273,6 +273,8 @@ export function squadArrives(ctx: TickContext, c: CommanderEntity, x: number, z:
       g.brain.task = { id: c.camp.nextTask++, kind: 'fetch', x: room.x, z: room.z, ...(room.y === undefined ? {} : { y: room.y }), issued: ctx.tick, cause: event };
       continue;
     }
+    // In a camp that hunts, with someone placed outside: they're men for a section, and the commander forms it (brain/commander.ts).
+    if (c.camp.hunts && c.camp.threat) continue;
     const target = c.camp.search ?? (c.camp.shots.estimate ? { x: c.camp.shots.estimate.x, z: c.camp.shots.estimate.z } : { x: site.x, z: site.z });
     g.brain.task = { id: c.camp.nextTask++, kind: 'search', x: target.x, z: target.z, issued: ctx.tick, cause: event };
   }
@@ -447,7 +449,7 @@ export const campCommander: System = {
     const every = Math.max(1, Math.round((officer ? T.planEvery : T.noOfficerEvery) * hz));
     if (ctx.tick - camp.planned >= every) {
       camp.planned = ctx.tick;
-      const mind: CampMind = { camp, world: ctx.world, tuning: ctx.tuning, tick: ctx.tick, time: ctx.tick / hz, officer };
+      const mind: CampMind = { camp, world: ctx.world, tuning: ctx.tuning, tick: ctx.tick, time: ctx.tick / hz, officer, work: ctx.work };
       plan(mind, orders);
       for (const o of orders) sendOrder(ctx, c, o.guard, o.task);
     }
@@ -486,7 +488,7 @@ export const orderDeliver: ScheduleHandler = (ctx, entry) => {
   const task = c.camp.tasks.find((t) => t.id === entry.b);
   if (!task) return;
   const b = g.brain;
-  b.task = { id: task.id, kind: task.kind, x: task.x, z: task.z, ...(task.y === undefined ? {} : { y: task.y }), issued: ctx.tick, cause: task.cause };
+  b.task = { id: task.id, kind: task.kind, x: task.x, z: task.z, ...(task.y === undefined ? {} : { y: task.y }), issued: ctx.tick, cause: task.cause, ...(task.hunt ? { hunt: { ...task.hunt, men: [...task.hunt.men], watch: [...task.hunt.watch] } } : {}) };
   // A new order starts afresh, even mid-task: not the old one's linger, its sweep or its cover.
   b.linger = -1;
   b.until = -1;

@@ -76,6 +76,31 @@ Four more fights on the camps of the owner's sitting have none over 4 ms either,
 
 **Not done, on purpose.** A search the commander orders doesn't climb (only a man who sensed something upstairs, or is sent for the target, goes up). Nothing tells a player which building is the target's except that it stands tall and blank on a camp that buries him: a flag on it is the owner's call. Patrols and workers are as visible from a ridge as they were. A floor has one flight: a route's legs take that for granted, and a second flight to a floor would want the shorter of the two ways.
 
+## 2026-11-11 · The hunt: a section goes out after a shooter the camp has placed
+
+**Why.** Step 2 of the camp work existed because nothing the camp did after the first shot reached the shooter (`docs/camp-engine.md`, section 9). The firefight answered someone close. This answers someone on a ridge, or in the field past the wire: the owner's "taking out each new enemy as they came into view, never really being seen".
+
+**Built** (`brain/approach.ts`, `brain/hunt.ts`, `brain/commander.ts`; the design, the drill and the numbers are in `docs/camp-engine.md`, section 9, *Step 2b*). A camp that hunts places a shooter from what its men heard, sends two men out by the way that keeps most out of his view, and they watch his firing point from short of it before one goes on to walk round it.
+
+**Decisions inside it.**
+- **They stop short and watch.** Measured: no way to a firing point stays out of its view, at any price. Every one has 145 m or more in view, most of it the last stretch. So the drill isn't a run at the place.
+- **Men say where the shot came from, once they're down.** Without that the camp had one bearing at most, often a wrong one, and the hunt would have had nothing to act on. It is a change to every camp that fights and hunts: more is said on the net in the first ten seconds.
+- **A fix has to be good enough.** One good bearing against the range card is; a bullet's crack isn't (`hunt.sure`, 80 m).
+- **Nobody is sent while he's still firing** (`hunt.quiet`, 18 s), and the camp's marksmen cover a section across open ground (`hunt.fix`, 12 s).
+- **A camp that hunts sends no lone searchers** while it has someone placed outside, and a man doesn't walk off its ground alone. That takes away the men the owner picked off one by one.
+- **A section is a drill, not a puppet.** Each man works the way out for himself from the order, and knows of the other half only what he hears it say. So there is no section entity and no section mind: the layer the foundation review asked for is, for now, an order and a shared drill. If a second kind of section needs more, that is when to build it.
+- **The camp names its dead.** A body on a man's beat, and he's gone quiet: it's him. Nothing set a man down as dead before, so a section could be given a dead man.
+- **The valley is read off a raster, not with rays.** 93% agreement with real lines of sight, under a millisecond a way. A man's own eyes settle where he stops.
+- **Ways keep to ground a man can climb.** The map's walk edges don't know how much the ground rises between two cells, and a man sent up a 33° face stalled at the foot of it. The lattice has its own test (25°, or 34° where there's no other way). The map's edges themselves are unchanged: that is a generation change for another day, and it is the reason a hunter can still stall between two stops.
+
+**Measured** (`npm run experiment -- hunt`, 12 camps): a shooter who fires once and stays is placed on 12, sent after on 11, found on 9 after a median 210 s, with enough rounds on him to kill on 6. If he moves 90 m he's found on 3. Before, none of it happened on any camp. Against a marksman who shoots everything he sees the camp loses 2.1 section men and never hurts him: that needs step 3's means.
+
+**Not settled, so not pinned.** The seconds and the numbers are a person's to set. `tests/hunt.test.ts` holds what's settled: a section is sent, of men the camp believes are on their feet; nobody else goes; it says what it's doing, watches before closing in, and finds him or calls the place; nobody is sent while he's firing or without the radio; a man alone comes home; a camp without it does none of this; and the same hunt ends the same way twice. `tests/approach.test.ts` holds the reading of the valley.
+
+**Ticks** (`npm run hitches`, and `-- hunt`): none over 4 ms on the four standing fights or the hunt's scene, in a fresh tab's run (3.6 ms at worst) or warm (2.7 ms). Two things had to be rehearsed at load to get there, about 0.4 s more loading a camp: a hunt itself (`rehearseHunt`), since the tick a section is first formed took 5.1 ms; and routes out to the ridges (`rehearseRidges`), which lone guards used to find during the rehearsal and no longer do. `docs/performance.md`, section 8, has how the second was found, and the two options `npm run hitches` gained for it.
+
+**Versions.** `SIM_VERSION` 18: the pinned camp fight behaves differently, because its camp now hunts. No other pinned run's behaviour moved. `STATE_SCHEMA` 12: a camp keeps who it's hunting, its sections and what they've crossed off, and a man on the hunt keeps his way out. The brain lane's bench is re-pinned: the fight's worst tick expands 7,824 cells where it expanded 6,503.
+
 ## 2026-11-11 · Where the firefight meets the taller camps
 
 Merging the two brought up one thing neither had alone: an intruder who is up on something. The firefight took his eyes to be 1.3 m above the ground at his place. With someone at an upper window or on a deck that's a line into the wall beneath him, so every place tested as hidden, and a man could kneel in the open under a window believing he was out of sight. A position, a covered way and a man's own exposure are now judged from where the intruder is believed to be when that's more than 2.4 m above the ground (`positions.ts`, `eyesAt`; `firefight.spot.raised`). On the ground nothing changed, to the bit: no pinned value moved, and `tests/firefight.test.ts` holds the new case on a camp's raised posts, where one position in eight chosen the old way was in view. `walk()` takes a goal's height and then a route's price. Positions are still found on the ground only: nobody takes one indoors or upstairs, which belongs with how a camp answers someone inside a building.

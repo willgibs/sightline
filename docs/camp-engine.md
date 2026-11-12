@@ -334,7 +334,7 @@ These are scored with the person-limited shooter, not the perfect one, and every
 | --- | --- | --- | --- |
 | **0 · The bench** | Done: experiments, switches, gauges, the panel, the way out, forking a run, re-rolling the dice on one camp, a shooter limited to what a person can do, a fight pinned on the bench | Today's camp with the panel on: the "before" | Medium |
 | **1 · The first fight** | Built: a whistle you can hear, men who leave the line and come back, tower men who fire back, near misses that knock you off your rest, a muzzle flash anyone looking can see. The compound simulator and its flaw detectors. So far: a perfect shooter's kills fall from 8.7 to 7.0 of 9.6, and the share of guards in his line 20 s after a shot from 61% to 41% | The compound simulator first, then a real perch. Fifteen minutes, three questions: what did the camp do, why did you move, what would you do next? | Medium |
-| **2 · The camp hunts** | Done: stance for guards, routes that reach the ridges, and the firefight (2a, below). Still to come: Picture and Command, sections that sweep, cut-offs on the road, the fallbacks | Getting out, with someone coming | Large |
+| **2 · The camp hunts** | Done: stance for guards, routes that reach the ridges, the firefight (2a, below) and the hunt (2b, below): the camp places a shooter and sends a section after him. Still to come: cut-offs on the road, the relief as a second section, a hunt without the radio | Getting out, with someone coming | Large |
 | **3 · The camp has means** | The counter-sniper pair and the optics law, a crewed gun, close protection, role tells and marking, preparedness levels | Break the Chain, The Duel | Large |
 | **4 · If play asks for it** | Mortar, smoke, hardening, Memory, decoys, Second Front, Be the Camp, the tournament | | Large |
 
@@ -429,13 +429,77 @@ And the walk in itself (`npm run scene -- firefight`): someone stands in front o
 
 **What it doesn't do yet, and where each belongs.**
 
-- **Outside the wire nobody follows.** Across an open field there's no covered way, so they hold and shoot. Going out after someone is a section's job, by dead ground or by truck: step 2b.
+- **Outside the wire nobody follows.** Across an open field there's no covered way, so they hold and shoot. Going out after someone is a section's job: the hunt, below.
 - **One man goes, alone.** A pair bounding in turn, with covering fire on the place, needs a man to know where his own side is, which a mind doesn't yet (`docs/foundation-review.md`, "People should be one kind of thing"). Until then nobody fires blind at a place someone has said he's moving on.
 - **Tower men are as they were:** upright on an open deck, and the first to die. A parapet and the counter-sniper pair are step 3.
 - **Nobody takes a position indoors or upstairs.** Positions are found on the ground. A man who is upstairs when a fight starts comes down to one, and someone in a windowless upper room is watched from outside until the fight lapses (35 s) and a man goes up to look, as before the firefight. What a camp does about an intruder inside a building belongs with how the target answers (the brief's second part).
 - **The first man up still dies** to someone already aiming at his spot. That's fair to a careful player, and it's why a careless one still gets three or four men before he's stopped.
 
 **Dials a person should set by playing,** all in `tuning.brain.firefight`: how well they shoot from a position (`spreadDeg`, 0.6°: about one round in two on a standing man at 50 m), how long a look lasts, how long a near miss pins a man, and how far a man will follow.
+
+**On the taller camps** (measured again when two storeys landed, the same experiment): circling ends with the shooter dead on 10 camps of 16, from 8 without the firefight, and he gets all the way round on 5, from 7. Men he puts down from the walk fall from 3.1 to 2.1. The effect is smaller than on one storey because a taller camp shows a walker fewer men, and fewer of them see him.
+
+### Step 2b, built: the hunt (Nov 11)
+
+`brain/approach.ts`, `brain/hunt.ts`, and the hunt's half of `brain/commander.ts`. Only a camp with `hunts` does it (`off=hunt` plays the camp as it was). A hunt ends in a firefight, so `off=firefight` takes it away too.
+
+**What was wrong.** After a shot from a ridge the camp got down, its tower men fired back, and that was the end of it. Nobody worked out where he was and nobody came. He could lie where he had fired from for as long as he liked: on 12 camps he was placed on none and found on none.
+
+**Three things had to exist first.**
+
+- **A fix worth acting on.** Men dived for cover and said nothing, so the camp had one bearing at most, and that was often the crack of the bullet, which points the wrong way. Now a man who has got down says on the net where the shot came from: the flash if he saw it, or the muzzle's report with the error of his ears. The camp fuses the bearings as it did and names the listed firing point they fit best. A fix wider than 80 m is left alone. After one loud shot the camp places the shooter on 12 camps of 12, a median 27 m off.
+- **A reading of the valley** (`approach.ts`). What hides a man from a ridge is the ground and the trees, and a section has to read that the way a man reads a map before he leaves. It is a lattice of places 10 m apart over a relief on the map's own cells: the ground's height, anything solid on it, and each tree crown as the cone it is. Whether a place is in a firing point's view is read off that with no rays. Held against real lines of sight (`npm run experiment -- approach`) it agrees on 93% of the ground, and 7% of what it calls hidden is in view. Finding a way takes under a millisecond.
+- **A camp that knows who is down.** It used to send a dead man out. A body is now put a name to: whoever's beat it lies on, if he has gone quiet since.
+
+**The finding that shaped the drill.** No way to a firing point stays out of its view. At any price, on every camp tried, a way has 145 m or more of it in view, and most of that is the last stretch, which is the ground the firing point looks down on. A pair sent straight at the place would hand a waiting shooter two more targets. So they stop short and watch.
+
+**What a section does:**
+
+| Phase | What it does | What you see or hear |
+| --- | --- | --- |
+| Gather | Two men, of those who can be spared, make their own way to where the way out leaves the wire | Two men leaving the camp, about half a minute after your last shot |
+| Out | Ground out of your view they run together. Ground in it they cross by bounds, in turn: one dashes to the next stop, gets down and says "Set!", and the other goes when he hears it | Dashes of a few seconds; "Set!" and "Moving!" if you're within about 55 m |
+| Watch | At the last cover within rifle range of the place (55 to 130 m) they get down and watch it: up to look, down again, for 20 s | Heads coming up at two places. A shot or a man getting up now is under two rifles |
+| Close | The leader goes on to the place in short dashes. The other covers him with fire on it until he's within 22 m | Rounds landing on the place he believes you're at |
+| Look it over | He walks a box round the place, looking in, and then round each listed firing point within 60 m of it | A man walking round you, 6 m off |
+| Hold, home | Nobody there: he says so, on the net and aloud. The camp crosses those places off and sends them on to the next, or they come home | "Clear here." |
+
+**Six rules carry it.**
+
+- **Not while you're firing.** Nobody is sent, and nobody crosses ground in view, until you've been quiet for 18 s. The camp answers a rifle that's speaking from where it is.
+- **Fix him with fire, finish him with men.** Before a section steps out onto ground you can see, it says so on the net, and the camp's marksmen put rounds on the place for 12 s. If the camp has you placed right, those rounds are on you.
+- **Nobody else goes.** While the camp has someone placed outside the wire it sends no lone searchers, and a man doesn't walk off its ground alone to look. Two fighting men always stay at home.
+- **By voice, and only by voice.** A man knows where the other half is by hearing it say so (rule 13). A man who hears nothing goes on after a wait, and after three such he turns for home: a man alone doesn't hunt. One whose partner never comes to the rally says who is missing, and the camp sends someone else.
+- **Ways a man can climb.** A way keeps to ground that rises no more than 25° where it can, and takes a harder climb only where there's no other. A place the leader can't get onto isn't called clear, and his call says how far out from the place it holds.
+- **Honest.** The camp places you from what its men heard and said. A quiet round that nobody hears gives it nothing to go on.
+
+**Measured** (`npm run experiment -- hunt`, 12 camps, the same seeds before and with the hunt; a scripted shooter on the best overview who can't be hurt, and the rounds that would have struck a man lying where he last fired from, of which three kill a player):
+
+| | Before | With the hunt |
+| --- | --- | --- |
+| One loud shot: the camp places him | 0 of 12 | 12 of 12, a median 27 m off |
+| A section is sent | 0 | 11 of 12 |
+| It's watching his place after | never | 152 s |
+| He stays: found | 0 | 9 of 12, after a median 210 s |
+| He stays: enough rounds on him to kill | 0 | 6 of 12, by a median 214 s |
+| He fires four times and stays: found | 0 | 8 of 12 |
+| He moves about 90 m after the shot: found | 0 | 3 of 12 |
+| He moves: enough rounds on him to kill | 0 | 1 of 12 |
+| Men not sent who went past the wire | 0 | 0.08 |
+| Fewest fighting men left at home | | 3.5 |
+
+So staying put after a loud shot now gets a shooter found on three camps in four, and moving a hundred metres is worth most of that back. That is what step 2 was for.
+
+**What it doesn't do yet, and where each belongs.**
+
+- **A marksman who shoots everything he sees still wins.** Played by the mission's rules with a shooter who never misses his chance, the camp sends 1.7 sections, loses 2.1 of their men, and never hurts him. A section on foot can't beat a rifle that's watching for it. The camp's answer to that is means, and those are step 3: the counter-sniper pair, a crewed gun.
+- **It takes about three and a half minutes.** The design hoped for two. A foot section going 250 to 350 m by cover and bounds can't do that. A cut-off by truck could.
+- **One section at a time.** The relief's spare men aren't yet a second section with another job: the way out.
+- **No radio, no section.** The camp places nobody and orders nobody. A section already out carries on. A hunt called by voice by whoever saw the flash is still to build.
+- **Some places it won't go.** A walled camp whose gate faces away is 900 m or more round to the place, and nobody is sent. A firing point up a face a man can't climb isn't called clear, and the camp leaves it be for four minutes.
+- **Inside the wire nothing changed.** A search of the camp's own ground waits while someone is placed outside.
+
+**Dials a person should set by playing,** all in `tuning.brain.hunt`: how long after your last shot they come (`quiet`, `after`), how long they watch before closing in (`watch.for`), how long the marksmen cover a crossing (`fix`), how many men go and how many stay (`size`, `keep`), and how much longer a way they'll take for cover (`ground.price`, `ground.priceOn`).
 
 ## 10. Decisions
 

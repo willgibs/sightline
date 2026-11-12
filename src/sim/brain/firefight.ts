@@ -373,7 +373,7 @@ function mayLook(m: GuardMind): boolean {
 }
 
 /** Writes the order: where to go and how, the place to face, and how low to be. */
-function steer(m: GuardMind, out: Order, wishX: number, wishZ: number, gait: Gait, lookX: number, lookZ: number, stance: Stance): void {
+export function steer(m: GuardMind, out: Order, wishX: number, wishZ: number, gait: Gait, lookX: number, lookZ: number, stance: Stance): void {
   const A = m.tuning.perception.awareness;
   const dt = 1 / m.tuning.sim.tickHz;
   const dx = lookX - m.self.x;
@@ -392,7 +392,7 @@ function steer(m: GuardMind, out: Order, wishX: number, wishZ: number, gait: Gai
 }
 
 /** Keeps him on a spot, in a stance, facing a place, with a step back onto it if he's off it. True once he's on it, in the stance, and facing. */
-function stayAt(m: GuardMind, out: Order, x: number, z: number, stance: Stance, lookX: number, lookZ: number): boolean {
+export function stayAt(m: GuardMind, out: Order, x: number, z: number, stance: Stance, lookX: number, lookZ: number): boolean {
   const F = m.tuning.brain.firefight;
   const dx = x - m.self.x;
   const dz = z - m.self.z;
