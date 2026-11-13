@@ -673,7 +673,7 @@ In the code:
 | Rounds held for one of its own | 0 | 6 |
 | Rounds that hit him once he was out | 46 | 46 |
 
-- **Nobody is shot by his own side**, on any of the dice: none in these 126 fights, and none in 440 longer ones on 60 camps.
+- **Nobody is shot by his own side**, on any of the dice: none in these 126 fights, and none in 330 longer ones on 60 camps, on the two rolls that had gone worst (he stays by the wall, runs, or fights back; with the chase and without).
 - **It costs the rounds that would have gone past a mate, and nothing else.** A runner is hit as often as he was.
 
 **What it did to the chase** (`out-the-gate`, the same 21 camps, the chase as it landed beside the chase now). Who comes out, how soon and how many read the same to the digit. What changed is the fire:
@@ -698,7 +698,7 @@ In the code:
 | `circling` | Rounds at him on a lap, down by 0.4 to 1.1 in four of the six kinds of place (a farm: 20.4 to 19.3). One more walled camp and one more as built made him out at all (11 and 14 of 16), and a walled camp lost 1.2 men to him on the walk where it lost 1.3 |
 | `ladder` | Shoot once and leave: rounds at him 9.0 to 8.9. Careless: he fired 6.0 rounds where he fired 5.9 |
 
-@@ATTRIB@@
+**They moved by this rule and nothing else.** The same build with no camp given `mates` reads the same as `main` on all three, to the digit, so taking out the chase's stand-ins and reshaping the check changed nothing by themselves.
 
 **What it leaves.**
 
