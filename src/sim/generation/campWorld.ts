@@ -3,7 +3,7 @@ import { assertTuning } from '../../config/validate';
 import type { MissionSpec } from '../kernel/mission';
 import { Rng } from '../kernel/core/rng';
 import { ColliderSet } from '../kernel/world/colliders';
-import { buildGrid, steepenMap, type SpatialGrid } from '../kernel/world/grid';
+import { buildGrid, type SpatialGrid } from '../kernel/world/grid';
 import type { World } from '../kernel/world/world';
 import type { TerrainReport } from './analysis';
 import type { Camp } from './camp';
@@ -74,10 +74,6 @@ export function generateCampWorld(spec: MissionSpec, tuning: Tuning, clock?: () 
   }
   const playHalf = terrain.heightfield.size / 2 - G.world.playMargin;
   const spawn = chooseSpawn(spec.insertion, terrain.heightfield, terrain.features, colliders, report, playHalf, camp.site, grid.map, campWalkStart(camp));
-  // Everything above read the map by its cells' middles, so a seed builds the camp it always
-  // built. The world carries the map a body can be walked by: a cell with ground under it too
-  // steep to climb is steep, whichever of its triangles that is (kernel/world/grid.ts).
-  steepenMap(grid.map, terrain.heightfield, G);
   return {
     grid,
     spec,
@@ -118,9 +114,7 @@ function buildCamp(seed: string, attempt: number, terrain: TerrainResult, G: Tun
   const props = scatterProps(fork('props'), terrain.heightfield, terrain.features, colliders, G);
   colliders.build();
   // The fine grid covers the ground the analysis looks at: the camp and its margin.
-  // Its map layer by a cell's middle, as every camp so far was laid out and judged: the
-  // world that goes out has it brought to the whole of a cell (generateCampWorld, below).
-  const grid = buildGrid(terrain.heightfield, colliders, siteBounds(camp, colliders, Math.max(G.grid.siteMargin, G.analysis.margin + 2)), G, camp.storeys, camp.stairs, { mapSlope: 'middle' });
+  const grid = buildGrid(terrain.heightfield, colliders, siteBounds(camp, colliders, Math.max(G.grid.siteMargin, G.analysis.margin + 2)), G, camp.storeys, camp.stairs);
   // Staffing searches the grid (its chokepoints, its patrols' paths) and sees through the
   // analysis raster (who would see whom drop), so it shapes the camp's clusters as it goes.
   let raster = buildRaster(camp, terrain.heightfield, colliders, grid.site, G, props.trees, grid);

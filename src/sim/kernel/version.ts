@@ -15,11 +15,11 @@
  * can walk to. 7: tree crowns are part of the world, and a perch's view stops at them.
  * 8: compound types: a keep, a depot and a farm (docs/compound-types.md).
  * 9: two-storey buildings: floors, stairs and windows, an upper floor the grid and the analysis know.
- * 10: the map layer a world carries calls a cell steep if either triangle under it is
- * (kernel/world/grid.ts; it asked only the one under the cell's middle). Generation still
- * lays a camp out and judges it on the map read by its middles, and brings it to the whole
- * of each cell as it hands the world over: every seed builds the camp it built, and only
- * the grid in the world moved, and so every valley's fingerprint.
+ * 10: the map layer marks the edges whose walk, from one cell's middle to the next, gains
+ * height on ground too steep to climb (kernel/world/grid.ts, Edge.EastSteep and NorthSteep):
+ * a cell answers for the triangle under its middle, and such a walk crosses another.
+ * Nothing generation reads has changed, so every seed builds the camp it built. Only the
+ * grid in the world moved, by those marks, and so every valley's fingerprint.
  */
 export const GEN_VERSION = 10;
 
