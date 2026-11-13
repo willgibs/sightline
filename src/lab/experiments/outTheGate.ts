@@ -1,7 +1,7 @@
 import type { Tuning } from '../../config/tuning';
 import { player } from '../../sim/game/entities';
 import { leavingOf } from '../../sim/game/leaving';
-import { emptyGateSeen, outTheGate, watchGate, type GateSeen } from '../../sim/game/scenes/outTheGate';
+import { HELD_UP, emptyGateSeen, outTheGate, watchGate, type GateSeen } from '../../sim/game/scenes/outTheGate';
 import type { Simulation } from '../../sim/game/sim';
 import { startScene, type Scene } from '../../sim/kernel/scene';
 import type { Arm, Experiment } from '../experiment';
@@ -59,7 +59,7 @@ function play(seed: string, arm: Arm, t: Tuning, plan: 'wall' | 'run' | 'fight')
 function run(seed: string, arm: Arm, t: Tuning): Record<string, number> {
   const hz = t.sim.tickHz;
   const out: Record<string, number> = {
-    done: 0, aware: NaN, came: NaN, cameAt: NaN, went: NaN, wentAt: NaN, soon: NaN, found: NaN, foundAt: NaN, most: NaN, men: NaN, home: NaN, rounds: NaN, own: NaN,
+    done: 0, aware: NaN, came: NaN, cameAt: NaN, went: NaN, wentAt: NaN, soon: NaN, found: NaN, foundAt: NaN, most: NaN, men: NaN, home: NaN, rounds: NaN, own: NaN, held: NaN, heldUp: NaN,
     'r.done': 0, 'r.fired': NaN, 'r.struck': NaN, 'r.killed': NaN, 'r.own': NaN,
     'f.done': 0, 'f.came': NaN, 'f.down': NaN, 'f.late': NaN, 'f.most': NaN, 'f.own': NaN,
   }; // prettier-ignore
@@ -80,6 +80,8 @@ function run(seed: string, arm: Arm, t: Tuning): Record<string, number> {
     out.home = wall.home === Infinity ? NaN : wall.home;
     out.rounds = wall.roundsOut;
     out.own = wall.own.size;
+    out.held = wall.held / hz;
+    out.heldUp = wall.held > HELD_UP * hz ? 1 : 0;
   }
   const ran = play(seed, arm, t, 'run');
   if (ran) {
@@ -122,6 +124,8 @@ export const outTheGateExperiment: Experiment = {
     { key: 'most', label: 'by the wall: most out at once', kind: 'mean' },
     { key: 'home', label: 'by the wall: fewest fighting men left inside', kind: 'mean' },
     { key: 'own', label: 'by the wall: men shot by their own side', kind: 'mean' },
+    { key: 'held', label: 'by the wall: longest a man on his way out was held up (s)', kind: 'mean' },
+    { key: 'heldUp', label: `by the wall: a man on his way out was held up over ${HELD_UP} s`, kind: 'rate' },
     { key: 'r.fired', label: 'runs for the trees: rounds fired at him', kind: 'mean' },
     { key: 'r.struck', label: 'runs for the trees: rounds that hit him once he was out', kind: 'mean' },
     { key: 'r.killed', label: 'runs for the trees: enough of them to kill', kind: 'rate' },

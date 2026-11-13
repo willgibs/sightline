@@ -39,7 +39,7 @@ export interface Route {
   /** The best distance to the next waypoint so far, and the tick it was reached. */
   best: number;
   progressTick: number;
-  /** While stepping around something in the way (a body, a fence's post): the way he goes, and until when. */
+  /** While stepping around something in the way (a body, a fence's post): the way he goes, and until when at the latest. -1 when he isn't. */
   sideX: number;
   sideZ: number;
   sideUntil: number;
@@ -635,6 +635,9 @@ export class Navigator {
     return !sightLine(this.view, ax, ay, az, bx, by, bz, Blocks.Sight);
   }
 
+  /** `clear`, as something to hand on (followRoute's `feel.open`): the same function for the navigator's life. */
+  readonly open = (ax: number, az: number, bx: number, bz: number): boolean => this.clear(ax, az, bx, bz);
+
   /**
    * True if a body can walk the straight segment, to its end: every sample stands on a walkable cell
    * (the finest layer there) and fits among the colliders, by the test the grid was built
@@ -733,16 +736,48 @@ export function emptySteering(): Steering {
 /** What a walk is doing now. */
 export type Walk = 'walking' | 'arrived' | 'stalled';
 
+/** What a walker can tell of his own going, and of the ground he's on: without it, a walk is judged by the route and his place alone. */
+export interface Feel {
+  /** He asked his legs for a pace and got less than `creep` of it: a man pressed against something gains a centimetre now and then, and isn't getting anywhere. Sliding round a shoulder is quicker than that, and feeds itself. */
+  pressed?: boolean;
+  /** Whether a body can walk straight from one place to another over the ground he knows (Navigator.clear): a step aside goes where there's room for it. */
+  open?: (ax: number, az: number, bx: number, bz: number) => boolean;
+}
+
 /**
  * One tick of walking a route: steers `self` at `speed` toward the next waypoint, moving
  * on as each is reached. A walk that stops gaining on its waypoint for `stallSeconds` is
- * stalled: something the grid doesn't know is in the way. It then steps aside for a moment,
- * alternating sides each time, and comes back to the route; after `stallsMax` stalls
- * it says so, and the brain decides what to do (find another route, give up).
+ * stalled: something the grid doesn't know is in the way (a mate, the camp's own truck, a
+ * fence's post). He then steps aside and comes back to the route, and after `stallsMax`
+ * stalls it says so, and the brain decides what to do (find another route, give up).
  *
- * Doesn't draw: a pure function of the route, the body and the tuning.
+ * - The first step on a leg comes as soon as he's pressed against something (`feel.pressed`,
+ *   `creep`). Pressed against a mate he slides a centimetre nearer every half second, which
+ *   by the distance alone kept him "walking" for four seconds before he stepped aside at
+ *   all. After that one step, sliding counts again (`creepSteps`): where there's no room to
+ *   step round, pushing slowly through is how he gets there, and stepping from side to side
+ *   behind what's in his way isn't.
+ * - The step is no longer than it takes to get round a truck (`sideStep`), however fast
+ *   he's going: he stops stepping once it has taken him that far off his line, or after
+ *   `sideSeconds`. Up to a hurry the time runs out first, and the step is what it always
+ *   was. At a run, a step that lasted `sideSeconds` threw him three metres and more off his
+ *   route, and into the next wall.
+ * - It goes to the side the ground makes the better (`feel.open`): first one he can walk
+ *   straight on to his waypoint from, then one he can step to. A man wedged between a mate
+ *   and a wall has one way round, and a man at the end of a wall mustn't step behind it.
+ *   Where the ground doesn't choose: right first, then left, by a rule that depends only
+ *   on who he is and how many times this walk has stalled.
+ * - Once it's over (`sideUntil` back at -1) he has `stallSeconds` again to gain on his
+ *   waypoint from where it left him. The time used to run from when the step began, which
+ *   left him a fifth of a second to show for it before he was stepping the other way.
+ *
+ * He keeps the route he had. A new one from where the step leaves him was tried and is
+ * worse: its first waypoint is farther off, past whoever is in his way, where the old
+ * one's was a step from him and reached by sliding round a shoulder (docs/decisions.md).
+ *
+ * Doesn't draw: a pure function of the route, the body, the tuning and the static ground.
  */
-export function followRoute(route: Route, x: number, z: number, speed: number, id: number, tick: number, tuning: Tuning, out: Steering): Walk {
+export function followRoute(route: Route, x: number, z: number, speed: number, id: number, tick: number, tuning: Tuning, out: Steering, feel?: Feel): Walk {
   const N = tuning.brain.nav;
   out.wishX = 0;
   out.wishZ = 0;
@@ -750,16 +785,23 @@ export function followRoute(route: Route, x: number, z: number, speed: number, i
   out.dirZ = 0;
   if (route.next * 2 >= route.points.length) return 'arrived';
   const hz = tuning.sim.tickHz;
-  // Stepping aside: straight toward the side point until it's over.
-  if (tick < route.sideUntil) {
-    out.wishX = route.sideX * speed;
-    out.wishZ = route.sideZ * speed;
-    out.dirX = route.sideX;
-    out.dirZ = route.sideZ;
-    return 'walking';
-  }
   let px = route.points[route.next * 2]!;
   let pz = route.points[route.next * 2 + 1]!;
+  if (route.sideUntil >= 0) {
+    // Stepping aside: straight to the side, until he's far enough off the line he was on.
+    // The step began on the line from him to his waypoint, so how far he is from that line is how far it has taken him.
+    const off = (x - px) * route.sideX + (z - pz) * route.sideZ;
+    if (tick < route.sideUntil && off < N.sideStep) {
+      out.wishX = route.sideX * speed;
+      out.wishZ = route.sideZ * speed;
+      out.dirX = route.sideX;
+      out.dirZ = route.sideZ;
+      return 'walking';
+    }
+    route.sideUntil = -1;
+    route.best = FAR;
+    route.progressTick = tick;
+  }
   let dx = px - x;
   let dz = pz - z;
   let d = Math.sqrt(dx * dx + dz * dz);
@@ -778,7 +820,15 @@ export function followRoute(route: Route, x: number, z: number, speed: number, i
     route.next++;
     return 'arrived';
   }
-  if (d < route.best - N.progress) {
+  const ux = dx / d;
+  const uz = dz / d;
+  // Slow into the last waypoint so a guard doesn't overrun where he was going.
+  const last = route.next * 2 + 2 >= route.points.length;
+  const v = last && d < N.slowDown ? Math.max(N.minSpeed, (speed * d) / N.slowDown) : speed;
+  // Sliding along whatever he's pressed against isn't gaining on the waypoint, until he has tried a step round it.
+  // A leg's first measure always counts.
+  const creeping = route.best < FAR && route.stalls < N.creepSteps && feel?.pressed === true;
+  if (d < route.best - N.progress && !creeping) {
     route.best = d;
     route.progressTick = tick;
   } else if ((tick - route.progressTick) / hz >= N.stallSeconds) {
@@ -786,11 +836,21 @@ export function followRoute(route: Route, x: number, z: number, speed: number, i
     route.best = d;
     route.progressTick = tick;
     if (route.stalls > N.stallsMax) return 'stalled';
-    // Step aside, perpendicular to the way he was going: right first, then left, by a
-    // rule that depends only on who he is and how many times this walk has stalled.
-    const side = (id + route.stalls) % 2 === 0 ? 1 : -1;
-    const ux = dx / d;
-    const uz = dz / d;
+    // Step aside, perpendicular to the way he was going: to the better side by the ground, or by his own rule.
+    let side = (id + route.stalls) % 2 === 0 ? 1 : -1;
+    const open = feel?.open;
+    if (open) {
+      // How far the step will take him, and what each side is worth. Most, that he can walk straight on to his waypoint
+      // from the end of it: a step round the end of a wall mustn't leave him behind it. Then, that the step itself is
+      // clear, which says less: pressed against a wall's corner, no step from where he stands looks clear.
+      const reach = Math.min(N.sideStep, speed * N.sideSeconds);
+      const worth = (s: number): number => {
+        const sx = x - uz * s * reach;
+        const sz = z + ux * s * reach;
+        return (open(sx, sz, px, pz) ? 2 : 0) + (open(x, z, sx, sz) ? 1 : 0);
+      };
+      if (worth(-side) > worth(side)) side = -side;
+    }
     route.sideX = -uz * side;
     route.sideZ = ux * side;
     route.sideUntil = tick + Math.round(N.sideSeconds * hz);
@@ -800,11 +860,6 @@ export function followRoute(route: Route, x: number, z: number, speed: number, i
     out.dirZ = route.sideZ;
     return 'walking';
   }
-  const ux = dx / d;
-  const uz = dz / d;
-  // Slow into the last waypoint so a guard doesn't overrun where he was going.
-  const last = route.next * 2 + 2 >= route.points.length;
-  const v = last && d < N.slowDown ? Math.max(N.minSpeed, (speed * d) / N.slowDown) : speed;
   out.wishX = ux * v;
   out.wishZ = uz * v;
   out.dirX = ux;
