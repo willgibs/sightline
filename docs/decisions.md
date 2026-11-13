@@ -2,6 +2,24 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-12 · A man looks out for his own
+
+**Why.** The chase (below) left "a man doesn't see his own side", held off with rules about what a mate had said. Measuring it properly showed it was older and bigger than the chase: with other rolls of the dice than the game's own, a three-minute fight round a gate ended with a man shot dead by his own side in about one fight in ten on `main`, and 15 men were shot in 55 fights on the roll that goes worst. The owner said go on and build it.
+
+**What it was.** A man already held his fire for one of his own, if that man was dead on his line: one ray from his eye to what he was shooting at (`game/combat.ts`, since the firefight). A round goes anywhere inside the error of his aim, which is half a metre at 50 m. Every man shot, in the 29 cases looked at, was between the rifle and its target and about half a metre off the line, beside it or crouched under it.
+
+**Built** (`game/combat.ts`, `ownInTheWay`; `docs/camp-engine.md`, section 9, *Step 2d*). He holds for one of the camp's own anywhere the round could go: within the error of his aim and a margin, out to what he's shooting at, where that man stands or would stand on his feet, if a round could reach the side of him nearest the line. `npm run experiment -- own-side --dice 3`: fights with a man shot by his own side go from 5 of 63 to none by the wall and from 6 of 63 to none against a runner, for ten rounds in sixty-six held by the wall, and a runner is hit as often as he was.
+
+**Decided along the way.**
+- **Not a perception system.** The plan was for a man to perceive his mates and his brain to hold his fire. The check that was already there is settled where the round is made, "as his eyes would settle it", and all that was wrong with it was its width. Widening it is one place every round goes through, costs a ray or two a shot, and leaves the brain as it was. A brain that knows where its mates are is worth building when something needs it: moving for a clear line is the first thing that would.
+- **By what a round could reach, not by what he can see.** The test is the same ray a bullet is: a man behind a wall isn't in the way, and one behind a bush is.
+- **On his feet as well.** The one man still shot with the first version was down behind a crate half a metre off the line, and stood up into the round. He's looked for where he'd stand.
+- **Nothing past the target.** None of the men shot was beyond it, and counting them would make an intruder safe between two guards.
+- **The chase's stand-ins came out.** "Nothing blind near where a mate went out" and "nothing through that opening for the rest of the fight" kept the camp's rounds off the men it had sent out, and kept them off the intruder too. With this in, taking them out leaves nobody shot by his own side on 60 camps and three rolls, and a runner is hit 14 times where it was 9.
+- **A switch, and a fact about the camp.** `off=mates` plays a camp that holds only for a man on the line. No pinned run's camp has `mates`, so no behaviour fingerprint moved.
+
+**What moved.** `SIM_VERSION` 25, with no pinned behaviour changed. `STATE_SCHEMA` 17 (a camp's `mates`, a man's `held`; `mateOut` is gone). A new event, `held`. On the lab benches, against `main` the same evening: the chase's own bench reads the same for who comes out and when, and a runner is hit 20 times where the chase as it landed hit him 14 (13 before the chase); `firefight`, `circling` and `ladder` moved by under a round a run, and `firefight`'s men shot by their own side went from 0.07 a fight to none; `second-step`, `hunt`, `takedown`, `answer` and `flaws` read the same to the digit. The tables are in `docs/camp-engine.md`, section 9, *Step 2d*.
+
 ## 2026-11-12 · Out of the gate isn't out of the fight: the chase
 
 **Why.** The owner, from playing: seen by a whole camp, they left by an opening in its wall, turned along the outside and were gone. "It was very, very rare for a guard to even step outside the door to look around or continue a gunfight... the current reaction gives a slight impression of 'he walked out that door, must be gone forever'." What they'd expect is "a guard or two maybe continue pursuit to fire from behind me as I escape, but if I can shoot them down as they expose themselves outside of the camp, then I get more of that sense of security because I took out the ones that did pursue, and the rest are still defending within". And how to go about it: "Don't want our efforts in fixing this more minor problem to cascade into massive errors in judgment across the reactive intelligence you're starting to hone in already."
