@@ -289,8 +289,10 @@ export function squadArrives(ctx: TickContext, c: CommanderEntity, x: number, z:
     }
     c.camp.roster.push({ id: g.id, post: g.guard.spawn, x: g.body.x, z: g.body.z, tick: ctx.tick, status: 'ok', ...(g.guard.reserve ? { reserve: { x: g.guard.reserve.x, z: g.guard.reserve.z } } : {}) });
     if (room && !c.camp.relief && fetchers < ctx.tuning.brain.protect.fetchers) {
+      // Each with his place, in a camp that hands them out: the first 0, the next 1 (brain/protect.ts).
+      const place = c.camp.places ? { place: fetchers } : {};
       fetchers++;
-      g.brain.task = { id: c.camp.nextTask++, kind: 'fetch', x: room.x, z: room.z, ...(room.y === undefined ? {} : { y: room.y }), issued: ctx.tick, cause: event };
+      g.brain.task = { id: c.camp.nextTask++, kind: 'fetch', x: room.x, z: room.z, ...(room.y === undefined ? {} : { y: room.y }), issued: ctx.tick, cause: event, ...place };
       continue;
     }
     // In a camp that hunts, with someone placed outside: they're men for a section, and the commander forms it (brain/commander.ts).
@@ -552,7 +554,9 @@ export const orderDeliver: ScheduleHandler = (ctx, entry) => {
   const b = g.brain;
   // A man bringing the target out, readying his way out or on his way to hold his door finishes that: a lesser order isn't taken.
   if (b.task && forTheTarget(b.task.kind) && !forTheTarget(task.kind)) return;
-  b.task = { id: task.id, kind: task.kind, x: task.x, z: task.z, ...(task.y === undefined ? {} : { y: task.y }), issued: ctx.tick, cause: task.cause, ...(task.hunt ? { hunt: { ...task.hunt, men: [...task.hunt.men], watch: [...task.hunt.watch] } } : {}) };
+  // One task, several men: his own place on it is the task's first and his number among them (brain/protect.ts).
+  const mine = task.place === undefined ? -1 : task.assigned.indexOf(g.id);
+  b.task = { id: task.id, kind: task.kind, x: task.x, z: task.z, ...(task.y === undefined ? {} : { y: task.y }), issued: ctx.tick, cause: task.cause, ...(task.hunt ? { hunt: { ...task.hunt, men: [...task.hunt.men], watch: [...task.hunt.watch] } } : {}), ...(mine >= 0 ? { place: task.place! + mine } : {}) };
   // A new order starts afresh, even mid-task: not the old one's linger, its sweep or its cover.
   b.linger = -1;
   b.until = -1;

@@ -164,6 +164,8 @@ export interface Tasking {
   cause: number;
   /** A section's order (hunt.ts): who's in it, where it gathers, and where the shooter may be watching from. */
   hunt?: HuntOrder;
+  /** His place among the men sent on an errand about the target (protect.ts), in a camp that hands them out: where he stands by the vehicle, and how far short of the door he stops, so two men don't make for one spot. Absent, or 0, for the point itself. */
+  place?: number;
 }
 
 export function createBrain(): BrainState {
