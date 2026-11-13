@@ -15,8 +15,13 @@
  * can walk to. 7: tree crowns are part of the world, and a perch's view stops at them.
  * 8: compound types: a keep, a depot and a farm (docs/compound-types.md).
  * 9: two-storey buildings: floors, stairs and windows, an upper floor the grid and the analysis know.
+ * 10: the map layer marks the edges whose walk, from one cell's middle to the next, gains
+ * height on ground too steep to climb (kernel/world/grid.ts, Edge.EastSteep and NorthSteep):
+ * a cell answers for the triangle under its middle, and such a walk crosses another.
+ * Nothing generation reads has changed, so every seed builds the camp it built. Only the
+ * grid in the world moved, by those marks, and so every valley's fingerprint.
  */
-export const GEN_VERSION = 9;
+export const GEN_VERSION = 10;
 
 /**
  * How the simulation behaves for given inputs. 3: events carry ids, times, entity sources
@@ -103,5 +108,9 @@ export const GEN_VERSION = 9;
  * numbered as they're sent, and stand apart by his vehicle and at his door, where they all
  * used to walk to the one point. No pinned run's behaviour moved. `camp-fight`'s state did:
  * its camp now says its men have places.
+ * 28: a route keeps off ground too steep to climb (brain/nav.ts): out in the valley it
+ * takes no walk the map has marked as gaining height on such ground (kernel/world/grid.ts,
+ * Edge.EastSteep), and no stretch of it is pulled straight across one. No pinned run's
+ * route crossed such ground, so no fingerprint moved.
  */
-export const SIM_VERSION = 27;
+export const SIM_VERSION = 28;

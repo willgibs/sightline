@@ -21,6 +21,8 @@ beforeAll(() => {
 describe('world generation', () => {
   it('validates walkability with the controller\'s own slope limit', () => {
     expect(defaultTuning.gen.walkableSlopeDeg).toBe(defaultTuning.bodies.player.maxSlopeDeg);
+    // The guards walk by the same grid, so theirs has to be the same number too.
+    expect(defaultTuning.gen.walkableSlopeDeg).toBe(defaultTuning.bodies.guard.maxSlopeDeg);
   });
 
   it('builds the same valley from the same seed', () => {
@@ -146,4 +148,4 @@ describe('world generation', () => {
   });
 });
 
-const GOLDEN_TAL_4471 = 'd65c15c8a7a25bb6';
+const GOLDEN_TAL_4471 = '4640c8146acaa42b';

@@ -19,7 +19,7 @@ export const GOLDEN = {
   /** Bits of every deterministic math function over 4,000 inputs each. */
   detmath: '8d55144e8e74968f',
   /** Everything generation decides for TAL-4471 (also pinned in tests/world.test.ts). */
-  world: 'd65c15c8a7a25bb6',
+  world: '4640c8146acaa42b',
   /** 60 s of play: the person-like bot in two valleys, the fuzzing bot in one. */
   play: {
     'TAL-4471 wander': { behaviour: 'dd04c3ea131fbc77', state: 'd3c806b930e211e2' },

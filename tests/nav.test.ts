@@ -9,9 +9,11 @@ import { placePlayer } from '../src/sim/game/setup';
 import { Simulation } from '../src/sim/game/sim';
 import { SYSTEMS } from '../src/sim/game/systems';
 import { neutralInput } from '../src/sim/kernel/input';
+import { dtanDeg } from '../src/sim/kernel/core/detmath';
 import { missionSpec } from '../src/sim/kernel/mission';
 import { withSystem, type System } from '../src/sim/kernel/systems';
 import { Blocks, type ColliderInput } from '../src/sim/kernel/world/colliders';
+import { CLIMB_SLACK } from '../src/sim/kernel/world/grid';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { turnTowards, yawFromDirection } from '../src/sim/kernel/core/math';
 import type { World } from '../src/sim/kernel/world/world';
@@ -219,6 +221,36 @@ describe('navigation', () => {
       pz = z;
     }
     expect(work.nodes).toBeLessThan(T.brain.nav.mapExpansions + 2 * T.brain.nav.siteExpansions);
+  });
+
+  it('keeps a route off ground too steep to climb, where the map’s cells answer for their middles only', () => {
+    // HEL-2923, out in the valley, where a hunter at a run stopped dead at (132.5, -94.2): the
+    // straight way east there runs up the 45 degree half of a cell whose middle lies on 27.
+    const world = generateWorld(missionSpec('HEL-2923'), T);
+    const nav = navigatorOf(world, T);
+    const tanMax = dtanDeg(T.gen.walkableSlopeDeg);
+    const from = { x: 126.25, z: -93.75 };
+    const to = { x: 141.25, z: -93.75 };
+    // Both ends, and every cell between them, are walkable: the map's cells alone say go straight across.
+    expect(nav.standable(from.x, from.z) && nav.standable(133.75, -93.75) && nav.standable(to.x, to.z)).toBe(true);
+    // The straight line isn't one a body can walk: more than a metre of it is up ground it can't climb...
+    expect(world.terrain.gainOnSteep(from.x, from.z, to.x, to.z, tanMax)).toBeGreaterThan(1);
+    expect(nav.clear(from.x, from.z, to.x, to.z)).toBe(false);
+    // ...though back down it is.
+    expect(nav.clear(to.x, to.z, from.x, from.z)).toBe(true);
+    // The route goes round, a metre longer, and no stretch of it climbs such ground.
+    const r = emptyRoute();
+    expect(nav.find(from.x, from.z, to.x, to.z, {}, r)).toBe('found');
+    const length = routeLength(r, from.x, from.z);
+    expect(length).toBeGreaterThan(15);
+    expect(length).toBeLessThan(18);
+    let px = from.x;
+    let pz = from.z;
+    for (const [x, z] of waypoints(r)) {
+      expect(world.terrain.gainOnSteep(px, pz, x, z, tanMax), `${px.toFixed(1)},${pz.toFixed(1)} to ${x.toFixed(1)},${z.toFixed(1)}`).toBeLessThanOrEqual(CLIMB_SLACK);
+      px = x;
+      pz = z;
+    }
   });
 });
 

@@ -6,6 +6,7 @@ import { buildRoutine, type Routine } from '../src/sim/generation/routine';
 import { Rng } from '../src/sim/kernel/core/rng';
 import type { World } from '../src/sim/kernel/world/world';
 import { Blocks, circleOverlaps, type ColliderInput } from '../src/sim/kernel/world/colliders';
+import { Edge } from '../src/sim/kernel/world/grid';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { buildWorld, type HandmadeSpec } from '../src/sim/generation/handmade';
 
@@ -42,6 +43,19 @@ export function testWorld(opts: TestWorldOptions = {}): World {
     }
   }
   return world;
+}
+
+/**
+ * A world with its map as it was before the walks too steep to climb were marked on it
+ * (Nov 13; kernel/world/grid.ts, `markSteepEdges`). The marks are bits added to the map's
+ * edges, over what was there, so with them left out a fingerprint taken before them still
+ * stands: a test that pins "what generation made then" keeps its pin, and says that nothing
+ * but the marks has moved. Changes the world it's given.
+ */
+export function withoutSteepMarks(w: World): World {
+  const edges = w.grid.map.edges;
+  for (let k = 0; k < edges.length; k++) edges[k] = edges[k]! & ~(Edge.EastSteep | Edge.NorthSteep);
+  return w;
 }
 
 /** A guard spawn for a hand-built camp, with its routine built the way generation builds it. */

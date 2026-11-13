@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { generateWorld } from '../src/sim/generation/world';
+import { dtanDeg } from '../src/sim/kernel/core/detmath';
 import { missionSpec } from '../src/sim/kernel/mission';
 import { Blocks } from '../src/sim/kernel/world/colliders';
-import { Cell, Edge, cellAt, cellIndex, type GridLayer } from '../src/sim/kernel/world/grid';
+import { CLIMB_SLACK, Cell, Edge, cellAt, cellIndex, type GridLayer } from '../src/sim/kernel/world/grid';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testWorld } from './fixtures';
 
@@ -62,6 +63,74 @@ describe('the spatial grid', () => {
     expect(has(w.grid.site, 30, 0, Cell.Steep)).toBe(true);
     expect(has(w.grid.site, 30, 0, Cell.Walkable)).toBe(false);
     expect(has(w.grid.site, 10, 0, Cell.Walkable)).toBe(true);
+  });
+
+  it('marks the walk that climbs a triangle neither cell answered for, and leaves the cells and their other edges alone', () => {
+    // A 35 degree ramp up to the east, on a test world's 2 m terrain, with one vertex dipped,
+    // at (30, 10). The cell from x 30 to 32 and z 8 to 10 has it as its (i, j + 1) corner: the
+    // triangle its middle lies on is the ramp's 35 degrees, and its other one is 49. The cell
+    // west of it has the dip on the triangle under its middle, at 39 degrees: walkable too.
+    const w = testWorld({ height: (x, z) => 0.7 * (Math.min(34, Math.max(26, x)) - 26) + (x === 30 && z === 10 ? -0.8 : 0), spawnOnTop: true });
+    expect(w.terrain.cell).toBe(2);
+    const tanMax = dtanDeg(T.gen.walkableSlopeDeg);
+    const { map, site } = w.grid;
+    expect(has(map, 31, 9, Cell.Walkable)).toBe(true);
+    expect(has(map, 29, 9, Cell.Walkable)).toBe(true);
+    // West to east, middle to middle, runs up the steep triangle: 1.1 m gained in a metre. Back down it gains nothing.
+    expect(w.terrain.gainOnSteep(29, 9, 31, 9, tanMax)).toBeCloseTo(1.1, 5);
+    expect(w.terrain.gainOnSteep(31, 9, 29, 9, tanMax)).toBe(0);
+    // A body fits along that edge, and it's marked: one mark for both ways.
+    const west = cellIndex(map, 29, 9);
+    expect(map.edges[west]! & (Edge.East | Edge.EastSteep)).toBe(Edge.East | Edge.EastSteep);
+    // The cell's other ways lie on the triangle under its middle: east, and from the south.
+    const here = cellIndex(map, 31, 9);
+    const south = cellIndex(map, 31, 7);
+    expect(map.edges[here]! & (Edge.East | Edge.EastSteep)).toBe(Edge.East);
+    expect(map.edges[south]! & (Edge.North | Edge.NorthSteep)).toBe(Edge.North);
+    // North of it the ground is steep under a cell's own middle: no edge, so nothing to mark.
+    expect(has(map, 31, 11, Cell.Steep)).toBe(true);
+    expect(map.edges[here]! & (Edge.North | Edge.NorthSteep)).toBe(0);
+    // The fine layer isn't marked.
+    expect(site.edges.some((e) => (e & (Edge.EastSteep | Edge.NorthSteep)) !== 0)).toBe(false);
+  });
+
+  it('marks every walk of a valley’s map that the motor would refuse, and no other', () => {
+    // HEL-2923 is where it showed: a guard at a run stopped dead at (132.5, -94.2), on the west
+    // edge of a cell that is 27 degrees under its middle and 45 on its other triangle, five
+    // times, and gave the walk up.
+    const w = generateWorld(missionSpec('HEL-2923'), T);
+    const tanMax = dtanDeg(T.gen.walkableSlopeDeg);
+    const L = w.grid.map;
+    expect(has(L, 133.75, -93.75, Cell.Walkable)).toBe(true);
+    expect(L.edges[cellIndex(L, 131.25, -93.75)]! & (Edge.East | Edge.EastSteep)).toBe(Edge.East | Edge.EastSteep);
+    // Every edge a body fits along, walked both ways on the ground's own triangles: marked
+    // where it gains height on ground too steep to climb, which is what the motor refuses,
+    // and nowhere else. And no mark without an edge.
+    let fits = 0;
+    let marked = 0;
+    let wrong = 0;
+    for (let j = 0; j < L.nz; j++) {
+      for (let i = 0; i < L.nx; i++) {
+        const e = L.edges[j * L.nx + i]!;
+        const x = L.x0 + (i + 0.5) * L.cell;
+        const z = L.z0 + (j + 0.5) * L.cell;
+        for (const [bit, steep, dx, dz] of [[Edge.East, Edge.EastSteep, L.cell, 0], [Edge.North, Edge.NorthSteep, 0, L.cell]] as const) {
+          if ((e & bit) === 0) {
+            if ((e & steep) !== 0) wrong++;
+            continue;
+          }
+          fits++;
+          const climbs = w.terrain.gainOnSteep(x, z, x + dx, z + dz, tanMax) > CLIMB_SLACK || w.terrain.gainOnSteep(x + dx, z + dz, x, z, tanMax) > CLIMB_SLACK;
+          if ((e & steep) !== 0) marked++;
+          if (climbs !== ((e & steep) !== 0)) wrong++;
+        }
+      }
+    }
+    expect(fits).toBeGreaterThan(400000);
+    expect(marked).toBeGreaterThan(100);
+    expect(wrong).toBe(0);
+    // The site layer carries none.
+    expect(w.grid.site.edges.some((e) => (e & (Edge.EastSteep | Edge.NorthSteep)) !== 0)).toBe(false);
   });
 
   it("covers the generated camp, whose buildings stop bodies and sound", () => {
