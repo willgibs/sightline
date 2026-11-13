@@ -1047,6 +1047,7 @@ export const defaultTuning = {
       near: 4, // metres from his door at which they've reached him
       wait: 6, // seconds they give him to hear it and come
       call: 2.5, // seconds between telling him again
+      apart: 1.5, // metres between the places of men sent on one errand about him: by his vehicle, side by side across the way they came, or one behind another where there's no room
       // What a camp does about its target depends on the problem it's built round (generation/crux.ts; brain/protect.ts).
       // A camp that holds keeps him in his room and posts its relief on his doors. A camp that bolts readies his
       // vehicle at the siren and brings him out to it. Any other waits for the relief to come for him, as above.

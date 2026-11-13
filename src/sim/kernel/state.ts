@@ -46,8 +46,10 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * intruder had gone out; and a contact can say so (brain/firefight.ts, the chase).
  * 17: a camp says whether its men look out for their own when they fire, and a man keeps
  * the tick he last held his fire for one of them (game/combat.ts).
+ * 18: a camp says whether men sent about its target have places of their own, and a task
+ * and the man it's given to keep his place (brain/protect.ts, `placeAt`).
  */
-export const STATE_SCHEMA = 17;
+export const STATE_SCHEMA = 18;
 
 export type EntityId = number;
 

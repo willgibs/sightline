@@ -2,6 +2,63 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-13 · Men sent about the target each have a place
+
+**What broke.** Found while landing the held-up walk (below): the relief's men and the men the camp sends for its target stood four to a spot. It shows since that fix, because the relief now arrives together (`npm run experiment -- flaws` counted 4 pile-ups before it and 40 after, all on three camps). `npm run flaws -- NUB-9046 suppressed-sniper` on `main`:
+
+| | |
+| --- | --- |
+| 108 s | The relief arrives. Its first two men are sent in for him (`squadArrives`): to his room, six seconds at his door, then out to his vehicle to cover his way |
+| 150 s | Both stand at the vehicle's point, at (−1.1, −41.7) and (−0.7, −42.2): half a metre apart |
+| 155 s | His vehicle hasn't moved, so the commander sends two of the camp's own the same way (`fetchEvery`, 45 s after the first two) |
+| 170 s | They're on that point too. Four men within 2.5 m, until the order lapses and they look about them where they stand, at about 195 s |
+
+Every man on that errand was given the one point, at his door and then by his vehicle, and walked to it. On GIN-9513 it's the door: the relief's two stop at one spot in the doorway, beside a man already in cover there, as the target comes out.
+
+**What's built.** A man is handed a place with his task (`Tasking.place`): a number, and nothing more. He knows no more of the others than he did (rule 13).
+
+- **Who gets which.** The relief's two get 0 and 1 (`game/comms.ts`). Each pair the commander sends after them gets the next two (`brain/commander.ts`): a man's own is the task's first and his number among those sent, put on the order as it reaches him. In a camp that bolts, the man on the door is 0 and the man who started the engine is 1 (`brain/protect.ts`, `drill`).
+- **By the vehicle** (`placeAt`, in the shape of the hunt's `spotAt`): place 0 on the point, and the rest across the way from his room to it, on alternate sides, 1.5 m between each (`tuning.brain.protect.apart`). Where a man couldn't walk straight from the point to his place (a wall, the vehicle itself), he stops short of the point on that line, so men file. Where even that isn't open, he stands on the point.
+- **At his door** the second man of a pair stops 1.5 m further out, on his own way in. The sideways place is for open ground: a room may be upstairs, and a doorway has nothing beside it.
+- **`off=places`** plays a camp that sends them all to the point. With it the state is `main`'s, tick for tick, on the three camps below.
+- **The flaw report** no longer calls a man stuck who stands where his order put him (an escort by the vehicle, a man by it to start it, one on a door), and `npm run flaws -- <seed> <attack> <off>` takes switches.
+
+**What it's worth.** Pile-up lines in the flaw report (a man with three others within 2.5 m for over 4 s):
+
+| | `main` | Places |
+| --- | --- | --- |
+| NUB-9046, `suppressed-sniper` | 12 | 0 |
+| GIN-9513, `relocating` | 4 | 0 |
+| SUK-5361, `sniper` | 3 | 1 |
+
+SUK-5361's one is at 148 s: the relief's two are 1.7 m apart, beside an officer on his round and the sentry at that door.
+
+**One test changed.** `tests/answer.test.ts` holds the man on the target's door to staying by it while a shooter circles the camp, and needs the shooter to come round to him. On NUT-4776 the shooter was killed at 378 s, after he had. With a relief man standing 1.5 m short of the door the fight takes another course and he's killed at 300 s, before. Who wins on the way isn't what that test is about, so its shooter can't be hurt.
+
+**The standing benches, against `main` at ea9c1a7.** Two men standing 1.5 m apart, where they stood on one spot, send the rest of a fight a little differently, so these can't all read the same. No count moves by more than one camp.
+
+| Bench | How it reads |
+| --- | --- |
+| `out-the-gate`, `takedown`, `own-side --dice 3` | Every figure the same |
+| `hunt`, `second-step`, `answer`, `ladder` | One to three figures each, in the last digit: a second off a time, a tenth off a mean |
+| `firefight` | With the firefight, two means inside their intervals. In the arm that plays a camp without it, five counts by one camp each |
+| `circling` | Three counts by one camp each: made out at all, on the plain yard (11 → 12 of 16) and the keep (13 → 14), and shot dead on the walk, on the keep (15 → 14). Means inside their intervals |
+| `flaws`, 8 camps | 15 of 72 runs, on 4 camps. `stuck` falls in 14 of them, which is partly the report itself, no longer counting a man who stands where he was sent. Pile-ups on GIN-9513: `suppressed-sniper` 2 → 0, `relocating` 4 → 0, `two-fronts` 3 → 5 |
+
+**GIN-9513 under `two-fronts` isn't men on one spot.** From 131 s to 137 s, on `main` and here, there's a crowd at his door: the relief's two have reached it and are giving him his six seconds to come (`protect.wait`), the door's sentry is a metre from them, the target comes out past them, and a worker on his way to cover is held up getting by. On `main` the second relief man pushed up behind the first, stepped aside and walked off. Here he waits 1.5 m behind him, as built, so he and the sentry beside him are in the count too. What's left there is a way out that men waiting at a door have shut.
+
+**The sittings.** The `answer` and `takedown` sittings' links, played headless on both builds (`npm run sitting`): HOT-7106 and NUT-4776, from the perch and from the ground, read line for line as on `main`. On LEB-2534 the target sees a body a second sooner and is away at 2:35, where it was 2:36, for the same reason.
+
+**Versions and pins.** `SIM_VERSION` 27. `STATE_SCHEMA` 18: a camp's `places` and a task's `place` are new state. No pinned run's `behaviour` moved. Every pinned `state` value did, since the schema's number is part of what's hashed. The golden recording is rewritten, and no bench pin moved.
+
+**What it leaves.**
+
+- **A crowd at his door while men wait for him,** as on GIN-9513 above: nobody is told to keep the way out clear.
+- **The camp sends two more men every 45 s while his vehicle hasn't moved,** up to three times, whether or not he ever came out. On NUB-9046 he never did, and the same two were sent again at 200 s. That is the camp's answer as built (`fetchEvery`, `fetches`), and the owner's to tune.
+- **A bolting camp's two and the relief's two share places 0 and 1** if they're ever by the vehicle together. It needs a drill left stranded as the relief arrives, and hasn't been seen.
+- **The chase's two men still share one kneeling place** outside an opening (`performChase`): the second presses at the first for a second or two on PID-8021 and ZOH-8906. The chase was built to change nothing else, so that is its own change if it's worth one.
+- **`apart` is the owner's by playing.**
+
 ## 2026-11-12 · A man held up by a mate steps round him
 
 **What broke.** Tracing the chase (below) turned up a fault in how a man walks a route, older than the chase and there for every act that sets a man off at a run. `npm run scene -- out-the-gate --params 'seed=DOT-6344&for=160'`: an officer 45 m from the gate takes up the chase 4.4 s after the intruder has gone out of it. The first steps of his way run along a wall, and another man is crouched on that line, 0.4 m from the wall. A route is planned on a grid that knows nothing of bodies, and a brain doesn't see its own side (rule 13), so the officer finds his mate by running into him. On `main`, from the moment he sets off:
