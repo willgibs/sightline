@@ -717,7 +717,7 @@ In the code:
 | | |
 | --- | --- |
 | What he goes by | What he saw over his sights when the round was held: which side of his line the man in the way stood, how far the nearest edge of him was from it, and how far along it. Three numbers about one man, at that moment, relative to his own line of fire |
-| How far | A pace `p` sideways moves his line by `p (1 − along / L)` where that man stands, `L` being how far off he believes the intruder is. The round is held for a man whose edge is within `along × spread + clear` of the line (step 2d), so he needs that, and `pad` more: `p = (along × spread + clear + pad − off) / (1 − along / L)`. A man close in front is cleared by a short pace; a man near the intruder needs a long one |
+| How far | A pace `p` sideways moves his line by `p (1 − along / L)` where that man stands, `L` being how far off he believes the intruder is. The round is held for a man whose edge is within `along × spread + clear` of the line (step 2d), so he needs that, and `pad` more, and aims `near` past it because that's how short of a place he may stop: `p = (along × spread + clear + pad − off) / (1 − along / L) + near`. A man close in front is cleared by a short pace; a man near the intruder needs a long one |
 | Not | A pace over `cap`, or a place farther than `cap` from the firing place his position gave him: he holds, as before |
 | Where | Somewhere he can stand and walk straight to, with a line to where the intruder is, that shows no more of him to it than his firing place does |
 | Dead on the line | Either side, the first by his id: an even id tries right first, an odd one left, so a column fans out |
@@ -730,14 +730,38 @@ In the code:
 - **"No more exposed" is graded** (`positions.ts`, `exposure`). `exposedAt` is one ray to the top of a man and is true at every firing place, since a man who can see out can be seen. `exposure` counts six points on him as the intruder's place sees them: the top of his head and the middle of him, each at the middle and a shoulder's width either side. The place he shifts to may show no more of those than his firing place does. A man kneeling at a wall's end shows a head and a shoulder; a step farther out shows his chest, and is refused.
 - **The burst's last round is counted a tick later** in a camp that shifts, so a held last round gets its answer before he gets down. In a camp that doesn't, nothing moves.
 - **He reaches the place**: `stayAt` takes a man as on his spot within `firefight.near` (0.45 m), which is most of a pace. For a shift it's `shift.near` (0.1 m).
-- **`off=shift`** plays a camp whose men hold and wait. It's also off with `mates`, `firefight` or `fight` off. With it off, a run's state hash is the same as before this step tick for tick (three camps, both plans; the `held` event carries two more fields).
+- **`off=shift`** plays a camp whose men hold and wait. It's also off with `mates`, `firefight` or `fight` off. With it off, a run's state hash is the same as before this step, tick for tick, and so is every event's kind, in the `own-side` fight on TES-6931, LEB-2534 and DOT-6344, both plans (92 holds in one of them). The `held` event carries two more fields.
 - **Explainable**: a `shift` event (who was in the way, which way, how far), `held` says which side the man was and how far off, the debug label reads "shifting for a clear line", and the debug view draws the pace from the firing place.
 
 **Numbers** (`brain.firefight.shift`, the owner's to set by playing): `cap` 1.5 m, `deadOn` 0.2 m, `pad` 0.1 m, `near` 0.1 m.
 
 **Measured** (`npm run experiment -- own-side --dice 3`, 24 camps, three rolls of the dice on each):
 
-OWNSIDE_TABLE
+| | Fires past his own (`off=mates`) | Holds and waits (`off=shift`) | Shifts for a clear line |
+| --- | --- | --- | --- |
+| **He stays by the wall** (63 fights). Fights with a man shot by his own side | 7 | 0 | **0** |
+| Rounds the camp fired, a fight | 69.2 | 58.4 | **67.1** |
+| Rounds held for one of its own | 0 | 12.9 | 10.1 |
+| Holds that ended in a shift | 0 | 0 | 3.4 |
+| Rounds held again from the place he shifted to | 0 | 0 | 1.3 |
+| Seconds from a hold to that man's next round (median of a fight's) | – | 3.1 | **1.5** |
+| Holds followed by a round within 3 s | – | 27% | **56%** |
+| **He runs for the trees** (63 fights). Fights with a man shot by his own side | 4 | 0 | **0** |
+| Rounds the camp fired, a fight | 157 | 153 | **157** |
+| Rounds held for one of its own | 0 | 8.0 | 7.9 |
+| Holds that ended in a shift | 0 | 0 | 2.4 |
+| Rounds held again from the place he shifted to | 0 | 0 | 1.1 |
+| Seconds from a hold to that man's next round (median of a fight's) | – | 4.0 | **1.0** |
+| Holds followed by a round within 3 s | – | 30% | **63%** |
+| Rounds that hit him once he was out | 46.7 | 45.8 | 47.0 |
+| Enough of them to kill | 52 | 53 | 52 |
+
+"Rounds held" now counts every hold by the brain's own record of it, the silent ones dead on the line included, so it reads higher than step 2d's table did (12.9 where that said 11). Nearly all of the rounds the camp gave up by holding are back: by the wall, 67.1 a fight where firing past its own was 69.2 and holding was 58.4.
+
+- **Nobody is shot by his own side**, on any of the dice, as with step 2d.
+- **A hold is followed by a round twice as soon**: 1.5 s by the wall where it was 3.1, 1.0 s on the run where it was 4.0.
+- **A runner is hit as often**: 47.0 hits where holding gave 45.8, within the spread between camps (±16).
+- **A shift is often held again** (1.3 of 3.4 by the wall). Looked at on TES-6931: two men crouched shoulder to shoulder, 0.5 m apart, each shuffling back onto his own place; the man beside moves back into the line the pace had cleared. The first version stopped 0.1 m short and was held again more than half the time (1.1 of 1.9); aiming past the place by that much is what moved it.
 
 **What it leaves.**
 
