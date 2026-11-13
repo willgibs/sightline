@@ -197,9 +197,12 @@ const guardBrains: System = {
         g.brain!.event = ctx.emit({ type: 'act', source: g.id, cause: change.cause, from: change.from, to: change.to, why: change.why, x: change.x, z: change.z, weight: change.weight });
       }
       if (g.brain) {
-        // A pace he has just decided on, for a clear line past one of his own (brain/firefight.ts): which way, and how far.
-        const shift = g.brain.ff?.shift;
-        if (shift && shift.at === ctx.tick + 1) ctx.emit({ type: 'shift', source: g.id, cause: g.brain.event, mate: shift.mate, side: shift.side, pace: shift.pace });
+        // What he has just done about a clear line past one of his own (brain/firefight.ts): a pace, which way and how far, and so on.
+        const news = g.brain.shiftNews;
+        if (news) {
+          ctx.emit({ type: 'shift', source: g.id, cause: g.brain.event, what: news.what, mate: news.mate, side: news.side, pace: news.pace });
+          delete g.brain.shiftNews;
+        }
         if (g.brain.fire) {
           // What a man knows of his own trigger: that he didn't pull it, because one of his own was in front of his rifle. In a camp
           // whose men shift for a clear line, what he saw of that man over his sights, too (brain.ts, `HeldLine`).

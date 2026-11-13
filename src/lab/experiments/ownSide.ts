@@ -23,7 +23,8 @@ import { keptWorld } from '../worlds';
  * silent ones (a man dead on the line) included, with how long until that man's next round.
  */
 
-const ARMS: readonly Arm[] = [{ name: 'as it was', off: 'mates' }, { name: 'holds and waits', off: 'shift' }, { name: 'shifts for a clear line' }];
+const ONE_BURST = 'a pace for one burst';
+const ARMS: readonly Arm[] = [{ name: 'as it was', off: 'mates' }, { name: 'holds and waits', off: 'shift' }, { name: ONE_BURST }, { name: 'a pace kept' }];
 
 /** Seconds from a hold to that man's next round that count as soon. */
 const SOON = 3;
@@ -31,7 +32,13 @@ const SOON = 3;
 /** Seconds a run is played for, from its start: the fight goes on long after he's out, and that's when men are in each other's way. */
 const LENGTH = 180;
 
-function play(seed: string, arm: Arm, t: Tuning, plan: 'wall' | 'run'): Record<string, number> | null {
+function play(seed: string, arm: Arm, given: Tuning, plan: 'wall' | 'run'): Record<string, number> | null {
+  // The one-burst arm is the same camp with places not kept (brain.firefight.shift.keep).
+  let t = given;
+  if (arm.name === ONE_BURST) {
+    t = structuredClone(given);
+    t.brain.firefight.shift.keep = false;
+  }
   const sc = outTheGate(`seed=${seed}${plan === 'wall' ? '' : `&plan=${plan}`}${arm.off ? `&off=${arm.off}` : ''}`) as Scene<Simulation>;
   const sim = startScene(sc, t, keptWorld(`live-camp:${seed}`, t, sc.world));
   if (!leavingOf(sim.world, t)) return null;
@@ -46,13 +53,22 @@ function play(seed: string, arm: Arm, t: Tuning, plan: 'wall' | 'run'): Record<s
   const waits: number[] = [];
   let holds = 0;
   let shifts = 0;
-  let again = 0;
+  let gaveUp = 0;
+  let kept = 0;
+  let againSame = 0;
+  let againOther = 0;
+  // Each man's pace aside as of the tick before, by the man it was for: a hold while he had one is a shift held again.
+  const hadShift = new Map<number, number>();
   for (let k = 0; k < LENGTH * t.sim.tickHz; k++) {
     const events = sim.step(d.next(sim, raw));
     watchGate(sim, events, seen);
     gauges.observe(sim, events);
     for (const e of events) {
-      if (e.type === 'shift') shifts++;
+      if (e.type === 'shift') {
+        if (e.what === 'pace' || e.what === 'again') shifts++;
+        else if (e.what === 'kept') kept++;
+        else gaveUp++;
+      }
       else if (e.type === 'shot' && waiting.has(e.source)) {
         waits.push((e.tick - waiting.get(e.source)!) / t.sim.tickHz);
         waiting.delete(e.source);
@@ -63,9 +79,18 @@ function play(seed: string, arm: Arm, t: Tuning, plan: 'wall' | 'run'): Record<s
       if (h === undefined || h === lastHeld.get(g.id)) continue;
       lastHeld.set(g.id, h);
       holds++;
-      // Held again from the place he shifted to: someone else in the way there, or the same man.
-      if (g.brain?.ff?.shift) again++;
+      // Held again at the place he shifted to: by the same man, or someone else in the way there.
+      const was = hadShift.get(g.id);
+      if (was !== undefined) {
+        if (g.brain?.heldLine?.mate === was) againSame++;
+        else againOther++;
+      }
       if (!waiting.has(g.id)) waiting.set(g.id, h);
+    }
+    for (const g of sim.guards) {
+      const sh = g.brain?.ff?.shift;
+      if (sh) hadShift.set(g.id, sh.mate);
+      else hadShift.delete(g.id);
     }
     // Hits before he was out of the walls are the fight inside's.
     if (seen.left < 0) before = player(sim.index).health?.hits ?? 0;
@@ -78,7 +103,7 @@ function play(seed: string, arm: Arm, t: Tuning, plan: 'wall' | 'run'): Record<s
   waits.sort((a, b) => a - b); // unique: plain numbers, and equal ones are interchangeable
   const wait = waits.length === 0 ? NaN : waits.length % 2 === 1 ? waits[(waits.length - 1) / 2]! : (waits[waits.length / 2 - 1]! + waits[waits.length / 2]!) / 2;
   const soon = waits.length === 0 ? NaN : waits.filter((w) => w <= SOON).length / waits.length;
-  return { own: r.ownSide, any: r.ownSide > 0 ? 1 : 0, fired: r.roundsAtYou, held: holds, shifted: shifts, again, wait, soon, hits, killed: hits >= t.brain.combat.playerHits ? 1 : 0 };
+  return { own: r.ownSide, any: r.ownSide > 0 ? 1 : 0, fired: r.roundsAtYou, held: holds, shifted: shifts, same: againSame, other: againOther, gaveUp, kept, wait, soon, hits, killed: hits >= t.brain.combat.playerHits ? 1 : 0 };
 }
 
 export const ownSideExperiment: Experiment = {
@@ -94,7 +119,10 @@ export const ownSideExperiment: Experiment = {
     { key: 'fired', label: 'by the wall: rounds the camp fired', kind: 'mean' },
     { key: 'held', label: 'by the wall: rounds held for one of its own', kind: 'mean' },
     { key: 'shifted', label: 'by the wall: holds that ended in a shift', kind: 'mean' },
-    { key: 'again', label: 'by the wall: rounds held again from the place he shifted to', kind: 'mean' },
+    { key: 'same', label: 'by the wall: shifts held again, by the same man', kind: 'mean' },
+    { key: 'other', label: 'by the wall: shifts held again, by another', kind: 'mean' },
+    { key: 'gaveUp', label: 'by the wall: paces given up', kind: 'mean' },
+    { key: 'kept', label: 'by the wall: bursts begun from a kept place', kind: 'mean' },
     { key: 'wait', label: 'by the wall: seconds from a hold to that man\'s next round (median of a run\'s)', kind: 'median' },
     { key: 'soon', label: `by the wall: share of holds followed by a round within ${SOON} s`, kind: 'mean' },
     { key: 'r.own', label: 'runs for the trees: men shot by their own side', kind: 'mean' },
@@ -102,21 +130,24 @@ export const ownSideExperiment: Experiment = {
     { key: 'r.fired', label: 'runs for the trees: rounds the camp fired', kind: 'mean' },
     { key: 'r.held', label: 'runs for the trees: rounds held for one of its own', kind: 'mean' },
     { key: 'r.shifted', label: 'runs for the trees: holds that ended in a shift', kind: 'mean' },
-    { key: 'r.again', label: 'runs for the trees: rounds held again from the place he shifted to', kind: 'mean' },
+    { key: 'r.same', label: 'runs for the trees: shifts held again, by the same man', kind: 'mean' },
+    { key: 'r.other', label: 'runs for the trees: shifts held again, by another', kind: 'mean' },
+    { key: 'r.gaveUp', label: 'runs for the trees: paces given up', kind: 'mean' },
+    { key: 'r.kept', label: 'runs for the trees: bursts begun from a kept place', kind: 'mean' },
     { key: 'r.wait', label: 'runs for the trees: seconds from a hold to that man\'s next round (median of a run\'s)', kind: 'median' },
     { key: 'r.soon', label: `runs for the trees: share of holds followed by a round within ${SOON} s`, kind: 'mean' },
     { key: 'r.hits', label: 'runs for the trees: rounds that hit him once he was out', kind: 'mean' },
     { key: 'r.killed', label: 'runs for the trees: enough of them to kill', kind: 'rate' },
   ],
   run(seed, arm, t) {
-    const out: Record<string, number> = { done: 0, own: NaN, any: NaN, fired: NaN, held: NaN, shifted: NaN, again: NaN, wait: NaN, soon: NaN, 'r.own': NaN, 'r.any': NaN, 'r.fired': NaN, 'r.held': NaN, 'r.shifted': NaN, 'r.again': NaN, 'r.wait': NaN, 'r.soon': NaN, 'r.hits': NaN, 'r.killed': NaN };
+    const out: Record<string, number> = { done: 0, own: NaN, any: NaN, fired: NaN, held: NaN, shifted: NaN, same: NaN, other: NaN, gaveUp: NaN, kept: NaN, wait: NaN, soon: NaN, 'r.own': NaN, 'r.any': NaN, 'r.fired': NaN, 'r.held': NaN, 'r.shifted': NaN, 'r.same': NaN, 'r.other': NaN, 'r.gaveUp': NaN, 'r.kept': NaN, 'r.wait': NaN, 'r.soon': NaN, 'r.hits': NaN, 'r.killed': NaN };
     const wall = play(seed, arm, t, 'wall');
     if (wall) {
       out.done = 1;
-      for (const k of ['own', 'any', 'fired', 'held', 'shifted', 'again', 'wait', 'soon']) out[k] = wall[k]!;
+      for (const k of ['own', 'any', 'fired', 'held', 'shifted', 'same', 'other', 'gaveUp', 'kept', 'wait', 'soon']) out[k] = wall[k]!;
     }
     const ran = play(seed, arm, t, 'run');
-    if (ran) for (const k of ['own', 'any', 'fired', 'held', 'shifted', 'again', 'wait', 'soon', 'hits', 'killed']) out[`r.${k}`] = ran[k]!;
+    if (ran) for (const k of ['own', 'any', 'fired', 'held', 'shifted', 'same', 'other', 'gaveUp', 'kept', 'wait', 'soon', 'hits', 'killed']) out[`r.${k}`] = ran[k]!;
     return out;
   },
 };

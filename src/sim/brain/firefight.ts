@@ -126,11 +126,16 @@ export interface Firefight {
   heardOut: number;
   outX: number;
   outZ: number;
-  /** A pace aside for a clear line, for the rest of this time up (`clearLine`): absent until a round of his is held for one of his own and he has somewhere to shift to, and gone when he gets down. */
+  /** A pace aside for a clear line (`clearLine`): absent until a round of his is held for one of his own and he has somewhere to shift to. Gone when he gets down, or, where places are kept (`shift.keep`), when his position changes or the place stops being good. */
   shift?: Shift;
 }
 
-/** Where he shifts to for a clear line past one of his own, and why: the place, the firing place it's a pace from, when he chose it, the man, which way (1 right, −1 left, looking down his line) and how far. */
+/**
+ * Where he shifts to for a clear line past one of his own, and why: the place, the firing
+ * place it's a pace from, when he chose it, the man, which way (1 right, −1 left, looking down
+ * his line) and how far; the tick by which he has to be on it, and whether he has been this
+ * time up.
+ */
 export interface Shift {
   x: number;
   z: number;
@@ -140,7 +145,12 @@ export interface Shift {
   mate: number;
   side: number;
   pace: number;
+  by: number;
+  reached: boolean;
 }
+
+/** What a shift's event says (game/systems.ts): a pace chosen, another from a place he'd shifted to, a time up begun at a kept place, or a pace he couldn't finish. */
+export type ShiftWhat = 'pace' | 'again' | 'kept' | 'gave-up';
 
 function createFirefight(): Firefight {
   return { x: 0, y: 0, z: 0, r: 0, news: -1, own: false, since: -1, seen: -1, sx: 0, sz: 0, vx: 0, vz: 0, inside: -1, ox: 0, oz: 0, ot: -1, spot: null, there: false, up: false, until: -1, rounds: 0, pinned: -1, shouted: -1, calling: -1, improved: 0, exposed: true, bounds: 0, clear: -1, lost: false, bound: null, out: [], outAt: [], gate: null, cried: -1, sweep: 0, swept: -1, heardOut: -1, outX: 0, outZ: 0 };
@@ -717,16 +727,16 @@ function getDown(m: GuardMind, ff: Firefight): void {
   ff.rounds = 0;
   m.brain!.fireAt = -1;
   ff.until = m.tick + Math.round((D.min + (D.max - D.min) * m.draw()) * m.tuning.sim.tickHz);
-  // Down, he's back on his position's own places.
-  if (ff.shift) delete ff.shift;
+  // Down, he's at his position's hiding place. The pace aside goes with this time up, unless places are kept.
+  if (ff.shift && !m.tuning.brain.firefight.shift.keep) delete ff.shift;
 }
 
 /**
  * A clear line (step 2e; docs/camp-engine.md, section 9). His round was held for one of his
  * own in front of his rifle (game/combat.ts): he shifts a pace sideways, away from that man,
- * just far enough that the round would go, and fires the rest of his burst from there. He
- * doesn't walk round him and he doesn't leave his cover. A man near the target isn't worth
- * moving for, and the pace says so by being long.
+ * just far enough that the round would go, and fires from there. He doesn't walk round him
+ * and he doesn't leave his cover. A man near the target isn't worth moving for, and the pace
+ * says so by being long.
  *
  * All he goes by is what he saw over his sights when the round was held (`HeldLine`): which
  * side of his line the man stood, how far off it his nearest edge was, and how far along it.
@@ -741,24 +751,106 @@ function getDown(m: GuardMind, ff: Firefight): void {
  * intruder's place, and showing no more of him to it than his firing place does
  * (positions.ts, `exposure`). No more than `cap` from the firing place his position gave
  * him. Without one he holds, as a man always did, and the held round counts to his burst.
- * True if he shifts.
+ *
+ * A held round mid-burst is answered up (`clearLine`): the round doesn't count, and his
+ * burst starts afresh at the new place. A held last round has already put him down, as it
+ * always did; it's answered on his next think (`answerLast`), by coming straight back up at
+ * the new place for a fresh burst. So a fight in which no round is held is the same tick for
+ * tick as in a camp that doesn't shift. He has `within` seconds to get onto the place, or he
+ * gives it up and gets down. Where places are kept (`keep`), the place outlives getting down:
+ * he comes up there next time if it still has a line and still shows no more of him, and a
+ * round held there moves him again from where he stands, or, with nowhere to go, back to his
+ * position's own place.
  */
-function clearLine(m: GuardMind, ff: Firefight, s: Position): boolean {
+
+/** The held round he's to answer now: the one he ordered last tick, if it was held. Read once. */
+function freshHold(m: GuardMind): HeldLine | null {
   const b = m.brain!;
   const h = b.heldLine;
-  if (!h) return false;
+  if (!h) return null;
   delete b.heldLine;
-  // Only the round he's just fired, only up, and one pace a burst: a round held at the new place counts.
-  if (m.tick - h.tick > 2 || !ff.up || ff.shift) return false;
-  const place = paceFor(m, ff, s, h);
-  if (!place) return false;
+  // His order on one tick is fired in the same system run, a tick earlier by the simulation's count (game/systems.ts).
+  return m.tick - h.tick === 2 ? h : null;
+}
+
+/** He shifts to `place`, and says so. */
+function shiftTo(m: GuardMind, ff: Firefight, place: Shift, what: ShiftWhat): void {
   ff.shift = place;
-  // The held round doesn't count, and his burst starts afresh at the new place.
-  ff.rounds = 0;
+  m.brain!.shiftNews = { what, mate: place.mate, side: place.side, pace: place.pace };
+}
+
+/** He gives up the pace aside, and says so if it's because he couldn't get onto it. */
+function dropShift(m: GuardMind, ff: Firefight, gaveUp: boolean): void {
+  const sh = ff.shift;
+  if (!sh) return;
+  delete ff.shift;
+  if (gaveUp) m.brain!.shiftNews = { what: 'gave-up', mate: sh.mate, side: sh.side, pace: sh.pace };
+}
+
+/** A round held mid-burst, up: a pace aside, or another from the place he'd shifted to. */
+function clearLine(m: GuardMind, ff: Firefight, s: Position): void {
+  const h = freshHold(m);
+  if (!h || !ff.up) return;
+  if (!ff.shift) {
+    const place = paceFor(m, ff, s, h);
+    if (!place) return;
+    shiftTo(m, ff, place, 'pace');
+    // The held round doesn't count, and his burst starts afresh at the new place.
+    ff.rounds = 0;
+    return;
+  }
+  // Held at the place he'd shifted to. For one burst, it counts and he stays. Where places are kept, he moves again if he can, or
+  // goes back to his position's own place; either way the round counts.
+  if (!m.tuning.brain.firefight.shift.keep) return;
+  const place = paceFor(m, ff, s, h);
+  if (place) shiftTo(m, ff, place, 'again');
+  else dropShift(m, ff, false);
+}
+
+/** A held last round, down: straight back up at a pace aside for a fresh burst, if there's one. True if he comes up. */
+function answerLast(m: GuardMind, ff: Firefight, s: Position, pinned: boolean): boolean {
+  const h = freshHold(m);
+  if (!h || pinned) return false;
+  const X = m.tuning.brain.firefight.shift;
+  // For one burst, a round held at the place he'd shifted to counts, and the burst is over.
+  if (ff.shift && !X.keep) return false;
+  const again = ff.shift !== undefined;
+  const place = paceFor(m, ff, s, h);
+  if (!place) {
+    dropShift(m, ff, false);
+    return false;
+  }
+  shiftTo(m, ff, place, again ? 'again' : 'pace');
+  comeUp(m, ff);
   return true;
 }
 
-/** Where to shift to for a clear line past the man in `h`, or null: none within the cap passes, or this tick has no look left. */
+/** Up to look and fire, for a time drawn from his own stream. */
+function comeUp(m: GuardMind, ff: Firefight): void {
+  const L = m.tuning.brain.firefight.look;
+  ff.up = true;
+  ff.rounds = 0;
+  m.brain!.fireAt = -1;
+  ff.until = m.tick + Math.round((L.min + (L.max - L.min) * m.draw()) * m.tuning.sim.tickHz);
+}
+
+/** Coming up with a kept place: is it still good against where the intruder is believed now? If so he goes to it, with time to get there; if not, or there's no look to spare, he comes up on his position's own place. */
+function keptPlace(m: GuardMind, ff: Firefight, s: Position): void {
+  const sh = ff.shift;
+  if (!sh) return;
+  const T = m.tuning;
+  if (!mayLook(m) || !lineFrom(m.world, T, sh.x, sh.z, s.fs, ff.x, ff.z, m.nav.work, ff.y) || howMuchSeen(m.world, T, sh.x, sh.z, s.fs, ff.x, ff.z, m.nav.work, ff.y) > howMuchSeen(m.world, T, s.fx, s.fz, s.fs, ff.x, ff.z, m.nav.work, ff.y)) {
+    dropShift(m, ff, false);
+    return;
+  }
+  const F = T.brain.firefight;
+  const d = Math.sqrt((sh.x - m.self.x) * (sh.x - m.self.x) + (sh.z - m.self.z) * (sh.z - m.self.z));
+  sh.by = m.tick + Math.round((F.shift.within + d / F.paces.shift) * T.sim.tickHz);
+  sh.reached = false;
+  m.brain!.shiftNews = { what: 'kept', mate: sh.mate, side: sh.side, pace: sh.pace };
+}
+
+/** Where to shift to for a clear line past the man in `h`, from where he stands, or null: none within the cap passes, or this tick has no look left. */
 function paceFor(m: GuardMind, ff: Firefight, s: Position, h: HeldLine): Shift | null {
   const T = m.tuning;
   const F = T.brain.firefight;
@@ -796,7 +888,7 @@ function paceFor(m: GuardMind, ff: Firefight, s: Position, h: HeldLine): Shift |
     }
     if (!lineFrom(m.world, T, x, z, s.fs, ff.x, ff.z, m.nav.work, ff.y)) continue;
     if (howMuchSeen(m.world, T, x, z, s.fs, ff.x, ff.z, m.nav.work, ff.y) > howMuchSeen(m.world, T, s.fx, s.fz, s.fs, ff.x, ff.z, m.nav.work, ff.y)) continue;
-    return { x, z, fx: s.fx, fz: s.fz, at: m.tick, mate: h.mate, side, pace };
+    return { x, z, fx: s.fx, fz: s.fz, at: m.tick, mate: h.mate, side, pace, by: m.tick + Math.round(X.within * T.sim.tickHz), reached: false };
   }
   return null;
 }
@@ -847,6 +939,8 @@ export function performFight(m: GuardMind, out: Order): void {
     steer(m, out, 0, 0, 'idle', ff.x, ff.z, 'crouch');
     return;
   }
+  // A pace aside is from his position's firing place: a new position, and it's gone.
+  if (ff.shift && (ff.shift.fx !== s.fx || ff.shift.fz !== s.fz)) dropShift(m, ff, false);
   if (!ff.there) {
     const dx = s.hx - self.x;
     const dz = s.hz - self.z;
@@ -876,7 +970,11 @@ export function performFight(m: GuardMind, out: Order): void {
     }
   }
   if (!ff.up) {
-    if (ff.shift) delete ff.shift;
+    // His last round held for one of his own: straight back up, a pace aside, if there's one to be had.
+    if (m.shifts && answerLast(m, ff, s, pinned)) {
+      stayAt(m, out, ff.shift!.x, ff.shift!.z, s.fs, ff.x, ff.z, F.shift.near);
+      return;
+    }
     stayAt(m, out, s.hx, s.hz, s.hs, ff.x, ff.z);
     // Down, and what he's down behind doesn't hide him from where the intruder is now: somewhere better, or flat.
     if ((m.tick + m.id) % 6 === 0 && !pinned && !seen && s.hs !== 'prone' && self.stance === s.hs && exposedAt(m.world, T, self.x, self.z, s.hs, ff.x, ff.z, m.nav.work, ff.y, self.y)) {
@@ -911,28 +1009,29 @@ export function performFight(m: GuardMind, out: Order): void {
       } else ff.lost = true;
     }
     if (!pinned && m.tick >= ff.until && (s.line || seen)) {
-      ff.up = true;
-      ff.rounds = 0;
-      b.fireAt = -1;
-      const L = F.look;
-      ff.until = m.tick + Math.round((L.min + (L.max - L.min) * m.draw()) * hz);
+      comeUp(m, ff);
+      // A place a pace aside that he kept from last time: still good, or his position's own.
+      if (ff.shift) keptPlace(m, ff, s);
     }
     return;
   }
-  // A round of his held for one of his own: a pace aside for a clear line, if there's one to be had. In a camp whose men do that,
-  // the burst's last round is counted here, a tick on, so that one held has its answer first.
-  if (m.shifts) {
-    if (ff.shift && (ff.shift.fx !== s.fx || ff.shift.fz !== s.fz)) delete ff.shift;
-    clearLine(m, ff, s);
-    if (ff.rounds >= F.burst) {
+  // A round of his held mid-burst for one of his own: a pace aside for a clear line, if there's one to be had.
+  if (m.shifts) clearLine(m, ff, s);
+  // A pace aside he can't get onto (a man on it): given up after a while, and down.
+  const sh = ff.shift;
+  if (sh && !sh.reached) {
+    const dx = sh.x - self.x;
+    const dz = sh.z - self.z;
+    if (dx * dx + dz * dz <= F.shift.near * F.shift.near) sh.reached = true;
+    else if (m.tick > sh.by) {
+      dropShift(m, ff, true);
       getDown(m, ff);
       stayAt(m, out, s.hx, s.hz, s.hs, ff.x, ff.z);
       return;
     }
   }
   // Up, at the firing place, or the pace aside from it: at the man if he's in sight, and otherwise back at the flash, while it's fresh.
-  const sh = ff.shift;
-  const ready = sh ? stayAt(m, out, sh.x, sh.z, s.fs, ff.x, ff.z, F.shift.near) : stayAt(m, out, s.fx, s.fz, s.fs, ff.x, ff.z);
+  const ready = ff.shift ? stayAt(m, out, ff.shift.x, ff.shift.z, s.fs, ff.x, ff.z, F.shift.near) : stayAt(m, out, s.fx, s.fz, s.fs, ff.x, ff.z);
   const at = sight ?? (answers(m, ff) && s.line ? ff : null);
   if (at) {
     const dx = at.x - self.x;
@@ -944,7 +1043,7 @@ export function performFight(m: GuardMind, out: Order): void {
         b.fire = { x: at.x, y: at.y, z: at.z };
         b.fireAt = m.tick + Math.round(F.every * hz);
         ff.rounds++;
-        if (ff.rounds >= F.burst && !m.shifts) getDown(m, ff);
+        if (ff.rounds >= F.burst) getDown(m, ff);
       }
       return;
     }

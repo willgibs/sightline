@@ -92,7 +92,11 @@ export function describe(e: SimEvent): string {
     case 'held':
       return `held his fire: guard ${e.mate} was ${m(e.distance)} m in front of his rifle, ${e.off <= 0 ? 'on his line' : `${m(e.off)} m to its ${e.side < 0 ? 'left' : 'right'}`}`;
     case 'shift':
-      return `shifted ${m(e.pace)} m to his ${e.side < 0 ? 'left' : 'right'} for a clear line past guard ${e.mate}`;
+      return e.what === 'gave-up'
+        ? `gave up the place a pace to his ${e.side < 0 ? 'left' : 'right'}: he couldn't get onto it`
+        : e.what === 'kept'
+          ? `came up at the place a pace to his ${e.side < 0 ? 'left' : 'right'} that he kept, clear of guard ${e.mate}`
+          : `shifted ${m(e.pace)} m to his ${e.side < 0 ? 'left' : 'right'} for a clear line past guard ${e.mate}${e.what === 'again' ? ', again' : ''}`;
     case 'objective':
       return 'the target is down: now get out';
     case 'door':

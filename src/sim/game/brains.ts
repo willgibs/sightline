@@ -37,7 +37,7 @@ export function drawBrain(draw: DebugDraw, ctx: TickContext, g: GuardEntity): vo
   const phase = firefightPhase(b, ctx.tick) ?? huntPhase(b, ctx.tick) ?? (errand ? (b.task!.kind === 'start' && b.engine ? 'by the vehicle, engine running' : errand) : null);
   // He had a shot and didn't take it: one of his own was in front of his rifle (game/combat.ts). Shown for a moment after, since the moment itself is one tick.
   // Or he's shifted a pace aside for a clear line past him, for the rest of this burst (brain/firefight.ts).
-  const shift = b.ff?.shift;
+  const shift = b.ff?.up ? b.ff.shift : undefined;
   const holding = shift ? ' · shifting for a clear line' : b.held !== undefined && (ctx.tick - b.held) / ctx.tuning.sim.tickHz <= HELD_SHOWN ? ' · holding his fire' : '';
   const why = shift ? ` · shifted ${shift.pace.toFixed(1)} m to his ${shift.side < 0 ? 'left' : 'right'}: guard ${shift.mate} was in front of his rifle` : holding ? ' · holding his fire: one of his own is in front of his rifle' : '';
   draw.label(body.x, body.y + body.eyeHeight + 0.95, body.z, `${phase ? `${b.act} · ${phase}` : b.act}${holding}`, tone, `${b.act}${phase ? ` (${phase})` : ''} · ${a}${b.linger >= 0 ? ' · looking around' : ''}${why}`);

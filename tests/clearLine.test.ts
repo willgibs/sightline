@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultTuning as T } from '../src/config/tuning';
+import { defaultTuning as T, type Tuning } from '../src/config/tuning';
 import { giveBrains } from '../src/sim/game/brains';
 import { commanderOf, giveCommander } from '../src/sim/game/comms';
 import { player } from '../src/sim/game/entities';
@@ -36,6 +36,11 @@ interface Line {
   walls?: ColliderInput[];
   /** List the man in front first, so that the ids go the other way. */
   frontFirst?: boolean;
+  /** Put the man in front at (10, 0.45), into the rear man's line, a moment before the third round of his first burst. */
+  stepIn?: boolean;
+  /** A third man, standing where he is. */
+  third?: { x: number; z: number };
+  tuning?: Tuning;
 }
 
 interface Fought {
@@ -49,6 +54,9 @@ interface Fought {
   /** Times the rear man got down from being up, and ticks on which he had a shift in mind or a held line, by what he remembers. */
   downs: number;
   shifting: number;
+  /** Ticks on which the rear man got down, and every body's pose each tick. */
+  downAt: number[];
+  poses: string[];
   sim: Simulation;
 }
 
@@ -56,8 +64,9 @@ function fight(o: Line): Fought {
   const post = { y: 0, faceX: 1, faceZ: 0, elevated: false, route: null, routeStart: 0, scanPhase: 0, scanScale: 0 };
   const spawns = [testGuard({ id: 0, role: 'sentry', x: o.rear.x, z: o.rear.z, ...post }), testGuard({ id: 1, role: 'sentry', x: o.front.x, z: o.front.z, ...post })];
   if (o.frontFirst) spawns.reverse();
+  if (o.third) spawns.push(testGuard({ id: 2, role: 'sentry', x: o.third.x, z: o.third.z, ...post }));
   const world = testWorld({ size: 200, spawn: { x: RANGE, z: 0, faceX: -1, faceZ: 0 }, colliders: o.walls ?? [], camp: { structures: [], guards: spawns, fenceHalf: 0 } });
-  const sim = new Simulation(world, T, SYSTEMS);
+  const sim = new Simulation(world, o.tuning ?? T, SYSTEMS);
   giveSenses(sim);
   giveBrains(sim);
   giveCommander(sim);
@@ -71,16 +80,28 @@ function fight(o: Line): Fought {
   const front = at(o.front);
   const you = player(sim.index);
   you.health = { hits: -1e9 };
-  const out: Fought = { events: [], rear, front, farthest: 0, rounds: [], downs: 0, shifting: 0, sim };
+  const out: Fought = { events: [], rear, front, farthest: 0, rounds: [], downs: 0, shifting: 0, downAt: [], poses: [], sim };
   let up = false;
   for (let i = 0; i < SECONDS * HZ; i++) {
     const events = sim.step(neutralInput()).map((e) => ({ ...e }));
     out.events.push(...events);
+    if (o.stepIn) {
+      const fired = out.events.filter((e) => e.type === 'shot' && e.source === rear);
+      if (fired.length === 2 && sim.tick === fired[1]!.tick + HZ - 2) {
+        const f = sim.index.get(front) as { body: { x: number; z: number } };
+        f.body.x = 10;
+        f.body.z = 0.45;
+      }
+    }
     const r = sim.index.get(rear) as { body: { x: number; z: number } };
     const f = sim.index.get(front) as { body: { x: number; z: number } };
     out.farthest = Math.max(out.farthest, Math.hypot(r.body.x - o.rear.x, r.body.z - o.rear.z));
     const b = (sim.index.get(rear) as { brain: { ff?: { up: boolean; shift?: unknown }; heldLine?: unknown } }).brain;
-    if (up && b.ff?.up !== true) out.downs++;
+    if (up && b.ff?.up !== true) {
+      out.downs++;
+      out.downAt.push(sim.tick);
+    }
+    out.poses.push(sim.guards.map((g) => `${g.id} ${g.body.x} ${g.body.y} ${g.body.z} ${g.body.yaw} ${g.body.stance}`).join('|'));
     up = b.ff?.up === true;
     if (b.ff?.shift !== undefined || b.heldLine !== undefined) out.shifting++;
     for (const e of events) if (e.type === 'shot' && e.source === rear) out.rounds.push({ x: e.x, y: e.y, z: e.z, dx: e.dx, dy: e.dy, dz: e.dz, fx: f.body.x, fz: f.body.z });
@@ -156,5 +177,53 @@ describe('a clear line', () => {
       expect(shifts.length, `the man behind, id ${f.rear}`).toBeGreaterThan(0);
       expect(shifts[0]!.side).toBe(f.rear % 2 === 0 ? 1 : -1);
     }
+  }, 120_000);
+  it('makes no difference to a fight in which no round is held: every pose and every event the same as a camp that holds and waits', () => {
+    // The man in front is well off the line: nothing is ever held.
+    const on = fight({ rear: { x: 0, z: 0 }, front: { x: 10, z: 4 } });
+    const off = fight({ rear: { x: 0, z: 0 }, front: { x: 10, z: 4 }, shifts: false });
+    expect(of(on.events, 'held', on.rear)).toHaveLength(0);
+    expect(of(on.events, 'shot', on.rear).length).toBeGreaterThan(0);
+    expect(on.poses).toEqual(off.poses);
+    const said = (f: Fought): string[] => f.events.map((e) => JSON.stringify(e));
+    expect(said(on)).toEqual(said(off));
+  }, 120_000);
+
+  it('answers a held last round by coming straight back up at the new place, for a fresh burst', () => {
+    // Off the line, until he steps into it just before the third round of the first burst.
+    const f = fight({ rear: { x: 0, z: 0 }, front: { x: 10, z: 4 }, stepIn: true });
+    const shots = of(f.events, 'shot', f.rear);
+    expect(of(f.events, 'held', f.rear).length).toBeGreaterThan(0);
+    // The held round was the third of his burst, so it put him down; the pace is chosen the next tick, and a whole fresh burst follows from it.
+    const held = of(f.events, 'held', f.rear)[0]!;
+    const pace = of(f.events, 'shift', f.rear)[0]!;
+    expect(pace.what).toBe('pace');
+    expect(pace.tick - held.tick).toBeLessThanOrEqual(2);
+    expect(shots.filter((s) => s.tick < held.tick && s.tick > held.tick - 3 * HZ)).toHaveLength(T.brain.firefight.burst - 1);
+    expect(f.downAt.some((t) => t >= held.tick && t <= pace.tick + 1), 'he got down on the held last round').toBe(true);
+    expect(shots.filter((s) => s.tick > pace.tick && s.tick <= pace.tick + 4 * HZ)).toHaveLength(T.brain.firefight.burst);
+  }, 120_000);
+
+  it('gives up a pace he cannot get onto, and gets down', () => {
+    // A third man stands where the pace would take him.
+    const f = fight({ rear: { x: 0, z: 0 }, front: { x: 10, z: 0.45 }, third: { x: 0, z: -0.8 } });
+    const gave = of(f.events, 'shift', f.rear).filter((e) => e.what === 'gave-up');
+    expect(gave.length).toBeGreaterThan(0);
+    for (const g of gave) {
+      const chosen = of(f.events, 'shift', f.rear).filter((e) => e.tick < g.tick && e.what !== 'gave-up').pop()!;
+      expect((g.tick - chosen.tick) / HZ).toBeLessThanOrEqual(X.within + 1);
+      expect(f.downAt.some((t) => t >= g.tick && t <= g.tick + 1)).toBe(true);
+    }
+  }, 120_000);
+
+  it('comes up at a place he kept, and with places not kept goes back to his own each time', () => {
+    const kept = fight({ rear: { x: 0, z: 0 }, front: { x: 10, z: 0.45 } });
+    const keptPaces = of(kept.events, 'shift', kept.rear);
+    expect(keptPaces.filter((e) => e.what === 'kept').length).toBeGreaterThan(0);
+    const once = structuredClone(T);
+    once.brain.firefight.shift.keep = false;
+    const burst = fight({ rear: { x: 0, z: 0 }, front: { x: 10, z: 0.45 }, tuning: once });
+    const burstPaces = of(burst.events, 'shift', burst.rear);
+    expect(burstPaces.filter((e) => e.what === 'kept')).toHaveLength(0);
   }, 120_000);
 });

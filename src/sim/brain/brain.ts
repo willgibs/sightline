@@ -2,7 +2,7 @@ import { dcos, dlog, dsin } from '../kernel/core/detmath';
 import type { AwarenessName } from '../kernel/events';
 import { routinePose, type RoutinePose } from '../generation';
 import type { HuntOrder, TaskKind } from './camp';
-import { beginFirefight, noteFirefight, offerFirefight, performFight, performPush, seesHim, type Firefight } from './firefight';
+import { beginFirefight, noteFirefight, offerFirefight, performFight, performPush, seesHim, type Firefight, type ShiftWhat } from './firefight';
 import { groundSpot } from './ground';
 import { hasGrounds, noteGrounds } from './grounds';
 import { beginHunt, offerHunt, performHunt, type Hunt } from './hunt';
@@ -169,6 +169,8 @@ export interface BrainState {
   held?: number;
   /** In a camp whose men shift for a clear line (firefight.ts): what his eyes over the sights told him of the man in the way when that round was held, relative to his own line of fire. Absent until a round is held, and gone once he has answered it. */
   heldLine?: HeldLine;
+  /** What he's just done about a clear line (firefight.ts), for its system to say as an event this tick. Absent otherwise. */
+  shiftNews?: { what: ShiftWhat; mate: number; side: number; pace: number };
   /** The hunt he's on (hunt.ts): the way out, the stop he's at, and what he's doing there. Absent until he's ordered out with a section. */
   hunt?: Hunt;
 }

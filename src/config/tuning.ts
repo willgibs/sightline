@@ -933,6 +933,8 @@ export const defaultTuning = {
         deadOn: 0.2, // metres: a man in the way this close to the line is dead on it, and which side he's on means nothing: the side is chosen by the shooter's id
         pad: 0.1, // metres he clears the man in the way by beyond what would hold his round, for what his eyes can't measure
         near: 0.1, // metres from the place he shifts to that counts as on it: closer than a position's own `near`, because a pace that stops short clears nobody
+        within: 1.5, // seconds from choosing a place (and the walk to it, coming up at a kept one) to be on it: past that, someone's on it, and he gives it up and gets down
+        keep: true, // the place is kept while his position stands: he comes up there next time if it's still good. False: a pace is for the one burst
       },
       pin: { within: 4, min: 2.5, max: 5 }, // a round striking this close keeps his head down for this long (metres, seconds)
       // Following him: one man goes, in bounds, while whoever heard him say so watches.
