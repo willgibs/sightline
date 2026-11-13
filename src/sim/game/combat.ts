@@ -98,13 +98,16 @@ function ownInTheWay(ctx: TickContext, g: GuardEntity, ux: number, uy: number, u
     nearestTo(eye.x, eye.y, eye.z, ux, uy, uz, reach, part);
     if (nearest.along < M.near || nearest.gap - part.r > nearest.along * spread + M.clear) return false;
     const along = nearest.along;
-    const dx = nearest.x - eye.x;
-    const dy = nearest.y - eye.y;
-    const dz = nearest.z - eye.z;
+    // The side of him nearest the line is what a round going wide finds first: most of the way from his middle to his edge,
+    // so that a man with only a shoulder showing round a wall's end is still a man in the way.
+    const k = nearest.gap > 1e-6 ? (Math.min(part.r, nearest.gap) * M.edge) / nearest.gap : 0;
+    const dx = nearest.x + (eye.x + ux * along - nearest.x) * k - eye.x;
+    const dy = nearest.y + (eye.y + uy * along - nearest.y) * k - eye.y;
+    const dz = nearest.z + (eye.z + uz * along - nearest.z) * k - eye.z;
     const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
     if (d <= 0) return false;
     // A wall he's behind takes the round, and he's nobody the man with the rifle can see.
-    raycast(view, eye.x, eye.y, eye.z, dx / d, dy / d, dz / d, whole ? d + part.r : d - part.r, Blocks.Bullet, reached, g.id);
+    raycast(view, eye.x, eye.y, eye.z, dx / d, dy / d, dz / d, whole ? d + part.r : d, Blocks.Bullet, reached, g.id);
     nearest.along = along;
     return whole ? reached.what === 'body' && reached.id === id : reached.what === 'none' || (reached.what === 'body' && reached.id === id);
   };

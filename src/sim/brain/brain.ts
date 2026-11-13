@@ -2,7 +2,7 @@ import { dcos, dlog, dsin } from '../kernel/core/detmath';
 import type { AwarenessName } from '../kernel/events';
 import { routinePose, type RoutinePose } from '../generation';
 import type { HuntOrder, TaskKind } from './camp';
-import { beginFirefight, mateGoneOut, mateInLine, noteFirefight, noteMatesOut, offerFirefight, performFight, performPush, seesHim, type Firefight } from './firefight';
+import { beginFirefight, noteFirefight, offerFirefight, performFight, performPush, seesHim, type Firefight } from './firefight';
 import { groundSpot } from './ground';
 import { hasGrounds, noteGrounds } from './grounds';
 import { beginHunt, offerHunt, performHunt, type Hunt } from './hunt';
@@ -148,8 +148,6 @@ export interface BrainState {
   ff?: Firefight;
   /** The tick he last held his fire for one of his own in front of his rifle (game/combat.ts). Absent until he has. */
   held?: number;
-  /** Where one of his own last said he was going out of the walls to (firefight.ts, the chase), and when he heard it: he puts no rounds into ground he can't see into near there. Absent until someone does. */
-  mateOut?: { x: number; z: number; heard: number };
   /** The hunt he's on (hunt.ts): the way out, the stop he's at, and what he's doing there. Absent until he's ordered out with a section. */
   hunt?: Hunt;
 }
@@ -225,7 +223,6 @@ export function decide(m: GuardMind, out: Order): ActChange | null {
   const newest = Math.max(newestPercept(m), newestTold(b));
   if (b.sirenAt < 0 && heardSiren(m)) b.sirenAt = m.tick;
   noteProtection(m);
-  noteMatesOut(m);
   noteFirefight(m);
   noteGrounds(m);
   // A hunt he's been taken off, by another order or by none: there's nothing of it to remember.
@@ -878,8 +875,6 @@ function performEngage(m: GuardMind, out: Order): void {
   if (b.fireAt < 0) b.fireAt = m.tick + Math.round(C.react * hz);
   if (m.tick >= b.fireAt && seesTarget(m)) {
     const f = m.belief ?? focusOf3(m);
-    // Not through the opening one of his own has just gone out by (firefight.ts, the chase): they're in it, coming and going.
-    if (mateInLine(m, f.x, f.y, f.z)) return;
     b.fire = { x: f.x, y: f.y, z: f.z };
     b.fireAt = m.tick + Math.round(C.every * hz);
   }
@@ -1124,8 +1119,7 @@ function performSuppress(m: GuardMind, out: Order): void {
   // His own flash or report first; then the place a section has asked for fire on; then wherever he believes the shooter is.
   const asked = covering(m);
   const at = shotFrom(m) ?? asked ?? m.belief;
-  // Nothing into ground he can't see where one of his own has just gone out to look: the man by the gate may be his.
-  if (m.tick >= b.fireAt && at && !mateGoneOut(m, at.x, at.z) && !mateInLine(m, at.x, at.y, at.z)) {
+  if (m.tick >= b.fireAt && at) {
     b.fire = { x: at.x, y: at.y, z: at.z };
     b.fireAt = m.tick + Math.round(F.every * hz);
   }

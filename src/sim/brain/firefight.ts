@@ -166,69 +166,6 @@ function fighter(m: GuardMind): boolean {
 }
 
 /**
- * Keeps the last word that one of his own is going out of the walls, and where (the chase).
- * Every man who has a brain keeps it, tower men too: it's about where not to shoot.
- */
-export function noteMatesOut(m: GuardMind): void {
-  if (!m.chases) return;
-  const b = m.brain!;
-  for (const t of b.told) {
-    if (t.kind !== 'moving' || t.out !== true || t.from === m.id) continue;
-    if (!b.mateOut || t.heard > b.mateOut.heard) b.mateOut = { x: t.x, z: t.z, heard: t.heard };
-  }
-}
-
-/**
- * True if one of his own has said he's going out of the walls to somewhere near this place,
- * lately. A man fires at nothing he can't see near there: the camp's rounds at "the place
- * outside the gate" were killing the men it had just sent out to kneel on it. A man in his
- * sights is another matter.
- */
-export function mateGoneOut(m: GuardMind, x: number, z: number): boolean {
-  const o = m.brain!.mateOut;
-  if (!o) return false;
-  const C = m.tuning.brain.firefight.chase;
-  if ((m.tick - o.heard) / m.tuning.sim.tickHz > C.cease) return false;
-  return (o.x - x) * (o.x - x) + (o.z - z) * (o.z - z) <= C.clearOf * C.clearOf;
-}
-
-/**
- * True if a round from this man to a place would go through the opening one of his own said
- * he was going out by, lately or in this same fight, at the height of a man: the gateway is where the men who went
- * are, coming and going, and a man inside the walls firing through it at someone beyond has
- * them in his line, from 30 m back or from the gateway itself. A man who is outside the
- * walls is out there with them, and fires as he sees fit; a tower's round at something far
- * out passes over their heads.
- */
-export function mateInLine(m: GuardMind, x: number, y: number, z: number): boolean {
-  const b = m.brain!;
-  const o = b.mateOut;
-  if (!o) return false;
-  const C = m.tuning.brain.firefight.chase;
-  // For as long as his own fight has men out in it: the one who came back in stands in the gateway, a minute on and more.
-  // A man with no fight of his own (a tower's) goes by how long ago he heard.
-  if (!(b.ff && b.ff.out.length > 0) && (m.tick - o.heard) / m.tuning.sim.tickHz > C.cease) return false;
-  const g = openingNear(m.world, o.x, o.z);
-  const lane = (g ? g.width / 2 : 0) + C.lane;
-  const sx = m.self.x;
-  const sz = m.self.z;
-  // Out there himself.
-  if (outsideWalls(m.world, sx, sz)) return false;
-  const dx = x - sx;
-  const dz = z - sz;
-  const len = dx * dx + dz * dz;
-  if (len < 1e-6) return false;
-  // Where along the round's way it passes nearest the place: not at all, if that's behind him or beyond what he's shooting at.
-  const t = ((o.x - sx) * dx + (o.z - sz) * dz) / len;
-  if (t <= 0 || t >= 1) return false;
-  const px = sx + dx * t;
-  const pz = sz + dz * t;
-  if ((o.x - px) * (o.x - px) + (o.z - pz) * (o.z - pz) > lane * lane) return false;
-  const from = m.self.y + m.tuning.bodies.guard.eyeHeight.stand;
-  return from + (y - from) * t - m.world.terrain.heightAt(o.x, o.z) <= C.over;
-}
-
-/**
  * What this tick's senses do to what he remembers of the fight, once a tick before he
  * thinks: where the intruder is by the newest thing that says, which way he was going,
  * whether rounds are landing close, and whether it's over.
@@ -754,7 +691,7 @@ function position(m: GuardMind, ff: Firefight, seen: boolean): Position | null {
  */
 function answers(m: GuardMind, ff: Firefight): boolean {
   const A = m.tuning.brain.firefight.answer;
-  return ff.own && ff.r <= A.sure && (m.tick - ff.news) / m.tuning.sim.tickHz <= A.fresh && !someoneMoving(m) && !mateGoneOut(m, ff.x, ff.z);
+  return ff.own && ff.r <= A.sure && (m.tick - ff.news) / m.tuning.sim.tickHz <= A.fresh && !someoneMoving(m);
 }
 
 /** Down behind it again, for a moment drawn from his own stream. */
@@ -892,7 +829,7 @@ export function performFight(m: GuardMind, out: Order): void {
     const range = Math.max(F.range, T.brain.combat.range[m.post.role]);
     if (dx * dx + dz * dz <= range * range) {
       if (b.fireAt < 0) b.fireAt = m.tick + Math.round(F.react * hz);
-      if (ready && m.tick >= b.fireAt && !mateInLine(m, at.x, at.y, at.z)) {
+      if (ready && m.tick >= b.fireAt) {
         b.fire = { x: at.x, y: at.y, z: at.z };
         b.fireAt = m.tick + Math.round(F.every * hz);
         ff.rounds++;

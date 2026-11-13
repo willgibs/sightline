@@ -21,6 +21,9 @@ const ERRANDS: Partial<Record<TaskKind, string>> = {
   'post': 'to hold his door',
 };
 
+/** Seconds a man's label says he's holding his fire, after he has. */
+const HELD_SHOWN = 2;
+
 export function drawBrain(draw: DebugDraw, ctx: TickContext, g: GuardEntity): void {
   const b = g.brain;
   if (!b) return;
@@ -32,7 +35,9 @@ export function drawBrain(draw: DebugDraw, ctx: TickContext, g: GuardEntity): vo
   // What he's on, for a man in a fight, on a hunt, or on an errand about the target (brain/protect.ts): the part he's at, or what the errand is.
   const errand = b.act === 'task' && b.task ? ERRANDS[b.task.kind] : undefined;
   const phase = firefightPhase(b, ctx.tick) ?? huntPhase(b, ctx.tick) ?? (errand ? (b.task!.kind === 'start' && b.engine ? 'by the vehicle, engine running' : errand) : null);
-  draw.label(body.x, body.y + body.eyeHeight + 0.95, body.z, phase ? `${b.act} · ${phase}` : b.act, tone, `${b.act}${phase ? ` (${phase})` : ''} · ${a}${b.linger >= 0 ? ' · looking around' : ''}`);
+  // He had a shot and didn't take it: one of his own was in front of his rifle (game/combat.ts). Shown for a moment after, since the moment itself is one tick.
+  const holding = b.held !== undefined && (ctx.tick - b.held) / ctx.tuning.sim.tickHz <= HELD_SHOWN ? ' · holding his fire' : '';
+  draw.label(body.x, body.y + body.eyeHeight + 0.95, body.z, `${phase ? `${b.act} · ${phase}` : b.act}${holding}`, tone, `${b.act}${phase ? ` (${phase})` : ''} · ${a}${b.linger >= 0 ? ' · looking around' : ''}${holding ? ' · holding his fire: one of his own is in front of his rifle' : ''}`);
   // A firefight: where he believes the intruder is, and his position: where he hides, and where he fires from.
   const ff = b.ff;
   if (ff && phase) {

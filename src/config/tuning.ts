@@ -874,6 +874,7 @@ export const defaultTuning = {
       mates: {
         clear: 0.3, // metres more than his aim's error that he leaves round one of his own: a careful man's margin, and a man who shifts his weight
         near: 0.5, // metres in front of his muzzle before anyone counts as in front of it: the man at his shoulder isn't
+        edge: 0.7, // how far from a man's middle toward his edge the round is imagined going, to tell whether anything would stop it first
       },
       nearMiss: { radius: 3, knock: 1.4 }, // metres from your head that a round counts as a near miss, and the seconds it knocks you off your rest
       flash: { range: 520, suppressed: 140 }, // metres a muzzle flash can be seen at, by someone looking that way
@@ -962,10 +963,6 @@ export const defaultTuning = {
         hold: 5, // seconds he then watches the ground beyond with nobody in sight before he gives it up and goes back in
         spot: 25, // metres from the opening within which a figure he glimpses, out there and looking, is the man he came out for: he's expecting him
         patience: 12, // seconds after he said he was going that he keeps trying to get there, with something in his way that no map shows
-        cease: 60, // seconds after a man said he was going out that nobody fires at ground he can't see into (a man in the fight himself holds for as long as it lasts)
-        clearOf: 15, // within this many metres of where he said he was going,
-        lane: 2.5, // or along a line that passes within this many metres of that opening's sides,
-        over: 2.5, // less than this many metres above the ground there: a tower's round at something far out goes over a man's head
       },
       improve: { after: 9, run: 16, times: 2 }, // with no view of the place: seconds before he tries for a better position, how far he'll go for one, and how many times
       contactEvery: 6, // seconds between shouts of where the intruder is

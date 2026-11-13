@@ -94,6 +94,7 @@ function events(): { sim: Simulation; all: SimEvent[]; valley: number; range: Si
     { type: 'objective', id: 0, tick, t: tick / 30, source: guard, cause: 1, stage: 'get-out' },
     { type: 'whistle', id: 0, tick, t: tick / 30, source: guard, cause: 1, ...voice, loudness: 50, radius: 600 },
     { type: 'passed', id: 0, tick, t: tick / 30, source: guard, cause: 1, distance: 2 },
+    { type: 'held', id: 0, tick, t: tick / 30, source: guard, cause: 1, mate: 7, distance: 21.5 },
     { type: 'door', id: 0, tick, t: tick / 30, source: guard, cause: 1, ...voice, loudness: 14 / defaultTuning.noise.radiusPerUnit, radius: 14, open: 1 },
     { type: 'siren', id: 0, tick, t: tick / 30, source: guard, cause: 1, ...voice, loudness: 900 / defaultTuning.noise.radiusPerUnit, radius: 900 },
     { type: 'engine', id: 0, tick, t: tick / 30, source: guard, cause: 1, ...voice, loudness: 320 / defaultTuning.noise.radiusPerUnit, radius: 320, load: 'idle' },
