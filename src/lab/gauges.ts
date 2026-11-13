@@ -89,6 +89,9 @@ export interface Readings {
   roundsAtYou: number;
   /** Rounds that passed within a near miss of your head. */
   nearMisses: number;
+  /** Men of the camp shot dead by the camp, and rounds a man held because one of his own was in front of his rifle (game/combat.ts). */
+  ownSide: number;
+  held: number;
   /** Whether any guard has confirmed sight of the player. */
   detected: boolean;
   /** Metres from the shooter to the nearest guard now. */
@@ -115,6 +118,8 @@ export class CampGauges {
   private shotsFired = 0;
   private roundsAtYou = 0;
   private nearMisses = 0;
+  private ownSide = 0;
+  private held = 0;
   private detected = false;
   private siren = false;
   private nearestEver = Infinity;
@@ -140,7 +145,9 @@ export class CampGauges {
           this.roundsAtYou++;
           if (this.shooter && sim.index.get(e.source)?.kind === 'guard') this.measureReturnFire(sim, e, this.shooter);
         }
-      } else if (e.type === 'detected' && e.target === sim.playerId) this.detected = true;
+      } else if (e.type === 'death' && sim.index.get(e.source)?.kind === 'guard') this.ownSide++;
+      else if (e.type === 'held') this.held++;
+      else if (e.type === 'detected' && e.target === sim.playerId) this.detected = true;
       else if (e.type === 'siren') this.siren = true;
       else if (e.type === 'passed') this.nearMisses++;
     }
@@ -192,6 +199,8 @@ export class CampGauges {
       inLine: inClearLine(sim, this.shooter ?? undefined),
       roundsAtYou: this.roundsAtYou,
       nearMisses: this.nearMisses,
+      ownSide: this.ownSide,
+      held: this.held,
       detected: this.detected,
       nearest,
       nearestEver: this.nearestEver,

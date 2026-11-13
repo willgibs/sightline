@@ -89,6 +89,8 @@ export function describe(e: SimEvent): string {
       return `the camp's whistle, heard to ${m(e.radius)} m`;
     case 'passed':
       return `a round passed ${m(e.distance)} m from your head`;
+    case 'held':
+      return `held his fire: guard ${e.mate} was ${m(e.distance)} m in front of his rifle`;
     case 'objective':
       return 'the target is down: now get out';
     case 'door':

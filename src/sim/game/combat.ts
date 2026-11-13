@@ -1,12 +1,12 @@
 import type { BulletEntity } from '../ballistics';
 import { ballisticOf, flightAt, flightEnd, launch, solveAim, vec3, zeroOf } from '../ballistics';
-import { eyeOf, startle } from '../body';
+import { bodyShape, eyeOf, hasBody, startle } from '../body';
 import { dcos, dsin } from '../kernel/core/detmath';
 import { air, windAt } from '../kernel/env';
 import { Faction } from '../kernel/state';
 import { Blocks } from '../kernel/world/colliders';
 import { emptyHit, raycast } from '../kernel/world/query';
-import type { BodyPart } from '../kernel/world/shape';
+import { emptyShape, type BodyPart, type BodyShape, type Capsule } from '../kernel/world/shape';
 import type { SimEvent } from '../kernel/events';
 import { decide, type System, type TickContext } from '../kernel/systems';
 import { player, type GuardEntity, type PlayerEntity } from './entities';
@@ -25,13 +25,119 @@ const head = { x: 0, y: 0, z: 0 };
 const aim = vec3();
 const wind = { x: 0, z: 0 };
 const inFront = emptyHit();
+const reached = emptyHit();
+/** Where a line and a body part pass nearest: how far along the line, how far apart, and the point on the part. */
+const nearest = { along: 0, gap: 0, x: 0, y: 0, z: 0 };
+
+/**
+ * Where a line of fire passes nearest a capsule: the line from (ox, oy, oz) along the unit
+ * vector (ux, uy, uz) for `reach` metres, against the capsule's own segment. A sphere is a
+ * capsule whose ends are one point. Writes `nearest`.
+ */
+function nearestTo(ox: number, oy: number, oz: number, ux: number, uy: number, uz: number, reach: number, c: Capsule): void {
+  const vx = c.bx - c.ax;
+  const vy = c.by - c.ay;
+  const vz = c.bz - c.az;
+  const rx = ox - c.ax;
+  const ry = oy - c.ay;
+  const rz = oz - c.az;
+  const e = vx * vx + vy * vy + vz * vz;
+  const f = vx * rx + vy * ry + vz * rz;
+  const cc = ux * rx + uy * ry + uz * rz;
+  const clamp = (v: number, hi: number): number => Math.max(0, Math.min(hi, v));
+  // s is metres along the line of fire (its direction is a unit vector), t the fraction of the way along the part.
+  let s = 0;
+  let t = 0;
+  if (e <= 1e-9) s = clamp(-cc, reach);
+  else {
+    const b = ux * vx + uy * vy + uz * vz;
+    const denom = e - b * b;
+    s = denom > 1e-9 ? clamp((b * f - cc * e) / denom, reach) : 0;
+    t = (b * s + f) / e;
+    if (t < 0) {
+      t = 0;
+      s = clamp(-cc, reach);
+    } else if (t > 1) {
+      t = 1;
+      s = clamp(b - cc, reach);
+    }
+  }
+  nearest.x = c.ax + vx * t;
+  nearest.y = c.ay + vy * t;
+  nearest.z = c.az + vz * t;
+  const dx = ox + ux * s - nearest.x;
+  const dy = oy + uy * s - nearest.y;
+  const dz = oz + uz * s - nearest.z;
+  nearest.along = s;
+  nearest.gap = Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+const point: Capsule = { ax: 0, ay: 0, az: 0, bx: 0, by: 0, bz: 0, r: 0 };
+const upright = emptyShape();
+
+/**
+ * One of the camp's own where this round could go, or 0: between the muzzle and what it's
+ * aimed at, within the error of his aim and a margin, with nothing between the two men that
+ * would stop it. A round goes anywhere inside its error radius, so a man beside the line or
+ * crouched under it is in front of the rifle as surely as one standing on it: every man the
+ * camp shot of its own, in the runs that were looked at, was one of those, half a metre off
+ * the line. A man behind a wall isn't, and nor is one past the target.
+ *
+ * He's looked for where he is and where he'd be on his feet: a man down behind a crate in
+ * the middle of a fight is about to come up from behind it.
+ *
+ * A brain knows nothing of where its own side is (rule 13), but a man sees who's in front
+ * of his rifle, so it's settled here, where the round is made, as his eyes would settle it.
+ * Writes how far along the line that man is to `nearest.along`.
+ */
+function ownInTheWay(ctx: TickContext, g: GuardEntity, ux: number, uy: number, uz: number, reach: number, spread: number): number {
+  const M = ctx.tuning.brain.fight.mates;
+  const view = ctx.query();
+  /** Whether a round could get to this part of him: it's within the cone, and nothing but him would stop a round sent at it. `whole` is the man as he stands, whom a ray can find; on his feet he's only a place. */
+  const within = (part: Capsule, id: number, whole: boolean): boolean => {
+    nearestTo(eye.x, eye.y, eye.z, ux, uy, uz, reach, part);
+    if (nearest.along < M.near || nearest.gap - part.r > nearest.along * spread + M.clear) return false;
+    const along = nearest.along;
+    // The side of him nearest the line is what a round going wide finds first: most of the way from his middle to his edge,
+    // so that a man with only a shoulder showing round a wall's end is still a man in the way.
+    const k = nearest.gap > 1e-6 ? (Math.min(part.r, nearest.gap) * M.edge) / nearest.gap : 0;
+    const dx = nearest.x + (eye.x + ux * along - nearest.x) * k - eye.x;
+    const dy = nearest.y + (eye.y + uy * along - nearest.y) * k - eye.y;
+    const dz = nearest.z + (eye.z + uz * along - nearest.z) * k - eye.z;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (d <= 0) return false;
+    // A wall he's behind takes the round, and he's nobody the man with the rifle can see.
+    raycast(view, eye.x, eye.y, eye.z, dx / d, dy / d, dz / d, whole ? d + part.r : d, Blocks.Bullet, reached, g.id);
+    nearest.along = along;
+    return whole ? reached.what === 'body' && reached.id === id : reached.what === 'none' || (reached.what === 'body' && reached.id === id);
+  };
+  const parts = (shape: BodyShape, id: number, whole: boolean): boolean => {
+    point.ax = point.bx = shape.head.x;
+    point.ay = point.by = shape.head.y;
+    point.az = point.bz = shape.head.z;
+    point.r = shape.head.r;
+    return within(point, id, whole) || within(shape.torso, id, whole) || within(shape.legs, id, whole);
+  };
+  for (const q of view.bodies) {
+    if (q.id === g.id) continue;
+    const e = ctx.index.get(q.id);
+    if (!e || e.faction !== Faction.Camp || !hasBody(e)) continue;
+    if (parts(q.shape, q.id, true)) return q.id;
+    // And on his feet, if he isn't.
+    const spec = ctx.tuning.bodies[e.kind];
+    if (e.body.eyeHeight >= spec.eyeHeight.stand) continue;
+    const stood = { ...e.body, eyeHeight: spec.eyeHeight.stand, lean: 0 };
+    if (parts(bodyShape(stood, spec, upright), q.id, false)) return q.id;
+  }
+  return 0;
+}
 
 /**
  * A guard fires at where he believes his target is: a shot from his eye, with his aim's
  * error from his own stream. The shot, its report and the bullet are the same as the
  * player's, so it sounds and strikes through lab B's pipeline.
  */
-export function guardFire(ctx: TickContext, g: GuardEntity, target: { x: number; y: number; z: number }): void {
+export function guardFire(ctx: TickContext, g: GuardEntity, target: { x: number; y: number; z: number }): boolean {
   const T = ctx.tuning;
   const B = T.ballistics;
   const C = T.brain.combat;
@@ -46,7 +152,8 @@ export function guardFire(ctx: TickContext, g: GuardEntity, target: { x: number;
   const kit = { load: B.rifle.load, zero: B.rifle.zero.start };
   const bal = ballisticOf(kit, T, a.density, wind);
   const zero = zeroOf(kit, T, a.density);
-  const fights = ctx.index.of('commander')[0]?.camp.fights === true;
+  const camp = ctx.index.of('commander')[0]?.camp;
+  const fights = camp?.fights === true;
   // A camp that fights holds over for the range: at 300 m a straight aim from a 100 m zero is half a metre low.
   if (fights) solveAim(eye, target, 0, 0, zero, bal, B.maxFlight, line);
   else {
@@ -59,12 +166,20 @@ export function guardFire(ctx: TickContext, g: GuardEntity, target: { x: number;
   // man sees who's in front of his rifle, so it's settled here, where the round is made, as his eyes would settle it.
   const reach = Math.sqrt((target.x - eye.x) * (target.x - eye.x) + (target.y - eye.y) * (target.y - eye.y) + (target.z - eye.z) * (target.z - eye.z));
   raycast(ctx.query(), eye.x, eye.y, eye.z, line.x / d, line.y / d, line.z / d, reach, Blocks.Bullet, inFront, g.id);
-  if (inFront.what === 'body' && ctx.index.get(inFront.id)?.faction === Faction.Camp) return;
+  if (inFront.what === 'body' && ctx.index.get(inFront.id)?.faction === Faction.Camp) return false;
   // His aim's error: a small disk around the line to the target, from his own stream.
   const role = ctx.world.camp.guards[g.guard.spawn]?.role;
   // From a position, in a firefight (brain/firefight.ts), he has something to steady the rifle on.
   const steady = g.brain?.act === 'fight' && role !== 'marksman';
   const spread = ((steady ? T.brain.firefight.spreadDeg : fights ? (role === 'marksman' ? T.brain.fight.spreadDeg.marksman : T.brain.fight.spreadDeg.other) : C.spreadDeg) * Math.PI) / 180;
+  // And one of his own anywhere that error could put the round, in a camp whose men look out for each other.
+  if (camp?.mates) {
+    const mate = ownInTheWay(ctx, g, line.x / d, line.y / d, line.z / d, reach, spread);
+    if (mate) {
+      ctx.emit({ type: 'held', source: g.id, mate, distance: nearest.along });
+      return false;
+    }
+  }
   const [eu, ev] = ctx.draw(g.id, 'aim', (rng) => {
     const r = spread * Math.sqrt(rng.next());
     const a = rng.next() * 2 * Math.PI;
@@ -89,6 +204,7 @@ export function guardFire(ctx: TickContext, g: GuardEntity, target: { x: number;
   ctx.spawn((id): BulletEntity => ({ id, kind: 'bullet', faction: Faction.Camp, bullet: { shooter: g.id, shot, flight, swept: t } }));
   const radius = B.sound.report;
   ctx.emit({ type: 'report', source: g.id, t, cause: shot, x: eye.x, y: eye.y, z: eye.z, surface: b.surface, loudness: radius / T.noise.radiusPerUnit, radius, suppressed: 0 });
+  return true;
 }
 
 /**
