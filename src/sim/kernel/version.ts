@@ -112,5 +112,11 @@ export const GEN_VERSION = 10;
  * takes no walk the map has marked as gaining height on such ground (kernel/world/grid.ts,
  * Edge.EastSteep), and no stretch of it is pulled straight across one. No pinned run's
  * route crossed such ground, so no fingerprint moved.
+ * 29: a man whose round is held for one of his own shifts a pace for a clear line
+ * (brain/firefight.ts, `clearLine`): the game records what he saw of that man over his
+ * sights (game/combat.ts, `seenInTheWay`), and he works out the pace from it, keeps the place
+ * while his position stands, and answers a held last round by coming straight back up there
+ * once. The `held` event says which side the man was and how far off, and a `shift` event is
+ * new. No pinned run holds a round, so no `behaviour` fingerprint moved.
  */
-export const SIM_VERSION = 28;
+export const SIM_VERSION = 29;
