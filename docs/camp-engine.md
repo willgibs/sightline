@@ -735,35 +735,41 @@ In the code:
 - **`off=shift`** plays a camp whose men hold and wait. It's also off with `mates`, `firefight` or `fight` off. With it off, a run's state hash is the same as before this step, tick for tick, and so is every event's kind, in the `own-side` fight on TES-6931, LEB-2534 and DOT-6344, both plans (92 holds in one of them). The `held` event carries two more fields.
 - **Explainable**: a `shift` event (a pace, another from a place he'd shifted to, a time up begun at a kept place, or a pace given up; who was in the way, which way, how far), `held` says which side the man was and how far off, the debug label reads "shifting for a clear line" while he's up there, and the debug view draws the pace from the firing place.
 
-**Numbers** (`brain.firefight.shift`, the owner's to set by playing): `cap` 1.5 m, `deadOn` 0.2 m, `pad` 0.1 m, `near` 0.1 m, `within` 1.5 s, and `keep` (KEEP_DEFAULT).
+**Numbers** (`brain.firefight.shift`, the owner's to set by playing): `cap` 1.5 m, `deadOn` 0.2 m, `pad` 0.1 m, `near` 0.1 m, `within` 1.5 s, and `keep` (true: the place is kept, on the measure below; false plays a pace for one burst).
 
-**Measured** (`npm run experiment -- own-side --dice 3`, 24 camps, three rolls of the dice on each):
+**Measured** (`npm run experiment -- own-side --dice 3`, 24 camps, three rolls of the dice on each, 63 fights a plan):
 
-| | Fires past his own (`off=mates`) | Holds and waits (`off=shift`) | Shifts for a clear line |
-| --- | --- | --- | --- |
-| **He stays by the wall** (63 fights). Fights with a man shot by his own side | 7 | 0 | **0** |
-| Rounds the camp fired, a fight | 69.2 | 58.4 | **67.1** |
-| Rounds held for one of its own | 0 | 12.9 | 10.1 |
-| Holds that ended in a shift | 0 | 0 | 3.4 |
-| Rounds held again from the place he shifted to | 0 | 0 | 1.3 |
-| Seconds from a hold to that man's next round (median of a fight's) | – | 3.1 | **1.5** |
-| Holds followed by a round within 3 s | – | 27% | **56%** |
-| **He runs for the trees** (63 fights). Fights with a man shot by his own side | 4 | 0 | **0** |
-| Rounds the camp fired, a fight | 157 | 153 | **157** |
-| Rounds held for one of its own | 0 | 8.0 | 7.9 |
-| Holds that ended in a shift | 0 | 0 | 2.4 |
-| Rounds held again from the place he shifted to | 0 | 0 | 1.1 |
-| Seconds from a hold to that man's next round (median of a fight's) | – | 4.0 | **1.0** |
-| Holds followed by a round within 3 s | – | 30% | **63%** |
-| Rounds that hit him once he was out | 46.7 | 45.8 | 47.0 |
-| Enough of them to kill | 52 | 53 | 52 |
+| | Fires past his own (`off=mates`) | Holds and waits (`off=shift`) | A pace for one burst | A pace kept |
+| --- | --- | --- | --- | --- |
+| **He stays by the wall.** Fights with a man shot by his own side | 7 | 0 | 0 | **0** |
+| Rounds the camp fired, a fight | 69.2 | 58.4 | 69.1 | **69.5** |
+| Rounds held for one of its own | 0 | 12.9 | 9.5 | **6.9** |
+| Paces taken | 0 | 0 | 3.4 | 1.5 |
+| Bursts begun from a kept place | 0 | 0 | 0 | 5.3 |
+| Shifts held again: by the same man / by another | – | – | 0.60 / 0.51 | 0.40 / 0.30 |
+| Paces given up | – | – | 0.08 | 0.25 |
+| Seconds from a hold to that man's next round (median of a fight's) | – | 3.1 | 2.0 | 1.7 |
+| Holds followed by a round within 3 s | – | 27% | 54% | 54% |
+| **He runs for the trees.** Fights with a man shot by his own side | 4 | 0 | 0 | **0** |
+| Rounds the camp fired, a fight | 157 | 153 | 157 | **160** |
+| Rounds held for one of its own | 0 | 8.0 | 6.6 | **3.9** |
+| Paces taken | 0 | 0 | 1.8 | 0.54 |
+| Bursts begun from a kept place | 0 | 0 | 0 | 3.7 |
+| Shifts held again: by the same man / by another | – | – | 0.71 / 0.11 | 0.21 / 0 |
+| Paces given up | – | – | 0 | 0.02 |
+| Seconds from a hold to that man's next round (median of a fight's) | – | 4.0 | 1.9 | 2.0 |
+| Holds followed by a round within 3 s | – | 30% | 56% | 61% |
+| Rounds that hit him once he was out | 46.7 | 45.8 | 46.8 | 47.7 |
+| Enough of them to kill | 52 | 53 | 52 | 52 |
 
-"Rounds held" now counts every hold by the brain's own record of it, the silent ones dead on the line included, so it reads higher than step 2d's table did (12.9 where that said 11). Nearly all of the rounds the camp gave up by holding are back: by the wall, 67.1 a fight where firing past its own was 69.2 and holding was 58.4.
+"Rounds held" counts every hold by the brain's own record of it, the silent ones dead on the line included, so it reads higher than step 2d's table did (12.9 where that said 11).
 
-- **Nobody is shot by his own side**, on any of the dice, as with step 2d.
-- **A hold is followed by a round twice as soon**: 1.5 s by the wall where it was 3.1, 1.0 s on the run where it was 4.0.
-- **A runner is hit as often**: 47.0 hits where holding gave 45.8, within the spread between camps (±16).
-- **A shift is often held again** (1.3 of 3.4 by the wall). Looked at on TES-6931: two men crouched shoulder to shoulder, 0.5 m apart, each shuffling back onto his own place; the man beside moves back into the line the pace had cleared. The first version stopped 0.1 m short and was held again more than half the time (1.1 of 1.9); aiming past the place by that much is what moved it.
+- **Nobody is shot by his own side**, on any of the dice, in any arm that holds.
+- **The rounds holding cost are back.** By the wall the camp fires 69.5 rounds a fight, where firing past its own fired 69.2 and holding and waiting 58.4.
+- **Kept is the default.** Against a pace for one burst, rounds held go down (6.9 from 9.5 by the wall, 3.9 from 6.6 on the run) and rounds fired don't (69.5 from 69.1, 160 from 157). A man who has found a clear line comes up there, and his round isn't held at the old place before he shifts again.
+- **A runner is hit as often**: 47.7 hits, within the spread between camps (±16).
+- **A shift is still held again sometimes**, more often by the same man (0.40 a fight by the wall). Looked at on TES-6931, before the place was kept: two men crouched shoulder to shoulder, 0.5 m apart, each shuffling back onto his own place, so the man beside moves back into the line the pace had cleared. Aiming `near` past the place cut it from more than half of the shifts.
+- **A pace is given up a quarter of a time a fight by the wall** where places are kept: someone is standing on a place that was good when he chose it.
 
 **What it leaves.**
 
