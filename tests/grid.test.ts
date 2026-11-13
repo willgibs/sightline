@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
 import { generateWorld } from '../src/sim/generation/world';
+import { dtanDeg } from '../src/sim/kernel/core/detmath';
 import { missionSpec } from '../src/sim/kernel/mission';
 import { Blocks } from '../src/sim/kernel/world/colliders';
 import { Cell, Edge, cellAt, cellIndex, type GridLayer } from '../src/sim/kernel/world/grid';
@@ -62,6 +63,56 @@ describe('the spatial grid', () => {
     expect(has(w.grid.site, 30, 0, Cell.Steep)).toBe(true);
     expect(has(w.grid.site, 30, 0, Cell.Walkable)).toBe(false);
     expect(has(w.grid.site, 10, 0, Cell.Walkable)).toBe(true);
+  });
+
+  it('marks a cell steep when either of its triangles is, not only the one under its middle', () => {
+    // One raised corner, at (30, 10), on a test world's 2 m terrain. The cell from x 30 to 32 and
+    // z 8 to 10 has it as its (i, j + 1) corner: the triangle its middle lies on is flat, and
+    // the other rises 3 m in 2.
+    const w = testWorld({ height: (x, z) => (x === 30 && z === 10 ? 3 : 0) });
+    expect(w.terrain.cell).toBe(2);
+    expect(w.terrain.heightAt(30, 10)).toBe(3);
+    expect(w.terrain.steepestIn(30, 8, 32, 10)).toBeCloseTo(Math.sqrt(2) * 1.5, 5);
+    // A corner of that cell lying on its flat triangle only, and the next cell east: a
+    // rectangle that ends on a cell line takes nothing from beyond it.
+    expect(w.terrain.steepestIn(31.5, 8, 32, 8.5)).toBe(0);
+    expect(w.terrain.steepestIn(32, 8, 34, 10)).toBe(0);
+    const { map, site } = w.grid;
+    expect(has(map, 31, 9, Cell.Steep)).toBe(true);
+    expect(has(map, 31, 9, Cell.Walkable)).toBe(false);
+    expect(has(map, 33, 9, Cell.Walkable)).toBe(true);
+    // The fine layer by the same rule at its own size: steep on the raised half, walkable on the flat one.
+    expect(cellIndex(site, 30.25, 9.75)).toBeGreaterThanOrEqual(0);
+    expect(has(site, 30.25, 9.75, Cell.Walkable)).toBe(false);
+    expect(has(site, 31.75, 8.25, Cell.Walkable)).toBe(true);
+  });
+
+  it('never calls ground walkable that the motor would refuse to climb', () => {
+    // HEL-2923 is where it showed: a guard at a run stopped dead at (132.5, -94.2) at the edge of
+    // a cell that was 27 degrees under its middle and 45 on its other triangle, five times, and gave up.
+    const w = generateWorld(missionSpec('HEL-2923'), T);
+    const tanMax = dtanDeg(T.gen.walkableSlopeDeg);
+    expect(has(w.grid.map, 133.75, -93.75, Cell.Walkable)).toBe(false);
+    // Every edge of both layers, walked both ways on the ground's own triangles: no height
+    // gained on ground too steep to climb, which is what the motor refuses.
+    let edges = 0;
+    let refused = 0;
+    for (const L of [w.grid.map, w.grid.site]) {
+      for (let j = 0; j < L.nz; j++) {
+        for (let i = 0; i < L.nx; i++) {
+          const e = L.edges[j * L.nx + i]!;
+          const x = L.x0 + (i + 0.5) * L.cell;
+          const z = L.z0 + (j + 0.5) * L.cell;
+          for (const [bit, dx, dz] of [[Edge.East, L.cell, 0], [Edge.North, 0, L.cell]] as const) {
+            if ((e & bit) === 0) continue;
+            edges++;
+            if (w.terrain.gainOnSteep(x, z, x + dx, z + dz, tanMax) > 0 || w.terrain.gainOnSteep(x + dx, z + dz, x, z, tanMax) > 0) refused++;
+          }
+        }
+      }
+    }
+    expect(edges).toBeGreaterThan(400000);
+    expect(refused).toBe(0);
   });
 
   it("covers the generated camp, whose buildings stop bodies and sound", () => {

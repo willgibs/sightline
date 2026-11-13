@@ -245,7 +245,11 @@ function fill(L: GridLayer, terrain: Heightfield, colliders: ColliderSet, G: Gen
       const z = L.z0 + (j + 0.5) * L.cell;
       terrain.sample(x, z, sample);
       const ground = sample.height;
-      let flags = sample.slopeTan > tanMax ? Cell.Steep : Cell.Walkable;
+      // Steep if any triangle under the cell is. Its middle lies on one of them, and the
+      // motor stops a body at whichever it steps on to: a map cell lined up with the
+      // terrain's has two, and with only the middle asked, a guard was routed up the other.
+      const steepest = terrain.steepestIn(L.x0 + i * L.cell, L.z0 + j * L.cell, L.x0 + (i + 1) * L.cell, L.z0 + (j + 1) * L.cell);
+      let flags = steepest > tanMax ? Cell.Steep : Cell.Walkable;
       let cover = 0;
       colliders.query(x - B.bodyRadius, z - B.bodyRadius, x + B.bodyRadius, z + B.bodyRadius, ids);
       for (let q = 0; q < ids.length; q++) {

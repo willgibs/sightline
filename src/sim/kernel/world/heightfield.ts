@@ -139,6 +139,60 @@ export class Heightfield {
   }
 
   /**
+   * The steepest slope (rise over run, as `sample` gives it) among the triangles that have
+   * any of their area inside the rectangle from (x0, z0) to (x1, z1). A point says what one
+   * triangle does, and a square of ground lies on two or more: whoever asks whether the
+   * whole square can be stood on has to ask this, because the motor judges the triangle a
+   * body is on (CLAUDE.md rule 7). A triangle that only touches the rectangle along an edge
+   * or at a corner doesn't count.
+   */
+  steepestIn(x0: number, z0: number, x1: number, z1: number): number {
+    const { cell, cells, n, heights } = this;
+    const a0 = (x0 - this.min) / cell;
+    const a1 = (x1 - this.min) / cell;
+    const b0 = (z0 - this.min) / cell;
+    const b1 = (z1 - this.min) / cell;
+    const last = cells - 1;
+    // The cells with area inside: a rectangle that ends exactly on a cell line stops there.
+    const i0 = Math.max(0, Math.min(last, Math.floor(a0)));
+    const i1 = Math.max(i0, Math.min(last, Math.ceil(a1) - 1));
+    const j0 = Math.max(0, Math.min(last, Math.floor(b0)));
+    const j1 = Math.max(j0, Math.min(last, Math.ceil(b1) - 1));
+    let worst = -1;
+    for (let j = j0; j <= j1; j++) {
+      // The rectangle's part of this cell, in the cell's own 0 to 1.
+      const v0 = Math.max(0, Math.min(1, b0 - j));
+      const v1 = Math.max(0, Math.min(1, b1 - j));
+      for (let i = i0; i <= i1; i++) {
+        const u0 = Math.max(0, Math.min(1, a0 - i));
+        const u1 = Math.max(0, Math.min(1, a1 - i));
+        const k = j * n + i;
+        const h00 = heights[k]!;
+        const h10 = heights[k + 1]!;
+        const h01 = heights[k + n]!;
+        const h11 = heights[k + n + 1]!;
+        // The triangle where u >= v has area in the part if the part reaches a u over its least v.
+        if (u1 > v0) {
+          const gx = (h10 - h00) / cell;
+          const gz = (h11 - h10) / cell;
+          const s = gx * gx + gz * gz;
+          if (s > worst) worst = s;
+        }
+        // And the other, where u < v, if it reaches a v over its least u.
+        if (v1 > u0) {
+          const gx = (h11 - h01) / cell;
+          const gz = (h01 - h00) / cell;
+          const s = gx * gx + gz * gz;
+          if (s > worst) worst = s;
+        }
+      }
+    }
+    // A rectangle with no area on the terrain (off its edge, or a point): what the point under its middle says.
+    if (worst < 0) return this.sample((x0 + x1) / 2, (z0 + z1) / 2, this.piece).slopeTan;
+    return Math.sqrt(worst);
+  }
+
+  /**
    * Height gained on ground steeper than `tanMax` along the straight line from (x0, z0) to
    * (x1, z1). The line is cut wherever it crosses a triangle's edge (a grid line, or a
    * cell's diagonal), and each piece that lies on a triangle steeper than the limit adds
