@@ -300,6 +300,9 @@ describe('a man on the target’s door', () => {
     const world = worldOf(ESCORT);
     const sc = { ...(ladder(`seed=${ESCORT}&plan=circle`) as Scene<Simulation>), world: () => world, playOn: true };
     const sim = startScene(sc, T, world);
+    // A shooter who can't be hurt, so the circle always comes round to this man's door: who
+    // wins the fight on the way there isn't what this is about, and it turns on a metre.
+    delete player(sim.index).health;
     const bot = circleOf(sim);
     const driver = new ViewDriver(bot);
     const raw = sc.game.still(sim);
