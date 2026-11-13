@@ -2,6 +2,64 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-13 · A man whose round is held shifts a pace for a clear line
+
+**What it is.** The owner's ask: a guard whose fire is held for one of his own steps aside for a clear line, instead of standing there holding. Since step 2d a man holds his fire for one of the camp's own anywhere his round could go (`game/combat.ts`, `ownInTheWay`). He then stood where he was and tried again a second later. A held round counted toward his burst, so three of them put him down having fired nothing, and he came up at the same place to the same man in the way. By the wall in the `own-side` fight that was 12.9 rounds held a fight, and 3.1 s from a hold to that man's next round. Now he shifts a pace sideways, away from the man in the way, just far enough that his round would go, and fires from there. He doesn't walk round him and he doesn't leave his cover (`docs/camp-engine.md`, section 9, *Step 2e*).
+
+**What's built.**
+
+- **What he saw over his sights** (`game/combat.ts`, `seenInTheWay`; `BrainState.heldLine`). Where the round is made, the game records three numbers about the one man his round was held for, at that moment, relative to his own line of fire: which side of it the man stands, how far it is from his nearest edge, and how far along it he is. This keeps rule 13 for the reason step 2d gave: a man sees who is in front of his rifle. It says nothing of where anyone else on his side is, nor where that man is in the camp, nor anything after that moment. The silent hold (a man dead on the line) records it too. `ownInTheWay` hands back how far along the line the man is through an out-parameter, where it used to leave it in a shared scratch.
+- **The pace** (`brain/firefight.ts`, `paceFor`). A pace `p` moves his line by `p (1 − along / L)` where that man stands, `L` being how far off he believes the intruder is. He needs the man's edge outside what holds a round (`along × spread + clear`), and `pad` more, and aims `near` past it because that's how short of a place he may stop: `p = (along × spread + clear + pad − off) / (1 − along / L) + near`. A man dead on the line (`deadOn`) can be cleared either way, the first side by his id, so a column fans out.
+- **The place** has to be one he can stand on and walk straight to, with a line to where the intruder is, no more than `cap` from his position's firing place, and showing no more of him to the intruder's place than the firing place does. That last is graded (`brain/positions.ts`, `exposure`): `exposedAt` is one ray to the top of a man and is true at every firing place, so `exposure` counts six points on him, the top of his head and the middle of him, each at the middle and a shoulder's width either side.
+- **A held round mid-burst** doesn't count, and his burst starts afresh at the new place. **A held last round** puts him down, as it always did, and on his next think he comes straight back up at the new place for a fresh burst: `answers` times running (one), so a man among several of his own still gets down. An ordinary time down starts the count again.
+- **A pace he can't finish** (someone on the place) is given up `within` seconds after he chose it, and he gets down, the held round counted.
+- **The place is kept while his position stands** (`keep`). He gets down at his position's hiding place and comes up next time at the place he kept, if it still has a line and shows no more of him to where the intruder is believed now; if not, or this tick has no look left, at his position's own. A round held at a kept place moves him again from where he stands, within `cap`, and counts; with nowhere to go he's back on his position's place.
+- **`off=shift`** plays a camp whose men hold and wait. It's also off with `mates`, `firefight` or `fight`.
+- **Explainable** (rule 8): the `held` event says which side the man was and how far off, a `shift` event says what he did (a pace, another from a place he'd shifted to, a time up begun at a kept place, a pace given up, a held last round the bound didn't answer), the debug label reads "shifting for a clear line", and the debug view draws the pace from the firing place.
+- **Numbers** (`tuning.brain.firefight.shift`, the owner's to set by playing): `cap` 1.5 m, `deadOn` 0.2 m, `pad` 0.1 m, `near` 0.1 m, `within` 1.5 s, `answers` 1, `keep` true.
+
+**What's proven.**
+
+- **No held round, no difference.** Nothing of this runs until a round is held, and it draws nothing from a man's stream before then. On DOT-6344, both plans of the `own-side` fight (180 s each, no round held), a camp that shifts and one with `off=shift` match in every body's pose and every event, tick for tick; the state differs by the camp's flag alone. The first build counted every burst's last round a tick late, so every fight in every live camp would have differed from `main`; the review caught it, and the held last round is answered from down instead. With `off=shift`, the state hash and every event's kind matched the build before this, tick for tick, on TES-6931, LEB-2534 and DOT-6344, both plans (92 holds in one).
+- `tests/clearLine.test.ts`: two men in a line and an intruder beyond them. The rear man's round is held, he shifts away from the man in front no farther than the cap, fires within 3 s, and none of his rounds passes within the margin of that man. With the switch off he never shifts. Against a wall with no place to shift to, he holds, and gets down after a burst of held rounds. Dead on the line, the side goes by his id. A held last round brings him straight back up for a whole fresh burst, and only so many times running. A third man standing on the place makes him give it up and get down. With places kept he comes up at the kept place; without, never. A fight with no round held is the same in every pose and event with the switch on and off.
+- **The `own-side` bench** (`npm run experiment -- own-side --dice 3`, 24 camps, three rolls of the dice on each, 63 fights a plan):
+
+| | Fires past his own (`off=mates`) | Holds and waits (`off=shift`) | A pace for one burst | A pace kept |
+| --- | --- | --- | --- | --- |
+| **He stays by the wall.** Fights with a man shot by his own side | 7 | 0 | 0 | **0** |
+| Rounds the camp fired, a fight | 69.2 | 58.4 | 68.8 | **69.5** |
+| Rounds held for one of its own | 0 | 12.9 | 9.7 | **6.9** |
+| Paces taken | 0 | 0 | 3.5 | 1.5 |
+| Bursts begun from a kept place | 0 | 0 | 0 | 5.6 |
+| Shifts held again: by the same man / by another | – | – | 0.62 / 0.56 | 0.40 / 0.30 |
+| Paces given up | – | – | 0.11 | 0.25 |
+| Held last rounds not answered, by the bound | – | – | 0.08 | 0.02 |
+| Longest run of bursts by one man without a time down | 1.2 | 1.2 | 1.3 | 1.3 |
+| Seconds from a hold to that man's next round (median of a fight's) | – | 3.1 | 2.0 | 1.7 |
+| **He runs for the trees.** Fights with a man shot by his own side | 4 | 0 | 0 | **0** |
+| Rounds the camp fired, a fight | 157 | 153 | 157 | **160** |
+| Rounds held for one of its own | 0 | 8.0 | 6.3 | **3.9** |
+| Seconds from a hold to that man's next round (median of a fight's) | – | 4.0 | 1.9 | 2.0 |
+| Rounds that hit him once he was out | 46.7 | 45.8 | 46.7 | 47.7 |
+
+The rounds holding cost are back (69.5 a fight by the wall, where firing past its own fired 69.2), a hold is followed by a round in about half the time, a runner is hit as often, and nobody is shot by his own side. Kept is the default because, against a pace for one burst, rounds held go down and rounds fired don't. With the bound on coming straight back up lifted, every figure in the kept column reads the same but bursts begun from a kept place (5.3 where the bound gives 5.6): a man held at the end of burst after burst didn't happen on these camps, and the bound is there for one where it would. "Rounds held" counts every hold by the brain's own record of it, the silent ones included, so it reads higher than step 2d's table (12.9 where that said 11).
+
+**The standing benches, against `main` at d2586ab.**
+
+BENCHES
+
+**Versions and pins.** `SIM_VERSION` 29: men whose round is held now move. No pinned run holds a round, so no pinned `behaviour` value moved. `STATE_SCHEMA` 19: a camp's `shifts`, a man's `heldLine`, `shiftNews`, and a firefight's `shift` and `answered` are new state, and every pinned `state` value moved with the schema's number. The golden recording is rewritten. Every lane's bench holds its pinned numbers, so no bench pin moved.
+
+**What it leaves.**
+
+- **He finds a man on his kept place by walking into him** (0.25 a fight by the wall). Nothing tells him a place is taken until he can't get onto it.
+- **Positions half a metre apart are still handed out.** Nothing tells a man a spot is taken, so two men can fight shoulder to shoulder; on TES-6931 that's what a shift held again by the same man was, the one beside him shuffling back onto his own place, into the line the pace had cleared.
+- **The place is judged against where he believes the intruder is**, not where he is, and checked again each time he comes up.
+- **He knows only the man his round was held for.** Two men can shift the same way, or a shift can put another man in front of him. The game holds the round again, so nobody is shot for it, and the round counts.
+- **He comes back to within 0.45 m of his hiding place**, as a man always did, not onto it.
+- **A man running across a line of fire still isn't led**, and nothing past the target counts (step 2d's).
+- **Nobody has played it.** Whether a pace and a half is the most a man would take, and whether it reads as a man stepping aside or as fidgeting, is the owner's: `off=shift` plays a camp that holds and waits, and `shift.keep` false a pace for one burst.
+
 ## 2026-11-13 · A route keeps off ground too steep to climb
 
 **What broke.** Men of a hunting section, at a run out in the valley with nobody near them, stopped dead, stepped aside, tried again, and after five tries gave the walk up. A second and a half later they asked for a route, were given the same one, and did it again. Found while measuring the held-up walk (below), and on `main` before it. On HEL-2923, a yard, played the way the circling bench plays it, guard 9:
