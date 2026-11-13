@@ -298,9 +298,9 @@ export function plan(m: CampMind, out: CampOrder[]): void {
   const relief = camp.relief;
   const going = camp.objective?.status === 'escaping' || camp.objective?.status === 'escaped';
   if (camp.protects && camp.answer !== 'hold' && camp.devices.escape && relief && !going && relief.fetches < P.fetches && (relief.fetches === 0 || (m.tick - relief.last) / hz >= P.fetchEvery) && !camp.tasks.some((t) => t.kind === 'fetch')) {
-    const fetch = addTask(camp, 'fetch', camp.protects.x, camp.protects.z, 4, P.fetchers, m.tick, camp.protects.y);
+    const sent = addTask(camp, 'fetch', camp.protects.x, camp.protects.z, 4, P.fetchers, m.tick, camp.protects.y);
     // Its men's places follow those of every pair sent before them, the relief's first: no two of them are given one spot by his vehicle (protect.ts).
-    if (camp.places) fetch.place = relief.fetches * P.fetchers;
+    if (camp.places) sent.place = relief.fetches * P.fetchers;
     relief.fetches++;
     relief.last = m.tick;
   }
