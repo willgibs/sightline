@@ -16,7 +16,7 @@ import type { Simulation } from './sim';
  * differently draws differently, as he should.
  */
 
-export const CAMP_SWITCHES = ['commander', 'radio', 'alarm', 'truck', 'reinforce', 'fight', 'firefight', 'chase', 'mates', 'places', 'hunt', 'answer', 'protect', 'power'] as const;
+export const CAMP_SWITCHES = ['commander', 'radio', 'alarm', 'truck', 'reinforce', 'fight', 'firefight', 'chase', 'mates', 'shift', 'places', 'hunt', 'answer', 'protect', 'power'] as const;
 
 export type CampSwitch = (typeof CAMP_SWITCHES)[number];
 
@@ -82,6 +82,8 @@ export function takeAway(sim: Simulation, off: readonly CampSwitch[]): void {
   if (has('fight') || has('firefight') || has('chase')) delete camp.chases;
   // Looking out for their own (game/combat.ts): a man holds his fire only for one of his own dead on his line, as every camp once did.
   if (has('fight') || has('mates')) delete camp.mates;
+  // A clear line (brain/firefight.ts): a man whose round is held for one of his own holds and waits. It's a held round's answer, and a position's, so without those there's none.
+  if (has('fight') || has('firefight') || has('mates') || has('shift')) delete camp.shifts;
   // Places (brain/protect.ts): every man sent about the target makes for the one point, by his door and by his vehicle, as before them.
   if (has('places')) delete camp.places;
   // Step 2b (brain/hunt.ts): nobody goes out after a shooter the camp has placed. A hunt ends in a firefight, so without that there's none.

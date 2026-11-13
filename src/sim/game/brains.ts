@@ -36,8 +36,11 @@ export function drawBrain(draw: DebugDraw, ctx: TickContext, g: GuardEntity): vo
   const errand = b.act === 'task' && b.task ? ERRANDS[b.task.kind] : undefined;
   const phase = firefightPhase(b, ctx.tick) ?? huntPhase(b, ctx.tick) ?? (errand ? (b.task!.kind === 'start' && b.engine ? 'by the vehicle, engine running' : errand) : null);
   // He had a shot and didn't take it: one of his own was in front of his rifle (game/combat.ts). Shown for a moment after, since the moment itself is one tick.
-  const holding = b.held !== undefined && (ctx.tick - b.held) / ctx.tuning.sim.tickHz <= HELD_SHOWN ? ' · holding his fire' : '';
-  draw.label(body.x, body.y + body.eyeHeight + 0.95, body.z, `${phase ? `${b.act} · ${phase}` : b.act}${holding}`, tone, `${b.act}${phase ? ` (${phase})` : ''} · ${a}${b.linger >= 0 ? ' · looking around' : ''}${holding ? ' · holding his fire: one of his own is in front of his rifle' : ''}`);
+  // Or he's shifted a pace aside for a clear line past him, for the rest of this burst (brain/firefight.ts).
+  const shift = b.ff?.shift;
+  const holding = shift ? ' · shifting for a clear line' : b.held !== undefined && (ctx.tick - b.held) / ctx.tuning.sim.tickHz <= HELD_SHOWN ? ' · holding his fire' : '';
+  const why = shift ? ` · shifted ${shift.pace.toFixed(1)} m to his ${shift.side < 0 ? 'left' : 'right'}: guard ${shift.mate} was in front of his rifle` : holding ? ' · holding his fire: one of his own is in front of his rifle' : '';
+  draw.label(body.x, body.y + body.eyeHeight + 0.95, body.z, `${phase ? `${b.act} · ${phase}` : b.act}${holding}`, tone, `${b.act}${phase ? ` (${phase})` : ''} · ${a}${b.linger >= 0 ? ' · looking around' : ''}${why}`);
   // A firefight: where he believes the intruder is, and his position: where he hides, and where he fires from.
   const ff = b.ff;
   if (ff && phase) {
@@ -48,6 +51,8 @@ export function drawBrain(draw: DebugDraw, ctx: TickContext, g: GuardEntity): vo
       draw.point(s.hx, ground(s.hx, s.hz), s.hz, 0.25, 'good');
       if (s.fx !== s.hx || s.fz !== s.hz) draw.line(s.hx, ground(s.hx, s.hz), s.hz, s.fx, ground(s.fx, s.fz), s.fz, s.line ? 'good' : 'muted');
       draw.point(s.fx, ground(s.fx, s.fz) + (s.fs === 'stand' ? 1.2 : 0.6), s.fz, 0.15, s.line ? 'good' : 'muted');
+      // The pace aside from it, for a clear line past one of his own.
+      if (shift) draw.line(s.fx, ground(s.fx, s.fz), s.fz, shift.x, ground(shift.x, shift.z), shift.z, 'info');
     }
   }
   // A hunt: the way out as its stops, in view (warn) or out of it, the one he's on or making for, and the place.

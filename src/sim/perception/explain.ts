@@ -90,7 +90,9 @@ export function describe(e: SimEvent): string {
     case 'passed':
       return `a round passed ${m(e.distance)} m from your head`;
     case 'held':
-      return `held his fire: guard ${e.mate} was ${m(e.distance)} m in front of his rifle`;
+      return `held his fire: guard ${e.mate} was ${m(e.distance)} m in front of his rifle, ${e.off <= 0 ? 'on his line' : `${m(e.off)} m to its ${e.side < 0 ? 'left' : 'right'}`}`;
+    case 'shift':
+      return `shifted ${m(e.pace)} m to his ${e.side < 0 ? 'left' : 'right'} for a clear line past guard ${e.mate}`;
     case 'objective':
       return 'the target is down: now get out';
     case 'door':

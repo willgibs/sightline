@@ -373,6 +373,21 @@ export interface HeldEvent extends EventBase {
   mate: number;
   /** How far along his line of fire that man is, metres. */
   distance: number;
+  /** Which side of the line he stands, looking down it: 1 right, −1 left. */
+  side: number;
+  /** Metres from the line, level with the ground, to his nearest edge: negative when the line passes through him. */
+  off: number;
+}
+
+/** A guard whose round was held for one of his own shifts a pace for a clear line (Lab F; brain/firefight.ts). Source: the guard. */
+export interface ShiftEvent extends EventBase {
+  type: 'shift';
+  /** The man who was in the way. */
+  mate: number;
+  /** Which way he steps, looking down his line: 1 right, −1 left. */
+  side: number;
+  /** Metres to the place he shifts to. */
+  pace: number;
 }
 
 /** The mission has moved on (Lab F): the target is down, and now you have to get out. */
@@ -457,6 +472,7 @@ export type SimEvent =
   | WhistleEvent
   | PassedEvent
   | HeldEvent
+  | ShiftEvent
   | DoorEvent
   | SirenEvent
   | EngineEvent
@@ -590,7 +606,8 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   whistle: { code: 103, range: 'brain', sound: true, fields: { ...SOUND } },
   engine: { code: 105, range: 'brain', sound: true, fields: { ...SOUND, load: { enum: every<EventOf<'engine'>['load']>()(['start', 'idle', 'drive']) } } },
   passed: { code: 104, range: 'brain', sound: false, fields: { distance: 'f32' } },
-  held: { code: 106, range: 'brain', sound: false, fields: { mate: 'u32', distance: 'f32' } },
+  held: { code: 106, range: 'brain', sound: false, fields: { mate: 'u32', distance: 'f32', side: 'i32', off: 'f32' } },
+  shift: { code: 107, range: 'brain', sound: false, fields: { mate: 'u32', side: 'i32', pace: 'f32' } },
   objective: { code: 102, range: 'brain', sound: false, fields: { stage: { enum: every<EventOf<'objective'>['stage']>()(['get-out']) } } },
   sabotage: { code: 100, range: 'brain', sound: false, fields: { what: { enum: every<EventOf<'sabotage'>['what']>()(['generator', 'radio', 'vehicle', 'alarm']) }, x: 'f32', z: 'f32' } },
   door: { code: 101, range: 'brain', sound: true, fields: { ...SOUND, open: 'u8' } },
