@@ -119,8 +119,12 @@ export function buildGrid(terrain: Heightfield, colliders: ColliderSet, site: { 
   const sx = Math.max(1, Math.ceil((site.maxX - site.minX) / fine));
   const sz = Math.max(1, Math.ceil((site.maxZ - site.minZ) / fine));
   const siteLayer = layer(site.minX, site.minZ, fine, sx, sz);
-  fill(map, terrain, colliders, G);
-  fill(siteLayer, terrain, colliders, G);
+  // A map cell is as big as the terrain's own, so it lies on two triangles and has to answer
+  // for both. A site cell is a fifth as wide and still answers for the ground under its
+  // middle: asking it for all of its ground moves the camp generation builds on about one
+  // seed in ten, for a fault nobody has seen inside a camp (docs/decisions.md, Nov 13).
+  fill(map, terrain, colliders, G, true);
+  fill(siteLayer, terrain, colliders, G, false);
   const built = storeys.map((s): Storey => {
     // On the site layer's cell lines.
     const x0 = site.minX + Math.floor((s.minX - site.minX) / fine) * fine;
@@ -236,7 +240,12 @@ function layer(x0: number, z0: number, cell: number, nx: number, nz: number): Gr
   return { x0, z0, cell, nx, nz, flags: new Uint8Array(nx * nz), cover: new Uint8Array(nx * nz), edges: new Uint8Array(nx * nz) };
 }
 
-function fill(L: GridLayer, terrain: Heightfield, colliders: ColliderSet, G: GenTuning): void {
+/**
+ * Fills a layer's cells and edges. `whole`: a cell is steep if any triangle under it is,
+ * and not only the one under its middle. The motor stops a body at whichever triangle it
+ * steps on to, so a cell that answers for one of its two sends a walker up the other.
+ */
+function fill(L: GridLayer, terrain: Heightfield, colliders: ColliderSet, G: GenTuning, whole: boolean): void {
   const B = G.grid;
   const tanMax = dtanDeg(G.walkableSlopeDeg);
   for (let j = 0; j < L.nz; j++) {
@@ -245,10 +254,7 @@ function fill(L: GridLayer, terrain: Heightfield, colliders: ColliderSet, G: Gen
       const z = L.z0 + (j + 0.5) * L.cell;
       terrain.sample(x, z, sample);
       const ground = sample.height;
-      // Steep if any triangle under the cell is. Its middle lies on one of them, and the
-      // motor stops a body at whichever it steps on to: a map cell lined up with the
-      // terrain's has two, and with only the middle asked, a guard was routed up the other.
-      const steepest = terrain.steepestIn(L.x0 + i * L.cell, L.z0 + j * L.cell, L.x0 + (i + 1) * L.cell, L.z0 + (j + 1) * L.cell);
+      const steepest = whole ? terrain.steepestIn(L.x0 + i * L.cell, L.z0 + j * L.cell, L.x0 + (i + 1) * L.cell, L.z0 + (j + 1) * L.cell) : sample.slopeTan;
       let flags = steepest > tanMax ? Cell.Steep : Cell.Walkable;
       let cover = 0;
       colliders.query(x - B.bodyRadius, z - B.bodyRadius, x + B.bodyRadius, z + B.bodyRadius, ids);

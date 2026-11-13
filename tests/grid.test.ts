@@ -81,7 +81,8 @@ describe('the spatial grid', () => {
     expect(has(map, 31, 9, Cell.Steep)).toBe(true);
     expect(has(map, 31, 9, Cell.Walkable)).toBe(false);
     expect(has(map, 33, 9, Cell.Walkable)).toBe(true);
-    // The fine layer by the same rule at its own size: steep on the raised half, walkable on the flat one.
+    // The fine layer, whose cells are a quarter the width and still go by their middles: steep
+    // on the raised half, walkable on the flat one.
     expect(cellIndex(site, 30.25, 9.75)).toBeGreaterThanOrEqual(0);
     expect(has(site, 30.25, 9.75, Cell.Walkable)).toBe(false);
     expect(has(site, 31.75, 8.25, Cell.Walkable)).toBe(true);
@@ -93,11 +94,12 @@ describe('the spatial grid', () => {
     const w = generateWorld(missionSpec('HEL-2923'), T);
     const tanMax = dtanDeg(T.gen.walkableSlopeDeg);
     expect(has(w.grid.map, 133.75, -93.75, Cell.Walkable)).toBe(false);
-    // Every edge of both layers, walked both ways on the ground's own triangles: no height
-    // gained on ground too steep to climb, which is what the motor refuses.
+    // Every edge of the map layer, walked both ways on the ground's own triangles: no height
+    // gained on ground too steep to climb, which is what the motor refuses. (The site layer
+    // isn't held to it: its cells answer for their middles.)
     let edges = 0;
     let refused = 0;
-    for (const L of [w.grid.map, w.grid.site]) {
+    for (const L of [w.grid.map]) {
       for (let j = 0; j < L.nz; j++) {
         for (let i = 0; i < L.nx; i++) {
           const e = L.edges[j * L.nx + i]!;

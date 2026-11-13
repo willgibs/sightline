@@ -15,8 +15,11 @@
  * can walk to. 7: tree crowns are part of the world, and a perch's view stops at them.
  * 8: compound types: a keep, a depot and a farm (docs/compound-types.md).
  * 9: two-storey buildings: floors, stairs and windows, an upper floor the grid and the analysis know.
+ * 10: the walking grid calls a cell steep if any triangle under it is (kernel/world/grid.ts;
+ * it asked only the one under the cell's middle). The grid is part of a world, so every
+ * valley's fingerprint moves, and what generation works out from the grid can move with it.
  */
-export const GEN_VERSION = 9;
+export const GEN_VERSION = 10;
 
 /**
  * How the simulation behaves for given inputs. 3: events carry ids, times, entity sources
