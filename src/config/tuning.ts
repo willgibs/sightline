@@ -869,6 +869,12 @@ export const defaultTuning = {
       whistle: { radius: 600, every: 6 }, // metres it carries, and the seconds between blasts: it's how a person on a ridge knows the camp has reacted
       suppress: { range: 480, react: 2.5, every: 2.2, forget: 25 }, // tower men firing at where they believe he is: metres, seconds to the first round, between rounds, and how long a shot stays worth answering
       spreadDeg: { marksman: 0.3, other: 1.1 }, // the error radius of a round fired by a camp that fights, degrees
+      // One of his own where his round could go (game/combat.ts): he holds his fire. A round goes anywhere inside its error radius,
+      // so that's the cone he keeps clear, out to what he's shooting at, of any man the round could reach. Only a camp with `mates`.
+      mates: {
+        clear: 0.3, // metres more than his aim's error that he leaves round one of his own: a careful man's margin, and a man who shifts his weight
+        near: 0.5, // metres in front of his muzzle before anyone counts as in front of it: the man at his shoulder isn't
+      },
       nearMiss: { radius: 3, knock: 1.4 }, // metres from your head that a round counts as a near miss, and the seconds it knocks you off your rest
       flash: { range: 520, suppressed: 140 }, // metres a muzzle flash can be seen at, by someone looking that way
     },

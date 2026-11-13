@@ -146,6 +146,8 @@ export interface BrainState {
   start?: boolean;
   /** The firefight he's in (firefight.ts): where he believes the intruder is, his position, and what he's doing at it. Absent until he's in one. */
   ff?: Firefight;
+  /** The tick he last held his fire for one of his own in front of his rifle (game/combat.ts). Absent until he has. */
+  held?: number;
   /** Where one of his own last said he was going out of the walls to (firefight.ts, the chase), and when he heard it: he puts no rounds into ground he can't see into near there. Absent until someone does. */
   mateOut?: { x: number; z: number; heard: number };
   /** The hunt he's on (hunt.ts): the way out, the stop he's at, and what he's doing there. Absent until he's ordered out with a section. */

@@ -185,7 +185,7 @@ const guardBrains: System = {
   phase: 'decide',
   reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.guard.reserve', 'guard.senses', 'guard.brain'],
   writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'commander.camp.devices', 'commander.camp.level', 'commander.camp.since', 'commander.camp.objective', 'commander.camp.inbox', 'commander.camp.whistled', 'alarm.alarm.raised', 'objective.objective.status', 'vehicle.vehicle', 'schedule', 'entities', 'bullet.bullet'],
-  emits: ['act', 'call', 'shot', 'report', 'alarm', 'siren', 'level', 'whistle'],
+  emits: ['act', 'call', 'shot', 'report', 'held', 'alarm', 'siren', 'level', 'whistle'],
   run(ctx) {
     const nav = navAllowance(ctx);
     const devices = commanderOf(ctx)?.camp.devices;
@@ -198,7 +198,8 @@ const guardBrains: System = {
       }
       if (g.brain) {
         if (g.brain.fire) {
-          guardFire(ctx, g, g.brain.fire);
+          // What a man knows of his own trigger: that he didn't pull it, because one of his own was in front of his rifle.
+          if (!guardFire(ctx, g, g.brain.fire) && commanderOf(ctx)?.camp.mates) g.brain.held = ctx.tick;
           g.brain.fire = null;
         }
         if (g.brain.raise >= 0) {

@@ -366,6 +366,15 @@ export interface PassedEvent extends EventBase {
   distance: number;
 }
 
+/** A guard held his fire: one of his own was where the round could go (Lab F; game/combat.ts). Source: the guard. */
+export interface HeldEvent extends EventBase {
+  type: 'held';
+  /** The man in the way. */
+  mate: number;
+  /** How far along his line of fire that man is, metres. */
+  distance: number;
+}
+
 /** The mission has moved on (Lab F): the target is down, and now you have to get out. */
 export interface ObjectiveEvent extends EventBase {
   type: 'objective';
@@ -447,6 +456,7 @@ export type SimEvent =
   | ObjectiveEvent
   | WhistleEvent
   | PassedEvent
+  | HeldEvent
   | DoorEvent
   | SirenEvent
   | EngineEvent
@@ -580,6 +590,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   whistle: { code: 103, range: 'brain', sound: true, fields: { ...SOUND } },
   engine: { code: 105, range: 'brain', sound: true, fields: { ...SOUND, load: { enum: every<EventOf<'engine'>['load']>()(['start', 'idle', 'drive']) } } },
   passed: { code: 104, range: 'brain', sound: false, fields: { distance: 'f32' } },
+  held: { code: 106, range: 'brain', sound: false, fields: { mate: 'u32', distance: 'f32' } },
   objective: { code: 102, range: 'brain', sound: false, fields: { stage: { enum: every<EventOf<'objective'>['stage']>()(['get-out']) } } },
   sabotage: { code: 100, range: 'brain', sound: false, fields: { what: { enum: every<EventOf<'sabotage'>['what']>()(['generator', 'radio', 'vehicle', 'alarm']) }, x: 'f32', z: 'f32' } },
   door: { code: 101, range: 'brain', sound: true, fields: { ...SOUND, open: 'u8' } },

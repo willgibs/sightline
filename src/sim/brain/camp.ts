@@ -144,6 +144,8 @@ export interface CampState {
   hunts?: true;
   /** A camp whose men go after someone they watched leave its walls (firefight.ts, the chase): one or two, to the opening and a step out of it. Absent for a camp that lets him go. */
   chases?: true;
+  /** A camp whose men look out for their own when they fire (game/combat.ts): no round goes where one of them stands in the way of it. Absent for a camp that holds only for a man dead on the line. */
+  mates?: true;
   /** Who it's hunting, if anyone; its sections out; the next section's id; places they've found empty; and the tick the last one came home or was lost, or −1. */
   threat: Threat | null;
   sections: Section[];
