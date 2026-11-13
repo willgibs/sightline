@@ -24,7 +24,7 @@ import { keptWorld } from '../worlds';
  */
 
 const ONE_BURST = 'a pace for one burst';
-const UNBOUNDED = 'kept, back up without limit';
+const UNBOUNDED = 'kept, no bound';
 const ARMS: readonly Arm[] = [{ name: 'as it was', off: 'mates' }, { name: 'holds and waits', off: 'shift' }, { name: ONE_BURST }, { name: 'a pace kept' }, { name: UNBOUNDED }];
 
 /** Seconds from a hold to that man's next round that count as soon. */
