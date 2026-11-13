@@ -1,7 +1,7 @@
 import type { Tuning } from '../../config/tuning';
-import { datan2 } from '../kernel/core/detmath';
+import { datan2, dtanDeg } from '../kernel/core/detmath';
 import { Blocks, footprintContains, type Collider } from '../kernel/world/colliders';
-import { Cell, cellIndex, storeyAt, type GridLayer, type Stair } from '../kernel/world/grid';
+import { CLIMB_SLACK, Cell, Edge, cellIndex, storeyAt, type GridLayer, type Stair } from '../kernel/world/grid';
 import { sightLine, type QueryView } from '../kernel/world/query';
 import { Solids } from '../kernel/world/solids';
 import { COST_PER_METRE, GridSearch, components, landmarkTables, type Bounds, type MoveCost, type SearchOptions } from '../kernel/world/search';
@@ -26,8 +26,15 @@ import type { Ground } from './mind';
  * grid was built with, and the motor walks them (followRoute): no second authority over
  * where bodies go, and no state outside the guard who walks.
  *
- * Everything here reads the static world the mind holds: the grid and the colliders.
- * A route knows nothing of bodies; a guard who is stalled by one steps around it (below).
+ * A route keeps off ground too steep to climb, as the motor will hold a body to it: out in
+ * the valley it takes no walk the map has marked (grid.ts, Edge.EastSteep), and no stretch
+ * of it is pulled straight across such ground (`clear`). The map's cells answer for the
+ * ground under their middles only, and a route that went by them alone ran a man at a face
+ * he couldn't get up, to stall there and be sent the same way again.
+ *
+ * Everything here reads the static world the mind holds: the grid, the ground and the
+ * colliders. A route knows nothing of bodies; a guard who is stalled by one steps around it
+ * (below).
  */
 
 /** A route: the waypoints left to walk, in order, and how the walk is going. Plain data, in the guard's state. */
@@ -367,7 +374,7 @@ export class Navigator {
     const site = this.site.layer;
     const field = this.rimField();
     const map = field.layer;
-    const outer = this.nearestWalkable(map, inA ? bx : ax, inA ? bz : az);
+    const outer = this.nearestWalkable(map, inA ? bx : ax, inA ? bz : az, true);
     if (outer < 0 || field.cost[outer]! < 0) return 'no-route';
     const coarse = this.rimCells;
     coarse.length = 0;
@@ -417,7 +424,7 @@ export class Navigator {
       const z = cellZ(map, c);
       if (inside(x, z) && !(inside(x + map.cell, z) && inside(x - map.cell, z) && inside(x, z + map.cell) && inside(x, z - map.cell))) sources.push(c);
     }
-    field.flood(sources, { maxExpansions: map.nx * map.nz });
+    field.flood(sources, { maxExpansions: map.nx * map.nz, cost: this.offSteep });
     this.rim = field;
     return field;
   }
@@ -477,8 +484,9 @@ export class Navigator {
   /** Searches one layer between the nearest walkable cells to two points. */
   private searchLayer(search: GridSearch, ax: number, az: number, bx: number, bz: number, maxExpansions: number, opts: FindOptions, out: number[]): RouteResult {
     const L = search.layer;
-    const start = this.nearestWalkable(L, ax, az);
-    const goal = this.nearestWalkable(L, bx, bz);
+    const coarse = search === this.map;
+    const start = this.nearestWalkable(L, ax, az, coarse);
+    const goal = this.nearestWalkable(L, bx, bz, coarse);
     if (start < 0 || goal < 0) return 'no-route';
     const aid = search === this.site ? this.siteAid() : null;
     // Different ground: there is no way, and a search would look at all of his before saying so.
@@ -486,7 +494,7 @@ export class Navigator {
       out.length = 0;
       return 'no-route';
     }
-    const r = search.path(start, goal, { maxExpansions, work: opts.work, cost: search === this.site ? opts.cost : undefined, bounds: aid?.bounds ?? undefined }, out);
+    const r = search.path(start, goal, { maxExpansions, work: opts.work, cost: search === this.site ? opts.cost : coarse ? this.offSteep : undefined, bounds: aid?.bounds ?? undefined }, out);
     if (r.found) return 'found';
     return r.exhausted ? 'out-of-budget' : 'no-route';
   }
@@ -581,10 +589,49 @@ export class Navigator {
   }
 
   /**
-   * The nearest walkable cell to a point, by the grid: its own cell, or the first in
-   * widening rings (nearest first, in a fixed order). −1 if none is near.
+   * Closes the walks the map has marked (grid.ts, Edge.EastSteep): middle to middle, they
+   * gain height on ground too steep to climb. A corner move goes where both of its two-step
+   * paths do, as in the search itself: it is closed by a mark on any side of the square the
+   * two cells share.
    */
-  private nearestWalkable(L: GridLayer, x: number, z: number): number {
+  private readonly offSteep: MoveCost = (from, to, length) => {
+    const e = this.map.layer.edges;
+    const nx = this.map.layer.nx;
+    const a = from < to ? from : to;
+    const d = (from < to ? to : from) - a;
+    if (d === 1) return (e[a]! & Edge.EastSteep) !== 0 ? -1 : length;
+    if (d === nx) return (e[a]! & Edge.NorthSteep) !== 0 ? -1 : length;
+    // North-east of `a`, or north-west of it: the square's south-west cell is `a`, or the one west of it.
+    const sw = d === nx + 1 ? a : a - 1;
+    return (e[sw]! & (Edge.EastSteep | Edge.NorthSteep)) !== 0 || (e[sw + 1]! & Edge.NorthSteep) !== 0 || (e[sw + nx]! & Edge.EastSteep) !== 0 ? -1 : length;
+  };
+
+  /** True if a map cell has ways out of it for a body that fits, and every one of them is marked steep: a ledge no route leaves or reaches. */
+  private cutOff(c: number): boolean {
+    const L = this.map.layer;
+    const e = L.edges;
+    const i = c % L.nx;
+    let ways = 0;
+    let open = 0;
+    const side = (bits: number, fits: number, steep: number): void => {
+      if ((bits & fits) === 0) return;
+      ways++;
+      if ((bits & steep) === 0) open++;
+    };
+    side(e[c]!, Edge.East, Edge.EastSteep);
+    side(e[c]!, Edge.North, Edge.NorthSteep);
+    if (i > 0) side(e[c - 1]!, Edge.East, Edge.EastSteep);
+    if (c >= L.nx) side(e[c - L.nx]!, Edge.North, Edge.NorthSteep);
+    return ways > 0 && open === 0;
+  }
+
+  /**
+   * The nearest walkable cell to a point, by the grid: its own cell, or the first in
+   * widening rings (nearest first, in a fixed order). −1 if none is near. `reachable`, on
+   * the map layer: not a cell the steep marks have cut off, which would end a search before
+   * it began; the route ends beside it.
+   */
+  private nearestWalkable(L: GridLayer, x: number, z: number, reachable = false): number {
     const R = this.tuning.brain.nav.snapRadius;
     const i0 = Math.max(0, Math.min(L.nx - 1, Math.floor((x - L.x0) / L.cell)));
     const j0 = Math.max(0, Math.min(L.nz - 1, Math.floor((z - L.z0) / L.cell)));
@@ -600,6 +647,7 @@ export class Navigator {
           if (i < 0 || j < 0 || i >= L.nx || j >= L.nz) continue;
           const c = j * L.nx + i;
           if ((L.flags[c]! & Cell.Walkable) === 0) continue;
+          if (reachable && this.cutOff(c)) continue;
           const cx = L.x0 + (i + 0.5) * L.cell - x;
           const cz = L.z0 + (j + 0.5) * L.cell - z;
           const dd = cx * cx + cz * cz;
@@ -642,6 +690,9 @@ export class Navigator {
    * True if a body can walk the straight segment, to its end: every sample stands on a walkable cell
    * (the finest layer there) and fits among the colliders, by the test the grid was built
    * with (kernel/world/grid.ts), so a pulled route never cuts what the search went around.
+   * And it gains no height on ground too steep to climb, going that way: the cells it crosses
+   * answer for their middles, and a straight line across one can run up the triangle its
+   * middle isn't on.
    */
   clear(ax: number, az: number, bx: number, bz: number): boolean {
     const { world } = this;
@@ -650,6 +701,7 @@ export class Navigator {
     const dz = bz - az;
     const len = Math.sqrt(dx * dx + dz * dz);
     if (len < 1e-6) return true;
+    if (world.terrain.gainOnSteep(ax, az, bx, bz, dtanDeg(this.tuning.gen.walkableSlopeDeg)) > CLIMB_SLACK) return false;
     const site = world.grid.site;
     const map = world.grid.map;
     const r = G.bodyRadius;

@@ -11,6 +11,7 @@ import { sightLine } from '../src/sim/kernel/world/query';
 import { Solids } from '../src/sim/kernel/world/solids';
 import { startScene, type Scene } from '../src/sim/kernel/scene';
 import type { World } from '../src/sim/kernel/world/world';
+import { withoutSteepMarks } from './fixtures';
 
 /**
  * Compound types (docs/compound-types.md, generation/plots.ts): a seed gets a kind of place
@@ -76,7 +77,8 @@ describe('with only the yard weighted', () => {
       delete b.floorY;
       delete b.storey;
     }
-    expect(worldFingerprint(w)).toBe(BEFORE_TYPES);
+    // Nor the marks since made on the map for walks too steep to climb.
+    expect(worldFingerprint(withoutSteepMarks(w))).toBe(BEFORE_TYPES);
   }, 120_000);
 });
 

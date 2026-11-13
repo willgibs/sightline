@@ -17,11 +17,30 @@ import { makeTerrainSample, type Heightfield } from './heightfield';
  * fit a body, and only the edge between them knows it's there. Doors and anything else
  * that changes during a mission will override cells from the simulation's state.
  *
+ * Ground too steep to climb isn't walkable, and a cell answers for the ground under its
+ * middle. A map cell lies on two of the terrain's triangles, though, and the walk from its
+ * middle to a neighbour's can cross one that neither cell answered for. Where that walk
+ * gains height on ground too steep, one way or the other, the map layer marks the edge
+ * (Edge.EastSteep, Edge.NorthSteep), and a route keeps off it (brain/nav.ts). The bits a
+ * body fits by are left as they are, for everything else that reads them.
+ *
  * Built for a standard human body (gen.grid), kept equal to the player's by a test.
  */
 
-/** Edge bits: a body can walk from this cell's centre to its neighbour's. */
-export const Edge = { East: 1, North: 2 } as const;
+/**
+ * Edge bits. East and North: a body fits all the way from this cell's centre to its
+ * neighbour's. EastSteep and NorthSteep, set on the map layer beside those: it fits, but
+ * the walk gains height on ground too steep to climb, one way or the other, which the
+ * motor refuses. Only a walker's route reads them.
+ */
+export const Edge = { East: 1, North: 2, EastSteep: 4, NorthSteep: 8 } as const;
+
+/**
+ * Metres a walk may gain on ground too steep and still be one a body can make at any pace:
+ * the motor's own slack (body/motor.ts, terrainBlocks), which lets a rise this small on to
+ * such ground go by.
+ */
+export const CLIMB_SLACK = 0.002;
 
 export const Cell = {
   /** A standing body fits here: ground not too steep, nothing solid in the way. */
@@ -44,7 +63,7 @@ export interface GridLayer {
   flags: Uint8Array;
   /** Height above the ground of the tallest thing in the cell that blocks sight, in decimetres. */
   cover: Uint8Array;
-  /** Edge bits: Edge.East to cell (i + 1, j), Edge.North to cell (i, j + 1). */
+  /** Edge bits: Edge.East to cell (i + 1, j), Edge.North to cell (i, j + 1), and the same two marked steep. */
   edges: Uint8Array;
 }
 
@@ -120,6 +139,7 @@ export function buildGrid(terrain: Heightfield, colliders: ColliderSet, site: { 
   const sz = Math.max(1, Math.ceil((site.maxZ - site.minZ) / fine));
   const siteLayer = layer(site.minX, site.minZ, fine, sx, sz);
   fill(map, terrain, colliders, G);
+  markSteepEdges(map, terrain, G);
   fill(siteLayer, terrain, colliders, G);
   const built = storeys.map((s): Storey => {
     // On the site layer's cell lines.
@@ -230,6 +250,36 @@ function clearPathAt(colliders: ColliderSet, y: number, x: number, z: number, dx
     }
   }
   return true;
+}
+
+/**
+ * Marks the edges of the map layer whose walk, middle to middle, gains height on ground too
+ * steep to climb, either way: read off the terrain's own triangles (rule 7), as the motor
+ * reads them. A cell's flag answers for the triangle under its middle, and a walk east or
+ * north out of it crosses its other one, or the next cell's. Nothing else is touched: the
+ * bit that says a body fits stays, and so do both cells' flags.
+ *
+ * The site layer isn't marked. Its cells are a fifth as wide, so a walk between two of
+ * their middles rarely leaves the triangles they answered for, and no walk inside a camp
+ * has been seen to fail on one that does.
+ */
+function markSteepEdges(L: GridLayer, terrain: Heightfield, G: GenTuning): void {
+  const tanMax = dtanDeg(G.walkableSlopeDeg);
+  const c = L.cell;
+  const climbs = (x0: number, z0: number, x1: number, z1: number): boolean => terrain.gainOnSteep(x0, z0, x1, z1, tanMax) > CLIMB_SLACK || terrain.gainOnSteep(x1, z1, x0, z0, tanMax) > CLIMB_SLACK;
+  for (let j = 0; j < L.nz; j++) {
+    for (let i = 0; i < L.nx; i++) {
+      const k = j * L.nx + i;
+      const e = L.edges[k]!;
+      if (e === 0) continue;
+      const x = L.x0 + (i + 0.5) * c;
+      const z = L.z0 + (j + 0.5) * c;
+      let marked = e;
+      if ((e & Edge.East) !== 0 && climbs(x, z, x + c, z)) marked |= Edge.EastSteep;
+      if ((e & Edge.North) !== 0 && climbs(x, z, x, z + c)) marked |= Edge.NorthSteep;
+      L.edges[k] = marked;
+    }
+  }
 }
 
 function layer(x0: number, z0: number, cell: number, nx: number, nz: number): GridLayer {
