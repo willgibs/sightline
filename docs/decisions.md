@@ -57,7 +57,7 @@ A second try closed the edges into a bad triangle and left the cell alone. A wal
 | `firefight` | With the firefight, someone came after him 1 → 2 of 6. Means inside their intervals |
 | `ladder` | Shoot and relocate: shot dead 4 → 2 of 16, detected 4 → 2 of 16. Means inside their intervals |
 
-**Versions and pins.** `GEN_VERSION` 10: the grid in a world carries the marks, and TAL-4471's fingerprint is `4640c8146acaa42b`. `SIM_VERSION` 28: routes changed. No pinned run's route crossed such ground, so no pinned run's `behaviour` or `state` moved, and no bench pin moved.
+**Versions and pins.** `GEN_VERSION` 10: the grid in a world carries the marks, and TAL-4471's fingerprint is `4640c8146acaa42b`. `SIM_VERSION` 28: routes changed. No pinned run's route crossed such ground, so no pinned run's `behaviour` or `state` moved, and no bench pin moved. Two tests pin whole worlds as generation made them before compound types and before upper floors (`tests/types.test.ts`, `tests/storeys.test.ts`). They now leave the marks out (`withoutSteepMarks`, `tests/fixtures.ts`), as they already leave out the fields those changes added, and their five pins stand as they were: on TAL-4471 as a yard, MAZ-1737, HAM-3144, TAP-5457 and HUB-9331, nothing but the marks moved.
 
 **What it leaves.**
 

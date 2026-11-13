@@ -18,6 +18,7 @@ import { Cell, cellIndex, storeyAt } from '../src/sim/kernel/world/grid';
 import { neutralInput } from '../src/sim/kernel/input';
 import { startScene, type Scene } from '../src/sim/kernel/scene';
 import { noWork } from '../src/sim/kernel/work';
+import { withoutSteepMarks } from './fixtures';
 import { GridSearch } from '../src/sim/kernel/world/search';
 import type { World } from '../src/sim/kernel/world/world';
 import { yawFromDirection } from '../src/sim/kernel/core/math';
@@ -410,7 +411,8 @@ describe('what taller camps are for (the owner, Nov 10)', () => {
         delete b.floorY;
         delete b.storey;
       }
-      expect(worldFingerprint(w), `${seed}, a ${type}`).toBe(was);
+      // Nor the marks since made on the map for walks too steep to climb: with them left out, these are the worlds they were.
+      expect(worldFingerprint(withoutSteepMarks(w)), `${seed}, a ${type}`).toBe(was);
     }
   }, 300_000);
 
