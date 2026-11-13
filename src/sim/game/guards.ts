@@ -48,6 +48,7 @@ export interface CampFacts {
   firefight?: boolean;
   hunts?: boolean;
   chases?: boolean;
+  places?: boolean;
   protects?: Readonly<{ x: number; z: number; y?: number }> | null;
   answer?: CampAnswer | null;
 }
@@ -84,6 +85,7 @@ export function guardMind(g: GuardEntity, world: World, tuning: Tuning, tick: nu
   out.firefight = facts.firefight === true;
   out.hunts = facts.hunts === true;
   out.chases = facts.chases === true;
+  out.places = facts.places === true;
   out.protects = facts.protects ?? null;
   out.answer = facts.answer ?? null;
   return out;
@@ -106,7 +108,7 @@ function reservePost(borrowed: GuardSpawn, at: { x: number; z: number; yaw: numb
 /** A mind for guardMind to fill: every field is written on each use. */
 export function emptyMind(): Writable<GuardMind> {
   const unset = null as never;
-  return { fights: false, firefight: false, hunts: false, chases: false, protects: null, answer: null, id: 0, self: unset, head: 0, post: unset, world: unset, tuning: unset, tick: 0, time: 0, percepts: NO_PERCEPTS, awareness: UNAWARE, belief: null, brain: null, draw: noDraw, nav: noNav, alarms: NO_ALARMS, escape: null };
+  return { fights: false, firefight: false, hunts: false, chases: false, places: false, protects: null, answer: null, id: 0, self: unset, head: 0, post: unset, world: unset, tuning: unset, tick: 0, time: 0, percepts: NO_PERCEPTS, awareness: UNAWARE, belief: null, brain: null, draw: noDraw, nav: noNav, alarms: NO_ALARMS, escape: null };
 }
 
 const noDraw = (): number => {

@@ -1,6 +1,7 @@
 import type { ActName, BrainState, Tasking } from './brain';
 import type { GuardMind } from './mind';
 import { stand, walk } from './moves';
+import { navigatorOf } from './nav';
 import type { Order } from './orders';
 import type { Option } from './utility';
 
@@ -151,7 +152,9 @@ function drill(m: GuardMind): void {
   const hz = m.tuning.sim.tickHz;
   const holds = m.post.holdsDoor === true;
   const mine = (kind: 'start' | 'fetch', x: number, z: number, y?: number): void => {
-    b.task = { id: 0, kind, x, z, ...(y === undefined ? {} : { y }), issued: m.tick, cause: m.awareness.cause };
+    // In for him and out to the vehicle, the man on his door first and whoever started it second: each knows which he is, so each knows his place.
+    const place = kind === 'fetch' && m.places ? { place: holds ? 0 : 1 } : {};
+    b.task = { id: 0, kind, x, z, ...(y === undefined ? {} : { y }), issued: m.tick, cause: m.awareness.cause, ...place };
   };
   if (b.drilled === 'fetch') return;
   if (b.engine) {
@@ -274,8 +277,14 @@ export function performFetch(m: GuardMind, out: Order, task: Tasking): boolean {
     return true;
   }
   if (task.kind === 'escort') {
-    // To his vehicle, and stay by it while he gets away: the order lapses with the commander's.
-    const w = walk(m, out, task.x, task.z, T.paces.run, 'sprint', task.x, task.z);
+    // To his vehicle, to his own place by it, and stay there while he gets away: the order lapses with the commander's.
+    const room = m.protects;
+    if (room && task.place) placeAt(m, task.x, task.z, room.x, room.z, task.place, spot);
+    else {
+      spot.x = task.x;
+      spot.z = task.z;
+    }
+    const w = walk(m, out, spot.x, spot.z, T.paces.run, 'sprint', task.x, task.z);
     if (w !== 'walking') stand(m, out, true);
     if ((m.tick - task.issued) / hz > T.camp.keepOrder) {
       b.task = null;
@@ -301,8 +310,9 @@ export function performFetch(m: GuardMind, out: Order, task: Tasking): boolean {
   }
   const dx = task.x - m.self.x;
   const dz = task.z - m.self.z;
-  // On the same floor as him, if he's upstairs: under his feet isn't at his door.
-  const near = dx * dx + dz * dz <= P.near * P.near && (task.y === undefined || Math.abs(task.y - m.self.y) < m.tuning.gen.compound.storey / 2);
+  // On the same floor as him, if he's upstairs: under his feet isn't at his door. Men sent together file in: each stops his place's width short of the one before him, on his own way in.
+  const reach = P.near + ((task.place ?? 0) % P.fetchers) * P.apart;
+  const near = dx * dx + dz * dz <= reach * reach && (task.y === undefined || Math.abs(task.y - m.self.y) < m.tuning.gen.compound.storey / 2);
   const w = near ? 'arrived' : walk(m, out, task.x, task.z, T.paces.run, 'sprint', task.x, task.z, task.y);
   if (w === 'arrived' || near) {
     b.linger = m.tick + Math.round(P.wait * hz);
@@ -314,6 +324,47 @@ export function performFetch(m: GuardMind, out: Order, task: Tasking): boolean {
     stand(m, out, false);
   }
   return true;
+}
+
+const spot = { x: 0, z: 0 };
+
+/**
+ * Where a man stands at a point he and others were sent to (hunt.ts's spotAt is the shape),
+ * by the place he was given with his order: place 0 on the point, and the others across the
+ * way they came to it from (fromX, fromZ), on alternate sides, `apart` between each. Where
+ * he couldn't walk straight from the point to that place (a wall, the vehicle itself), he
+ * stops short of the point on the way they came instead, his place's width behind it, so
+ * men file rather than stack; and where even that isn't open ground, on the point.
+ *
+ * It knows nothing of the others (rule 13): two men with different places stand apart
+ * because their numbers differ, not because either can see the other. On the ground only:
+ * a vehicle stands on it.
+ */
+export function placeAt(m: GuardMind, x: number, z: number, fromX: number, fromZ: number, place: number, out: { x: number; z: number }): void {
+  out.x = x;
+  out.z = z;
+  const dx = x - fromX;
+  const dz = z - fromZ;
+  const d = Math.sqrt(dx * dx + dz * dz);
+  if (place <= 0 || d < 1e-6) return;
+  const ux = dx / d;
+  const uz = dz / d;
+  const apart = m.tuning.brain.protect.apart;
+  const nav = navigatorOf(m.world, m.tuning);
+  const side = (place % 2 === 1 ? 1 : -1) * Math.floor((place + 1) / 2) * apart;
+  const sx = x - uz * side;
+  const sz = z + ux * side;
+  if (nav.clear(x, z, sx, sz)) {
+    out.x = sx;
+    out.z = sz;
+    return;
+  }
+  const bx = x - ux * place * apart;
+  const bz = z - uz * place * apart;
+  if (nav.clear(x, z, bx, bz)) {
+    out.x = bx;
+    out.z = bz;
+  }
 }
 
 /** "Time to go": said aloud at his door, for whoever is in earshot, and again in a moment. */

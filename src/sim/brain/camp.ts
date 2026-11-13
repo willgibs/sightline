@@ -50,6 +50,8 @@ export interface Task {
   issued: number;
   /** A section's order: who, from where, against whom (hunt.ts). */
   hunt?: HuntOrder;
+  /** For men sent to bring the target out, in a camp that hands out places (protect.ts): the first man's place. Each man's own is this and his number among `assigned`, put on the order he receives. */
+  place?: number;
 }
 
 /** `fetch` and `escort` are the two halves of bringing the target out (protect.ts): to his door, then to his vehicle. `hunt` is a section's (hunt.ts). */
@@ -146,6 +148,8 @@ export interface CampState {
   chases?: true;
   /** A camp whose men look out for their own when they fire (game/combat.ts): no round goes where one of them stands in the way of it. Absent for a camp that holds only for a man dead on the line. */
   mates?: true;
+  /** A camp whose men sent about the target each get a place of their own (protect.ts): by his vehicle they stand apart, not on one spot. Absent for a camp that sends them all to the point. */
+  places?: true;
   /** Who it's hunting, if anyone; its sections out; the next section's id; places they've found empty; and the tick the last one came home or was lost, or −1. */
   threat: Threat | null;
   sections: Section[];

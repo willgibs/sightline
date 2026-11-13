@@ -103,5 +103,14 @@ export const GEN_VERSION = 10;
  * no fingerprint moved. The brain lane's bench did, on one of its three overlook camps: two
  * men set off pressed together, and the one sent to start the target's vehicle now lives
  * to start it.
+ * 27: men sent about a camp's target each have a place of their own (brain/protect.ts,
+ * `placeAt`): the relief's two, each pair the camp sends after them and the drill's two are
+ * numbered as they're sent, and stand apart by his vehicle and at his door, where they all
+ * used to walk to the one point. No pinned run's behaviour moved. `camp-fight`'s state did:
+ * its camp now says its men have places.
+ * 28: a route keeps off ground too steep to climb (brain/nav.ts): out in the valley it
+ * takes no walk the map has marked as gaining height on such ground (kernel/world/grid.ts,
+ * Edge.EastSteep), and no stretch of it is pulled straight across one. No pinned run's
+ * route crossed such ground, so no fingerprint moved.
  */
-export const SIM_VERSION = 26;
+export const SIM_VERSION = 28;

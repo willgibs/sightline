@@ -82,7 +82,10 @@ export class FlawWatch {
       if (!b) continue;
       const spawn = sim.world.camp.guards[g.guard.spawn];
       const speed = Math.sqrt(g.body.vx * g.body.vx + g.body.vz * g.body.vz);
-      if (WALKING.has(b.act) && b.routeOk && b.route.points.length > 0 && !b.covered && b.linger < 0 && speed < 0.05) {
+      // A man whose order is to stand somewhere, at the end of his way there, is standing where he was told to: an escort by the vehicle, a man by it to start it, one on a door.
+      const kind = b.task?.kind;
+      const placed = (kind === 'escort' || kind === 'start' || kind === 'post') && b.route.next * 2 >= b.route.points.length;
+      if (WALKING.has(b.act) && b.routeOk && b.route.points.length > 0 && !b.covered && b.linger < 0 && !placed && speed < 0.05) {
         const s = (this.still.get(g.id) ?? 0) + dt;
         this.still.set(g.id, s);
         if (s >= 4) this.add(sim, 'stuck', g.id, `${b.act}, not moving for ${s.toFixed(0)} s`, `stuck${g.id}${Math.floor(sim.tick / (15 * hz))}`);
