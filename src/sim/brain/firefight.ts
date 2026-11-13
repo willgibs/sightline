@@ -128,6 +128,8 @@ export interface Firefight {
   outZ: number;
   /** A pace aside for a clear line (`clearLine`): absent until a round of his is held for one of his own and he has somewhere to shift to. Gone when he gets down, or, where places are kept (`shift.keep`), when his position changes or the place stops being good. */
   shift?: Shift;
+  /** How many times running a held last round has brought him straight back up (`answerLast`), since he last had an ordinary time down. Absent at none. */
+  answered?: number;
 }
 
 /**
@@ -150,7 +152,7 @@ export interface Shift {
 }
 
 /** What a shift's event says (game/systems.ts): a pace chosen, another from a place he'd shifted to, a time up begun at a kept place, or a pace he couldn't finish. */
-export type ShiftWhat = 'pace' | 'again' | 'kept' | 'gave-up';
+export type ShiftWhat = 'pace' | 'again' | 'kept' | 'gave-up' | 'bounded';
 
 function createFirefight(): Firefight {
   return { x: 0, y: 0, z: 0, r: 0, news: -1, own: false, since: -1, seen: -1, sx: 0, sz: 0, vx: 0, vz: 0, inside: -1, ox: 0, oz: 0, ot: -1, spot: null, there: false, up: false, until: -1, rounds: 0, pinned: -1, shouted: -1, calling: -1, improved: 0, exposed: true, bounds: 0, clear: -1, lost: false, bound: null, out: [], outAt: [], gate: null, cried: -1, sweep: 0, swept: -1, heardOut: -1, outX: 0, outZ: 0 };
@@ -755,7 +757,8 @@ function getDown(m: GuardMind, ff: Firefight): void {
  * A held round mid-burst is answered up (`clearLine`): the round doesn't count, and his
  * burst starts afresh at the new place. A held last round has already put him down, as it
  * always did; it's answered on his next think (`answerLast`), by coming straight back up at
- * the new place for a fresh burst. So a fight in which no round is held is the same tick for
+ * the new place for a fresh burst, `answers` times running at most, so a man among several
+ * of his own still gets down. So a fight in which no round is held is the same tick for
  * tick as in a camp that doesn't shift. He has `within` seconds to get onto the place, or he
  * gives it up and gets down. Where places are kept (`keep`), the place outlives getting down:
  * he comes up there next time if it still has a line and still shows no more of him, and a
@@ -814,6 +817,11 @@ function answerLast(m: GuardMind, ff: Firefight, s: Position, pinned: boolean): 
   const X = m.tuning.brain.firefight.shift;
   // For one burst, a round held at the place he'd shifted to counts, and the burst is over.
   if (ff.shift && !X.keep) return false;
+  // He's been straight back up as often as he will be: down, as a held burst always put him, and the place he kept stays kept.
+  if ((ff.answered ?? 0) >= X.answers) {
+    m.brain!.shiftNews = { what: 'bounded', mate: h.mate, side: h.side, pace: 0 };
+    return false;
+  }
   const again = ff.shift !== undefined;
   const place = paceFor(m, ff, s, h);
   if (!place) {
@@ -822,6 +830,7 @@ function answerLast(m: GuardMind, ff: Firefight, s: Position, pinned: boolean): 
   }
   shiftTo(m, ff, place, again ? 'again' : 'pace');
   comeUp(m, ff);
+  ff.answered = (ff.answered ?? 0) + 1;
   return true;
 }
 
@@ -1010,6 +1019,8 @@ export function performFight(m: GuardMind, out: Order): void {
     }
     if (!pinned && m.tick >= ff.until && (s.line || seen)) {
       comeUp(m, ff);
+      // An ordinary time down is over: a held last round may bring him straight back up again.
+      if (ff.answered !== undefined) delete ff.answered;
       // A place a pace aside that he kept from last time: still good, or his position's own.
       if (ff.shift) keptPlace(m, ff, s);
     }

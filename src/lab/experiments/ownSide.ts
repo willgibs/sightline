@@ -24,7 +24,8 @@ import { keptWorld } from '../worlds';
  */
 
 const ONE_BURST = 'a pace for one burst';
-const ARMS: readonly Arm[] = [{ name: 'as it was', off: 'mates' }, { name: 'holds and waits', off: 'shift' }, { name: ONE_BURST }, { name: 'a pace kept' }];
+const UNBOUNDED = 'kept, back up without limit';
+const ARMS: readonly Arm[] = [{ name: 'as it was', off: 'mates' }, { name: 'holds and waits', off: 'shift' }, { name: ONE_BURST }, { name: 'a pace kept' }, { name: UNBOUNDED }];
 
 /** Seconds from a hold to that man's next round that count as soon. */
 const SOON = 3;
@@ -38,6 +39,11 @@ function play(seed: string, arm: Arm, given: Tuning, plan: 'wall' | 'run'): Reco
   if (arm.name === ONE_BURST) {
     t = structuredClone(given);
     t.brain.firefight.shift.keep = false;
+  }
+  // And with a held last round bringing him straight back up as often as it may (brain.firefight.shift.answers), to see what the bound costs.
+  if (arm.name === UNBOUNDED) {
+    t = structuredClone(given);
+    t.brain.firefight.shift.answers = 1e9;
   }
   const sc = outTheGate(`seed=${seed}${plan === 'wall' ? '' : `&plan=${plan}`}${arm.off ? `&off=${arm.off}` : ''}`) as Scene<Simulation>;
   const sim = startScene(sc, t, keptWorld(`live-camp:${seed}`, t, sc.world));
@@ -54,6 +60,12 @@ function play(seed: string, arm: Arm, given: Tuning, plan: 'wall' | 'run'): Reco
   let holds = 0;
   let shifts = 0;
   let gaveUp = 0;
+  let bounded = 0;
+  // Bursts each man has begun since his last time down that lasted more than the tick a straight-back-up takes, and the longest such run.
+  const wasUp = new Map<number, boolean>();
+  const downFor = new Map<number, number>();
+  const bursts = new Map<number, number>();
+  let longest = 0;
   let kept = 0;
   let againSame = 0;
   let againOther = 0;
@@ -67,6 +79,7 @@ function play(seed: string, arm: Arm, given: Tuning, plan: 'wall' | 'run'): Reco
       if (e.type === 'shift') {
         if (e.what === 'pace' || e.what === 'again') shifts++;
         else if (e.what === 'kept') kept++;
+        else if (e.what === 'bounded') bounded++;
         else gaveUp++;
       }
       else if (e.type === 'shot' && waiting.has(e.source)) {
@@ -88,6 +101,17 @@ function play(seed: string, arm: Arm, given: Tuning, plan: 'wall' | 'run'): Reco
       if (!waiting.has(g.id)) waiting.set(g.id, h);
     }
     for (const g of sim.guards) {
+      const up = g.brain?.act === 'fight' && g.brain.ff?.up === true;
+      if (up && !wasUp.get(g.id)) {
+        // A time down of a tick is a straight-back-up; anything longer starts the count again.
+        const n = (downFor.get(g.id) ?? 2) > 1 ? 1 : (bursts.get(g.id) ?? 0) + 1;
+        bursts.set(g.id, n);
+        longest = Math.max(longest, n);
+      }
+      downFor.set(g.id, up ? 0 : (downFor.get(g.id) ?? 0) + 1);
+      wasUp.set(g.id, up);
+    }
+    for (const g of sim.guards) {
       const sh = g.brain?.ff?.shift;
       if (sh) hadShift.set(g.id, sh.mate);
       else hadShift.delete(g.id);
@@ -103,7 +127,7 @@ function play(seed: string, arm: Arm, given: Tuning, plan: 'wall' | 'run'): Reco
   waits.sort((a, b) => a - b); // unique: plain numbers, and equal ones are interchangeable
   const wait = waits.length === 0 ? NaN : waits.length % 2 === 1 ? waits[(waits.length - 1) / 2]! : (waits[waits.length / 2 - 1]! + waits[waits.length / 2]!) / 2;
   const soon = waits.length === 0 ? NaN : waits.filter((w) => w <= SOON).length / waits.length;
-  return { own: r.ownSide, any: r.ownSide > 0 ? 1 : 0, fired: r.roundsAtYou, held: holds, shifted: shifts, same: againSame, other: againOther, gaveUp, kept, wait, soon, hits, killed: hits >= t.brain.combat.playerHits ? 1 : 0 };
+  return { own: r.ownSide, any: r.ownSide > 0 ? 1 : 0, fired: r.roundsAtYou, held: holds, shifted: shifts, same: againSame, other: againOther, gaveUp, kept, bounded, longest, wait, soon, hits, killed: hits >= t.brain.combat.playerHits ? 1 : 0 };
 }
 
 export const ownSideExperiment: Experiment = {
@@ -123,6 +147,8 @@ export const ownSideExperiment: Experiment = {
     { key: 'other', label: 'by the wall: shifts held again, by another', kind: 'mean' },
     { key: 'gaveUp', label: 'by the wall: paces given up', kind: 'mean' },
     { key: 'kept', label: 'by the wall: bursts begun from a kept place', kind: 'mean' },
+    { key: 'bounded', label: 'by the wall: held last rounds not answered, by the bound', kind: 'mean' },
+    { key: 'longest', label: 'by the wall: the longest run of bursts by one man without a time down', kind: 'mean' },
     { key: 'wait', label: 'by the wall: seconds from a hold to that man\'s next round (median of a run\'s)', kind: 'median' },
     { key: 'soon', label: `by the wall: share of holds followed by a round within ${SOON} s`, kind: 'mean' },
     { key: 'r.own', label: 'runs for the trees: men shot by their own side', kind: 'mean' },
@@ -134,20 +160,22 @@ export const ownSideExperiment: Experiment = {
     { key: 'r.other', label: 'runs for the trees: shifts held again, by another', kind: 'mean' },
     { key: 'r.gaveUp', label: 'runs for the trees: paces given up', kind: 'mean' },
     { key: 'r.kept', label: 'runs for the trees: bursts begun from a kept place', kind: 'mean' },
+    { key: 'r.bounded', label: 'runs for the trees: held last rounds not answered, by the bound', kind: 'mean' },
+    { key: 'r.longest', label: 'runs for the trees: the longest run of bursts by one man without a time down', kind: 'mean' },
     { key: 'r.wait', label: 'runs for the trees: seconds from a hold to that man\'s next round (median of a run\'s)', kind: 'median' },
     { key: 'r.soon', label: `runs for the trees: share of holds followed by a round within ${SOON} s`, kind: 'mean' },
     { key: 'r.hits', label: 'runs for the trees: rounds that hit him once he was out', kind: 'mean' },
     { key: 'r.killed', label: 'runs for the trees: enough of them to kill', kind: 'rate' },
   ],
   run(seed, arm, t) {
-    const out: Record<string, number> = { done: 0, own: NaN, any: NaN, fired: NaN, held: NaN, shifted: NaN, same: NaN, other: NaN, gaveUp: NaN, kept: NaN, wait: NaN, soon: NaN, 'r.own': NaN, 'r.any': NaN, 'r.fired': NaN, 'r.held': NaN, 'r.shifted': NaN, 'r.same': NaN, 'r.other': NaN, 'r.gaveUp': NaN, 'r.kept': NaN, 'r.wait': NaN, 'r.soon': NaN, 'r.hits': NaN, 'r.killed': NaN };
+    const out: Record<string, number> = { done: 0, own: NaN, any: NaN, fired: NaN, held: NaN, shifted: NaN, same: NaN, other: NaN, gaveUp: NaN, kept: NaN, bounded: NaN, longest: NaN, wait: NaN, soon: NaN, 'r.own': NaN, 'r.any': NaN, 'r.fired': NaN, 'r.held': NaN, 'r.shifted': NaN, 'r.same': NaN, 'r.other': NaN, 'r.gaveUp': NaN, 'r.kept': NaN, 'r.bounded': NaN, 'r.longest': NaN, 'r.wait': NaN, 'r.soon': NaN, 'r.hits': NaN, 'r.killed': NaN };
     const wall = play(seed, arm, t, 'wall');
     if (wall) {
       out.done = 1;
-      for (const k of ['own', 'any', 'fired', 'held', 'shifted', 'same', 'other', 'gaveUp', 'kept', 'wait', 'soon']) out[k] = wall[k]!;
+      for (const k of ['own', 'any', 'fired', 'held', 'shifted', 'same', 'other', 'gaveUp', 'kept', 'bounded', 'longest', 'wait', 'soon']) out[k] = wall[k]!;
     }
     const ran = play(seed, arm, t, 'run');
-    if (ran) for (const k of ['own', 'any', 'fired', 'held', 'shifted', 'same', 'other', 'gaveUp', 'kept', 'wait', 'soon', 'hits', 'killed']) out[`r.${k}`] = ran[k]!;
+    if (ran) for (const k of ['own', 'any', 'fired', 'held', 'shifted', 'same', 'other', 'gaveUp', 'kept', 'bounded', 'longest', 'wait', 'soon', 'hits', 'killed']) out[`r.${k}`] = ran[k]!;
     return out;
   },
 };

@@ -934,6 +934,7 @@ export const defaultTuning = {
         pad: 0.1, // metres he clears the man in the way by beyond what would hold his round, for what his eyes can't measure
         near: 0.1, // metres from the place he shifts to that counts as on it: closer than a position's own `near`, because a pace that stops short clears nobody
         within: 1.5, // seconds from choosing a place (and the walk to it, coming up at a kept one) to be on it: past that, someone's on it, and he gives it up and gets down
+        answers: 1, // how many times running a held last round brings him straight back up a pace aside: past that he gets down, as a held burst always did, until an ordinary time down
         keep: true, // the place is kept while his position stands: he comes up there next time if it's still good. False: a pace is for the one burst
       },
       pin: { within: 4, min: 2.5, max: 5 }, // a round striking this close keeps his head down for this long (metres, seconds)

@@ -38,6 +38,8 @@ interface Line {
   frontFirst?: boolean;
   /** Put the man in front at (10, 0.45), into the rear man's line, a moment before the third round of his first burst. */
   stepIn?: boolean;
+  /** Before every last round of the rear man's bursts, put the man in front on his line, 10 m out: every last round is held. */
+  everyLast?: boolean;
   /** A third man, standing where he is. */
   third?: { x: number; z: number };
   tuning?: Tuning;
@@ -85,6 +87,18 @@ function fight(o: Line): Fought {
   for (let i = 0; i < SECONDS * HZ; i++) {
     const events = sim.step(neutralInput()).map((e) => ({ ...e }));
     out.events.push(...events);
+    if (o.everyLast) {
+      const b = (sim.index.get(rear) as { brain: { fireAt: number; ff?: { up: boolean; rounds: number } } }).brain;
+      if (b.ff?.up && b.ff.rounds === T.brain.firefight.burst - 1 && b.fireAt - sim.tick <= 3) {
+        const r = sim.index.get(rear) as { body: { x: number; z: number } };
+        const f = sim.index.get(front) as { body: { x: number; z: number } };
+        const dx = RANGE - r.body.x;
+        const dz = 0 - r.body.z;
+        const d = Math.hypot(dx, dz);
+        f.body.x = r.body.x + (dx / d) * 10;
+        f.body.z = r.body.z + (dz / d) * 10;
+      }
+    }
     if (o.stepIn) {
       const fired = out.events.filter((e) => e.type === 'shot' && e.source === rear);
       if (fired.length === 2 && sim.tick === fired[1]!.tick + HZ - 2) {
@@ -225,5 +239,21 @@ describe('a clear line', () => {
     const burst = fight({ rear: { x: 0, z: 0 }, front: { x: 10, z: 0.45 }, tuning: once });
     const burstPaces = of(burst.events, 'shift', burst.rear);
     expect(burstPaces.filter((e) => e.what === 'kept')).toHaveLength(0);
+  }, 120_000);
+  it('answers a held last round by coming straight back up only so many times running, then gets down', () => {
+    const bounded = fight({ rear: { x: 0, z: 0 }, front: { x: 10, z: 4 }, everyLast: true });
+    const said = (f: Fought): string[] => of(f.events, 'shift', f.rear).map((e) => e.what);
+    expect(said(bounded).filter((w) => w === 'pace' || w === 'again').length, 'answered at least once').toBeGreaterThan(0);
+    expect(said(bounded)).toContain('bounded');
+    // Never more answers in a row than the bound, between refusals.
+    let run = 0;
+    for (const w of said(bounded)) {
+      if (w === 'bounded') run = 0;
+      else if (w === 'pace' || w === 'again') expect(++run).toBeLessThanOrEqual(X.answers + 1);
+    }
+    const lifted = structuredClone(T);
+    lifted.brain.firefight.shift.answers = 1e9;
+    const free = fight({ rear: { x: 0, z: 0 }, front: { x: 10, z: 4 }, everyLast: true, tuning: lifted });
+    expect(said(free)).not.toContain('bounded');
   }, 120_000);
 });

@@ -383,7 +383,7 @@ export interface HeldEvent extends EventBase {
 export interface ShiftEvent extends EventBase {
   type: 'shift';
   /** A pace chosen, another from the place he'd shifted to, a time up begun at a place he kept, or a pace he couldn't get onto and gave up. */
-  what: 'pace' | 'again' | 'kept' | 'gave-up';
+  what: 'pace' | 'again' | 'kept' | 'gave-up' | 'bounded';
   /** The man who was in the way. */
   mate: number;
   /** Which way he steps, looking down his line: 1 right, −1 left. */
@@ -609,7 +609,7 @@ export const EVENTS: { readonly [K in EventType]: EventSpec<EventOf<K>> } = {
   engine: { code: 105, range: 'brain', sound: true, fields: { ...SOUND, load: { enum: every<EventOf<'engine'>['load']>()(['start', 'idle', 'drive']) } } },
   passed: { code: 104, range: 'brain', sound: false, fields: { distance: 'f32' } },
   held: { code: 106, range: 'brain', sound: false, fields: { mate: 'u32', distance: 'f32', side: 'i32', off: 'f32' } },
-  shift: { code: 107, range: 'brain', sound: false, fields: { what: { enum: every<EventOf<'shift'>['what']>()(['pace', 'again', 'kept', 'gave-up']) }, mate: 'u32', side: 'i32', pace: 'f32' } },
+  shift: { code: 107, range: 'brain', sound: false, fields: { what: { enum: every<EventOf<'shift'>['what']>()(['pace', 'again', 'kept', 'gave-up', 'bounded']) }, mate: 'u32', side: 'i32', pace: 'f32' } },
   objective: { code: 102, range: 'brain', sound: false, fields: { stage: { enum: every<EventOf<'objective'>['stage']>()(['get-out']) } } },
   sabotage: { code: 100, range: 'brain', sound: false, fields: { what: { enum: every<EventOf<'sabotage'>['what']>()(['generator', 'radio', 'vehicle', 'alarm']) }, x: 'f32', z: 'f32' } },
   door: { code: 101, range: 'brain', sound: true, fields: { ...SOUND, open: 'u8' } },
