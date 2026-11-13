@@ -733,7 +733,8 @@ function getDown(m: GuardMind, ff: Firefight): void {
  * A pace `p` sideways moves his line by `p (1 − along / L)` where that man stands, L being
  * how far off he believes the intruder is. The round is held for a man whose edge is within
  * `along × spread + clear` of the line (combat.ts, `ownInTheWay`), so he needs his line that
- * far from the man's edge, and `pad` more. A man dead on the line (`deadOn`) can be cleared
+ * far from the man's edge, and `pad` more, and he aims `near` past it, since that's how
+ * short of a place he may stop. A man dead on the line (`deadOn`) can be cleared
  * either way; the side is settled by his id, so a column of three fans out.
  *
  * The place has to be one he can stand on and walk straight to, with a line to the
@@ -782,7 +783,8 @@ function paceFor(m: GuardMind, ff: Firefight, s: Position, h: HeldLine): Shift |
   const rz = dx / L;
   let checked = false;
   for (const side of sides) {
-    const pace = (needed - h.off + (side === away ? 0 : 2 * centre)) / k;
+    // And as far again as he may stop short of the place: a pace that ends short clears nobody.
+    const pace = (needed - h.off + (side === away ? 0 : 2 * centre)) / k + X.near;
     if (pace > X.cap) continue;
     const x = self.x + rx * side * pace;
     const z = self.z + rz * side * pace;

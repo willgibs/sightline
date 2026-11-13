@@ -702,9 +702,48 @@ In the code:
 
 **What it leaves.**
 
-- **He holds, and doesn't yet move for a clear line.** A man with one of his own in front of him waits and tries again. A trained man would shift a pace. By the wall that's one round in six held, which is a lot of men waiting.
+- **He holds, and doesn't yet move for a clear line.** A man with one of his own in front of him waits and tries again. A trained man would shift a pace. By the wall that's one round in six held, which is a lot of men waiting. Step 2e is the answer to it.
 - **A man running across a line of fire isn't led.** The look is at where a man is and where he'd stand, not where he'll be a tenth of a second on. It hasn't happened in any run looked at.
 - **Nothing past the target counts.** A round that misses flies on, and a man 30 m behind the intruder is in more danger than this says. None of the men shot was one, and counting them would let an intruder stand between two guards and be safe from both.
+
+### Step 2e, built: a pace aside for a clear line (Nov 13)
+
+`brain/firefight.ts`, `clearLine`; `game/combat.ts`, `seenInTheWay`. Step 2d left this open: "he holds, and doesn't yet move for a clear line."
+
+**What was wrong.** A man whose round was held for one of his own stood where he was and tried again a second later, and again. A held round counted toward his burst, so three of them put him down having fired nothing, and he came up at the same place to the same man in the way. The owner's ask: a guard whose fire is held for one of his own steps aside for a clear line.
+
+**The rule.** He shifts a pace sideways, away from the man in the way, just far enough that his round would go, and fires the rest of his burst from there. He doesn't walk round him, and he doesn't leave his cover.
+
+| | |
+| --- | --- |
+| What he goes by | What he saw over his sights when the round was held: which side of his line the man in the way stood, how far the nearest edge of him was from it, and how far along it. Three numbers about one man, at that moment, relative to his own line of fire |
+| How far | A pace `p` sideways moves his line by `p (1 − along / L)` where that man stands, `L` being how far off he believes the intruder is. The round is held for a man whose edge is within `along × spread + clear` of the line (step 2d), so he needs that, and `pad` more: `p = (along × spread + clear + pad − off) / (1 − along / L)`. A man close in front is cleared by a short pace; a man near the intruder needs a long one |
+| Not | A pace over `cap`, or a place farther than `cap` from the firing place his position gave him: he holds, as before |
+| Where | Somewhere he can stand and walk straight to, with a line to where the intruder is, that shows no more of him to it than his firing place does |
+| Dead on the line | Either side, the first by his id: an even id tries right first, an odd one left, so a column fans out |
+| For how long | The rest of that time up. The held round doesn't count, and his burst starts afresh at the new place. When he gets down he's back on his position's own places. A round held with nowhere to shift to counts as before, so a man who can't shift still gets down |
+
+In the code:
+
+- **The hold is still settled where the round is made**, and now it also records what it looked like (`BrainState.heldLine`, beside the tick in `held`). This keeps rule 13 for the reason step 2d gave: a man sees who is in front of his rifle. The three numbers are what that sight is, measured from his own line, about the one man his round was held for. They hold nothing about where anyone else on his side is, nor where that man is in the camp, nor anything after that moment. The brain turns them into a pace with its own aim, its own idea of where the intruder is, and the static world.
+- **The silent hold** (a man dead on the line, found by the single ray) records it too, with no event, as before.
+- **"No more exposed" is graded** (`positions.ts`, `exposure`). `exposedAt` is one ray to the top of a man and is true at every firing place, since a man who can see out can be seen. `exposure` counts six points on him as the intruder's place sees them: the top of his head and the middle of him, each at the middle and a shoulder's width either side. The place he shifts to may show no more of those than his firing place does. A man kneeling at a wall's end shows a head and a shoulder; a step farther out shows his chest, and is refused.
+- **The burst's last round is counted a tick later** in a camp that shifts, so a held last round gets its answer before he gets down. In a camp that doesn't, nothing moves.
+- **He reaches the place**: `stayAt` takes a man as on his spot within `firefight.near` (0.45 m), which is most of a pace. For a shift it's `shift.near` (0.1 m).
+- **`off=shift`** plays a camp whose men hold and wait. It's also off with `mates`, `firefight` or `fight` off. With it off, a run's state hash is the same as before this step tick for tick (three camps, both plans; the `held` event carries two more fields).
+- **Explainable**: a `shift` event (who was in the way, which way, how far), `held` says which side the man was and how far off, the debug label reads "shifting for a clear line", and the debug view draws the pace from the firing place.
+
+**Numbers** (`brain.firefight.shift`, the owner's to set by playing): `cap` 1.5 m, `deadOn` 0.2 m, `pad` 0.1 m, `near` 0.1 m.
+
+**Measured** (`npm run experiment -- own-side --dice 3`, 24 camps, three rolls of the dice on each):
+
+OWNSIDE_TABLE
+
+**What it leaves.**
+
+- **He knows only the man his round was held for.** Two men can shift the same way, or a shift can put another man in front of him. The game holds his round again if it does, so nobody is shot for it; he doesn't shift twice in one burst, and that round counts. "Rounds held again from the place he shifted to" counts it.
+- **He comes back to within 0.45 m of his place**, not to it, as a man always did. Coming up again, he's measured from where he is.
+- **Nobody has played it.** Whether a pace and a half is the most a man would take, and whether it reads as a man stepping aside or as fidgeting, is the owner's by playing: `off=shift` plays a camp that holds and waits.
 
 ### Step 3a, built: the target's answer, by the camp's problem (Nov 11)
 
