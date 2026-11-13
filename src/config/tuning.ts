@@ -798,9 +798,12 @@ export const defaultTuning = {
       slowDown: 1.2, // metres before the last waypoint where he eases off
       minSpeed: 0.5, // m/s: never slower than this while walking a route
       progress: 0.02, // metres he must gain on a waypoint to count as progress
+      creep: 0.1, // and, until he has stepped aside for it, his body must be making this share of the pace he asked of it: slower is a man pressed against something. A slide round a mate's shoulder starts faster than this or soon is
+      creepSteps: 1, // steps aside he takes for being pressed, on one leg of a route, before sliding counts as progress again: pushing slowly through is how a man gets past where there's no room to step round
       stallSeconds: 0.9, // no progress for this long: something's in the way
       stallsMax: 4, // stalls a route may take before the brain is told
-      sideSeconds: 0.7, // how long a sidestep around something in the way lasts
+      sideSeconds: 0.7, // how long a sidestep around something in the way lasts, at the most
+      sideStep: 1.7, // metres off his line it takes him, at the most: half the width of the camp's truck and half his own, and a little over. Up to a hurry (2.4 m/s) the time runs out first; a run's step was 3.6 m
     },
     // A guard's brain (E3, brain.ts): awareness states, utility scoring inside each.
     think: 0.4, // seconds between reconsiderings, at most (sooner when something changes)

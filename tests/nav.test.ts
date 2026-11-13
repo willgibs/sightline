@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { emptyRoute, emptySteering, followRoute, navigatorOf, routeLength, type Route } from '../src/sim/brain/nav';
+import { emptyRoute, emptySteering, followRoute, navigatorOf, routeLength, type Feel, type Route } from '../src/sim/brain/nav';
 import { plainTuning, yardOnly } from '../src/lab/experiments/variety';
 import { campMission } from '../src/sim/generation';
 import { generateWorld } from '../src/sim/generation/world';
@@ -226,11 +226,13 @@ describe('navigation', () => {
  * Guards under a test brain that walks a route with the motor: its order every tick from
  * followRoute, from a route found once. Bodies obey every rule the player's do.
  */
-function walkers(world: World, goals: Array<{ x: number; z: number }>): { sim: Simulation; routes: Route[]; done: boolean[]; arrived: number[] } {
+function walkers(world: World, goals: Array<{ x: number; z: number }>, opts: { pace?: number; feel?: boolean } = {}): { sim: Simulation; routes: Route[]; done: boolean[]; arrived: number[] } {
   const routes = goals.map(() => emptyRoute());
   const done = goals.map(() => false);
   const arrived = goals.map(() => -1);
   const steer = emptySteering();
+  const pace = opts.pace ?? T.bodies.guard.speed.walk;
+  const feel: Feel = {};
   const brain: System = {
     name: 'test-walker',
     phase: 'decide',
@@ -253,7 +255,14 @@ function walkers(world: World, goals: Array<{ x: number; z: number }>): { sim: S
         if (r.points.length === 0 && arrived[k]! < 0) {
           if (navigatorOf(ctx.world, ctx.tuning).find(g.body.x, g.body.z, goals[k]!.x, goals[k]!.z, { work: ctx.work }, r) !== 'found') throw new Error(`no route for guard ${k}`);
         }
-        const w = followRoute(r, g.body.x, g.body.z, ctx.tuning.bodies.guard.speed.walk, g.id, ctx.tick, ctx.tuning, steer);
+        // With `feel`, as a brain walks (brain/moves.ts): he knows when he's pressed against something, and which side has room.
+        const nav = navigatorOf(ctx.world, ctx.tuning);
+        if (opts.feel) {
+          const asked = Math.hypot(o.wishX, o.wishZ);
+          feel.pressed = asked > 0 && g.body.speed < ctx.tuning.brain.nav.creep * asked;
+          feel.open = nav.open;
+        }
+        const w = followRoute(r, g.body.x, g.body.z, pace, g.id, ctx.tick, ctx.tuning, steer, opts.feel ? feel : undefined);
         if (w === 'arrived') {
           done[k] = true;
           arrived[k] = ctx.tick;
@@ -266,7 +275,7 @@ function walkers(world: World, goals: Array<{ x: number; z: number }>): { sim: S
         o.tick = ctx.tick + 1;
         o.wishX = steer.wishX;
         o.wishZ = steer.wishZ;
-        o.gait = 'walk';
+        o.gait = pace > ctx.tuning.bodies.guard.speed.walk ? 'sprint' : 'walk';
         o.yaw = turnTowards(g.body.yaw, yawFromDirection(steer.dirX, steer.dirZ), 8 * ctx.dt);
         o.headYaw = 0;
       }
@@ -339,6 +348,151 @@ describe('walking a route', () => {
     const { sim, done } = walkers(world, [{ x: 10, z: 0 }, { x: -10, z: 0 }]);
     hold(sim, 40, () => done[0]! && done[1]!);
     expect(done).toEqual([true, true]);
+  });
+});
+
+/**
+ * A man who sets off at a run with a mate in his way (the owner's camps, Nov 12: an officer took up a chase from behind a
+ * wall with another man crouched on the first steps of his route, and was eight seconds getting round him). The route knows
+ * nothing of bodies, so what gets him round is the walk: he knows he's pressed against something, steps a body's width to
+ * the side that has room, and has his time again from where that leaves him.
+ */
+describe('a mate in the way of a run', () => {
+  const N = T.brain.nav;
+  const hz = T.sim.tickHz;
+  const RUN = T.brain.firefight.paces.bound;
+
+  /** A straight route east from the origin, and a walk along it that the caller moves by hand. */
+  const straight = (): Route => ({ ...emptyRoute(), points: [20, 0] });
+
+  it('pressed against something, a centimetre now and then is not progress', () => {
+    const steer = emptySteering();
+    // He slides 2.5 cm nearer every half second: by the distance alone that's a walk that never stalls.
+    const slide = (feel: Feel | undefined): number => {
+      const r = straight();
+      for (let t = 1; t <= 6 * hz; t++) {
+        followRoute(r, 5 + 0.025 * Math.floor(t / 15), 0, RUN, 2, t, T, steer, feel);
+        if (r.stalls > 0) return t / hz;
+      }
+      return Infinity;
+    };
+    expect(slide(undefined)).toBe(Infinity);
+    expect(slide({ pressed: false })).toBe(Infinity);
+    const stalled = slide({ pressed: true });
+    expect(stalled).toBeGreaterThanOrEqual(N.stallSeconds);
+    expect(stalled).toBeLessThan(N.stallSeconds + 0.2);
+  });
+
+  it('after one step aside for it, sliding counts again: he pushes on through where there is no way round', () => {
+    const steer = emptySteering();
+    const r = straight();
+    let t = 1;
+    const at = (): number => 5 + 0.025 * Math.floor(t / 15);
+    for (; r.stalls === 0; t++) followRoute(r, at(), 0, RUN, 2, t, T, steer, { pressed: true });
+    // The step gets him nowhere (something is there too), and then he is sliding as before.
+    for (; r.sideUntil >= 0; t++) followRoute(r, at(), 0, RUN, 2, t, T, steer, { pressed: true });
+    const from = t;
+    for (; t < from + 8 * hz; t++) followRoute(r, at(), 0, RUN, 2, t, T, steer, { pressed: true });
+    expect(r.stalls).toBe(N.creepSteps);
+    // Until he reaches a waypoint: the next leg starts afresh.
+    expect(N.creepSteps).toBe(1);
+  });
+
+  it('a walk taken up again from a standstill starts its leg with a measure, pressed or not', () => {
+    const steer = emptySteering();
+    const r = straight();
+    // The first tick of a leg always counts, whatever he feels: a route found long ago isn't a stall the moment he walks it.
+    expect(followRoute(r, 5, 0, RUN, 2, 10 * hz, T, steer, { pressed: true })).toBe('walking');
+    expect(r.stalls).toBe(0);
+    expect(steer.wishX).toBeCloseTo(RUN);
+  });
+
+  it('the step is no longer than gets him round a truck, at any pace, and he has his time again when it is over', () => {
+    const steer = emptySteering();
+    for (const pace of [T.brain.paces.investigate, T.brain.paces.hurry, RUN]) {
+      const r = straight();
+      let t = 1;
+      // Held still until he stalls.
+      for (; r.stalls === 0; t++) followRoute(r, 5, 0, pace, 2, t, T, steer, { pressed: true });
+      expect(r.sideUntil).toBeGreaterThan(t);
+      // He steps the way he's told to, as fast as he was going, and nothing is in his way now.
+      let z = 0;
+      let x = 5;
+      const began = t;
+      for (; r.sideUntil >= 0 && t < began + 5 * hz; t++) {
+        x += steer.wishX / hz;
+        z += steer.wishZ / hz;
+        followRoute(r, x, z, pace, 2, t, T, steer, { pressed: false });
+      }
+      const took = (t - began) / hz;
+      // No further than the step and one tick's travel, and never longer than `sideSeconds`.
+      expect(Math.abs(z), `at ${pace} m/s`).toBeLessThanOrEqual(N.sideStep + pace / hz + 1e-9);
+      expect(took, `at ${pace} m/s`).toBeLessThanOrEqual(N.sideSeconds + 2 / hz);
+      // Up to a hurry the time runs out first, as it always did. At a run the distance does, in half the time.
+      expect(took, `at ${pace} m/s`).toBeLessThanOrEqual(Math.min(N.sideSeconds, N.sideStep / pace) + 2 / hz);
+      if (pace <= T.brain.paces.hurry) expect(took, `at ${pace} m/s`).toBeGreaterThanOrEqual(N.sideSeconds - 1 / hz);
+      else expect(took).toBeLessThan(N.sideSeconds * 0.6);
+      // And the clock starts again: stopped dead once more, he gets the whole of `stallSeconds` before the next step.
+      const again = t;
+      for (; r.stalls === 1 && t < again + 5 * hz; t++) followRoute(r, x, z, pace, 2, t, T, steer, { pressed: true });
+      expect((t - again) / hz).toBeGreaterThanOrEqual(N.stallSeconds - 1 / hz);
+    }
+  });
+
+  it('steps to the side the ground leaves room on, where only one does', () => {
+    const steer = emptySteering();
+    const stall = (id: number, open: Feel['open']): number => {
+      const r = straight();
+      for (let t = 1; r.stalls === 0; t++) followRoute(r, 5, 0, RUN, id, t, T, steer, { pressed: true, open });
+      return Math.sign(steer.wishZ);
+    };
+    // Heading east, +z is his right. By his own rule guard 2 goes left first and guard 3 right.
+    expect(stall(2, undefined)).toBe(-1);
+    expect(stall(3, undefined)).toBe(1);
+    expect(stall(2, () => true)).toBe(-1);
+    expect(stall(2, () => false)).toBe(-1);
+    // A wall on his left, a wall on his right: the step itself is shut.
+    const step = (az: number): boolean => az === 0;
+    expect(stall(2, (_ax, az, _bx, bz) => !step(az) || bz > 0)).toBe(1);
+    expect(stall(3, (_ax, az, _bx, bz) => !step(az) || bz > 0)).toBe(1);
+    expect(stall(3, (_ax, az, _bx, bz) => !step(az) || bz < 0)).toBe(-1);
+    // Room to step either way, and from his left he couldn't walk on to his waypoint: the end of a wall he'd be behind.
+    expect(stall(2, (_ax, az) => step(az) || az > 0)).toBe(1);
+    expect(stall(3, (_ax, az) => step(az) || az < 0)).toBe(-1);
+    // A side he can step to and not walk on from still beats one he can do neither with.
+    expect(stall(3, (_ax, az, _bx, bz) => step(az) && bz < 0)).toBe(-1);
+    // And walking on counts for more than the step: against a wall's corner no step looks clear, and one side still leads on.
+    expect(stall(2, (_ax, az, _bx, bz) => (step(az) ? bz < 0 : az > 0))).toBe(1);
+    expect(stall(2, (_ax, az) => !step(az) && az > 0)).toBe(1);
+  });
+
+  it('wedged between a mate and a wall, he is round him and running again within two seconds', () => {
+    // A wall along the north of his way, and a mate standing on it with less than a body's width between him and the wall.
+    // The runner meets him a little to the wall's side of head-on, so sliding off him takes the runner into the gap.
+    const colliders = [wall(0, -0.25, 6, 0.25)];
+    const world = testWorld({ size: 120, colliders, spawn: { x: -30, z: 30 }, camp: { structures: [], guards: [guardAt(-8, 0.5, 0), guardAt(0, 0.55, 1)], fenceHalf: 0 } });
+    const { sim, done } = walkers(world, [{ x: 8, z: 0.5 }, { x: 0, z: 0.55 }], { pace: RUN, feel: true });
+    const raw = neutralInput();
+    const runner = sim.guards[0]!.body;
+    const mate = sim.guards[1]!.body;
+    const stood = { x: mate.x, z: mate.z };
+    let met = -1;
+    let past = -1;
+    let shoved = 0;
+    for (let i = 0; i < 12 * hz && !done[0]; i++) {
+      sim.step(raw);
+      if (met < 0 && Math.hypot(runner.x - mate.x, runner.z - mate.z) < 0.65) met = sim.tick;
+      if (past < 0 && runner.x > mate.x + 1 && runner.speed > RUN * 0.9) past = sim.tick;
+      shoved = Math.max(shoved, Math.hypot(mate.x - stood.x, mate.z - stood.z));
+    }
+    expect(met, 'he ran into his mate').toBeGreaterThan(0);
+    expect(past, 'and got past him').toBeGreaterThan(0);
+    expect((past - met) / hz).toBeLessThan(2);
+    expect(done[0]).toBe(true);
+    // Round him, not through him.
+    expect(shoved).toBeLessThan(0.25);
+    // Sixteen metres at a run is three seconds. With the mate in the way it's under five.
+    expect(sim.tick / hz).toBeLessThan(5);
   });
 });
 

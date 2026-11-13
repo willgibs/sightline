@@ -90,5 +90,13 @@ export const GEN_VERSION = 9;
  * (game/combat.ts). Before, only for a man dead on his line. With that, the chase's own
  * rules about where not to fire are gone: they stood in for it. No pinned run's camp has
  * `mates`, so no fingerprint moved.
+ * 26: a walk held up by something no map shows (brain/nav.ts, followRoute; a mate behind
+ * the same wall, as often as not): pressed against it he steps aside at once, where sliding
+ * a centimetre nearer used to count as getting there; the step is no longer at a run than
+ * at a hurry, and goes to the side he can walk on to his waypoint from; and his time to
+ * show for it starts when the step ends. No pinned run has a walk that stalls, so
+ * no fingerprint moved. The brain lane's bench did, on one of its three overlook camps: two
+ * men set off pressed together, and the one sent to start the target's vehicle now lives
+ * to start it.
  */
-export const SIM_VERSION = 25;
+export const SIM_VERSION = 26;

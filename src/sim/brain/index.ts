@@ -17,7 +17,7 @@ export { Approach, approachOf, emptyWay, eyesOn, type Eyes, type Way } from './a
 export { firefightPhase, type Firefight, type Position } from './firefight';
 export { openingNear, openingThrough, outsideWalls, type Opening } from './walls';
 export { huntPhase, type Hunt } from './hunt';
-export { Navigator, emptyRoute, emptySteering, followRoute, navigatorOf, routeLength, type Route, type RouteResult, type Steering, type Walk } from './nav';
+export { Navigator, emptyRoute, emptySteering, followRoute, navigatorOf, routeLength, type Feel, type Route, type RouteResult, type Steering, type Walk } from './nav';
 export { ACTS, ACT_WHYS, createBrain, decide, type ActChange, type ActName, type ActWhy, type BrainState, type Tasking } from './brain';
 export { hasGrounds, noteGrounds } from './grounds';
 export { choose, response, type Curve, type Option } from './utility';

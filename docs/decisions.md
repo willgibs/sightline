@@ -2,6 +2,90 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-12 · A man held up by a mate steps round him
+
+**What broke.** Tracing the chase (below) turned up a fault in how a man walks a route, older than the chase and there for every act that sets a man off at a run. `npm run scene -- out-the-gate --params 'seed=DOT-6344&for=160'`: an officer 45 m from the gate takes up the chase 4.4 s after the intruder has gone out of it. The first steps of his way run along a wall, and another man is crouched on that line, 0.4 m from the wall. A route is planned on a grid that knows nothing of bodies, and a brain doesn't see its own side (rule 13), so the officer finds his mate by running into him. On `main`, from the moment he sets off:
+
+| | |
+| --- | --- |
+| 0.5 s | He reaches him. Sliding off a body takes him the short way round, which is into the gap between the man and the wall, and the gap is narrower than he is |
+| to 4.5 s | Pressed there, he slides 2 cm nearer his waypoint every 0.4 s. A walk stalls when it gains nothing for 0.9 s, and 2 cm counted as gaining |
+| 4.5 s | His first step aside, by turns: to his right, which is the wall. 0.7 s of nothing |
+| 5.4 s | 0.2 s later he is "stalled" again: the 0.9 s ran from when the step began. Left, for 0.7 s at a sprint: 2.6 m, and into a low wall |
+| 6.3 s, 7.2 s | Right 3 m, left 2 m, each time heading back for the same waypoint from somewhere the straight line to it is shut |
+| 8.2 s | The walk gives up. He stands for 1.5 s, finds a new route from where all that left him, and goes |
+
+The first man was out of that gate 24 s behind the intruder, where the other camps take about 12.
+
+**Measured first.** Every man who takes up the chase on the bench's 24 camps (50 of them, on the 21 camps where the intruder is seen and gets out): nine stalls and a walk given up, and DOT-6344 is the one camp where it cost the chase its head start. With the fix it's two stalls and none given up, and 19 of the 21 camps read exactly as they did.
+
+**Decision** (`brain/nav.ts`, `followRoute`; `brain/moves.ts`, `walk`). A man can't see his mate, but he knows two things: how his own legs are doing, and the ground. Four parts, and what each is worth, by taking it out again on the four camps of the 24 where a walk stalls once the intruder is out (every man's walk, not only the chasers'):
+
+| | DOT-6344: first man out | The other three |
+| --- | --- | --- |
+| As it was | 23.9 s, a walk given up | Walks given up on VOM-2928 and PET-8787 |
+| All four | **16.4 s**, one stall | No walk given up on any |
+| Without 1: sliding still counts as gaining | 19.3 s | |
+| Without 2: a step lasts 0.7 s at any pace | 20.0 s, two stalls | PET-8787: a second stall, and eyes on him a second later |
+| Without 3: sides by turns | 19.6 s, two stalls | |
+| Without 4: no fresh time after a step | 16.4 s | VOM-2928: eight stalls and a walk given up. ZOH-8906: three stalls |
+
+1. **Pressed against something, he steps aside at once.** He asked his legs for a pace and got less than a tenth of it (`nav.creep`): whatever that gains him doesn't restart the 0.9 s. What he asked is the order he gave last tick, so a man who stopped to fire and walks on isn't "pressed". It brings forward one step on each leg of a route (`nav.creepSteps`). After it, sliding counts as it did.
+2. **A step is no longer than gets him round a truck, at any pace** (`nav.sideStep`, 1.7 m: half the camp's truck, half himself, and a little). It ends when it has taken him that far off the line he was on, or after 0.7 s as before. Up to a hurry (2.4 m/s) the time runs out first and the step is what it was. At a run it was 3.6 m, and the next wall.
+3. **It goes to the side the ground makes the better** (`Feel.open`, the navigator's own test of a straight walk): first a side he can walk straight on to his waypoint from, then a side the step itself is clear to. Wedged between a mate and a wall there is one way round, and by turns he tried the wall first half the time. Where the ground doesn't choose, it's by turns as before.
+4. **His time starts again when the step is over.** It ran from when the step began, which left 0.2 s after it to gain on the waypoint before he was stepping the other way.
+
+On DOT-6344 the officer reaches his mate half a second after setting off, is stopped for a second, steps left, and is heading down his route again at 2.0 s, at a sprint by 2.2 s.
+
+**The owner's limit, and what it caught.** "Don't want our efforts in fixing this more minor problem to cascade": every other bench was re-run against `main`, camp by camp, with a count of every stall in every run. A stall is where this changes anything, so a run with one can come out differently, and a man who gets somewhere two seconds sooner changes a fight. That much was expected. Five things the first versions did were not, and each was this fix reaching too far. The circling bench found them: it has the longest runs and the most men moving.
+
+- **A step a body wide doesn't get round a truck.** The first version stepped 0.95 m, sized for a man. On TAP-5457 a relief man going back to his place found the camp's own truck across his way, end on. 0.95 m to one side, pressed again, 0.95 m back: 44 stalls and eight walks given up in a minute, behind a truck he used to get round in one step of 1.7 m. A step is as long as it was at a hurry, and no longer at a run.
+- **Sliding is how a man gets through where there's no room to step.** The first version never counted it. A man behind two kneeling in a gateway stepped from side to side until his walk gave up (PET-8787), where on `main` it didn't, and a man who was sliding round another in a doorway never got out of it. Being pressed now brings the first step forward and nothing more.
+- **A slide round a shoulder was taken for being pressed.** At a fifth of his pace the first version stopped a man who was a second from getting round another in a doorway (GUF-8063), and he never got out of the hut. Sliding off a body feeds itself: the further round he is, the faster he goes. Pressed is under a tenth, which a slide that is going anywhere is past within a few ticks.
+- **A step round the end of a wall left him behind it.** On PUH-1156 a man sliding round a wall's end stepped to the side his route didn't go, walked 11 m along the wrong face of the wall toward his waypoint, and gave up against it. Pressed against a corner, no step from where he stands looks clear, so the ground chose nothing and his turn chose wrong. What counts most now is whether he can walk on to his waypoint from where the step ends.
+- **A patrol who stopped to fire was "pressed" the moment he walked on.** The first version went by his speed alone, and he was standing still. It goes by what he asked of his legs.
+
+**Tried, and taken out: a new route from where the step leaves him.** It looked like the plain answer to "the straight line from there may be shut, or the waypoint may be behind him". On the chase's camps it changed nothing, and on VOM-2928 it was worse. There a man starts inside a hut with another crouched in its doorway. With his old route, one step aside and he slides round the man's shoulder to a waypoint 0.8 m off, and is through in 2.7 s. With a new one, its first waypoint is on the far side of the man in the door, he has to get all the way round him, and five stalls later he gives up, as he does on `main`. The old route's next point is nearly always the nearer one. So he keeps it.
+
+**Not done instead.**
+- **Having a man know where his mates are,** and walk round one without touching him. A brain still doesn't: holding his fire for them is settled where the round is made (the entry below), which "leaves the brain as it was", to be given that knowledge "when something needs it". This is a second thing that would use it. Until then this is what a man can do blind, and it stays right once he can see: something no map shows can still be in his way.
+- **Steering round bodies below the brain,** where the game can see them. Sliding off a body already does that, and it is what took the officer into the gap: to do better it has to know the wall, which is planning, and the brain's.
+- **Having the man in the way step aside.** He's behind that wall because he's fighting from it.
+- **A shorter wait.** 0.9 s without progress is what tells a mate who is in the way from one who is crossing it, and two men who brush past each other still sort themselves out without a step.
+- **A switch.** It's a fault in how a man walks, not a way for a camp to behave. `nav.creepSteps: 0` and a large `nav.sideStep` play the first two parts as they were.
+
+**What it leaves.**
+- **He still finds his mate by running into him,** and stands against him for 0.9 s. Until a brain knows where its mates are.
+- **Two men sent out by one opening are given the same place to kneel.** The second presses at the first for a second or two when he gets there (PID-8021, 2.2 s; ZOH-8906, where the second man now steps aside once and comes back). That's the chase's, not the walk's.
+- **A way that men have shut.** A doorway with a man in it and no room to slide past, a gateway with two kneeling in it, a man standing on the very point a route turns at: he pushes at them as he did, and the walk gives up as it did.
+- **A step that leaves nothing clear.** Where neither side leads on to his waypoint, he steps by turns and may walk into what cut him off. A new route from there is the answer to that case alone, and it wasn't met on these camps.
+- **A walk taken up again after a pause** is measured against where it had got to before the pause. If he's no nearer when he sets off again, that reads as a stall at once. Seen in the code and on no camp, so left.
+
+**Tests.** `tests/nav.test.ts`, "a mate in the way of a run": pressed, a centimetre now and then doesn't keep a walk going, and after one step for it, it does again; a leg's first measure always counts; the step is what it was at a walk and a hurry and 1.7 m at a run, and he has his 0.9 s again after it; it goes to the side he can walk on from, then the side he can step to; and in a handmade yard a runner wedged between a mate and a wall is round him and at a sprint inside 2 s. The out-the-gate scene now fails if any man on his way to the opening is held up for more than 2 s, DOT-6344 is in its table (on the walk as it was it fails: "guard 4 was held up for 4.7 s"), and `npm run experiment -- out-the-gate` reports the longest such hold.
+
+**Checked.**
+- **Every other bench, camp by camp, against `main`** as it stood that evening, with looking out for one's own in it (`docs/walk-benches.md` has every run that reads differently, with the first stall that isn't the same). 1,006 runs: 192 read differently, and every one of them has a walk that stalled. Walks stall 2,974 times where they stalled 6,860, and give up 256 times where they gave up 1,090.
+
+  | Bench | Runs | Read differently | Walks given up | Counts of runs that moved |
+  | --- | --- | --- | --- | --- |
+  | `ladder` | 64 | 12 | 34 → 4 | Shot dead 20 → 20, detected 17 → 17: one camp each way |
+  | `circling` | 96 | 43 | 133 → 86 | Made out at all 80 → 74; shot dead on the walk 87 → 85 |
+  | `second-step` | 240 | 5 | 94 → 37 | None |
+  | `hunt` | 24 | 8 | 181 → 30 | Found 8 → 9; enough rounds on him to kill 7 → 8; shot dead 0 → 1 |
+  | `takedown` | 96 | 8 | 55 → 26 | The target told to come out 12 → 14 |
+  | `answer` | 54 | 8 | 33 → 6 | None |
+  | `firefight`, 60 camps | 120 | 69 | 380 → 45 | With the firefight on: shot dead 27 → 28, the rest the same |
+  | `flaws`, 24 camps | 216 | 20 | 122 → 18 | Pile-ups 4 → 40, on three camps, where the relief meets the target |
+  | `out-the-gate` | 48 | 5 | 16 → 0 | A man out within 25 s 18 → 19 |
+  | `own-side` | 48 | 14 | 42 → 4 | None. Nobody shot by his own side, as on `main` |
+
+- **What the circling counts are worth: a placebo.** `main` with nothing changed but which side a man steps to first reads 77 made out and 83 shot dead, against `main`'s 80 and 87 and this change's 74 and 85. Those counts move about as far for a change that can't matter. Of the eight runs where the shooter is no longer made out, he is shot dead all the same on six.
+- **The pile-ups are the escort's.** They are all where the relief meets the target. On NUB-9046 the relief's two men reach his door together now, where on `main` the second was still stepping round the first, and are still there when the men sent to fetch him arrive. Four men standing at a door, nobody pushing: where the escort stands them is the next thing there.
+- **The brain lane's bench moved, and it's the same fault.** Its three overlook camps put a perfect shooter on the best overview. On BNC-0202 the siren goes at 6.7 s, a sentry is told to start the target's vehicle, and he sets off pressed against an officer running for cover. On `main` the officer's step aside, taken by turns, goes across the sentry's way; here it goes to the other side. The sentry is 0.4 m further along when the shooter's next round arrives at 8.3 s, and it passes behind him where on `main` it kills him. The order goes out again half a minute on and the engine starts at 39 s, so the shooter reaches the target first. Here the sentry starts it at 9.5 s and the target is away at 109 s, as he is on the other two camps. Pinned: the target got away on 3 of 3, from 2, and guards down from one perch 24 of 32, from 26. Nothing else in any lane's bench moved.
+- `npm run check` passes (99 files, 997 tests), and no fingerprint moved.
+
+**Versions.** `SIM_VERSION` 26 (looking out for one's own landed the same evening and took 25). No pinned run has a walk that stalls, so no fingerprint moved. Two numbers of the brain lane's bench are pinned anew (above). The golden recording is rewritten for the version.
+
 ## 2026-11-12 · A man looks out for his own
 
 **Why.** The chase (below) left "a man doesn't see his own side", held off with rules about what a mate had said. Measuring it properly showed it was older and bigger than the chase: with other rolls of the dice than the game's own, a three-minute fight round a gate ended with a man shot dead by his own side in about one fight in ten on `main`, and 15 men were shot in 55 fights on the roll that goes worst. The owner said go on and build it.

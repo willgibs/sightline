@@ -38,16 +38,22 @@ export interface OutTheGateParams {
   seed: string;
   /** What he does once he's along the wall: stays there, runs on away from the camp, or stays and shoots whoever comes out after him. */
   plan: 'wall' | 'run' | 'fight';
+  /** How long a headless run lasts, seconds: a camp whose men are slow to come by where he stands needs longer than most. */
+  seconds: number;
   off: CampSwitch[];
 }
 
+/** How long a headless run lasts unless its parameters say: long enough to be seen, get out and be followed, on most camps. */
+const SECONDS = 120;
+
 export function parseOutTheGate(text: string | undefined): OutTheGateParams {
-  const p: OutTheGateParams = { seed: 'TES-6931', plan: 'wall', off: [] };
+  const p: OutTheGateParams = { seed: 'TES-6931', plan: 'wall', seconds: SECONDS, off: [] };
   for (const part of (text ?? '').split('&')) {
     if (!part) continue;
     const [key, value] = part.split('=');
     if (key === 'seed' && value) p.seed = value;
     else if (key === 'plan' && (value === 'wall' || value === 'run' || value === 'fight')) p.plan = value;
+    else if (key === 'for' && Number(value) > 0) p.seconds = Number(value);
     else if (key === 'off') p.off = parseSwitches(value ?? '');
     else throw new Error(`The out-the-gate scene doesn't know '${part}'`);
   }
@@ -168,10 +174,18 @@ export interface GateSeen {
   late: Set<number>;
   /** Men of the camp shot dead by the camp, once he'd gone through: a man sent out to where the camp believes the intruder is mustn't be standing where it's shooting. */
   own: Set<number>;
+  /**
+   * The longest any man on his way to the opening was held up, in ticks, and who: he asked his legs for a run and got next to
+   * nothing, because something no map shows was in his way (a mate behind the same wall, as often as not). `holding` is each
+   * man's stretch as it stands.
+   */
+  held: number;
+  heldWho: number;
+  holding: Map<number, number>;
 }
 
 export function emptyGateSeen(): GateSeen {
-  return { sure: -1, left: -1, hidden: -1, astray: false, aware: 0, already: new Set(), came: new Set(), went: new Set(), outFor: new Map(), outAt: -1, cameAt: -1, wentAt: -1, found: -1, seenAgain: -1, rounds: 0, roundsOut: 0, most: 0, home: Infinity, down: new Set(), late: new Set(), own: new Set() };
+  return { sure: -1, left: -1, hidden: -1, astray: false, aware: 0, already: new Set(), came: new Set(), went: new Set(), outFor: new Map(), outAt: -1, cameAt: -1, wentAt: -1, found: -1, seenAgain: -1, rounds: 0, roundsOut: 0, most: 0, home: Infinity, down: new Set(), late: new Set(), own: new Set(), held: 0, heldWho: -1, holding: new Map() };
 }
 
 /** Metres from the opening's middle that count as at it, and as having come out by it. */
@@ -181,9 +195,15 @@ const BY_GATE = 12;
 const STAYED = 1.5;
 /** Seconds from his crossing the wall by which a man has to be out after him for it to be a chase, and not the camp's search finding its way there a minute on. */
 export const SOON = 30;
+/** Seconds a man on his way to the opening may be held up by something in his way: he steps round a mate, he doesn't wait behind him. */
+export const HELD_UP = 2;
 
-/** The scene's table: two camps, and on the first each thing he might do once he's out. */
-export const OUT_THE_GATE_TABLE: readonly string[] = ['seed=TES-6931', 'seed=VOP-9546', 'seed=TES-6931&plan=run', 'seed=TES-6931&plan=fight'];
+/**
+ * The scene's table: two camps, and on the first each thing he might do once he's out. And DOT-6344, where the officer who
+ * takes up the chase is behind a wall with another man crouched on the first steps of his way: he was eight seconds getting
+ * round him, and the first man was out of that gate 24 s behind the intruder (nav.ts, followRoute).
+ */
+export const OUT_THE_GATE_TABLE: readonly string[] = ['seed=TES-6931', 'seed=VOP-9546', 'seed=TES-6931&plan=run', 'seed=TES-6931&plan=fight', 'seed=DOT-6344&for=160'];
 
 /** Takes one tick's events and state into what the run has shown. */
 export function watchGate(sim: Simulation, events: ReturnType<Simulation['step']>, seen: GateSeen): void {
@@ -211,8 +231,20 @@ export function watchGate(sim: Simulation, events: ReturnType<Simulation['step']
   }
   let outside = 0;
   let home = 0;
+  const creep = sim.tuning.brain.nav.creep;
   for (const g of sim.guards) {
     const post = sim.world.camp.guards[g.guard.spawn]!;
+    // On his way to the opening, and getting nowhere: his order asks for a run, and his body is making next to none of it (`nav.creep`).
+    const chasing = g.brain?.act === 'push' && g.brain.ff?.gate != null && !g.brain.ff.there;
+    const asked = Math.sqrt(g.guard.order.wishX * g.guard.order.wishX + g.guard.order.wishZ * g.guard.order.wishZ);
+    if (chasing && asked > 1 && g.body.speed < creep * asked) {
+      const stretch = (seen.holding.get(g.id) ?? 0) + 1;
+      seen.holding.set(g.id, stretch);
+      if (stretch > seen.held) {
+        seen.held = stretch;
+        seen.heldWho = g.id;
+      }
+    } else seen.holding.delete(g.id);
     // The relief comes up the road from outside, and isn't anyone going after him.
     if (g.guard.reserve) continue;
     const out = outsideWalls(sim.world, g.body.x, g.body.z);
@@ -252,7 +284,7 @@ export function outTheGate(params?: string): Scene {
       ...base,
       name: 'out-the-gate',
       version: 1,
-      params: `seed=${p.seed}${p.plan === 'wall' ? '' : `&plan=${p.plan}`}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}`,
+      params: `seed=${p.seed}${p.plan === 'wall' ? '' : `&plan=${p.plan}`}${p.seconds === SECONDS ? '' : `&for=${p.seconds}`}${p.off.length > 0 ? `&off=${p.off.join(',')}` : ''}`,
       title: `Out of the gate (${p.seed})`,
       description: 'Someone stands inside an opening in the camp’s wall until he is seen, then runs out, turns along the outside of the wall and stops where no post can see him. What comes after him?',
       // `plan=fight` fires his rounds as the compound simulator drops its own: from where he stands, at a place.
@@ -266,7 +298,7 @@ export function outTheGate(params?: string): Scene {
         if (p.plan !== 'run') delete player(sim.index).health;
       },
       driver: () => new ShowAndLeave(p.plan),
-      seconds: 120,
+      seconds: p.seconds,
       playOn: true,
       expect: [
         {
@@ -312,6 +344,10 @@ export function outTheGate(params?: string): Scene {
         {
           name: 'and nobody is shot by his own side',
           after: () => (seen.own.size > 0 ? `${seen.own.size} of the camp's men were shot dead by the camp (guard ${[...seen.own].join(', ')})` : undefined),
+        },
+        {
+          name: 'a man who sets off after him gets round whoever is in his way',
+          after: (sim) => (seen.held > HELD_UP * sim.tuning.sim.tickHz ? `guard ${seen.heldWho} was held up for ${(seen.held / sim.tuning.sim.tickHz).toFixed(1)} s on his way to the opening` : undefined),
         },
       ],
     },

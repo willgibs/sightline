@@ -4,7 +4,7 @@ import { turnTowards, wrapAngle, yawFromDirection } from '../kernel/core/math';
 import type { Gait } from '../body';
 import type { GuardMind } from './mind';
 import type { MoveCost } from '../kernel/world/search';
-import { emptySteering, followRoute, navigatorOf, type Steering } from './nav';
+import { emptySteering, followRoute, navigatorOf, type Feel, type Steering } from './nav';
 import type { Order } from './orders';
 
 /**
@@ -15,6 +15,8 @@ import type { Order } from './orders';
  */
 
 const steer: Steering = emptySteering();
+/** What the walker feels of his own going, filled in for each walk: scratch, as `steer` is. */
+const feel: Feel = {};
 
 /** Where his attention is: his focus, or where he believes the intruder is. */
 export function focusOf(m: GuardMind): { x: number; z: number } {
@@ -69,11 +71,16 @@ export function lookAround(m: GuardMind, out: Order): void {
 /**
  * Walks toward a goal by the navigator, then says whether he's there. `goalY` is the height of a goal on an upper floor.
  * `cost` prices the route's moves, for a way that keeps out of someone's view (positions.ts, Danger).
+ *
+ * A route knows nothing of bodies, and neither does he: a brain doesn't see its own side (rule 13). What he does know is
+ * his own going, and the ground. So when a mate is in his way he finds out by being stopped, and steps round him by the
+ * side the ground leaves room on (followRoute).
  */
 export function walk(m: GuardMind, out: Order, x: number, z: number, pace: number, gait: Gait, lookX: number, lookZ: number, goalY?: number, cost?: MoveCost): 'walking' | 'arrived' | 'stuck' {
   const b = m.brain!;
   const T = m.tuning.brain;
   const hz = m.tuning.sim.tickHz;
+  const nav = navigatorOf(m.world, m.tuning);
   const moved = (x - b.goalX) * (x - b.goalX) + (z - b.goalZ) * (z - b.goalZ) > T.goalMoved * T.goalMoved;
   const retry = b.routed >= 0 && (m.tick - b.routed) / hz >= (b.routeOk ? T.routeEvery : T.routeRetry);
   if (b.routed < 0 || (moved && retry) || (!b.routeOk && retry)) {
@@ -82,7 +89,7 @@ export function walk(m: GuardMind, out: Order, x: number, z: number, pace: numbe
       return 'walking';
     }
     m.nav.searches.left--;
-    const r = navigatorOf(m.world, m.tuning).find(m.self.x, m.self.z, x, z, cost ? { work: m.nav.work, cost } : { work: m.nav.work }, b.route, m.self.y, goalY);
+    const r = nav.find(m.self.x, m.self.z, x, z, cost ? { work: m.nav.work, cost } : { work: m.nav.work }, b.route, m.self.y, goalY);
     b.routed = m.tick;
     b.routeOk = r === 'found';
     b.goalX = x;
@@ -90,7 +97,12 @@ export function walk(m: GuardMind, out: Order, x: number, z: number, pace: numbe
     if (!b.routeOk) return 'stuck';
   }
   if (!b.routeOk) return 'stuck';
-  const w = followRoute(b.route, m.self.x, m.self.z, pace, m.id, m.tick, m.tuning, steer);
+  // What he asked of his legs last tick is still in the order, and what he got is how fast he's moving now.
+  // A man who was standing by his own choice (he stopped to fire, and now walks on) isn't pressed against anything.
+  const asked = Math.sqrt(out.wishX * out.wishX + out.wishZ * out.wishZ);
+  feel.pressed = asked > 0 && m.self.speed < T.nav.creep * asked;
+  feel.open = nav.open;
+  const w = followRoute(b.route, m.self.x, m.self.z, pace, m.id, m.tick, m.tuning, steer, feel);
   if (w === 'arrived') return 'arrived';
   if (w === 'stalled') {
     // Something the grid doesn't know is in the way, and sidestepping hasn't cleared it.
