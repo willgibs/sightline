@@ -126,7 +126,8 @@ export function checkValley(hf: Heightfield, features: TerrainFeatures, gen: Gen
   // --- Ways in and out, on the map layer of the spatial grid (no colliders yet). ------
   const empty = new ColliderSet(hf.size);
   empty.build();
-  const map = buildGrid(hf, empty, { minX: site.x - 1, minZ: site.z - 1, maxX: site.x + 1, maxZ: site.z + 1 }, gen).map;
+  // By a cell's middle, as a valley has always been judged (kernel/world/grid.ts, GridOptions).
+  const map = buildGrid(hf, empty, { minX: site.x - 1, minZ: site.z - 1, maxX: site.x + 1, maxZ: site.z + 1 }, gen, [], [], { mapSlope: 'middle' }).map;
   const { access, access16, exfil, steepShare } = waysInAndOut(map, site, playHalf, gen);
 
   if (spines > 0 && ridgesSeen < spines) problems.push(`only ${ridgesSeen} of ${spines} ridges overlook the camp`);

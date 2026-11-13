@@ -148,4 +148,4 @@ describe('world generation', () => {
   });
 });
 
-const GOLDEN_TAL_4471 = '572853e5d9571a03';
+const GOLDEN_TAL_4471 = 'ec2015c6839654fe';

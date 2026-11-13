@@ -17,6 +17,9 @@ import { makeTerrainSample, type Heightfield } from './heightfield';
  * fit a body, and only the edge between them knows it's there. Doors and anything else
  * that changes during a mission will override cells from the simulation's state.
  *
+ * Ground too steep to climb isn't walkable. A map cell lies on two of the terrain's
+ * triangles and is steep if either is; a site cell answers for the one under its middle.
+ *
  * Built for a standard human body (gen.grid), kept equal to the player's by a test.
  */
 
@@ -105,6 +108,17 @@ export interface StairSpec {
   length: number;
 }
 
+export interface GridOptions {
+  /**
+   * How the map layer judges a cell's slope. 'cell', the default: by every triangle under
+   * it, which is what a finished world carries. 'middle': by the one under its middle, the
+   * way the map was read while every camp so far was laid out and judged. Generation still
+   * builds it so, and brings the map it hands over to 'cell' with `steepenMap`, so that a
+   * seed's camp is the camp it was.
+   */
+  mapSlope?: 'cell' | 'middle';
+}
+
 const sample = makeTerrainSample();
 const ids: number[] = [];
 
@@ -113,17 +127,16 @@ const ids: number[] = [];
  * the camp and a margin. A storey's layer is laid on the site layer's cells, so the two line
  * up cell for cell, and a stair joins the cell of its foot to the cell of its head.
  */
-export function buildGrid(terrain: Heightfield, colliders: ColliderSet, site: { minX: number; minZ: number; maxX: number; maxZ: number }, G: GenTuning, storeys: readonly StoreySpec[] = [], stairs: readonly StairSpec[] = []): SpatialGrid {
+export function buildGrid(terrain: Heightfield, colliders: ColliderSet, site: { minX: number; minZ: number; maxX: number; maxZ: number }, G: GenTuning, storeys: readonly StoreySpec[] = [], stairs: readonly StairSpec[] = [], options: GridOptions = {}): SpatialGrid {
   const map = layer(terrain.coord(0), terrain.coord(0), terrain.cell, terrain.cells, terrain.cells);
   const fine = G.grid.siteCell;
   const sx = Math.max(1, Math.ceil((site.maxX - site.minX) / fine));
   const sz = Math.max(1, Math.ceil((site.maxZ - site.minZ) / fine));
   const siteLayer = layer(site.minX, site.minZ, fine, sx, sz);
-  // A map cell is as big as the terrain's own, so it lies on two triangles and has to answer
-  // for both. A site cell is a fifth as wide and still answers for the ground under its
-  // middle: asking it for all of its ground moves the camp generation builds on about one
-  // seed in ten, for a fault nobody has seen inside a camp (docs/decisions.md, Nov 13).
-  fill(map, terrain, colliders, G, true);
+  // A map cell is as big as the terrain's own, so it lies on two triangles and answers for
+  // both. A site cell is a fifth as wide and answers for the ground under its middle: no
+  // walk inside a camp has been seen to fail on the difference (docs/decisions.md, Nov 13).
+  fill(map, terrain, colliders, G, options.mapSlope !== 'middle');
   fill(siteLayer, terrain, colliders, G, false);
   const built = storeys.map((s): Storey => {
     // On the site layer's cell lines.
@@ -238,6 +251,29 @@ function clearPathAt(colliders: ColliderSet, y: number, x: number, z: number, dx
 
 function layer(x0: number, z0: number, cell: number, nx: number, nz: number): GridLayer {
   return { x0, z0, cell, nx, nz, flags: new Uint8Array(nx * nz), cover: new Uint8Array(nx * nz), edges: new Uint8Array(nx * nz) };
+}
+
+/**
+ * Brings a map layer built by its cells' middles (`mapSlope: 'middle'`) to what `buildGrid`
+ * builds by default: every cell with a triangle under it too steep to climb is steep, not
+ * walkable, and the edges to it are closed. Cell for cell and edge for edge the same layer
+ * as building it whole (tests/grid.test.ts holds the two together).
+ */
+export function steepenMap(L: GridLayer, terrain: Heightfield, G: GenTuning): void {
+  const tanMax = dtanDeg(G.walkableSlopeDeg);
+  for (let j = 0; j < L.nz; j++) {
+    for (let i = 0; i < L.nx; i++) {
+      const k = j * L.nx + i;
+      // Steep by its middle is steep by the whole of it: the middle's triangle is one of them.
+      if ((L.flags[k]! & Cell.Steep) !== 0) continue;
+      if (terrain.steepestIn(L.x0 + i * L.cell, L.z0 + j * L.cell, L.x0 + (i + 1) * L.cell, L.z0 + (j + 1) * L.cell) <= tanMax) continue;
+      L.flags[k] = (L.flags[k]! & ~Cell.Walkable) | Cell.Steep;
+      // An edge needs both its cells walkable: its own two, and the two that led here.
+      L.edges[k] = 0;
+      if (i > 0) L.edges[k - 1] = L.edges[k - 1]! & ~Edge.East;
+      if (j > 0) L.edges[k - L.nx] = L.edges[k - L.nx]! & ~Edge.North;
+    }
+  }
 }
 
 /**

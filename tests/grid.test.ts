@@ -4,7 +4,7 @@ import { generateWorld } from '../src/sim/generation/world';
 import { dtanDeg } from '../src/sim/kernel/core/detmath';
 import { missionSpec } from '../src/sim/kernel/mission';
 import { Blocks } from '../src/sim/kernel/world/colliders';
-import { Cell, Edge, cellAt, cellIndex, type GridLayer } from '../src/sim/kernel/world/grid';
+import { buildGrid, Cell, Edge, cellAt, cellIndex, steepenMap, type GridLayer } from '../src/sim/kernel/world/grid';
 import { Surface } from '../src/sim/kernel/world/surfaces';
 import { testWorld } from './fixtures';
 
@@ -86,6 +86,30 @@ describe('the spatial grid', () => {
     expect(cellIndex(site, 30.25, 9.75)).toBeGreaterThanOrEqual(0);
     expect(has(site, 30.25, 9.75, Cell.Walkable)).toBe(false);
     expect(has(site, 31.75, 8.25, Cell.Walkable)).toBe(true);
+  });
+
+  it('builds the same map layer whole as by its middles and then steepened', () => {
+    // Generation lays a camp out on a map read by its cells' middles and hands over one
+    // brought to the whole of each cell: that has to be the map a finished world is built with.
+    const fence = { kind: 'box' as const, x: 12, z: 6, y0: -8, y1: 9, hx: 0.05, hz: 9, ux: 1, uz: 0, flags: Blocks.Move, surface: Surface.Metal };
+    const w = testWorld({ height: (x, z) => 5 * Math.sin(x / 4) * Math.cos(z / 5), colliders: [fence], spawnOnTop: true });
+    const box = { minX: -1, minZ: -1, maxX: 1, maxZ: 1 };
+    const whole = buildGrid(w.terrain, w.colliders, box, T.gen).map;
+    const drafted = buildGrid(w.terrain, w.colliders, box, T.gen, [], [], { mapSlope: 'middle' }).map;
+    // The ground has both kinds of cell: steep under its middle, and steep only elsewhere.
+    let steep = 0;
+    let hidden = 0;
+    for (let k = 0; k < whole.flags.length; k++) {
+      if ((drafted.flags[k]! & Cell.Steep) !== 0) steep++;
+      else if ((whole.flags[k]! & Cell.Steep) !== 0) hidden++;
+    }
+    expect(steep).toBeGreaterThan(50);
+    expect(hidden).toBeGreaterThan(50);
+    steepenMap(drafted, w.terrain, T.gen);
+    expect(drafted.flags).toEqual(whole.flags);
+    expect(drafted.edges).toEqual(whole.edges);
+    expect(drafted.cover).toEqual(whole.cover);
+    expect(w.grid.map.flags).toEqual(whole.flags);
   });
 
   it('never calls ground walkable that the motor would refuse to climb', () => {
