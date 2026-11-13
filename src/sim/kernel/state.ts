@@ -44,8 +44,10 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * intruder in sight, who he's heard go out of the walls after him and when, the opening he's
  * going out by and how far through his look round he is, and the last word he had that the
  * intruder had gone out; and a contact can say so (brain/firefight.ts, the chase).
+ * 17: a camp says whether its men look out for their own when they fire, and a man keeps
+ * the tick he last held his fire for one of them (game/combat.ts).
  */
-export const STATE_SCHEMA = 16;
+export const STATE_SCHEMA = 17;
 
 export type EntityId = number;
 

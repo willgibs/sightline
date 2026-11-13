@@ -636,6 +636,56 @@ That list, and the chase's own bench, read wrong more than once on the way. Each
 - **He's followed to the opening, not round the corner.** A chaser who sees nobody along the wall gives it up after his look. A man who keeps going round the compound's corner is the firefight's ordinary follow, or the hunt's.
 - **Hugging the wall still hides you from a tower.** That's honest geometry: a deck 3 m inside a 3 m wall can't see the ground within about 3.5 m of its far side. The answer to it is the man who steps out, which is this.
 
+### Step 2d, built: a man looks out for his own (Nov 12)
+
+`game/combat.ts`, `ownInTheWay`. Step 2c left this open: "a man doesn't see his own side". It turned out to be older than the chase and bigger than it looked.
+
+**What was wrong, measured** (`npm run experiment -- own-side --dice 3`, 24 camps, three rolls of the dice on each). A fight round a gate, three minutes long: someone seen inside leaves by an opening, and the camp fights him through it. As the camp was, a man was shot dead by his own side in 5 of 63 such fights where the intruder stays by the wall, and in 6 of 63 where he runs. On 60 camps with the dice that go worst it was 15 men in 55 fights. The game's own dice happen to be kind, which is why no bench had shown it.
+
+**Why.** A man did hold his fire for one of his own, if that man was dead on his line: one thin ray from his eye to what he was shooting at. A round doesn't go down that ray. It goes anywhere within the error of his aim, 0.6° from a position and 1.1° otherwise, which is half a metre at 50 m. Every one of the men shot, in the 26 cases looked at, was between the rifle and its target and about half a metre off the line: beside it, or crouched under it. None was past the target.
+
+**The rule.** A man holds his fire for one of the camp's own anywhere his round could go.
+
+| | |
+| --- | --- |
+| Where | Between his rifle and what he's shooting at, within the error of his aim and 0.3 m more |
+| Whom | A man a round could reach: nothing that stops a round stands between the rifle and the side of him nearest the line. A man behind a wall isn't in the way. A man with a shoulder showing past its end is |
+| On his feet | A man down behind a crate is looked for where he'd stand, too. In a fight he's about to |
+| Not | A man past the target, or at his own shoulder |
+| Then | He doesn't fire, and tries again when his next round is due |
+
+In the code:
+
+- **It's settled where the round is made**, as the single ray was. A brain knows nothing of where its own side is (rule 13), and a man sees who is in front of his rifle, so the game decides it as his eyes would, from the bodies as they stand and what would stop a round.
+- **He knows he held** (`BrainState.held`, and a `held` event that names the man in the way and how far off). The debug view's label says "holding his fire" for two seconds, and `explain()` says who was in front of him.
+- **`off=mates`** plays a camp that holds only for a man dead on the line, as every camp did. Only a camp with `mates` does this, so no pinned run moved.
+- **The chase's rules about where not to fire are gone.** Step 2c had a man hold his fire by what a mate had said: nothing blind near where one went out, and nothing through that opening for the rest of the fight. Those stood in for this, and they cost the camp its fire through its own gate whether anyone was in it or not.
+
+**Measured after** (`own-side --dice 3`, the same 63 fights each way):
+
+| | As it was | Looking out for its own |
+| --- | --- | --- |
+| **He stays by the wall.** Fights with a man shot by his own side | 5 | **0** |
+| Rounds the camp fired | 66 | 56 |
+| Rounds held for one of its own | 0 | 11 |
+| **He runs for the trees.** Fights with a man shot by his own side | 6 | **0** |
+| Rounds the camp fired | 156 | 153 |
+| Rounds held for one of its own | 0 | 6 |
+| Rounds that hit him once he was out | 46 | 46 |
+
+- **Nobody is shot by his own side**, on any of the dice: none in these 126 fights, and none in 440 longer ones on 60 camps.
+- **It costs the rounds that would have gone past a mate, and nothing else.** A runner is hit as often as he was.
+
+@@CHASE@@
+
+@@WIDER@@
+
+**What it leaves.**
+
+- **He holds, and doesn't yet move for a clear line.** A man with one of his own in front of him waits and tries again. A trained man would shift a pace. By the wall that's one round in six held, which is a lot of men waiting.
+- **A man running across a line of fire isn't led.** The look is at where a man is and where he'd stand, not where he'll be a tenth of a second on. It hasn't happened in any run looked at.
+- **Nothing past the target counts.** A round that misses flies on, and a man 30 m behind the intruder is in more danger than this says. None of the men shot was one, and counting them would let an intruder stand between two guards and be safe from both.
+
 ### Step 3a, built: the target's answer, by the camp's problem (Nov 11)
 
 `brain/protect.ts`, `game/protection.ts`, `game/escape.ts`. The owner's call (`core-challenge`, Nov 10): what the target does under attack depends on the camp, so that play "can't be reduced to always cutting a radio or disabling a vehicle", and with "a clear method to the madness", so that nobody is left asking "how could I have possibly known that without getting near the end then losing".

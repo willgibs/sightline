@@ -84,5 +84,11 @@ export const GEN_VERSION = 9;
  * ground, and once anyone has gone the rest keep inside the walls. And nobody fires at
  * ground he can't see into near where one of his own said he was going out. No pinned run
  * has anyone leave a camp by an opening, so no fingerprint moved.
+ * 25: in a camp whose men look out for their own, a man holds his fire for one of them
+ * anywhere his round could go: inside the error of his aim, out to what he's shooting at,
+ * where that man stands or would stand on his feet, if a round could reach him
+ * (game/combat.ts). Before, only for a man dead on his line. With that, the chase's own
+ * rules about where not to fire are gone: they stood in for it. No pinned run's camp has
+ * `mates`, so no fingerprint moved.
  */
-export const SIM_VERSION = 24;
+export const SIM_VERSION = 25;
