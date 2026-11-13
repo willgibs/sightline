@@ -2,6 +2,72 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-13 · A route keeps off ground too steep to climb
+
+**What broke.** Men of a hunting section, at a run out in the valley with nobody near them, stopped dead, stepped aside, tried again, and after five tries gave the walk up. A second and a half later they asked for a route, were given the same one, and did it again. Found while measuring the held-up walk (below), and on `main` before it. On HEL-2923, a yard, played the way the circling bench plays it, guard 9:
+
+| | |
+| --- | --- |
+| 126 s | At a run for a waypoint 6 m to his east, he stops at (132.5, −94.2). A step north, and he's stopped again 2 m on. A step south, and he's back where he was. Five stalls, and the walk is given up |
+| 250 s | Standing at (384.1, −95.9) with his route given up again, 95 m short of where the hunt sent him |
+
+Both places are the edge of a cell the map calls walkable. A cell of the 2.5 m map layer is lined up with a cell of the terrain, which is two triangles (rule 7). A cell answers for the ground's slope at its middle, and the middle of a cell always lies on the same one of the two. At the first place that triangle is 27° and the other is 45°. At the second they are 32° and 44°. The limit is 42°, the motor's own, and the motor stops a body at whichever triangle it steps on to. So his route ran straight up ground he couldn't climb, and the step aside a held-up walk takes (1.7 m) can't get round a face a cell wide.
+
+**How much of a valley.** On 20 valleys, 11,084 of 5.1 million walkable map cells have a triangle over the limit that the cell doesn't answer for: 0.22%, between 190 and 815 a valley, the steepest at 66°. They lie along the foot and the lip of every steep face, which is where a route round the face runs.
+
+**The first fix, and why it doesn't stand.** A cell was made steep if either of its triangles is. It cured the stalls, and it took ground away that men use: a cell with one bad triangle is half good ground, and on `main` sections were getting through such places. Measured on the hunt bench's 12 camps, with their 346 listed firing points:
+
+| | `main` | A whole cell steep | As built |
+| --- | --- | --- | --- |
+| Firing points a section has a covered way to, within the 900 m it's sent | 310 | 292 | 310 |
+| A walker's route to GAP-2753's best overview | 525 m | 881 m | 530 m |
+| A walker's route to a listed firing point, against `main`'s | the same | 22 m longer on average, the worst 493 m | 3 m longer on average, the worst 61 m |
+| GAP-2753: a section sent after one shot | yes | no: no way to 11 of its firing points | yes |
+
+It also reached into generation, which reads the same cells: built on that map, a perch, a post or a device moved on five of the twelve camps the owner's sittings play, and generation needed a copy of the old map to stand still. Three commits on this branch are that fix and its retreat.
+
+A second try closed the edges into a bad triangle and left the cell alone. A walker's routes came back to within a few metres of `main`'s, and the hunt's planning didn't: it joins places 10 m apart by looking for a way inside the two of them (`brain/approach.ts`), and with a few edges gone it still lost 18 covered ways. Letting it look 5 m wider lost 14, gained 8 and moved others by hundreds of metres. The hunt's reading of the ground is its own piece of work, and this isn't it.
+
+**What's built.**
+
+- **The map marks the walks that climb such ground** (`kernel/world/grid.ts`, `Edge.EastSteep` and `Edge.NorthSteep`). For every edge a body fits along, the walk from one cell's middle to the next is measured on the terrain's own triangles, both ways (`gainOnSteep`). If it gains more than the motor's own slack (2 mm) on a triangle over the limit, the edge is marked. A cell's flag and the bit that says a body fits are as they were. On HEL-2923 that is 253 of 492,000 edges.
+- **A route keeps off them** (`brain/nav.ts`). The navigator's searches over the map layer close a marked move, and a corner move where any side of its square is marked. The field that leads a route to the camp's rim is flooded the same way. An end that the marks have cut off, which is a ledge, is taken as the nearest cell with a way out of it.
+- **And isn't pulled straight across one.** `clear`, which says whether a body can walk a straight stretch, now also says no to one that gains height on ground too steep, going that way. So string-pulling doesn't put back what the search went round, and the side a held-up man steps to is judged on it.
+- **Nothing else reads the marks.** Sound, the camp's knowledge of its ground, the hunt's covered ways, the bots and generation all read the cells and the fitting bits, which haven't moved. So every seed builds the camp it built, and a section is sent where it was sent. On 20 valleys, nothing generation made differs from `main`'s apart from the marks: every cell's flag, its cover and the edges a body fits along are the same on both layers, and a valley has between 122 and 440 marks, all on the map layer.
+- **The site layer isn't marked.** Its cells are a fifth as wide, and no walk inside a camp has been seen to fail this way.
+- **No switch.** The other side to play is a route up a face a body can't climb.
+
+**What's proven.**
+
+- `tests/grid.test.ts`: on a ramp with one vertex dipped, the one walk that runs up the triangle neither cell answers for is marked, and the cell, its other edges and the fine layer aren't. On HEL-2923 the marks are exactly the walks that gain height on ground too steep, either way, among 492,000 edges: none missed and none extra.
+- `tests/nav.test.ts`: at the place guard 9 stopped, the straight way east gains 1.16 m on the 45° triangle. `clear` refuses it going up and allows it coming down, and the route goes round in 15.8 m where the straight line is 15.0, with no stretch that climbs.
+- `tests/world.test.ts`: the grid's slope limit is the guards' as well as the player's.
+- HEL-2923, guard 9: no stall between 120 s and 270 s, and at the place the hunt sent him by 240 s.
+- GAP-2753: the hunt goes out as on `main`, to the second.
+- The stall census (every stall of every walk, on both builds). The hunt bench, 12 camps and 24 runs: stalls 346 → 240, walks given up 30 → 14, and 5 runs on 5 camps read differently. On ROL-8005 the section now finds him, where on `main` it stalled 50 times and gave up 8 walks. The circling bench, 16 camps and 96 runs: stalls 653 → 234, walks given up 86 → 13, and 12 runs on 9 camps read differently. On HEL-2923's yard the camp now finds him (stalls 33 → 2, walks given up 5 → 0), and no run loses a find.
+
+**The standing benches, against `main` at ea9c1a7.** Men who go round steep ground get to some places by other routes and at other times, so the benches that send men out into the valley can't all read the same. No count moves by more than two camps.
+
+| Bench | How it reads |
+| --- | --- |
+| `second-step`, `out-the-gate`, `takedown`, `answer`, `own-side --dice 3`, `flaws` | Every figure the same |
+| `seeds -- --count 100` | Every figure the same: 90 of 100 valid the first time |
+| `hunt` | With the hunt, one shot and he stays: found 8 → 9 of 12, found after 221 → 233 s, enough rounds on him to kill 3 → 4 of 12, by 185 → 199 s. It watches his place for 161 s after, where it was 164. A section is sent on 10 of 12, as on `main` |
+| `circling` | Made out at all on the plain yard 11 → 12 of 16. Means inside their intervals |
+| `firefight` | With the firefight, someone came after him 1 → 2 of 6. Means inside their intervals |
+| `ladder` | Shoot and relocate: shot dead 4 → 2 of 16, detected 4 → 2 of 16. Means inside their intervals |
+
+**Versions and pins.** `GEN_VERSION` 10: the grid in a world carries the marks, and TAL-4471's fingerprint is `4640c8146acaa42b`. `SIM_VERSION` 28: routes changed. No pinned run's route crossed such ground, so no pinned run's `behaviour` or `state` moved, and no bench pin moved.
+
+**What it leaves.**
+
+- **The hunt's covered ways don't read the marks.** A way can still cross a marked walk, and the men on it go round by their own routes, a few metres longer. Planning that reads them needs a truer way of joining its places than looking inside the two of them, as the second try showed.
+- **Nor does generation,** when it asks which perches a body can walk to. It should at its next deliberate change, when camps move anyway.
+- **A marked walk is closed both ways,** though a body can come down it. A route that would have gone down a face goes round.
+- **The site layer,** as above.
+- **PUH-1156, the second case in the note that started this, isn't this.** On `main` today guard 8 runs into guard 7 there, steps round him once and goes on: the held-up walk's fix at work.
+- A truck or a gate, which is an entity's shape, is still not in the grid, as its header says.
+
 ## 2026-11-12 · A man held up by a mate steps round him
 
 **What broke.** Tracing the chase (below) turned up a fault in how a man walks a route, older than the chase and there for every act that sets a man off at a run. `npm run scene -- out-the-gate --params 'seed=DOT-6344&for=160'`: an officer 45 m from the gate takes up the chase 4.4 s after the intruder has gone out of it. The first steps of his way run along a wall, and another man is crouched on that line, 0.4 m from the wall. A route is planned on a grid that knows nothing of bodies, and a brain doesn't see its own side (rule 13), so the officer finds his mate by running into him. On `main`, from the moment he sets off:
