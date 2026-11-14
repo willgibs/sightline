@@ -487,6 +487,9 @@ export const defaultTuning = {
       maxSlopeDeg: 42, // steeper ground cannot be climbed
       uphillSlowdown: 0.55, // speed multiplier climbing at the maximum slope
       stepHeight: 0.45, // ledges up to this height are stepped onto
+      // A ledge with no room over it to stand in (a low box under a shelf or a ceiling) is a wall the body slides
+      // along (sim/body/motor.ts). False is the motor before Nov 14: walking into one stops the body dead (?ledge=stop)
+      ledgeWall: true,
       pitchLimit: 1.45, // radians the head can tilt up or down
       shoveMax: 0.08, // most another body shoves this one per resolve pass; small enough that walls always win
       groundSnap: 0.6, // stay glued to the ground walking downhill
@@ -565,6 +568,7 @@ export const defaultTuning = {
       maxSlopeDeg: 42,
       uphillSlowdown: 0.55,
       stepHeight: 0.45,
+      ledgeWall: true,
       pitchLimit: 1.45,
       shoveMax: 0.08,
       groundSnap: 0.6,
