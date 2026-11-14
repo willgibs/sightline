@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseResults, stringifyResults, toResultsFile, type ResultsFile } from '../src/lab/results';
-import { STANDING, choose, compareBench, formatComparison, shard, unchanged, type BenchResults } from '../src/lab/standing';
+import { STANDING, choose, compareBench, formatComparison, mergeParts, partOf, pieceName, shard, unchanged, whole, type BenchResults } from '../src/lab/standing';
 
 /** The standing benches' comparison of two builds (src/lab/standing.ts), on small made-up results. */
 
@@ -51,15 +51,37 @@ describe('the standing set', () => {
     expect(STANDING.find((b) => b.name === 'own-side')!.dice).toBe(3);
   });
 
-  it('puts the long benches in different shards of four, and every bench in exactly one', () => {
+  it('splits a dear bench by its camps, and deals every part of every bench to exactly one shard', () => {
     const all = choose();
-    const shards = [1, 2, 3, 4].map((k) => shard(all, k, 4).map((b) => b.name));
-    const long = ['circling', 'second-step', 'own-side'].map((n) => shards.findIndex((s) => s.includes(n)));
-    expect(new Set(long).size).toBe(3);
-    expect(shards.flat().sort()).toEqual(STANDING.map((b) => b.name).sort());
-    // Dealt dearest first to the lightest shard: none is heavier than the lightest by more than one bench.
-    const costs = [1, 2, 3, 4].map((k) => shard(all, k, 4).reduce((n, b) => n + b.cost, 0));
-    expect(Math.max(...costs) - Math.min(...costs)).toBeLessThanOrEqual(Math.max(...all.map((b) => b.cost)));
+    for (const n of [4, 8]) {
+      const shards = Array.from({ length: n }, (_, k) => shard(all, k + 1, n));
+      const pieces = shards.flat();
+      for (const b of all) {
+        const mine = pieces.filter((p) => p.bench.name === b.name);
+        expect(mine.map((p) => p.part).sort((x, y) => x - y)).toEqual(Array.from({ length: mine[0]!.parts }, (_, k) => k));
+      }
+      // No piece is dearer than an even share, so no bench sets how long the set takes.
+      const share = all.reduce((s, b) => s + b.cost, 0) / n;
+      expect(pieces.every((p) => p.cost <= share + 1e-9)).toBe(true);
+      expect(pieces.find((p) => p.bench.name === 'own-side')!.parts).toBeGreaterThan(1);
+      // Dealt dearest first to the lightest shard: none is heavier than the lightest by more than one piece.
+      const costs = shards.map((s) => s.reduce((c, p) => c + p.cost, 0));
+      expect(Math.max(...costs) - Math.min(...costs)).toBeLessThanOrEqual(Math.max(...pieces.map((p) => p.cost)));
+    }
+    expect(shard(all, 1, 1).map((p) => [p.bench.name, p.parts])).toEqual(all.map((b) => [b.name, 1]));
+  });
+
+  it("merges a bench's parts back into the file a whole run writes, run for run", () => {
+    const seeds = ['A-1', 'B-2', 'C-3', 'D-4', 'E-5', 'F-6', 'G-7'];
+    const exp = { name: 'x', about: 'y', series: 's', arms: [{ name: 'a' }, { name: 'b', off: 'z' }], measures: [{ key: 'm', label: 'M', kind: 'mean' as const }] };
+    const values = (arm: number, of: readonly string[]) => of.flatMap((s) => [0, 1].map((roll) => ({ m: arm * 100 + Number(s.slice(2)) * 10 + roll })));
+    const fileOf = (of: readonly string[]) => toResultsFile(exp, of, 2, new Map([['a', values(0, of)], ['b', values(1, of)]]));
+    // Part p of n holds the camps at p, p + n, ... (src/headless/labRunner.ts): more parts than camps leaves some empty.
+    for (const n of [1, 2, 3, 7, 9]) expect(mergeParts(Array.from({ length: n }, (_, p) => fileOf(seeds.filter((_, i) => i % n === p))))).toEqual(fileOf(seeds));
+    expect(() => mergeParts([fileOf(seeds), { ...fileOf(seeds), rolls: 3 }])).toThrow(/aren't of one run/);
+    expect(partOf(pieceName({ bench: STANDING[0]!, part: 2, parts: 3 }))).toEqual({ bench: STANDING[0]!.name, part: 2, parts: 3 });
+    expect(pieceName(whole(STANDING[0]!))).toBe(STANDING[0]!.name);
+    expect(partOf(STANDING[0]!.name)).toBeNull();
   });
 
   it('refuses a name that is not in the set', () => {

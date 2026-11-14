@@ -1,5 +1,5 @@
 import { cell, report, type ArmReport } from './experiment';
-import { fromResultsFile, type ResultsFile } from './results';
+import { fromResultsFile, type ResultsFile, type RunRecord } from './results';
 
 /**
  * The standing benches: the experiments every change to how a camp behaves is held to.
@@ -48,21 +48,83 @@ export function choose(only?: readonly string[]): StandingBench[] {
 }
 
 /**
- * Shard `k` of `n` (k from 1). The benches are dealt out dearest first, each to whichever
- * shard is lightest so far (the lowest-numbered of equals), so the shards take about as
- * long as each other and the dearest bench sets how long the set takes.
+ * A piece of a shard's work: a whole bench (one part of one), or one part of a dear bench
+ * split by its camps. Part `part` of `parts` (from 0) holds the camps whose place in the
+ * bench's list leaves `part` when divided by `parts`. Every run is independent, so a
+ * bench's parts together are the bench, run for run (`mergeParts`).
  */
-export function shard(benches: readonly StandingBench[], k: number, n: number): StandingBench[] {
+export interface Piece {
+  bench: StandingBench;
+  part: number;
+  parts: number;
+  /** Its share of the bench's cost. */
+  cost: number;
+}
+
+/** A bench as one piece. */
+export const whole = (bench: StandingBench): Piece => ({ bench, part: 0, parts: 1, cost: bench.cost });
+
+/**
+ * Shard `k` of `n` (k from 1). A bench dearer than an even share of the whole set is split
+ * by its camps into as many parts as it takes for each to fit in one, so no single bench
+ * sets how long the set takes. Then the pieces are dealt out dearest first, each to
+ * whichever shard is lightest so far (the lowest-numbered of equals).
+ */
+export function shard(benches: readonly StandingBench[], k: number, n: number): Piece[] {
   if (!Number.isInteger(n) || n < 1 || !Number.isInteger(k) || k < 1 || k > n) throw new Error(`a shard is k/n with 1 ≤ k ≤ n, not ${k}/${n}`);
-  const sorted = [...benches].sort((a, b) => b.cost - a.cost || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  const shards = Array.from({ length: n }, () => ({ cost: 0, benches: [] as StandingBench[] }));
-  for (const b of sorted) {
+  const share = benches.reduce((s, b) => s + b.cost, 0) / n;
+  const pieces = benches.flatMap((bench): Piece[] => {
+    const parts = n > 1 && share > 0 ? Math.max(1, Math.ceil(bench.cost / share)) : 1;
+    return Array.from({ length: parts }, (_, part) => ({ bench, part, parts, cost: bench.cost / parts }));
+  });
+  pieces.sort((a, b) => b.cost - a.cost || (a.bench.name < b.bench.name ? -1 : a.bench.name > b.bench.name ? 1 : a.part - b.part));
+  const shards = Array.from({ length: n }, () => ({ cost: 0, pieces: [] as Piece[] }));
+  for (const p of pieces) {
     let lightest = shards[0]!;
     for (const s of shards) if (s.cost < lightest.cost) lightest = s;
-    lightest.cost += b.cost;
-    lightest.benches.push(b);
+    lightest.cost += p.cost;
+    lightest.pieces.push(p);
   }
-  return shards[k - 1]!.benches;
+  return shards[k - 1]!.pieces;
+}
+
+/** The name of a piece's results files: the bench's own when it's whole, `<bench>.part-<p>-of-<n>` (p from 1) when it's split. */
+export function pieceName(p: Pick<Piece, 'bench' | 'part' | 'parts'>): string {
+  return p.parts === 1 ? p.bench.name : `${p.bench.name}.part-${p.part + 1}-of-${p.parts}`;
+}
+
+/** A results file's name back to its bench and part (from 0), or null for a whole bench's. */
+export function partOf(name: string): { bench: string; part: number; parts: number } | null {
+  const m = /^(.+)\.part-(\d+)-of-(\d+)$/.exec(name);
+  return m ? { bench: m[1]!, part: Number(m[2]) - 1, parts: Number(m[3]) } : null;
+}
+
+/**
+ * A split bench's parts, in order, back into the bench, run for run. Part p of n holds the
+ * camps at p, p + n, p + 2n... of the bench's list, so they're dealt back in that order and
+ * the file is the one a whole run would have written. Throws unless the parts are of one
+ * experiment, with the same arms and rolls.
+ */
+export function mergeParts(parts: readonly ResultsFile[]): ResultsFile {
+  const first = parts[0];
+  if (!first) throw new Error('there are no parts to merge');
+  const shape = (f: ResultsFile): string => JSON.stringify([f.experiment, f.rolls, f.arms.map((a) => a.name)]);
+  for (const p of parts) if (shape(p) !== shape(first)) throw new Error(`the parts of '${first.experiment}' aren't of one run: ${shape(p)} against ${shape(first)}`);
+  const n = parts.length;
+  const camps = parts.reduce((s, p) => s + p.camps, 0);
+  return {
+    ...first,
+    camps,
+    arms: first.arms.map((arm, a) => {
+      const runs: RunRecord[] = [];
+      for (let i = 0; i < camps; i++) {
+        const part = parts[i % n]!;
+        const j = Math.floor(i / n);
+        runs.push(...part.arms[a]!.runs.slice(j * part.rolls, (j + 1) * part.rolls));
+      }
+      return { ...arm, runs };
+    }),
+  };
 }
 
 /** A bench a build didn't have: why. */
