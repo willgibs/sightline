@@ -3,7 +3,7 @@ import { DEG, datan, dtanDeg } from '../kernel/core/detmath';
 import { clamp, smoothstep, wrapAngle } from '../kernel/core/math';
 import type { EventDraft } from '../kernel/events';
 import type { World } from '../kernel/world/world';
-import { Blocks, pushOutCircle } from '../kernel/world/colliders';
+import { Blocks, circleOverlaps, pushOutCircle } from '../kernel/world/colliders';
 import { makeTerrainSample } from '../kernel/world/heightfield';
 import type { Solids } from '../kernel/world/solids';
 import { surfaceLoudness, surfaceName, type Surface } from '../kernel/world/surfaces';
@@ -45,8 +45,8 @@ import type { DebugDraw } from '../kernel/debugDraw';
  *   because only there was the body's headroom checked at the height that ground gives it
  *   (isClear). The first promise rests on this: the place and the height a body ended the
  *   last tick at were clear, and a refused move keeps them, or lets it fall. It promises
- *   nothing about getting anywhere: a ledge with no room over it to stand in stops a body
- *   that walks into it, as the ground rising under a ceiling does;
+ *   nothing about getting anywhere: the ground rising under a ceiling stops a body that
+ *   walks into it. (A ledge with no room over it is a wall, not a refusal: below.)
  * - on the ground, the body never gains height on ground steeper than maxSlopeDeg, from
  *   any angle of approach. Exactly: from such ground it ends a tick no higher, wherever it
  *   ends; onto such ground it ends no higher either; and it gains nothing on the steep
@@ -96,6 +96,15 @@ import type { DebugDraw } from '../kernel/debugDraw';
  * on it you slide, the way scree or a rock face would carry you down. Walking off an edge
  * steeper than gravity can follow is a fall, and every fall or slide ends in a landing
  * that makes a sound.
+ *
+ * A ledge, anything solid whose top is a step or less above the feet, is a step up where
+ * there's room over it to stand in. Where there isn't (a low box under a shelf, or under a
+ * ceiling the body fits beneath on its own feet), it's a wall: a body walking into it slides
+ * along it as along any wall, and is never lifted onto it. Stepping up would put its head
+ * into what's over the ledge, so that move is refused, and then made again with the ledge
+ * as a wall for the tick (resolveMove). Until Nov 14 the refusal stood: a body stopped dead
+ * against such a ledge, and one touching it had to step away before it could go on. A spec
+ * with `ledgeWall: false` plays the motor so (?ledge=stop). A body lying down still stops.
  */
 
 /** What a body wants to do this tick. */
@@ -597,18 +606,101 @@ function driveAir(b: BodyState): void {
  * clear spawn: a move that is resolved ends where its headroom was checked, at the height
  * the ground there gives it, and a move that is refused ends in the pose the last tick
  * left clear, or below it.
+ *
+ * A standing body's move refused where it would step up onto a ledge with no room over it
+ * to stand in is made again, from the start, with each such ledge as a wall (crampedLedges):
+ * it slides along the ledge, and that move is checked as any other. A move that was never
+ * refused is made once, exactly as it would be without the rule, and so is every move of a
+ * body whose spec says `ledgeWall: false`.
  */
 export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec, ctx: MotorContext, out: { x: number; z: number }): boolean {
   const { world, solids } = ctx;
-  const height = bodyHeight(b, spec);
-  const feet = b.y;
   const tanMax = dtanDeg(spec.maxSlopeDeg);
   const circles = footprint(b, spec, feetCircles);
   const lying = circles.length > 1;
   // A lying body that's falling must be clear at the height it falls to, which isn't known
   // yet: its circles are taken as low as the tick can take it (the pivot is what the body
   // rests on, not its ends, so a leg resting on a rock doesn't hold it up).
-  const low = lying ? fallFloor(b, spec, ctx) : feet;
+  const low = lying ? fallFloor(b, spec, ctx) : b.y;
+  const vx = b.vx;
+  const vz = b.vz;
+  walls.length = 0;
+  slide(b, tx, tz, spec, ctx, circles, low, slid);
+  let clear = isClear(b, slid.x, slid.z, spec, world, solids, tanMax, circles, false, low);
+  if (!clear && spec.ledgeWall && !lying) {
+    // Each round walls off what refused the last try, and tries again with the speed it began with.
+    for (let round = 0; round < LEDGE_ROUNDS && !clear && crampedLedges(b, slid.x, slid.z, spec, solids); round++) {
+      b.vx = vx;
+      b.vz = vz;
+      slide(b, tx, tz, spec, ctx, circles, low, slid);
+      clear = isClear(b, slid.x, slid.z, spec, world, solids, tanMax, circles, false, low);
+    }
+  }
+  if (!clear) {
+    b.vx = 0;
+    b.vz = 0;
+    out.x = b.x;
+    out.z = b.z;
+    return false;
+  }
+  out.x = slid.x;
+  out.z = slid.z;
+  return true;
+}
+
+/** How many times a refused move is made again with the cramped ledges it met as walls: a row of crates under a shelf is met crate by crate. */
+const LEDGE_ROUNDS = 3;
+
+/**
+ * How far clear of a ledge walled off this tick a body is pushed, metres. Anything solid the
+ * body's circle overlaps at all is ground to it (groundBelow), so a push that left it touching
+ * by the last bit of a float would have it stand on the ledge after all.
+ */
+const LEDGE_GAP = 1e-6;
+
+/** The ledges walled off for the move being resolved (resolveMove), by collider id. */
+const walls: number[] = [];
+const slid = { x: 0, z: 0 };
+
+/**
+ * Finds the ledges a standing body at (x, z) would step up onto with no room over them to
+ * stand in, and adds those not yet found to `walls`. A ledge is anything solid its circle
+ * overlaps whose top is a step up from its feet; no room is something over that top (a
+ * shelf, a ceiling) that the body fits under on its feet and wouldn't up on the ledge, over
+ * its circle as isClear judges it. Returns whether it found any new one.
+ */
+function crampedLedges(b: BodyState, x: number, z: number, spec: BodySpec, solids: Solids): boolean {
+  const feet = b.y;
+  const height = bodyHeight(b, spec);
+  const r = spec.radius;
+  const found = walls.length;
+  solids.query(x - r, z - r, x + r, z + r, ids);
+  for (let q = 0; q < ids.length; q++) {
+    const c = solids.get(ids[q]!);
+    if ((c.flags & Blocks.Move) === 0 || c.y1 <= feet || c.y1 > feet + spec.stepHeight || walls.includes(c.id) || !circleOverlaps(c, x, z, r)) continue;
+    for (let k = 0; k < ids.length; k++) {
+      const s = solids.get(ids[k]!);
+      if ((s.flags & Blocks.Move) === 0 || s.y1 <= feet + spec.stepHeight || s.y0 < feet + height || s.y0 >= c.y1 + height) continue;
+      if (pushOutCircle(s, x, z, r, tmpPush) && tmpPush.x * tmpPush.x + tmpPush.z * tmpPush.z > 1e-8) {
+        walls.push(c.id);
+        break;
+      }
+    }
+  }
+  return walls.length > found;
+}
+
+/**
+ * The passes of a move toward (tx, tz) (resolveMove), until nothing moves the body or four
+ * have run, then the edge of the play area: where they leave it goes to `out`, unchecked.
+ * A ledge in `walls` is a wall to them, however low, and they leave the body a hair clear of it.
+ */
+function slide(b: BodyState, tx: number, tz: number, spec: BodySpec, ctx: MotorContext, circles: readonly FootCircle[], low: number, out: { x: number; z: number }): void {
+  const { world, solids } = ctx;
+  const height = bodyHeight(b, spec);
+  const feet = b.y;
+  const tanMax = dtanDeg(spec.maxSlopeDeg);
+  const lying = circles.length > 1;
   let nx = tx;
   let nz = tz;
 
@@ -687,9 +779,10 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
       for (let q = 0; q < ids.length; q++) {
         const c = solids.get(ids[q]!);
         if ((c.flags & Blocks.Move) === 0) continue;
-        if (c.y1 <= reach + spec.stepHeight) continue; // low enough to step onto
+        const wall = walls.length > 0 && walls.includes(c.id);
+        if (c.y1 <= reach + spec.stepHeight && !wall) continue; // low enough to step onto
         if (c.y0 >= head) continue; // overhead
-        if (!pushOutCircle(c, nx + C.x, nz + C.z, r, push)) continue;
+        if (!pushOutCircle(c, nx + C.x, nz + C.z, wall ? r + LEDGE_GAP : r, push)) continue;
         // It was above our head and over us at the start, and the ground has risen: a
         // ceiling we no longer fit beneath. If the body's centre is under it, that's not a
         // wall to slide off (pushing out could throw the body metres): leave it to isClear.
@@ -719,17 +812,8 @@ export function resolveMove(b: BodyState, tx: number, tz: number, spec: BodySpec
     nz = clamp(nz, -lim, lim);
     b.vz = 0;
   }
-
-  if (!isClear(b, nx, nz, spec, world, solids, tanMax, circles, false, low)) {
-    b.vx = 0;
-    b.vz = 0;
-    out.x = b.x;
-    out.z = b.z;
-    return false;
-  }
   out.x = nx;
   out.z = nz;
-  return true;
 }
 
 /**

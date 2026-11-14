@@ -24,6 +24,8 @@ import './styles.css';
  *   ?replay=playtests/<name>.slrec   watch a recording (in development, any session in playtests/)
  *   ?hz=60           run the simulation at another tick rate (every rate is per second); ?hz=blind
  *                    flips a coin between 30 and 60, for a blind comparison (the debug panel says which)
+ *   ?ledge=stop      the motor before Nov 14: a low box with no room over it to stand on (a shelf, a
+ *                    ceiling) stops a body that walks into it dead, instead of being a wall it slides along
  *   ?explore         the seed explorer instead of the game: a grid of camps and their validation
  *                    (&series=<name> &count=<n>; explore.ts)
  *   ?difficulty=0.5  how hard the generated camp is, 0 to 1
@@ -66,6 +68,19 @@ function tickRateChoice(tuning: Tuning, hz: string | null): Tuning {
   return out;
 }
 
+/**
+ * ?ledge=stop plays the motor as it was before Nov 14, for every kind of body: a ledge with
+ * no room over it to stand in stops a body that walks into it, rather than being a wall it
+ * slides along (sim/body/motor.ts). Recordings carry their tuning, so such a run replays as
+ * what it was.
+ */
+function ledgeChoice(tuning: Tuning, ledge: string | null): Tuning {
+  if (ledge !== 'stop') return tuning;
+  const out = structuredClone(tuning);
+  for (const spec of Object.values(out.bodies)) spec.ledgeWall = false;
+  return out;
+}
+
 const movementTrials = params.get('lab') === 'movement';
 const trialScene = movementTrials ? 'noise' : 'perception-lab';
 
@@ -84,7 +99,7 @@ function startGame(): void {
       hud: document.querySelector<HTMLElement>('#hud')!,
       overlay,
       seed: normalizeSeed(params.get('seed')),
-      tuning: tickRateChoice(defaultTuning, params.get('hz')),
+      tuning: ledgeChoice(tickRateChoice(defaultTuning, params.get('hz')), params.get('ledge')),
       debug: params.get('view') === 'debug' || sceneName === 'compound',
       spawn: (params.get('spawn') === 'edge' ? 'edge' : 'overlook') as SpawnKind,
       bench: params.has('bench'),
