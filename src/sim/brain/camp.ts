@@ -148,6 +148,8 @@ export interface CampState {
   chases?: true;
   /** A camp whose men look out for their own when they fire (game/combat.ts): no round goes where one of them stands in the way of it. Absent for a camp that holds only for a man dead on the line. */
   mates?: true;
+  /** A camp whose men, their round held for one of their own, shift a pace for a clear line (firefight.ts) instead of standing there holding. Absent for a camp whose men hold and wait. Needs `mates`. */
+  shifts?: true;
   /** A camp whose men sent about the target each get a place of their own (protect.ts): by his vehicle they stand apart, not on one spot. Absent for a camp that sends them all to the point. */
   places?: true;
   /** Who it's hunting, if anyone; its sections out; the next section's id; places they've found empty; and the tick the last one came home or was lost, or −1. */

@@ -926,6 +926,17 @@ export const defaultTuning = {
       every: 1, // seconds between rounds
       burst: 3, // rounds before he gets down again
       spreadDeg: 0.6, // the error radius of a round fired from a position, degrees: a rifle with something to steady it, in trained hands
+      // A clear line (step 2e): a man whose round was held for one of his own in front of his rifle (game/combat.ts) shifts a pace
+      // sideways for one, for the rest of that burst, instead of standing there holding. Only a camp that `shifts` does it (`off=shift`).
+      shift: {
+        cap: 1.5, // metres: the most he'll shift from the fire place his position gave him. A man who'd need more holds, as before
+        deadOn: 0.2, // metres: a man in the way this close to the line is dead on it, and which side he's on means nothing: the side is chosen by the shooter's id
+        pad: 0.1, // metres he clears the man in the way by beyond what would hold his round, for what his eyes can't measure
+        near: 0.1, // metres from the place he shifts to that counts as on it: closer than a position's own `near`, because a pace that stops short clears nobody
+        within: 1.5, // seconds from choosing a place (and the walk to it, coming up at a kept one) to be on it: past that, someone's on it, and he gives it up and gets down
+        answers: 1, // how many times running a held last round brings him straight back up a pace aside: past that he gets down, as a held burst always did, until an ordinary time down
+        keep: true, // the place is kept while his position stands: he comes up there next time if it's still good. False: a pace is for the one burst
+      },
       pin: { within: 4, min: 2.5, max: 5 }, // a round striking this close keeps his head down for this long (metres, seconds)
       // Following him: one man goes, in bounds, while whoever heard him say so watches.
       push: {

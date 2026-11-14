@@ -73,6 +73,8 @@ export interface GuardMind {
   readonly chases: boolean;
   /** Whether its men sent about the target are each given a place of their own (protect.ts): a camp's drill, which he knows as he knows its vehicle. */
   readonly places: boolean;
+  /** Whether its men, their round held for one of their own, shift a pace for a clear line (firefight.ts): a camp's drill. */
+  readonly shifts: boolean;
   /** Where his camp's hard room is, if it protects its target (protect.ts): another fact about the camp, and null if it doesn't. */
   readonly protects: Readonly<{ x: number; z: number; y?: number }> | null;
   /** How his camp answers for its target (protect.ts): its drill, which every man of it knows. Null for a camp that waits for its relief, or protects nobody. */

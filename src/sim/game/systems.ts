@@ -185,21 +185,33 @@ const guardBrains: System = {
   phase: 'decide',
   reads: ['guard.body', 'guard.guard.spawn', 'guard.guard.headYaw', 'guard.guard.reserve', 'guard.senses', 'guard.brain'],
   writes: ['guard.guard.order', 'guard.brain', 'rng.brain', 'rng.hearing', 'rng.aim', 'guard.senses.heard', 'commander.camp.voices', 'commander.camp.airwaves', 'commander.camp.nextAir', 'commander.camp.devices', 'commander.camp.level', 'commander.camp.since', 'commander.camp.objective', 'commander.camp.inbox', 'commander.camp.whistled', 'alarm.alarm.raised', 'objective.objective.status', 'vehicle.vehicle', 'schedule', 'entities', 'bullet.bullet'],
-  emits: ['act', 'call', 'shot', 'report', 'held', 'alarm', 'siren', 'level', 'whistle'],
+  emits: ['act', 'call', 'shot', 'report', 'held', 'shift', 'alarm', 'siren', 'level', 'whistle'],
   run(ctx) {
     const nav = navAllowance(ctx);
     const devices = commanderOf(ctx)?.camp.devices;
     // Where the boxes stand, and nothing of their state: a guard learns the alarm is up from the siren.
-    const facts = devices ? { alarms: devices.alarms.map((a) => ({ x: a.x, z: a.z })), escape: devices.escape, fights: commanderOf(ctx)?.camp.fights === true, firefight: commanderOf(ctx)?.camp.firefight === true, hunts: commanderOf(ctx)?.camp.hunts === true, chases: commanderOf(ctx)?.camp.chases === true, places: commanderOf(ctx)?.camp.places === true, protects: commanderOf(ctx)?.camp.protects ?? null, answer: commanderOf(ctx)?.camp.answer ?? null } : undefined;
+    const facts = devices ? { alarms: devices.alarms.map((a) => ({ x: a.x, z: a.z })), escape: devices.escape, fights: commanderOf(ctx)?.camp.fights === true, firefight: commanderOf(ctx)?.camp.firefight === true, hunts: commanderOf(ctx)?.camp.hunts === true, chases: commanderOf(ctx)?.camp.chases === true, places: commanderOf(ctx)?.camp.places === true, shifts: commanderOf(ctx)?.camp.shifts === true, protects: commanderOf(ctx)?.camp.protects ?? null, answer: commanderOf(ctx)?.camp.answer ?? null } : undefined;
     for (const g of [...ctx.index.of('guard')]) {
       const change = think(g, ctx.world, ctx.tuning, ctx.tick + 1, () => ctx.draw(g.id, 'brain', (rng) => rng.next()), nav, facts);
       if (change) {
         g.brain!.event = ctx.emit({ type: 'act', source: g.id, cause: change.cause, from: change.from, to: change.to, why: change.why, x: change.x, z: change.z, weight: change.weight });
       }
       if (g.brain) {
+        // What he has just done about a clear line past one of his own (brain/firefight.ts): a pace, which way and how far, and so on.
+        const news = g.brain.shiftNews;
+        if (news) {
+          ctx.emit({ type: 'shift', source: g.id, cause: g.brain.event, what: news.what, mate: news.mate, side: news.side, pace: news.pace });
+          delete g.brain.shiftNews;
+        }
         if (g.brain.fire) {
-          // What a man knows of his own trigger: that he didn't pull it, because one of his own was in front of his rifle.
-          if (!guardFire(ctx, g, g.brain.fire) && commanderOf(ctx)?.camp.mates) g.brain.held = ctx.tick;
+          // What a man knows of his own trigger: that he didn't pull it, because one of his own was in front of his rifle. In a camp
+          // whose men shift for a clear line, what he saw of that man over his sights, too (brain.ts, `HeldLine`).
+          const camp = commanderOf(ctx)?.camp;
+          const line = camp?.shifts ? { tick: 0, mate: 0, side: 1, off: 0, along: 0 } : undefined;
+          if (!guardFire(ctx, g, g.brain.fire, line) && camp?.mates) {
+            g.brain.held = ctx.tick;
+            if (line) g.brain.heldLine = line;
+          }
           g.brain.fire = null;
         }
         if (g.brain.raise >= 0) {

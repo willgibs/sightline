@@ -1,6 +1,7 @@
 import type { BulletEntity } from '../ballistics';
 import { ballisticOf, flightAt, flightEnd, launch, solveAim, vec3, zeroOf } from '../ballistics';
 import { bodyShape, eyeOf, hasBody, startle } from '../body';
+import type { HeldLine } from '../brain';
 import { dcos, dsin } from '../kernel/core/detmath';
 import { air, windAt } from '../kernel/env';
 import { Faction } from '../kernel/state';
@@ -88,9 +89,10 @@ const upright = emptyShape();
  *
  * A brain knows nothing of where its own side is (rule 13), but a man sees who's in front
  * of his rifle, so it's settled here, where the round is made, as his eyes would settle it.
- * Writes how far along the line that man is to `nearest.along`.
+ * Writes how far along the line that man is, to the part of him the round could find, to
+ * `found.along`.
  */
-function ownInTheWay(ctx: TickContext, g: GuardEntity, ux: number, uy: number, uz: number, reach: number, spread: number): number {
+function ownInTheWay(ctx: TickContext, g: GuardEntity, ux: number, uy: number, uz: number, reach: number, spread: number, found: { along: number }): number {
   const M = ctx.tuning.brain.fight.mates;
   const view = ctx.query();
   /** Whether a round could get to this part of him: it's within the cone, and nothing but him would stop a round sent at it. `whole` is the man as he stands, whom a ray can find; on his feet he's only a place. */
@@ -108,7 +110,7 @@ function ownInTheWay(ctx: TickContext, g: GuardEntity, ux: number, uy: number, u
     if (d <= 0) return false;
     // A wall he's behind takes the round, and he's nobody the man with the rifle can see.
     raycast(view, eye.x, eye.y, eye.z, dx / d, dy / d, dz / d, whole ? d + part.r : d, Blocks.Bullet, reached, g.id);
-    nearest.along = along;
+    found.along = along;
     return whole ? reached.what === 'body' && reached.id === id : reached.what === 'none' || (reached.what === 'body' && reached.id === id);
   };
   const parts = (shape: BodyShape, id: number, whole: boolean): boolean => {
@@ -132,12 +134,61 @@ function ownInTheWay(ctx: TickContext, g: GuardEntity, ux: number, uy: number, u
   return 0;
 }
 
+const seenShape = emptyShape();
+const stoodShape = emptyShape();
+const inTheWay = { along: 0 };
+const scratchLine: HeldLine = { tick: 0, mate: 0, side: 1, off: 0, along: 0 };
+
+/**
+ * What the man behind the rifle sees of one of his own in front of it (brain.ts, `HeldLine`):
+ * which side of his line that man stands, how far his nearest edge is from it, and how far
+ * down it he is, all level with the ground, from the line from his eye along (ux, uz). His
+ * edge is the nearest any part of him comes, as he stands or on his feet: the parts are the
+ * ones `ownInTheWay` looks for. Writes `out`, with the tick.
+ */
+function seenInTheWay(ctx: TickContext, mate: number, ux: number, uz: number, out: HeldLine): void {
+  const e = ctx.index.get(mate);
+  out.tick = ctx.tick;
+  out.mate = mate;
+  out.side = 1;
+  out.off = 0;
+  out.along = 0;
+  if (!e || !hasBody(e)) return;
+  const rl = Math.sqrt(ux * ux + uz * uz) || 1;
+  const hx = ux / rl;
+  const hz = uz / rl;
+  // To his right, looking down the line: yaw grows turning left (kernel/core/math.ts), so right of (hx, hz) is (−hz, hx).
+  const lateral = (x: number, z: number): number => (x - eye.x) * -hz + (z - eye.z) * hx;
+  const spec = ctx.tuning.bodies[e.kind];
+  const centre = lateral(e.body.x, e.body.z);
+  out.side = centre < 0 ? -1 : 1;
+  out.along = (e.body.x - eye.x) * hx + (e.body.z - eye.z) * hz;
+  let off = Infinity;
+  const edge = (c: Capsule): void => {
+    const a = lateral(c.ax, c.az);
+    const b = lateral(c.bx, c.bz);
+    off = Math.min(off, (a * b <= 0 ? 0 : Math.min(Math.abs(a), Math.abs(b))) - c.r);
+  };
+  const shapes = [bodyShape(e.body, spec, seenShape)];
+  if (e.body.eyeHeight < spec.eyeHeight.stand) shapes.push(bodyShape({ ...e.body, eyeHeight: spec.eyeHeight.stand, lean: 0 }, spec, stoodShape));
+  for (const sh of shapes) {
+    point.ax = point.bx = sh.head.x;
+    point.ay = point.by = sh.head.y;
+    point.az = point.bz = sh.head.z;
+    point.r = sh.head.r;
+    edge(point);
+    edge(sh.torso);
+    edge(sh.legs);
+  }
+  out.off = off;
+}
+
 /**
  * A guard fires at where he believes his target is: a shot from his eye, with his aim's
  * error from his own stream. The shot, its report and the bullet are the same as the
  * player's, so it sounds and strikes through lab B's pipeline.
  */
-export function guardFire(ctx: TickContext, g: GuardEntity, target: { x: number; y: number; z: number }): boolean {
+export function guardFire(ctx: TickContext, g: GuardEntity, target: { x: number; y: number; z: number }, held?: HeldLine): boolean {
   const T = ctx.tuning;
   const B = T.ballistics;
   const C = T.brain.combat;
@@ -166,7 +217,10 @@ export function guardFire(ctx: TickContext, g: GuardEntity, target: { x: number;
   // man sees who's in front of his rifle, so it's settled here, where the round is made, as his eyes would settle it.
   const reach = Math.sqrt((target.x - eye.x) * (target.x - eye.x) + (target.y - eye.y) * (target.y - eye.y) + (target.z - eye.z) * (target.z - eye.z));
   raycast(ctx.query(), eye.x, eye.y, eye.z, line.x / d, line.y / d, line.z / d, reach, Blocks.Bullet, inFront, g.id);
-  if (inFront.what === 'body' && ctx.index.get(inFront.id)?.faction === Faction.Camp) return false;
+  if (inFront.what === 'body' && ctx.index.get(inFront.id)?.faction === Faction.Camp) {
+    if (held) seenInTheWay(ctx, inFront.id, line.x / d, line.z / d, held);
+    return false;
+  }
   // His aim's error: a small disk around the line to the target, from his own stream.
   const role = ctx.world.camp.guards[g.guard.spawn]?.role;
   // From a position, in a firefight (brain/firefight.ts), he has something to steady the rifle on.
@@ -174,9 +228,11 @@ export function guardFire(ctx: TickContext, g: GuardEntity, target: { x: number;
   const spread = ((steady ? T.brain.firefight.spreadDeg : fights ? (role === 'marksman' ? T.brain.fight.spreadDeg.marksman : T.brain.fight.spreadDeg.other) : C.spreadDeg) * Math.PI) / 180;
   // And one of his own anywhere that error could put the round, in a camp whose men look out for each other.
   if (camp?.mates) {
-    const mate = ownInTheWay(ctx, g, line.x / d, line.y / d, line.z / d, reach, spread);
+    const mate = ownInTheWay(ctx, g, line.x / d, line.y / d, line.z / d, reach, spread, inTheWay);
     if (mate) {
-      ctx.emit({ type: 'held', source: g.id, mate, distance: nearest.along });
+      const seen = held ?? scratchLine;
+      seenInTheWay(ctx, mate, line.x / d, line.z / d, seen);
+      ctx.emit({ type: 'held', source: g.id, mate, distance: inTheWay.along, side: seen.side, off: seen.off });
       return false;
     }
   }

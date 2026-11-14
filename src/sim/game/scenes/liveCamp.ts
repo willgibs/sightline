@@ -96,6 +96,7 @@ export function liveCamp(params?: string): Scene {
       commanderOf(sim)!.camp.hunts = true;
       commanderOf(sim)!.camp.chases = true;
       commanderOf(sim)!.camp.mates = true;
+      commanderOf(sim)!.camp.shifts = true;
       commanderOf(sim)!.camp.places = true;
       giveProtection(sim);
       // Here, as in the missions to come, the job isn't done until you're out: at the end of the road.

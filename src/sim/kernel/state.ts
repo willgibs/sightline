@@ -48,8 +48,12 @@ import { emptySchedule, type ScheduleState } from './schedule';
  * the tick he last held his fire for one of them (game/combat.ts).
  * 18: a camp says whether men sent about its target have places of their own, and a task
  * and the man it's given to keep his place (brain/protect.ts, `placeAt`).
+ * 19: a camp says whether its men shift for a clear line; a man keeps what he saw of the one
+ * his round was last held for, the place a pace aside he's shifted to and how often running
+ * he has come straight back up for a held last round, and what he has just done about it,
+ * for its event (brain/firefight.ts, `clearLine`).
  */
-export const STATE_SCHEMA = 18;
+export const STATE_SCHEMA = 19;
 
 export type EntityId = number;
 
