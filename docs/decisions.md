@@ -2,6 +2,22 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-14 · The quick gate is `npm run gate`: `precheck` was npm's hook for `check`
+
+**What broke.** The first run of `main`'s CI to finish after the pipeline landed (below) failed its Windows check: `precheck: typecheck failed (spawnSync npm.cmd EINVAL)`. The step it failed in runs `npm run check`, the whole suite, which had nothing to do with the new gate.
+
+**Why.** Two things, both in the pipeline change.
+- **The name.** npm runs a script named `pre<name>` before `<name>`, and `post<name>` after it, by itself. A script called `precheck` is `check`'s hook. So `npm run check` ran the quick gate first, on every platform and here too: a typecheck, some tests and the self-test, before the suite that includes them.
+- **Windows.** The gate started `npm.cmd` and `npx.cmd` directly. Node refuses to start a `.cmd` file except through a shell, so there the gate failed at its first step, `check` stopped, and the whole suite never ran on Windows.
+
+It went unseen for three landings. A pull request's Windows job runs the self-test and a bot run, not `npm run check`: the whole suite on macOS and Windows runs only on a push to `main`. And each of those runs was cancelled by the next landing's push before it finished. The first to run to its end was the ladder fix's.
+
+**Decision.** The gate is `npm run gate` (`src/headless/gate.ts`). It starts npm through a shell on Windows. `tests/scripts.test.ts` holds the rule for every script: none may be named `pre` or `post` plus another script's name.
+
+**Proven.** The test fails with the old name and passes with the new one. `npm run gate` passes here. `main`'s Windows and macOS checks, which are what run `npm run check`, are read after this lands.
+
+**What it leaves.** `main`'s own CI is the only place the whole suite runs on macOS and Windows, and a landing cancels the run before it. Three landings in an evening meant none of them was checked there until the last. Nothing is changed about that here.
+
 ## 2026-11-13 · A path's pose and the walking motor agree on what is overhead
 
 **What broke.** Left open by "A refused move keeps its footing" (below). Two towers broke the first promise, on `main` from before the ladder's change: `tower:SWP-1424-4`, tick 98, the player `inside collider 4 by 0.3486 m`, and `tower:RFN-1208-3`, tick 2117, `inside collider 3 by 0.1985 m`. Each was a body on a ladder whose head ended a tick a hair into the underside of a shelf. In SWP-1424-4 the body then came off the ladder, and the walking motor pushed it out from under the shelf 0.35 m in one tick.
@@ -42,7 +58,7 @@ The owner, Nov 13: "If you'd like to reevaluate any of our workflows or pipeline
 - **The standing set, as data** (`src/lab/standing.ts`): `circling`, `second-step`, `own-side` with three rolls of the dice, `ladder`, `flaws`, `takedown`, `out-the-gate`, `hunt`, `firefight` and `answer`. With it, a pure comparison of two builds' results: the figures that moved, as each side's table prints them, and the runs that read differently, by seed and roll, the largest first.
 - **`npm run standing -- --base origin/main`** (`src/headless/standing.ts`): the set on this checkout and on a ref, and the comparison. A ref is run in a temporary worktree, by this checkout's tool loading that checkout's experiments (`--root`), so a build that predates the tool is run the same way. Results are kept under `.cache/standing/` by what a bench depends on, which is git's hashes of `src`, `package-lock.json`, `tsconfig.json` and `.nvmrc`. So a ref is run once for as long as its code stands, and a change to docs or tests runs nothing.
 - **CI** (`.github/workflows/standing.yml`): for every pull request, the set on the base and on the head, four shards each, cached by the same hash and the tool's own files, and the comparison in the run's summary. It informs, and never fails because a bench differs. A push to `main` runs the set on `main` alone (added the same day, after this landed): GitHub lets a pull request restore a cache made on `main` but never one made by another pull request, so without it every pull request ran its base again. Its first run, on this change: 1,078 runs a side in 47 minutes of machine time, done in 19.5 minutes side by side. The dearest bench, `own-side` with its five arms, took 16 minutes alone, so the shards are now dealt by measured cost, dearest first to the lightest shard, and that bench sets how long the set takes.
-- **`npm run precheck`** (`src/headless/precheck.ts`): typecheck, the architecture test, every test file the branch changed, and the self-test. About 90 s.
+- **`npm run precheck`** (`src/headless/precheck.ts`; renamed `npm run gate` the next day, above): typecheck, the architecture test, every test file the branch changed, and the self-test. About 90 s.
 
 **What changes in the working rules** (`CLAUDE.md`, *Checking work*).
 
