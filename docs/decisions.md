@@ -20,6 +20,8 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 **Measured on this pull request's first run.** The standing benches took 9.5 minutes with both sides run in full (the tool itself changed, so neither side's results could come from the cache), against 16 for one side before: shards of 3.5 to 9 minutes. Every bench read the same as `main`, the split ones merged back from their parts: `own-side` all 360 runs, `circling` all 96.
 
+**And its second,** with each file's time counted whole: the test quarters took 4.8 to 6.2 minutes, and CI's whole run 6.5, against 12 on the first run and 13.5 on pull request 60. The benches' base came from the cache in under 10 seconds a shard; their head ran again, since its source had changed, in 3.3 to 10 minutes. The slowest eighth held `second-step` and `ladder`, which now take longer than the costs the set is dealt by, so the costs are measured again with the next change to the set. The commit that added these lines changed only docs, and skipped the heavy jobs.
+
 **What it costs.** More jobs at once: a pull request's start asks for about 25 runners against the free plan's 20, so a few wait the seconds the cached jobs take. The timings drift as tests change, and a new file counts as the median until they're refreshed.
 
 **What it leaves.** `tests/bench.test.ts` is now the dearest file by far. Sharing out its lanes' metrics and its pinned runs, as `scenes` and `systems` are, would bring every test quarter to about four and a half minutes.
