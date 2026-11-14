@@ -122,7 +122,7 @@ export function report(exp: Experiment, results: Results, rolls = 1): ArmReport[
 const number = (x: number): string => (Number.isNaN(x) ? '–' : Math.abs(x) >= 100 ? x.toFixed(0) : Math.abs(x) < 1 ? x.toFixed(2) : x.toFixed(1));
 
 /** A measure's value, in words a table can hold. */
-function cell(m: MeasureReport): string {
+export function cell(m: MeasureReport): string {
   if (m.kind === 'rate') return Number.isNaN(m.value.value) ? '–' : `${Math.round(m.value.value * m.n)}/${m.n}`;
   if (m.kind === 'median') return number(m.value.value);
   return `${number(m.value.value)} ±${number((m.value.high - m.value.low) / 2)}`;
