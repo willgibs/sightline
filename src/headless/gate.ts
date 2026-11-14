@@ -1,7 +1,9 @@
 /**
  * The quick gate before a push, a minute or two: the typecheck, the architecture test
  * with every test file this branch changed or added against origin/main (committed or
- * not), and the self-test. It stops at the first step that fails and says which.
+ * not), and the self-test. It stops at the first step that fails and says which. The
+ * self-test runs only when something it checks could have changed (`SELFTEST_INPUTS`):
+ * CI runs it on every pull request, in four engines, whatever changed.
  *
  *   npm run gate
  *
@@ -35,20 +37,24 @@ function step(name: string, command: string, a: string[]): void {
   console.log(`\n${name}: passed in ${((performance.now() - started) / 1000).toFixed(0)} s.`);
 }
 
-/** Test files this branch changed or added against origin/main, or null if origin/main can't be found. */
-function changedTests(): string[] | null {
+/** What the self-test's answers can depend on: the simulation and its tuning, the self-test itself, and what it's compiled and run with. */
+const SELFTEST_INPUTS = ['src/sim/', 'src/config/', 'src/headless/selftest.ts', 'package-lock.json', 'tsconfig.json', 'tsconfig.kernel.json', '.nvmrc'];
+
+/** Every file this branch changed, added or removed against origin/main (committed or not, and untracked), or null if origin/main can't be found. */
+function changedFiles(): string[] | null {
   if (git('rev-parse', '--verify', '--quiet', 'origin/main^{commit}') === null) return null;
-  const lists = [git('diff', '--name-only', '--diff-filter=d', 'origin/main...HEAD'), git('diff', '--name-only', '--diff-filter=d', 'HEAD'), git('ls-files', '--others', '--exclude-standard', 'tests')];
-  const files = new Set(lists.flatMap((l) => (l ?? '').split('\n')).filter((f) => /^tests\/[^/]+\.test\.ts$/.test(f) && existsSync(join(REPO, f))));
-  return [...files].sort();
+  const lists = [git('diff', '--name-only', 'origin/main...HEAD'), git('diff', '--name-only', 'HEAD'), git('ls-files', '--others', '--exclude-standard')];
+  return [...new Set(lists.flatMap((l) => (l ?? '').split('\n')).filter(Boolean))].sort();
 }
 
 step('typecheck', 'npm', ['run', 'typecheck']);
-const changed = changedTests();
+const changed = changedFiles();
 if (changed === null) console.log("\ngate: origin/main can't be resolved, so there are no changed tests to pick; skipping the tests (git fetch origin, then run it again).");
 else {
-  const tests = [...new Set(['tests/architecture.test.ts', ...changed])];
+  const tests = [...new Set(['tests/architecture.test.ts', ...changed.filter((f) => /^tests\/[^/]+\.test\.ts$/.test(f) && existsSync(join(REPO, f)))])];
   step(`tests (${tests.length})`, 'npx', ['vitest', 'run', ...tests]);
 }
-step('self-test', 'npm', ['run', 'selftest']);
+if (changed !== null && !changed.some((f) => SELFTEST_INPUTS.some((p) => (p.endsWith('/') ? f.startsWith(p) : f === p)))) {
+  console.log(`\nself-test: skipped. Nothing it checks changed (${SELFTEST_INPUTS.join(', ')}), and CI runs it on every pull request anyway.`);
+} else step('self-test', 'npm', ['run', 'selftest']);
 console.log('\ngate: all passed.');

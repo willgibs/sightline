@@ -6,8 +6,14 @@
  * force-push a rebase), regenerate its goldens (`npm run golden`, `npm run bench --
  * --write`, and the values in golden.ts), push, and land it once CI is green again.
  *
- *   npm run land -- 12          land pull request 12
- *   npm run land -- 12 --check  say whether it could land, and change nothing
+ *   npm run land -- 12               land pull request 12
+ *   npm run land -- 12 --check       say whether it could land, and change nothing
+ *   npm run land -- 12 --fixes-main  land it though main's own CI is red, because it's the fix
+ *
+ * A pull request's checks say nothing about main itself, and some faults show only in
+ * main's runs: the whole suite on macOS and Windows runs there alone. One such fault went
+ * on under two more landings (pull requests 57 to 60). So a landing also needs the latest
+ * finished push run of each of main's workflows to be green.
  *
  * A merge queue needs an organization, and no branch rule is set on main (the owner's
  * call), so this script and CI's "Up to date with main" check are the rule.
@@ -17,8 +23,9 @@ import { execFileSync } from 'node:child_process';
 const argv = process.argv.slice(2);
 const pr = argv.find((a) => /^\d+$/.test(a));
 const checkOnly = argv.includes('--check');
+const fixesMain = argv.includes('--fixes-main');
 if (!pr) {
-  console.error('Usage: npm run land -- <pull request number> [--check]');
+  console.error('Usage: npm run land -- <pull request number> [--check] [--fixes-main]');
   process.exit(2);
 }
 
@@ -80,7 +87,23 @@ if (pending.length > 0) refuse(`CI is still running: ${pending.map((c) => c.name
 const failed = checks.filter((c) => !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(c.outcome));
 if (failed.length > 0) refuse(`CI isn't green: ${failed.map((c) => `${c.name} (${c.outcome.toLowerCase()})`).join(', ')}`);
 
+/**
+ * Each of main's workflows, by its latest finished run on a push. A cancelled run says
+ * nothing either way, so the one before it counts. A newer run may still be going: a red
+ * one still stops a landing until it's green, or until the fix lands with --fixes-main.
+ */
+const MAIN_WORKFLOWS = ['CI', 'Engines', 'Standing benches'];
+const red: string[] = [];
+for (const workflow of MAIN_WORKFLOWS) {
+  const runs = JSON.parse(sh('gh', 'run', 'list', '--branch', 'main', '--workflow', workflow, '--event', 'push', '--status', 'completed', '--limit', '10', '--json', 'conclusion,headSha,url')) as Array<{ conclusion: string; headSha: string; url: string }>;
+  const last = runs.find((r) => r.conclusion !== 'cancelled' && r.conclusion !== 'skipped');
+  if (last && last.conclusion !== 'success') red.push(`${workflow} at ${last.headSha.slice(0, 7)} (${last.conclusion}: ${last.url})`);
+}
+if (red.length > 0 && !fixesMain) refuse(`main's own CI is red: ${red.join('; ')}. Fix main first, or land the fix with --fixes-main`);
+
 console.log(`✓ ${view.headRefName} (${view.headRefOid.slice(0, 7)}) is up to date with main and green.`);
+if (red.length > 0) console.log(`! main's own CI is red (${red.join('; ')}), and this lands as its fix.`);
+else console.log("✓ main's own CI is green.");
 if (view.statusCheckRollup.some(rateLimited)) {
   console.log("! Vercel's daily limit is spent, so this commit wasn't deployed. CI built the game, so that doesn't hold up the landing, but the live site won't change until a push to main after room returns.");
 }
