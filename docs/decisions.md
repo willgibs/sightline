@@ -21,6 +21,7 @@ The slack came with the mantle (C4) and nothing in the motor needed it. The pose
 - `tests/ladder.test.ts`, "never takes a pose with its head a hair into a slab": a slab over the ladder whose underside is 0.17, 0.5 and 0.96 µm under where a climb step would put the head. The head never goes above the underside, the watch sees nothing, and off the ladder the body stays where it is. On `main` it fails: the head ends at 3.000000000000001 under a slab at 2.99999983.
 - The ladder, mantle, player, solids, invariants and steep tests pass, and so do the architecture tests and both typechecks.
 - Fresh towers: 600, each played as the long run plays one (four minutes, `TOWER_SECONDS`), and none broke a promise. The fault was about one tower in 1,300, so that says nothing else broke; the two towers and the test are what show the fix.
+- The standing benches, in CI on this pull request: all ten read the same as `main`, run by run, over 1,078 runs a side. `main`'s side came from the cache in nine seconds a shard.
 
 **Versions and pins.** `SIM_VERSION` 30. A body on a path now stops where it used to go a hair into a slab, so a recording made before this may not replay: a change to what the game does takes a version whether or not a pinned run shows it, as 22, 23, 26 and 28 did (`CLAUDE.md`, rule 11, now says so). No pinned run has a path's pose within a micrometre of a slab, so no fingerprint moved (`npm run selftest` matches) and every lane's bench holds its pinned numbers. The golden recording is rewritten for the version.
 
