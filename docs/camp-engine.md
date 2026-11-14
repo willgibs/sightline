@@ -710,7 +710,7 @@ In the code:
 
 `brain/firefight.ts`, `clearLine`; `game/combat.ts`, `seenInTheWay`. Step 2d left this open: "he holds, and doesn't yet move for a clear line."
 
-**What was wrong.** A man whose round was held for one of his own stood where he was and tried again a second later, and again. A held round counted toward his burst, so three of them put him down having fired nothing, and he came up at the same place to the same man in the way. The owner's ask: a guard whose fire is held for one of his own steps aside for a clear line.
+**What was wrong.** A man whose round was held for one of his own stood where he was and tried again a second later, and again. A held round counted toward his burst, so three of them put him down having fired nothing, and he came up at the same place to the same man in the way. Step 2d left it as the next thing to build, and the owner said yes (Nov 13): a guard whose fire is held for one of his own steps aside for a clear line.
 
 **The rule.** He shifts a pace sideways, away from the man in the way, just far enough that his round would go, and fires the rest of his burst from there. He doesn't walk round him, and he doesn't leave his cover.
 

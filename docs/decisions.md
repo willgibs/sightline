@@ -4,7 +4,7 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 ## 2026-11-13 · A man whose round is held shifts a pace for a clear line
 
-**What it is.** The owner's ask: a guard whose fire is held for one of his own steps aside for a clear line, instead of standing there holding. Since step 2d a man holds his fire for one of the camp's own anywhere his round could go (`game/combat.ts`, `ownInTheWay`). He then stood where he was and tried again a second later. A held round counted toward his burst, so three of them put him down having fired nothing, and he came up at the same place to the same man in the way. By the wall in the `own-side` fight that was 12.9 rounds held a fight, and 3.1 s from a hold to that man's next round. Now he shifts a pace sideways, away from the man in the way, just far enough that his round would go, and fires from there. He doesn't walk round him and he doesn't leave his cover (`docs/camp-engine.md`, section 9, *Step 2e*).
+**What it is.** Proposed when step 2d left men holding, and built on the owner's yes (Nov 13): a guard whose fire is held for one of his own steps aside for a clear line, instead of standing there holding. Since step 2d a man holds his fire for one of the camp's own anywhere his round could go (`game/combat.ts`, `ownInTheWay`). He then stood where he was and tried again a second later. A held round counted toward his burst, so three of them put him down having fired nothing, and he came up at the same place to the same man in the way. By the wall in the `own-side` fight that was 12.9 rounds held a fight, and 3.1 s from a hold to that man's next round. Now he shifts a pace sideways, away from the man in the way, just far enough that his round would go, and fires from there. He doesn't walk round him and he doesn't leave his cover (`docs/camp-engine.md`, section 9, *Step 2e*).
 
 **What's built.**
 
@@ -46,7 +46,17 @@ The rounds holding cost are back (69.5 a fight by the wall, where firing past it
 
 **The standing benches, against `main` at d2586ab.**
 
-BENCHES
+Only a fight in which a round is held can read differently from `main`, and where one does the camp fires a little more. No count moves by more than one camp, and nobody is shot by his own side on any bench.
+
+| Bench | How it reads |
+| --- | --- |
+| `second-step`, `takedown`, `answer`, `flaws` | Every figure the same |
+| `own-side --dice 3` | With `off=mates`, and with `off=shift`, every figure `main` has for its two arms is the same, but rounds held, which the bench now counts by the brain's own record (12.9 by the wall where `main`'s count says 11.6) |
+| `out-the-gate` | He stays by the wall: the men who came out fire 15.7 rounds a fight, where it was 10.9. He runs for the trees: 65.4 rounds fired at him, where it was 63.2, and 20.7 hit him once he was out, where it was 20.3. Who comes out, how many and how soon are the same, and with `off=chase` every figure is |
+| `hunt` | One figure: with no hunt, four shots and he stays, enough rounds on him to kill by 288 s, where it was 304. Every count the same |
+| `firefight` | One figure: circling, 37.8 rounds at him, where it was 37.4 |
+| `circling` | The plain yard: made out at all 12 → 13 of 16, and 28.8 rounds at him, where it was 28.6. Rounds at him on a farm 22.3 → 22.5, and as built 35.4 → 35.8 |
+| `ladder` | Careless: guards down 4.3 → 4.4, and 21.3 rounds at him, where it was 21.1 |
 
 **Versions and pins.** `SIM_VERSION` 29: men whose round is held now move. No pinned run holds a round, so no pinned `behaviour` value moved. `STATE_SCHEMA` 19: a camp's `shifts`, a man's `heldLine`, `shiftNews`, and a firefight's `shift` and `answered` are new state, and every pinned `state` value moved with the schema's number. The golden recording is rewritten. Every lane's bench holds its pinned numbers, so no bench pin moved.
 
