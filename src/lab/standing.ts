@@ -23,22 +23,22 @@ export interface StandingBench {
   camps?: number;
   /** Rolls of the dice on each camp. */
   dice?: number;
-  /** Roughly how long it takes, relative to the others: shards are dealt by it. */
+  /** How long it takes: seconds on one of CI's machines (four processes), as last measured. Shards are dealt by it. */
   cost: number;
 }
 
 export const STANDING: readonly StandingBench[] = [
-  { name: 'circling', experiment: 'circling', cost: 10 },
-  { name: 'second-step', experiment: 'second-step', cost: 9 },
   // A bench that only runs the game's own dice can hide a fault about who gets shot (CLAUDE.md).
-  { name: 'own-side', experiment: 'own-side', dice: 3, cost: 8 },
-  { name: 'ladder', experiment: 'ladder', cost: 6 },
-  { name: 'flaws', experiment: 'flaws', cost: 5 },
-  { name: 'takedown', experiment: 'takedown', cost: 5 },
-  { name: 'out-the-gate', experiment: 'out-the-gate', cost: 4 },
-  { name: 'hunt', experiment: 'hunt', cost: 3 },
-  { name: 'firefight', experiment: 'firefight', cost: 3 },
-  { name: 'answer', experiment: 'answer', cost: 2 },
+  { name: 'own-side', experiment: 'own-side', dice: 3, cost: 957 },
+  { name: 'circling', experiment: 'circling', cost: 644 },
+  { name: 'hunt', experiment: 'hunt', cost: 288 },
+  { name: 'second-step', experiment: 'second-step', cost: 230 },
+  { name: 'out-the-gate', experiment: 'out-the-gate', cost: 178 },
+  { name: 'takedown', experiment: 'takedown', cost: 142 },
+  { name: 'ladder', experiment: 'ladder', cost: 127 },
+  { name: 'flaws', experiment: 'flaws', cost: 116 },
+  { name: 'firefight', experiment: 'firefight', cost: 89 },
+  { name: 'answer', experiment: 'answer', cost: 75 },
 ];
 
 /** The benches named (all if none), in order of cost, the dearest first; throws on a name that isn't in the set. */
@@ -47,11 +47,22 @@ export function choose(only?: readonly string[]): StandingBench[] {
   return STANDING.filter((b) => !only || only.includes(b.name)).sort((a, b) => b.cost - a.cost || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 
-/** Shard `k` of `n` (k from 1): every n-th bench by cost, so the dearest land in different shards. */
+/**
+ * Shard `k` of `n` (k from 1). The benches are dealt out dearest first, each to whichever
+ * shard is lightest so far (the lowest-numbered of equals), so the shards take about as
+ * long as each other and the dearest bench sets how long the set takes.
+ */
 export function shard(benches: readonly StandingBench[], k: number, n: number): StandingBench[] {
   if (!Number.isInteger(n) || n < 1 || !Number.isInteger(k) || k < 1 || k > n) throw new Error(`a shard is k/n with 1 ≤ k ≤ n, not ${k}/${n}`);
   const sorted = [...benches].sort((a, b) => b.cost - a.cost || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  return sorted.filter((_, i) => i % n === k - 1);
+  const shards = Array.from({ length: n }, () => ({ cost: 0, benches: [] as StandingBench[] }));
+  for (const b of sorted) {
+    let lightest = shards[0]!;
+    for (const s of shards) if (s.cost < lightest.cost) lightest = s;
+    lightest.cost += b.cost;
+    lightest.benches.push(b);
+  }
+  return shards[k - 1]!.benches;
 }
 
 /** A bench a build didn't have: why. */

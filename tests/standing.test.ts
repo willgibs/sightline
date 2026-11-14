@@ -57,6 +57,9 @@ describe('the standing set', () => {
     const long = ['circling', 'second-step', 'own-side'].map((n) => shards.findIndex((s) => s.includes(n)));
     expect(new Set(long).size).toBe(3);
     expect(shards.flat().sort()).toEqual(STANDING.map((b) => b.name).sort());
+    // Dealt dearest first to the lightest shard: none is heavier than the lightest by more than one bench.
+    const costs = [1, 2, 3, 4].map((k) => shard(all, k, 4).reduce((n, b) => n + b.cost, 0));
+    expect(Math.max(...costs) - Math.min(...costs)).toBeLessThanOrEqual(Math.max(...all.map((b) => b.cost)));
   });
 
   it('refuses a name that is not in the set', () => {
