@@ -123,5 +123,11 @@ export const GEN_VERSION = 10;
  * was a head inside a shelf to the walking motor and the watch. A body on a ladder now holds
  * still under the shelf, and one reaching for the rungs lets go. No pinned run has a path's
  * pose within a micrometre of a slab, so no fingerprint moved.
+ * 31: a ledge with no room over it to stand in is a wall (body/motor.ts, `resolveMove`,
+ * `crampedLedges`). A standing body's move refused because it would step up onto one is
+ * made again with the ledge as a wall, so the body slides along it instead of stopping dead.
+ * `ledgeWall: false` in a body's spec plays the motor before (?ledge=stop). No pinned run
+ * meets such a ledge, so no fingerprint moved; the tuning gained the field, so the golden
+ * recording is rewritten.
  */
-export const SIM_VERSION = 30;
+export const SIM_VERSION = 31;
