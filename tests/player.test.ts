@@ -765,7 +765,7 @@ describe('a ledge with no room over it', () => {
       watch.beforeTick();
       sim.step({ ...input, crouch: true });
       watch.afterTick();
-      // Until it's up on the crate, which it crosses in about half a second.
+      // Until it steps up onto the crate: in another half second it would be across it and off the far side.
       for (let t = 0; t < 2 * HZ && p.standingOn !== 0; t++) {
         watch.beforeTick();
         sim.step(input);

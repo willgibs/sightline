@@ -46,7 +46,7 @@ import type { DebugDraw } from '../kernel/debugDraw';
  *   (isClear). The first promise rests on this: the place and the height a body ended the
  *   last tick at were clear, and a refused move keeps them, or lets it fall. It promises
  *   nothing about getting anywhere: the ground rising under a ceiling stops a body that
- *   walks into it. (A ledge with no room over it is a wall, which is no refusal: below.)
+ *   walks into it. (A ledge with no room over it is a wall, not a refusal: below.)
  * - on the ground, the body never gains height on ground steeper than maxSlopeDeg, from
  *   any angle of approach. Exactly: from such ground it ends a tick no higher, wherever it
  *   ends; onto such ground it ends no higher either; and it gains nothing on the steep
