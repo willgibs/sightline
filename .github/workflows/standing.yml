@@ -1,0 +1,116 @@
+name: Standing benches
+
+# Every change to how a camp behaves has to show the camp's other benches still read as
+# they did (src/lab/standing.ts). This runs the standing set on the pull request's base
+# and head, on clean machines, and compares them run by run in the job summary. It
+# informs and never fails because a bench differs: whether a difference is intended is
+# the author's call. Results are cached by tree, so a base already run, or a head whose
+# code didn't change, is not run again.
+#
+# The head's tool runs both sides (`--root`), so a base that predates the tool is run the
+# same way.
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: The ref to compare this one with
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: standing-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run:
+    name: ${{ matrix.side }} (${{ matrix.shard }} of 4)
+    strategy:
+      fail-fast: false
+      matrix:
+        side: [base, head]
+        shard: [1, 2, 3, 4]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: head
+      - if: matrix.side == 'base'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.base }}
+          path: base
+      - id: tree
+        shell: bash
+        run: echo "hash=$(git -C '${{ matrix.side }}' rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      - id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: standing-results
+          key: standing-${{ steps.tree.outputs.hash }}-${{ matrix.shard }}-of-4
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: head/.nvmrc
+          cache: npm
+          cache-dependency-path: head/package-lock.json
+      - if: steps.cache.outputs.cache-hit != 'true'
+        working-directory: head
+        run: npm ci
+      - if: steps.cache.outputs.cache-hit != 'true' && matrix.side == 'base'
+        working-directory: base
+        run: npm ci
+      - if: steps.cache.outputs.cache-hit != 'true'
+        working-directory: head
+        run: npm run standing -- --out ../standing-results --root '../${{ matrix.side }}' --shard ${{ matrix.shard }}/4 --jobs 4
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: standing-results
+          key: standing-${{ steps.tree.outputs.hash }}-${{ matrix.shard }}-of-4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: standing-${{ matrix.side }}-${{ matrix.shard }}
+          path: standing-results/
+
+  compare:
+    name: Standing benches, compared
+    needs: run
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: head
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: head/.nvmrc
+          cache: npm
+          cache-dependency-path: head/package-lock.json
+      - working-directory: head
+        run: npm ci
+      # Each shard's folder holds its benches and the same build.json, so the shards merge into one folder per side.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: standing-base-*
+          merge-multiple: true
+          path: standing/base
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: standing-head-*
+          merge-multiple: true
+          path: standing/head
+      - working-directory: head
+        shell: bash
+        run: npm run standing -- --diff ../standing/base ../standing/head --summary "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: standing-results
+          path: standing/
