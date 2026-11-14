@@ -13,9 +13,11 @@ on:
   schedule:
     - cron: '41 7 * * 1'
 
+# A pull request's (or a ci/ branch's) newer push cancels its older run; main's runs are
+# never cancelled, since `npm run land` reads them.
 concurrency:
-  group: engines-${{ github.ref }}
-  cancel-in-progress: true
+  group: engines-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   browsers:

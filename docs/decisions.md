@@ -2,6 +2,23 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-14 · CI dealt by time: tests in quarters, the benches in eighths, and landing that reads `main`
+
+**Where the time went**, measured on `main` at `c3a3f55` and on pull request 60:
+- **A pull request waited on the standing benches.** `own-side` alone takes 16 minutes on one machine, and the shards were dealt bench by bench, so no shard could finish sooner. The test shards were dealt by a hash of the files' names: 6, 8 and 10.5 minutes on `main`'s run, 13.5 on a slower runner. Two files set a floor of their own: `systems.test.ts` (370 s, which watches every system's writes through 24 whole runs) and `scenes.test.ts` (298 s).
+- **A behaviour change paid two full cycles.** Its decisions entry quotes the standing comparison, which only CI produces, and the commit that adds the quote ran everything again.
+- **`main`'s own run took 25 minutes**: the whole suite on macOS and on Windows, one job each. It blocks nothing, but it is the only place that suite runs, and the next landing cancelled it: that is how the Windows fault below went unseen.
+
+**What changed.**
+- **Test files are dealt to CI's shards by how long each took** (`tests/sequencer.ts`, from `tests/timings.json`): the dearest first, each to whichever shard is lightest so far. Four shards instead of three. The two long files' checks are shared out (`sceneChecks.ts` over three files, `writeChecks.ts` over four), so the dearest file is now `sites.test.ts` at under three minutes. Each Linux shard uploads vitest's JSON report, and `npm run timings` refreshes the timings from `main`'s last green run.
+- **The standing benches run in eighths, and a bench dearer than an eighth of the set is split by its camps** (`shard` in `src/lab/standing.ts`, the `part` option of `src/headless/labRunner.ts`). Part p of n runs the camps at p, p + n, p + 2n..., and reading a results folder merges the parts back into the file a whole run writes. On `answer`, run whole and run in two parts through the shard path, the comparison reads "same, all 54 runs" (`tests/standing.test.ts` holds the merge to every way of splitting).
+- **`main`'s macOS and Windows suites run in thirds.**
+- **A pull request whose newest commits change only docs, on top of a head CI passed, skips the heavy jobs** (the `changes` job in `ci.yml`), and so does a pull request of docs alone. No test reads the docs.
+- **`main`'s runs are never cancelled**, and **`npm run land` refuses while `main`'s own latest runs (CI, Engines, Standing benches) are red**, with `--fixes-main` for the pull request that fixes it.
+- **The gate runs the self-test only when something it checks changed** (the simulation, its tuning, how it's built). CI runs it on every pull request, in four engines.
+
+**What it costs.** More jobs at once: a pull request's start asks for about 25 runners against the free plan's 20, so a few wait the seconds the cached jobs take. The timings drift as tests change, and a new file counts as the median until they're refreshed.
+
 ## 2026-11-14 · The quick gate is `npm run gate`: `precheck` was npm's hook for `check`
 
 **What broke.** The first run of `main`'s CI to finish after the pipeline landed (below) failed its Windows check: `precheck: typecheck failed (spawnSync npm.cmd EINVAL)`. The step it failed in runs `npm run check`, the whole suite, which had nothing to do with the new gate.
