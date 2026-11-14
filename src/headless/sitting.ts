@@ -65,7 +65,7 @@ try {
       why: args.has('why'),
     },
     defaultTuning,
-    (line) => console.log(line),
+    { print: (line) => console.log(line) },
   );
 } catch (e) {
   if (e instanceof Unplayable) fail(e.message);

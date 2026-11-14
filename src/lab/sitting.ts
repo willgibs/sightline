@@ -32,6 +32,7 @@ import type { Simulation } from '../sim/game/sim';
 import { EventLog } from '../sim/kernel/eventlog';
 import { sceneTuning, startScene, type Scene } from '../sim/kernel/scene';
 import type { Outcome } from '../sim/kernel/state';
+import type { World } from '../sim/kernel/world/world';
 import { AWARENESS, BARKS, CUE_WORDS, cuesInMind, explainChain, rung } from '../sim/perception';
 import { huntOf, protectionOf } from './gauges';
 import { closeTo, overviewEye } from './vantage';
@@ -139,16 +140,23 @@ export interface Reading {
   why: number;
 }
 
-/**
- * Plays a sitting's link: `print` takes each line `npm run sitting` prints, in order.
- * Throws `Unplayable` before playing anything if the link can't be played as a sitting.
- */
-export function playSitting(link: SceneLink, how: Marksman, tuning: Tuning, print: (line: string) => void = () => {}): Reading {
+/** Where a played sitting's lines go, and the world it's played in if one is already built. */
+export interface SittingOut {
+  /** Takes each line `npm run sitting` prints, in order. */
+  print?: (line: string) => void;
+  /** The scene's world for this tuning (src/lab/worlds.ts keeps one between runs); built by the scene if not given. */
+  world?: (scene: Scene<Simulation>, tuning: Tuning) => World;
+}
+
+/** Plays a sitting's link. Throws `Unplayable` before playing anything if the link can't be played as a sitting. */
+export function playSitting(link: SceneLink, how: Marksman, tuning: Tuning, out: SittingOut = {}): Reading {
+  const print = out.print ?? ((): void => {});
   const { scene: name, params } = link;
   const make = SCENES[name];
   if (!make) throw new Unplayable(`No scene called ${name}. Scenes: ${Object.keys(SCENES).join(', ')}`);
   const scene = make(params || undefined) as Scene<Simulation>;
-  const sim = startScene(scene, sceneTuning(scene, tuning));
+  const T = sceneTuning(scene, tuning);
+  const sim = startScene(scene, T, out.world?.(scene, T));
   const hz = sim.tuning.sim.tickHz;
   const { seconds, shots } = how;
   const why = how.why === true;
