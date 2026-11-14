@@ -2,6 +2,30 @@
 
 Newest first. Taste calls and product decisions live in the design doc's Part 5; this log covers how the game is built.
 
+## 2026-11-13 · A path's pose and the walking motor agree on what is overhead
+
+**What broke.** Left open by "A refused move keeps its footing" (below). Two towers broke the first promise, on `main` from before the ladder's change: `tower:SWP-1424-4`, tick 98, the player `inside collider 4 by 0.3486 m`, and `tower:RFN-1208-3`, tick 2117, `inside collider 3 by 0.1985 m`. Each was a body on a ladder whose head ended a tick a hair into the underside of a shelf. In SWP-1424-4 the body then came off the ladder, and the walking motor pushed it out from under the shelf 0.35 m in one tick.
+
+**Why.** A path's pose check (`poseClear`, `body/mantle.ts`) took a slab as overhead when `c.y0 >= y + height - 1e-6`. So it let a head into a slab by up to a micrometre. The walking motor (`c.y0 >= head`, `body/motor.ts`) and the watch (`c.y0 >= b.y + height`, `body/invariants.ts`) allow none. A pose in that micrometre was clear to the path and inside the shelf to everything else.
+- **SWP-1424-4, reaching for the rungs.** The reach keeps the feet on the ground under it (`keepOnGround`). The ground there rose 0.68 mm, which put the head 0.96 µm into the shelf. The check let it by.
+- **RFN-1208-3, climbing.** A climb step put the head 0.17 µm into a shelf over the ladder's line. The check let it by.
+
+The slack came with the mantle (C4) and nothing in the motor needed it. The poses it let through weren't float error to be absorbed. They were heads a step of the path had honestly put into a slab.
+
+**Decision.** The pose check takes a slab as overhead by the same comparison as the rest of the motor: `c.y0 >= y + height`, with the same `y` and `height`, and no allowance. A pose that puts the head into a slab by any amount is refused, as any other pose in the way is. On a ladder that means the body holds still under the shelf; reaching for the rungs, it lets go and stays on the ground. The motor's header states it as an invariant of every path: a body on a path never ends a tick in a pose the walking motor would call inside something, and one that comes off its path stays where it is.
+
+**Not done instead.** Clamping the head to the slab's underside (`y = c.y0 - height`). `(c.y0 - height) + height` need not come back to `c.y0` in floating point, so the clamped pose could still be a bit inside. And it would let a climb end anywhere under a shelf, where now it ends one step short, as it does under any slab. Teaching the walking motor or the watch to allow a micrometre was the other way round, and it would have widened what every body may do.
+
+**Proven.**
+- Both towers hold for their full four minutes, and both are kept with the scene (`TOWER_FINDS`), which `tests/ladder.test.ts` plays.
+- `tests/ladder.test.ts`, "never takes a pose with its head a hair into a slab": a slab over the ladder whose underside is 0.17, 0.5 and 0.96 µm under where a climb step would put the head. The head never goes above the underside, the watch sees nothing, and off the ladder the body stays where it is. On `main` it fails: the head ends at 3.000000000000001 under a slab at 2.99999983.
+- The ladder, mantle, player, solids, invariants and steep tests pass, and so do the architecture tests and both typechecks.
+- Fresh towers: 600, each played as the long run plays one (four minutes, `TOWER_SECONDS`), and none broke a promise. The fault was about one tower in 1,300, so that says nothing else broke; the two towers and the test are what show the fix.
+
+**Versions and pins.** `SIM_VERSION` 30. A body on a path now stops where it used to go a hair into a slab, so a recording made before this may not replay: a change to what the game does takes a version whether or not a pinned run shows it, as 22, 23, 26 and 28 did (`CLAUDE.md`, rule 11, now says so). No pinned run has a path's pose within a micrometre of a slab, so no fingerprint moved (`npm run selftest` matches) and every lane's bench holds its pinned numbers. The golden recording is rewritten for the version.
+
+**What it leaves.** A climb now stops a step short under a shelf, as it always did for anything more than a micrometre in. The watch still checks the head as a sphere, whose top is `y + height - r + r`, which can differ from `y + height` by the last bit of a float for any body, walking or not. Nothing has broken on it.
+
 ## 2026-11-13 · A man whose round is held shifts a pace for a clear line
 
 **What it is.** Proposed when step 2d left men holding, and built on the owner's yes (Nov 13): a guard whose fire is held for one of his own steps aside for a clear line, instead of standing there holding. Since step 2d a man holds his fire for one of the camp's own anywhere his round could go (`game/combat.ts`, `ownInTheWay`). He then stood where he was and tried again a second later. A held round counted toward his burst, so three of them put him down having fired nothing, and he came up at the same place to the same man in the way. By the wall in the `own-side` fight that was 12.9 rounds held a fight, and 3.1 s from a hold to that man's next round. Now he shifts a pace sideways, away from the man in the way, just far enough that his round would go, and fires from there. He doesn't walk round him and he doesn't leave his cover (`docs/camp-engine.md`, section 9, *Step 2e*).
