@@ -28,19 +28,21 @@ export interface StandingBench {
 }
 
 export const STANDING: readonly StandingBench[] = [
+  // Costs as measured on CI on Nov 14 (pull request 61), a split bench's parts added up; the
+  // run's own log has each bench's time ("in N s"), to measure them again when they drift.
   // A bench that only runs the game's own dice can hide a fault about who gets shot (CLAUDE.md).
-  { name: 'own-side', experiment: 'own-side', dice: 3, cost: 957 },
-  { name: 'circling', experiment: 'circling', cost: 644 },
-  { name: 'hunt', experiment: 'hunt', cost: 288 },
-  { name: 'second-step', experiment: 'second-step', cost: 230 },
-  { name: 'out-the-gate', experiment: 'out-the-gate', cost: 178 },
-  { name: 'takedown', experiment: 'takedown', cost: 142 },
-  { name: 'ladder', experiment: 'ladder', cost: 127 },
-  { name: 'flaws', experiment: 'flaws', cost: 116 },
-  // Estimated, until CI measures it: here it took 406 s beside answer's 288 (75 on CI), and 1.5 times answer's CPU.
+  { name: 'own-side', experiment: 'own-side', dice: 3, cost: 780 },
+  { name: 'circling', experiment: 'circling', cost: 473 },
+  { name: 'second-step', experiment: 'second-step', cost: 326 },
+  { name: 'hunt', experiment: 'hunt', cost: 298 },
+  { name: 'ladder', experiment: 'ladder', cost: 256 },
+  { name: 'takedown', experiment: 'takedown', cost: 199 },
+  { name: 'out-the-gate', experiment: 'out-the-gate', cost: 180 },
+  { name: 'flaws', experiment: 'flaws', cost: 119 },
+  { name: 'firefight', experiment: 'firefight', cost: 113 },
+  // Estimated, until CI measures it: here it took 406 s beside answer's 288 (84 on CI), and 1.5 times answer's CPU.
   { name: 'sittings', experiment: 'sittings', cost: 110 },
-  { name: 'firefight', experiment: 'firefight', cost: 89 },
-  { name: 'answer', experiment: 'answer', cost: 75 },
+  { name: 'answer', experiment: 'answer', cost: 84 },
 ];
 
 /** The benches named (all if none), in order of cost, the dearest first; throws on a name that isn't in the set. */
