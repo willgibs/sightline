@@ -14,6 +14,45 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 
 **Left alone.** With a shelf exactly over a box, not reaching past it, `main` lifts a body touching the box's edge 0.3 m onto it for a tick. The watch allows it, so no promise breaks; it's worth a look on its own.
 
+## 2026-11-14 · The owner's sittings join the standing benches
+
+**Why.** A change to how a camp behaves is held to the standing benches, run by run, but none of them played what the owner plays: the sittings' links. "Run `npm run sitting` on every link" was a rule for a sitting about to go on the desk, never a check on the next change.
+
+**What.**
+- **The sittings as data** (`src/lab/sittings.ts`): every link the plan's *The owner's time* gives for a sitting on a camp, 26 of them, each with a short name that a comparison matches runs by. A link two sittings share is listed once. Left out: the trial modes, the range and the movement lab (not a camp's doing), the compound simulator (no player and no rules), and lab E's handmade camp (no perches).
+- **The engine of `npm run sitting` moved to the lab** (`src/lab/sitting.ts`), and reads its run as numbers as well as lines: 28 of them, counted from the same events. The tool's output is byte for byte the same on nine runs, refusals included.
+- **The bench `sittings`** (`src/lab/experiments/sittings.ts`) plays each link as the tool does, as linked and again with the suppressor, and joins the set (eleven benches). Its seeds are the sittings' names (`seedsOf`), so the comparison names a sitting that reads differently after a change. A sitting's two runs share its camp, built once.
+- `tests/campSittings.test.ts`: every link names a scene this build has, with parameters it takes; the names are the seeds, in order; one short look counts what the lines say.
+
+**What it leaves.**
+- **Half the sittings show the camp alone:** the tool's marksman fires only from a perch, so a walk-in or a gate start reads as seven minutes of the camp's routine. That still catches a change to how a camp lives, and a man who would now see him lying 45 m off.
+- **`?scene=hunt` plays from the player's own input in the page**, not the scripted shooter the plan describes (`src/app/game.ts` plays a scene's script only for the compound). The bench plays it with the tool's marksman.
+- The cost, 110 s, is an estimate until CI measures it.
+
+## 2026-11-14 · CI dealt by time: tests in quarters, the benches in eighths, and landing that reads `main`
+
+**Where the time went**, measured on `main` at `c3a3f55` and on pull request 60:
+- **A pull request waited on the standing benches.** `own-side` alone takes 16 minutes on one machine, and the shards were dealt bench by bench, so no shard could finish sooner. The test shards were dealt by a hash of the files' names: 6, 8 and 10.5 minutes on `main`'s run, 13.5 on a slower runner. Two files set a floor of their own: `systems.test.ts` (370 s, which watches every system's writes through 24 whole runs) and `scenes.test.ts` (298 s).
+- **A behaviour change paid two full cycles.** Its decisions entry quotes the standing comparison, which only CI produces, and the commit that adds the quote ran everything again.
+- **`main`'s own run took 25 minutes**: the whole suite on macOS and on Windows, one job each. It blocks nothing, but it is the only place that suite runs, and the next landing cancelled it: that is how the Windows fault below went unseen.
+
+**What changed.**
+- **Test files are dealt to CI's shards by how long each took** (`tests/sequencer.ts`, from `tests/timings.json`): the dearest first, each to whichever shard is lightest so far. Four shards instead of three. The two long files' checks are shared out (`sceneChecks.ts` over three files, `writeChecks.ts` over four). Each Linux shard uploads how long each of its files took, and `npm run timings` refreshes the timings from `main`'s last green run.
+- **A file's time counts its loading** (`tests/timesReporter.ts`). The first run here found a file that does its work while it loads: `tests/bench.test.ts` runs every lane's bench in its `describe`, about six minutes that vitest's reports leave out. Timed at seven seconds, it was dealt as a cheap file, and its quarter took 10.5 minutes against 3.5 to 6 for the others. Counted whole, it gets a quarter nearly to itself: about six minutes, and the other quarters about four and a half.
+- **The standing benches run in eighths, and a bench dearer than an eighth of the set is split by its camps** (`shard` in `src/lab/standing.ts`, the `part` option of `src/headless/labRunner.ts`). Part p of n runs the camps at p, p + n, p + 2n..., and reading a results folder merges the parts back into the file a whole run writes. On `answer`, run whole and run in two parts through the shard path, the comparison reads "same, all 54 runs" (`tests/standing.test.ts` holds the merge to every way of splitting).
+- **`main`'s macOS and Windows suites run in thirds.**
+- **A pull request whose newest commits change only docs, on top of a head CI passed, skips the heavy jobs** (the `changes` job in `ci.yml`), and so does a pull request of docs alone. No test reads the docs.
+- **`main`'s runs are never cancelled**, and **`npm run land` refuses while `main`'s own latest runs (CI, Engines, Standing benches) are red**, with `--fixes-main` for the pull request that fixes it.
+- **The gate runs the self-test only when something it checks changed** (the simulation, its tuning, how it's built). CI runs it on every pull request, in four engines.
+
+**Measured on this pull request's first run.** The standing benches took 9.5 minutes with both sides run in full (the tool itself changed, so neither side's results could come from the cache), against 16 for one side before: shards of 3.5 to 9 minutes. Every bench read the same as `main`, the split ones merged back from their parts: `own-side` all 360 runs, `circling` all 96.
+
+**And its second,** with each file's time counted whole: the test quarters took 4.8 to 6.2 minutes, and CI's whole run 6.5, against 12 on the first run and 13.5 on pull request 60. The benches' base came from the cache in under 10 seconds a shard; their head ran again, since its source had changed, in 3.3 to 10 minutes. The slowest eighth held `second-step` and `ladder`, which now take longer than the costs the set is dealt by, so the costs are measured again with the next change to the set. The commit that added these lines changed only docs, and skipped the heavy jobs.
+
+**What it costs.** More jobs at once: a pull request's start asks for about 25 runners against the free plan's 20, so a few wait the seconds the cached jobs take. The timings drift as tests change, and a new file counts as the median until they're refreshed.
+
+**What it leaves.** `tests/bench.test.ts` is now the dearest file by far. Sharing out its lanes' metrics and its pinned runs, as `scenes` and `systems` are, would bring every test quarter to about four and a half minutes.
+
 ## 2026-11-14 · The quick gate is `npm run gate`: `precheck` was npm's hook for `check`
 
 **What broke.** The first run of `main`'s CI to finish after the pipeline landed (below) failed its Windows check: `precheck: typecheck failed (spawnSync npm.cmd EINVAL)`. The step it failed in runs `npm run check`, the whole suite, which had nothing to do with the new gate.

@@ -1,13 +1,18 @@
 name: CI
 
 # Test what's settled, and don't make a pull request wait for what it can't break (the
-# owner, Nov 9). A pull request runs the whole suite on Linux, in thirds side by side, and
-# on macOS and Windows the self-test and a recorded bot run, whose final hashes must match
-# Linux's: a recording made anywhere has to replay identically everywhere. A push to main
-# and the weekly run add the whole suite on macOS and Windows. Once a week, and on demand,
-# bots also play fresh valleys for hours, checking the motor's promises every tick, and the
-# synctest saves, restores and re-steps for hours more. (engines.yml runs the browsers'
-# and Bun's engines on every push.) The repository is public, so these minutes are free.
+# owner, Nov 9). A pull request runs the whole suite on Linux, in quarters side by side,
+# and on macOS and Windows the self-test and a recorded bot run, whose final hashes must
+# match Linux's: a recording made anywhere has to replay identically everywhere. A push to
+# main and the weekly run add the whole suite on macOS and Windows, in thirds. Once a week,
+# and on demand, bots also play fresh valleys for hours, checking the motor's promises every
+# tick, and the synctest saves, restores and re-steps for hours more. (engines.yml runs the
+# browsers' and Bun's engines on every push.) The repository is public, so these minutes
+# are free.
+#
+# The suite's shards are dealt by how long each test file took (tests/sequencer.ts, from
+# tests/timings.json, which `npm run timings` refreshes from these runs' reports), so they
+# end at about the same time.
 on:
   push:
     branches: [main]
@@ -16,17 +21,67 @@ on:
   schedule:
     - cron: '23 7 * * 1'
 
+# A pull request's newer push cancels its older run. Main's runs are never cancelled: each
+# is the only place its whole suite runs on macOS and Windows, and `npm run land` reads them.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # What a push can break. A pull request that changes only docs, or whose newest commits
+  # change only docs on top of a head this workflow passed, skips the heavy jobs: the
+  # decisions entry that quotes a finished comparison doesn't run the suite again. No test
+  # reads the docs (*.md, docs/).
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      heavy: ${{ steps.what.outputs.heavy }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - id: what
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          BEFORE: ${{ github.event.before }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          # True when every file changed between $1 and this commit is docs.
+          docs_only() { ! git diff --name-only "$1" HEAD | grep -qvE '^docs/|\.md$'; }
+          heavy=true
+          why="Everything runs: this is main, or a pull request with more than docs in it."
+          if [ "$EVENT" = pull_request ]; then
+            if docs_only "$(git merge-base "origin/$BASE_REF" HEAD)"; then
+              heavy=false
+              why="Only docs differ from $BASE_REF, so the heavy jobs are skipped."
+            elif [ "$ACTION" = synchronize ] && [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null && docs_only "$BEFORE"; then
+              passed=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --commit "$BEFORE" --json conclusion -q '[.[] | select(.conclusion == "success")] | length')
+              if [ "${passed:-0}" -gt 0 ]; then
+                heavy=false
+                why="Only docs changed since ${BEFORE:0:7}, which this workflow passed, so the heavy jobs are skipped."
+              fi
+            fi
+          fi
+          echo "$why" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "heavy=$heavy" >> "$GITHUB_OUTPUT"
+
   tests:
-    name: Tests (${{ matrix.shard }} of 3)
+    name: Tests (${{ matrix.shard }} of 4)
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -38,10 +93,19 @@ jobs:
       - run: npm ci
       - if: matrix.shard == 1
         run: npm run typecheck
-      - run: npx vitest run --shard=${{ matrix.shard }}/3
+      # test-times.json is how long each file took here, loading included, for `npm run timings`.
+      - run: npx vitest run --shard=${{ matrix.shard }}/4 --reporter=default --reporter=./tests/timesReporter.ts
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-times-${{ matrix.shard }}
+          path: test-times.json
+          if-no-files-found: ignore
 
   build:
     name: Build, and a recorded bot run (Linux)
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -119,12 +183,18 @@ jobs:
         shell: bash
         run: npm run explain -- --base "${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}" --summary "$GITHUB_STEP_SUMMARY"
 
+  # On a pull request, part 0: the self-test and the recorded bot run. On main and in the
+  # weekly run, the whole suite as well, in thirds side by side; part 1 also has the
+  # typecheck, the self-test and the bot run, whose hash goes to same-everywhere.
   platforms:
-    name: Check (${{ matrix.os }})
+    name: Check (${{ matrix.os }}${{ matrix.part > 0 && format(', {0} of 3', matrix.part) || '' }})
+    needs: changes
+    if: needs.changes.outputs.heavy == 'true'
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
+        part: ${{ fromJSON(github.event_name == 'pull_request' && '[0]' || '[1, 2, 3]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     steps:
@@ -134,15 +204,21 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: The whole suite, on main and in the weekly run
-        if: github.event_name != 'pull_request'
-        run: npm run check
+      - name: Typecheck
+        if: matrix.part == 1
+        run: npm run typecheck
+      - name: The whole suite, a third of it, on main and in the weekly run
+        if: matrix.part > 0
+        run: npx vitest run --shard=${{ matrix.part }}/3
       - name: Self-test, in this platform's engine
+        if: matrix.part <= 1
         run: npm run selftest
       - name: 20-minute bot run, recorded and re-simulated
+        if: matrix.part <= 1
         shell: bash
         run: npm run sim -- --minutes 20 | tee sim.log && grep '^hash' sim.log | awk '{print $2}' > hash-${{ matrix.os }}.txt
-      - uses: actions/upload-artifact@v4
+      - if: matrix.part <= 1
+        uses: actions/upload-artifact@v4
         with:
           name: hash-${{ matrix.os }}
           path: hash-${{ matrix.os }}.txt
@@ -226,7 +302,7 @@ jobs:
   all:
     name: All checks
     if: always()
-    needs: [tests, build, up-to-date, explain, platforms, same-everywhere]
+    needs: [changes, tests, build, up-to-date, explain, platforms, same-everywhere]
     runs-on: ubuntu-latest
     steps:
       - shell: bash

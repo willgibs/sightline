@@ -32,6 +32,7 @@
     "experiment": "tsx src/headless/experiment.ts",
     "standing": "tsx src/headless/standing.ts",
     "gate": "tsx src/headless/gate.ts",
+    "timings": "tsx src/headless/timings.ts",
     "whatif": "tsx src/headless/whatif.ts",
     "flaws": "tsx src/headless/flaws.ts",
     "hitches": "tsx src/headless/hitches.ts",

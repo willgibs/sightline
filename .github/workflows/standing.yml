@@ -14,6 +14,10 @@ name: Standing benches
 # A push to main runs main alone and compares nothing. A cache made by a pull request's
 # run is that pull request's alone to restore, and one made on main is every branch's:
 # so this is what leaves main's results where the next pull requests find their base.
+#
+# Each side runs in eight shards. A bench dearer than an eighth of the set is split by its
+# camps (src/lab/standing.ts, `shard`), so no one bench sets how long the set takes, and
+# the comparison merges its parts back, run for run.
 on:
   pull_request:
   push:
@@ -27,18 +31,20 @@ on:
 permissions:
   contents: read
 
+# A pull request's newer push cancels its older run; main's runs are never cancelled, since
+# each leaves the base the next pull requests compare with, and `npm run land` reads them.
 concurrency:
-  group: standing-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: standing-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   run:
-    name: ${{ matrix.side }} (${{ matrix.shard }} of 4)
+    name: ${{ matrix.side }} (${{ matrix.shard }} of 8)
     strategy:
       fail-fast: false
       matrix:
         side: ${{ fromJSON(github.event_name == 'push' && '["head"]' || '["base", "head"]') }}
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -61,7 +67,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: standing-results
-          key: standing-${{ steps.inputs.outputs.hash }}-${{ hashFiles('head/src/lab/standing.ts', 'head/src/lab/results.ts', 'head/src/headless/labRunner.ts', 'head/src/headless/standing.ts') }}-${{ matrix.shard }}-of-4
+          key: standing-${{ steps.inputs.outputs.hash }}-${{ hashFiles('head/src/lab/standing.ts', 'head/src/lab/results.ts', 'head/src/headless/labRunner.ts', 'head/src/headless/standing.ts') }}-${{ matrix.shard }}-of-8
       - if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/setup-node@v4
         with:
@@ -76,12 +82,12 @@ jobs:
         run: npm ci
       - if: steps.cache.outputs.cache-hit != 'true'
         working-directory: head
-        run: npm run standing -- --out ../standing-results --root '../${{ matrix.side }}' --shard ${{ matrix.shard }}/4 --jobs 4
+        run: npm run standing -- --out ../standing-results --root '../${{ matrix.side }}' --shard ${{ matrix.shard }}/8 --jobs 4
       - if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: standing-results
-          key: standing-${{ steps.inputs.outputs.hash }}-${{ hashFiles('head/src/lab/standing.ts', 'head/src/lab/results.ts', 'head/src/headless/labRunner.ts', 'head/src/headless/standing.ts') }}-${{ matrix.shard }}-of-4
+          key: standing-${{ steps.inputs.outputs.hash }}-${{ hashFiles('head/src/lab/standing.ts', 'head/src/lab/results.ts', 'head/src/headless/labRunner.ts', 'head/src/headless/standing.ts') }}-${{ matrix.shard }}-of-8
       - uses: actions/upload-artifact@v4
         with:
           name: standing-${{ matrix.side }}-${{ matrix.shard }}
