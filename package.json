@@ -30,6 +30,8 @@
     "scene": "tsx src/headless/scene.ts",
     "sitting": "tsx src/headless/sitting.ts",
     "experiment": "tsx src/headless/experiment.ts",
+    "standing": "tsx src/headless/standing.ts",
+    "precheck": "tsx src/headless/precheck.ts",
     "whatif": "tsx src/headless/whatif.ts",
     "flaws": "tsx src/headless/flaws.ts",
     "hitches": "tsx src/headless/hitches.ts",
