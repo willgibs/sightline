@@ -19,3 +19,6 @@ shots/
 research_notes/
 reports/
 __pycache__/
+
+# Results kept by npm run standing, by tree
+.cache/

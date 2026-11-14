@@ -26,6 +26,43 @@ The slack came with the mantle (C4) and nothing in the motor needed it. The pose
 
 **What it leaves.** A climb now stops a step short under a shelf, as it always did for anything more than a micrometre in. The watch still checks the head as a sphere, whose top is `y + height - r + r`, which can differ from `y + height` by the last bit of a float for any body, walking or not. Nothing has broken on it.
 
+## 2026-11-13 · The standing benches and the whole suite are CI's to run, and a quick gate stays here
+
+The owner, Nov 13: "If you'd like to reevaluate any of our workflows or pipelines to ensure they're absolutely optimal for how we're building, please do so. I don't want us to get trapped by anything stale that's now hurting us but seemed like a good idea in the past."
+
+**What was wrong.** Two steps of the pipeline cost more than the work they checked, on the day the three changes below landed.
+
+- **Comparing the benches.** A change to how a camp behaves has to show that the camp's other benches still read as on `main`. That meant about ten experiments run on `main` and again on the branch, 20 to 50 minutes a pass on a machine other work kept at a load of 60 to 200, and the tables compared by eye or by a script kept outside the repository. A saved pass on `main` went stale when `main` moved. And what found the one real fault that day, the first valley fix cutting a camp's section off from its firing points, was reading the runs camp by camp: the tables of means held.
+- **The whole suite, here.** The rule was that `npm run check` passes before anything is handed back. With the machine loaded, one run took 41 minutes and failed 29 tests, every one a timeout and none an assertion. Run again apart from the rest, they passed. CI runs the same suite on clean machines for every pull request, and `npm run land` lands only what it passed, so the run here was checking, slowly and unreliably, what CI checks anyway.
+
+**What's built.**
+
+- **An experiment's results as data** (`src/lab/results.ts`; `npm run experiment -- <name> --json <file>`): every run's values, by arm, seed and roll of the dice.
+- **The standing set, as data** (`src/lab/standing.ts`): `circling`, `second-step`, `own-side` with three rolls of the dice, `ladder`, `flaws`, `takedown`, `out-the-gate`, `hunt`, `firefight` and `answer`. With it, a pure comparison of two builds' results: the figures that moved, as each side's table prints them, and the runs that read differently, by seed and roll, the largest first.
+- **`npm run standing -- --base origin/main`** (`src/headless/standing.ts`): the set on this checkout and on a ref, and the comparison. A ref is run in a temporary worktree, by this checkout's tool loading that checkout's experiments (`--root`), so a build that predates the tool is run the same way. Results are kept under `.cache/standing/` by what a bench depends on, which is git's hashes of `src`, `package-lock.json`, `tsconfig.json` and `.nvmrc`. So a ref is run once for as long as its code stands, and a change to docs or tests runs nothing.
+- **CI** (`.github/workflows/standing.yml`): for every pull request, the set on the base and on the head, four shards each, cached by the same hash and the tool's own files, and the comparison in the run's summary. It informs, and never fails because a bench differs. A push to `main` runs the set on `main` alone (added the same day, after this landed): GitHub lets a pull request restore a cache made on `main` but never one made by another pull request, so without it every pull request ran its base again. Its first run, on this change: 1,078 runs a side in 47 minutes of machine time, done in 19.5 minutes side by side. The dearest bench, `own-side` with its five arms, took 16 minutes alone, so the shards are now dealt by measured cost, dearest first to the lightest shard, and that bench sets how long the set takes.
+- **`npm run precheck`** (`src/headless/precheck.ts`): typecheck, the architecture test, every test file the branch changed, and the self-test. About 90 s.
+
+**What changes in the working rules** (`CLAUDE.md`, *Checking work*).
+
+- Before a push or a hand-back, `npm run precheck` passes. The whole suite is CI's to run, and `npm run check` is for when this machine is quiet.
+- A change to behaviour lands with the standing comparison read (CI's summary, or `npm run standing -- --base origin/main`), and its entry here says what moved and why.
+- A new behaviour's bench joins the set when it lands.
+
+**What's proven.**
+
+- `tests/standing.test.ts`: 11 tests on made-up results.
+- `main` against this change, which alters no behaviour, on CI: all ten benches the same, every one of 1,078 runs. The same on one bench here (`--base origin/main --only answer`: 54 runs), with `main` run in a temporary worktree that was removed after.
+- Two values altered by hand in a copy of one bench's results are reported as exactly those two runs and the two figures they move.
+
+**What it leaves.**
+
+- **The sittings aren't in it.** A sitting's link played headless (`npm run sitting`) is still run by hand on both builds: the links are on the owner's desk and in the plan, not in code.
+- **An arm or a measure only one build has** is named as such and otherwise left out: the comparison is of what both builds have.
+- **"The largest first"** goes by the raw gap between two values, whatever the measure's unit.
+- **The cache here is never pruned.** `.cache/standing/` grows by a few hundred kilobytes a build.
+- **`npm run land` waits for CI's benches too,** since it waits for every check.
+
 ## 2026-11-13 · A man whose round is held shifts a pace for a clear line
 
 **What it is.** Proposed when step 2d left men holding, and built on the owner's yes (Nov 13): a guard whose fire is held for one of his own steps aside for a clear line, instead of standing there holding. Since step 2d a man holds his fire for one of the camp's own anywhere his round could go (`game/combat.ts`, `ownInTheWay`). He then stood where he was and tried again a second later. A held round counted toward his burst, so three of them put him down having fired nothing, and he came up at the same place to the same man in the way. By the wall in the `own-side` fight that was 12.9 rounds held a fight, and 3.1 s from a hold to that man's next round. Now he shifts a pace sideways, away from the man in the way, just far enough that his round would go, and fires from there. He doesn't walk round him and he doesn't leave his cover (`docs/camp-engine.md`, section 9, *Step 2e*).

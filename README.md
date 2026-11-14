@@ -185,7 +185,9 @@ tests/                 Vitest
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Dev server with hot reload. Saving `src/config/tuning.ts` applies new numbers to the running game. |
-| `npm run check` | Typecheck plus every test. Must pass before anything is handed back. |
+| `npm run precheck` | The gate before a push, a minute or two: typecheck, the architecture test, the tests the branch changed, and the self-test. |
+| `npm run check` | Typecheck plus every test. CI runs this on every pull request; here it's for a quiet machine. |
+| `npm run standing -- --base origin/main` | The camp's standing benches on this checkout and on `main`, compared run by run: the figures that moved and the camps that read differently. CI does the same for every pull request. |
 | `npm test` | All tests: determinism, the motor's promises, collision, generation, recordings, scenes, architecture rules. |
 | `npm run test:browser` | Tests that need a real browser (Web Audio, WebGL, each engine's JavaScript), in Chromium. |
 | `npm run look` | Pictures of the honest and debug views from a headless browser, into `shots/`. |
