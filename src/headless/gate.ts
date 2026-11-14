@@ -3,17 +3,18 @@
  * with every test file this branch changed or added against origin/main (committed or
  * not), and the self-test. It stops at the first step that fails and says which.
  *
- *   npm run precheck
+ *   npm run gate
  *
- * It is not `npm run check`: the whole suite still runs in CI on every pull request.
+ * It is not `npm run check`: the whole suite still runs in CI on every pull request. And
+ * it is never to be called `precheck`. npm runs a script named `pre<name>` before `<name>`
+ * by itself, so under that name `npm run check` ran this first, and on Windows, where it
+ * couldn't start, the whole suite never ran (tests/scripts.test.ts holds the rule).
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO } from './builds';
 
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 const git = (...a: string[]): string | null => {
   try {
     return execFileSync('git', a, { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -25,9 +26,10 @@ const git = (...a: string[]): string | null => {
 function step(name: string, command: string, a: string[]): void {
   console.log(`\n▸ ${name}: ${[command, ...a].join(' ')}\n`);
   const started = performance.now();
-  const r = spawnSync(command, a, { cwd: REPO, stdio: 'inherit' });
+  // On Windows npm and npx are .cmd files, which Node starts only through a shell.
+  const r = spawnSync(command, a, { cwd: REPO, stdio: 'inherit', shell: process.platform === 'win32' });
   if (r.status !== 0) {
-    console.log(`\nprecheck: ${name} failed${r.status === null ? ` (${r.signal ?? r.error?.message})` : ''}.`);
+    console.log(`\ngate: ${name} failed${r.status === null ? ` (${r.signal ?? r.error?.message})` : ''}.`);
     process.exit(1);
   }
   console.log(`\n${name}: passed in ${((performance.now() - started) / 1000).toFixed(0)} s.`);
@@ -41,12 +43,12 @@ function changedTests(): string[] | null {
   return [...files].sort();
 }
 
-step('typecheck', npm, ['run', 'typecheck']);
+step('typecheck', 'npm', ['run', 'typecheck']);
 const changed = changedTests();
-if (changed === null) console.log("\nprecheck: origin/main can't be resolved, so there are no changed tests to pick; skipping the tests (git fetch origin, then run it again).");
+if (changed === null) console.log("\ngate: origin/main can't be resolved, so there are no changed tests to pick; skipping the tests (git fetch origin, then run it again).");
 else {
   const tests = [...new Set(['tests/architecture.test.ts', ...changed])];
-  step(`tests (${tests.length})`, npx, ['vitest', 'run', ...tests]);
+  step(`tests (${tests.length})`, 'npx', ['vitest', 'run', ...tests]);
 }
-step('self-test', npm, ['run', 'selftest']);
-console.log('\nprecheck: all passed.');
+step('self-test', 'npm', ['run', 'selftest']);
+console.log('\ngate: all passed.');
