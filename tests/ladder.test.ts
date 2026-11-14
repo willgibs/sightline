@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultTuning as T } from '../src/config/tuning';
-import { InvariantWatch, climbPrompt, createBody, ladderLine, ladderLinks, ladderTop, laddersOf, stepMotor, type Cylinder, type Ladder, type MotorContext, type MoveIntent } from '../src/sim/body';
+import { InvariantWatch, bodyHeight, climbPrompt, createBody, ladderLine, ladderLinks, ladderTop, laddersOf, stepMotor, type Cylinder, type Ladder, type MotorContext, type MoveIntent } from '../src/sim/body';
 import { buildRoutine, buildWorld, campMission, generateWorld, type GuardSpawn, type Routine } from '../src/sim/generation';
 import { TOWER_FINDS, ladderTower } from '../src/sim/game/scenes/ladderTower';
 import { placePlayer } from '../src/sim/game/setup';
@@ -194,6 +194,36 @@ describe('a ladder', () => {
     expect(sim.player.motor).toBe('ladder');
     expect(sim.player.y).toBeLessThan(2.0 - 1.2 + 0.1); // stopped short of the slab
     expect(watch.report.first).toBeNull();
+  });
+
+  it('never takes a pose with its head a hair into a slab, which the walking motor would call inside it', () => {
+    // Where the climb would put the head, without the slab: then a slab whose underside is
+    // that much less a fraction of a micrometre (tower:RFN-1208-3 was 0.17 µm, SWP-1424-4 0.96 µm).
+    const dry = run();
+    step(dry.sim, dry.watch, 0, 0, true);
+    const heads: number[] = [];
+    for (let t = 1; t < 90; t++) {
+      step(dry.sim, dry.watch, t, 1, false);
+      heads.push(dry.sim.player.y + bodyHeight(dry.sim.player, spec));
+    }
+    const at = heads.find((h) => h > 3)!;
+    for (const into of [0.17e-6, 0.5e-6, 0.96e-6]) {
+      const under = at - into;
+      const { sim, watch } = run([box(-0.6, 0.6, 1.6, 2.6, under, under + 0.2)]);
+      step(sim, watch, 0, 0, true);
+      for (let t = 1; t < 90; t++) {
+        step(sim, watch, t, 1, false);
+        expect(sim.player.y + bodyHeight(sim.player, spec)).toBeLessThanOrEqual(under);
+      }
+      expect(sim.player.motor).toBe('ladder');
+      expect(watch.report.first).toBeNull();
+      // And off the ladder in that pose, the walking motor leaves it where it is.
+      const { x, z } = sim.player;
+      step(sim, watch, 90, 0, true);
+      for (let t = 91; t < 100; t++) step(sim, watch, t, 0, false);
+      expect(Math.hypot(sim.player.x - x, sim.player.z - z)).toBeLessThan(0.01);
+      expect(watch.report.first).toBeNull();
+    }
   });
 
   it('is not offered from too far off, or facing away', () => {
