@@ -93,8 +93,8 @@ jobs:
       - run: npm ci
       - if: matrix.shard == 1
         run: npm run typecheck
-      # The JSON report is how long each file took here, for `npm run timings`.
-      - run: npx vitest run --shard=${{ matrix.shard }}/4 --reporter=default --reporter=json --outputFile.json=test-times.json
+      # test-times.json is how long each file took here, loading included, for `npm run timings`.
+      - run: npx vitest run --shard=${{ matrix.shard }}/4 --reporter=default --reporter=./tests/timesReporter.ts
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:

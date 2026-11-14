@@ -10,14 +10,19 @@ Newest first. Taste calls and product decisions live in the design doc's Part 5;
 - **`main`'s own run took 25 minutes**: the whole suite on macOS and on Windows, one job each. It blocks nothing, but it is the only place that suite runs, and the next landing cancelled it: that is how the Windows fault below went unseen.
 
 **What changed.**
-- **Test files are dealt to CI's shards by how long each took** (`tests/sequencer.ts`, from `tests/timings.json`): the dearest first, each to whichever shard is lightest so far. Four shards instead of three. The two long files' checks are shared out (`sceneChecks.ts` over three files, `writeChecks.ts` over four), so the dearest file is now `sites.test.ts` at under three minutes. Each Linux shard uploads vitest's JSON report, and `npm run timings` refreshes the timings from `main`'s last green run.
+- **Test files are dealt to CI's shards by how long each took** (`tests/sequencer.ts`, from `tests/timings.json`): the dearest first, each to whichever shard is lightest so far. Four shards instead of three. The two long files' checks are shared out (`sceneChecks.ts` over three files, `writeChecks.ts` over four). Each Linux shard uploads how long each of its files took, and `npm run timings` refreshes the timings from `main`'s last green run.
+- **A file's time counts its loading** (`tests/timesReporter.ts`). The first run here found a file that does its work while it loads: `tests/bench.test.ts` runs every lane's bench in its `describe`, about six minutes that vitest's reports leave out. Timed at seven seconds, it was dealt as a cheap file, and its quarter took 10.5 minutes against 3.5 to 6 for the others. Counted whole, it gets a quarter nearly to itself: about six minutes, and the other quarters about four and a half.
 - **The standing benches run in eighths, and a bench dearer than an eighth of the set is split by its camps** (`shard` in `src/lab/standing.ts`, the `part` option of `src/headless/labRunner.ts`). Part p of n runs the camps at p, p + n, p + 2n..., and reading a results folder merges the parts back into the file a whole run writes. On `answer`, run whole and run in two parts through the shard path, the comparison reads "same, all 54 runs" (`tests/standing.test.ts` holds the merge to every way of splitting).
 - **`main`'s macOS and Windows suites run in thirds.**
 - **A pull request whose newest commits change only docs, on top of a head CI passed, skips the heavy jobs** (the `changes` job in `ci.yml`), and so does a pull request of docs alone. No test reads the docs.
 - **`main`'s runs are never cancelled**, and **`npm run land` refuses while `main`'s own latest runs (CI, Engines, Standing benches) are red**, with `--fixes-main` for the pull request that fixes it.
 - **The gate runs the self-test only when something it checks changed** (the simulation, its tuning, how it's built). CI runs it on every pull request, in four engines.
 
+**Measured on this pull request's first run.** The standing benches took 9.5 minutes with both sides run in full (the tool itself changed, so neither side's results could come from the cache), against 16 for one side before: shards of 3.5 to 9 minutes. Every bench read the same as `main`, the split ones merged back from their parts: `own-side` all 360 runs, `circling` all 96.
+
 **What it costs.** More jobs at once: a pull request's start asks for about 25 runners against the free plan's 20, so a few wait the seconds the cached jobs take. The timings drift as tests change, and a new file counts as the median until they're refreshed.
+
+**What it leaves.** `tests/bench.test.ts` is now the dearest file by far. Sharing out its lanes' metrics and its pinned runs, as `scenes` and `systems` are, would bring every test quarter to about four and a half minutes.
 
 ## 2026-11-14 · The quick gate is `npm run gate`: `precheck` was npm's hook for `check`
 

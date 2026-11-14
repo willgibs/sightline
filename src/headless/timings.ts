@@ -1,8 +1,9 @@
 /**
  * Refreshes tests/timings.json, by which CI's test shards are dealt (tests/sequencer.ts),
- * from main's last green CI run: each Linux test shard uploads vitest's JSON report as the
- * artifact `test-times-<k>`. Run it when the shards' times drift apart (the CI run's Tests
- * jobs say how long each took), and commit the file.
+ * from main's last green CI run: each Linux test shard uploads how long each of its files
+ * took, loading included (tests/timesReporter.ts), as the artifact `test-times-<k>`. Run it
+ * when the shards' times drift apart (the CI run's Tests jobs say how long each took), and
+ * commit the file.
  *
  *   npm run timings                 from main's last green run
  *   npm run timings -- --run <id>   from that run
@@ -13,10 +14,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from './args';
 import { REPO } from './builds';
-
-interface Report {
-  testResults: Array<{ name: string; startTime: number; endTime: number }>;
-}
 
 const args = parseArgs(process.argv.slice(2));
 const gh = (...a: string[]): string => execFileSync('gh', a, { cwd: REPO, encoding: 'utf8' }).trim();
@@ -30,12 +27,7 @@ try {
   for (const artifact of readdirSync(dir).sort()) {
     const file = join(dir, artifact, 'test-times.json');
     if (!existsSync(file)) continue;
-    for (const r of (JSON.parse(readFileSync(file, 'utf8')) as Report).testResults) {
-      // The runner's absolute path, from the repository's tests folder on.
-      const path = r.name.replace(/\\/g, '/');
-      const at = path.lastIndexOf('/tests/');
-      if (at >= 0) seconds.set(path.slice(at + 1), Math.round((r.endTime - r.startTime) / 100) / 10);
-    }
+    for (const [path, s] of Object.entries(JSON.parse(readFileSync(file, 'utf8')) as Record<string, number>)) seconds.set(path, s);
   }
   if (seconds.size === 0) throw new Error(`run ${run} has no test-times reports: it may predate them, or its test jobs didn't run`);
   const sorted = [...seconds].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
