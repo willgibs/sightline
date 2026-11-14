@@ -58,6 +58,8 @@ Only a fight in which a round is held can read differently from `main`, and wher
 | `circling` | The plain yard: made out at all 12 → 13 of 16, and 28.8 rounds at him, where it was 28.6. Rounds at him on a farm 22.3 → 22.5, and as built 35.4 → 35.8 |
 | `ladder` | Careless: guards down 4.3 → 4.4, and 21.3 rounds at him, where it was 21.1 |
 
+**The sittings.** The four takedown links the owner's sittings play (`npm run sitting`: HOT-7106, NUT-4776 from the perch and from the ground, LEB-2534) read line for line as on `main`.
+
 **Versions and pins.** `SIM_VERSION` 29: men whose round is held now move. No pinned run holds a round, so no pinned `behaviour` value moved. `STATE_SCHEMA` 19: a camp's `shifts`, a man's `heldLine`, `shiftNews`, and a firefight's `shift` and `answered` are new state, and every pinned `state` value moved with the schema's number. The golden recording is rewritten. Every lane's bench holds its pinned numbers, so no bench pin moved.
 
 **What it leaves.**
