@@ -2,7 +2,7 @@ import { dcos, dlog, dsin } from '../kernel/core/detmath';
 import type { AwarenessName } from '../kernel/events';
 import { routinePose, type RoutinePose } from '../generation';
 import type { HuntOrder, TaskKind } from './camp';
-import { beginFirefight, noteFirefight, offerFirefight, performFight, performPush, seesHim, type Firefight } from './firefight';
+import { beginFirefight, noteFirefight, offerFirefight, performFight, performPush, seesHim, type Firefight, type ShiftWhat } from './firefight';
 import { groundSpot } from './ground';
 import { hasGrounds, noteGrounds } from './grounds';
 import { beginHunt, offerHunt, performHunt, type Hunt } from './hunt';
@@ -54,6 +54,25 @@ export interface ActChange {
 }
 
 /** A guard's brain: what he's doing and why, plain data in his state. */
+/**
+ * A round held for one of his own (game/combat.ts), as the man behind the rifle saw it: three
+ * numbers about one man, at that moment, relative to his own line of fire and nothing else.
+ * It's what he sees over his sights, so it crosses rule 13 the way his own trigger does: the
+ * game settled the hold where the round is made, and this is what the hold looked like.
+ */
+export interface HeldLine {
+  /** The tick the round was held. */
+  tick: number;
+  /** The man in the way. */
+  mate: number;
+  /** Which side of the line he stands: 1 to the shooter's right, −1 to his left, looking down it. */
+  side: number;
+  /** Metres from the line, level with the ground, to the nearest edge of him: negative when the line passes through him. */
+  off: number;
+  /** Metres along the line, level with the ground, to him. */
+  along: number;
+}
+
 export interface BrainState {
   act: ActName;
   /** The tick this act began. */
@@ -148,6 +167,10 @@ export interface BrainState {
   ff?: Firefight;
   /** The tick he last held his fire for one of his own in front of his rifle (game/combat.ts). Absent until he has. */
   held?: number;
+  /** In a camp whose men shift for a clear line (firefight.ts): what his eyes over the sights told him of the man in the way when that round was held, relative to his own line of fire. Absent until a round is held, and gone once he has answered it. */
+  heldLine?: HeldLine;
+  /** What he's just done about a clear line (firefight.ts), for its system to say as an event this tick. Absent otherwise. */
+  shiftNews?: { what: ShiftWhat; mate: number; side: number; pace: number };
   /** The hunt he's on (hunt.ts): the way out, the stop he's at, and what he's doing there. Absent until he's ordered out with a section. */
   hunt?: Hunt;
 }

@@ -347,3 +347,31 @@ export function lineFrom(world: Ground, tuning: Tuning, x: number, z: number, st
   const eye = world.terrain.heightAt(x, z) + tuning.bodies.guard.eyeHeight[stance];
   return navigatorOf(world, tuning).seesPoint(tx, eyesAt(world, tuning, tx, tz, ty), tz, x, eye, z);
 }
+
+/**
+ * How much of a man at (x, z) in this stance someone where the intruder is believed to be
+ * could see: of six points on him, the top of his head and the middle of him, each at the
+ * middle and a shoulder's width either side, how many are in view. A firing place shows
+ * some of him by being one; a man kneeling at a wall's end shows a head and a shoulder, and
+ * a step farther out shows his chest. Six rays, counted into `work`. `ty` as for exposedAt.
+ */
+export function exposure(world: Ground, tuning: Tuning, x: number, z: number, stance: Stance, tx: number, tz: number, work?: SearchOptions['work'], ty?: number): number {
+  const S = tuning.brain.firefight.spot;
+  const nav = navigatorOf(world, tuning);
+  const ground = world.terrain.heightAt(x, z);
+  const height = tuning.bodies.guard.height[stance];
+  const eyes = eyesAt(world, tuning, tx, tz, ty);
+  const dx = tx - x;
+  const dz = tz - z;
+  const range = Math.sqrt(dx * dx + dz * dz) || 1;
+  const sx = (-dz / range) * S.shoulder;
+  const sz = (dx / range) * S.shoulder;
+  let seen = 0;
+  for (const y of [ground + height, ground + height * 0.5]) {
+    for (const k of [-1, 0, 1]) {
+      if (work) work.rays++;
+      if (nav.seesPoint(tx, eyes, tz, x + sx * k, y, z + sz * k)) seen++;
+    }
+  }
+  return seen;
+}
