@@ -56,7 +56,13 @@ function faceNormal(c: Collider, x: number, z: number, out: { x: number; z: numb
   out.z = nx * c.uz + nz * c.ux;
 }
 
-/** True if a body of this height can stand at (x, y, z): nothing solid in the way (no step allowance), the ground under its feet, no other body. */
+/**
+ * True if a body of this height can stand at (x, y, z): nothing solid in the way (no step
+ * allowance), the ground under its feet, no other body. A slab is overhead only if its
+ * underside is at or above `y + height`, exactly as the walking motor (motor.ts) and the
+ * watch (invariants.ts) take it: a micrometre allowed here was a head inside a shelf to
+ * them, and a body off its path was pushed out from under it (tower:SWP-1424-4).
+ */
 export function poseClear(x: number, y: number, z: number, height: number, spec: BodySpec, ctx: MotorContext): boolean {
   const r = spec.radius;
   const { world, solids } = ctx;
@@ -65,7 +71,7 @@ export function poseClear(x: number, y: number, z: number, height: number, spec:
   solids.query(x - r, z - r, x + r, z + r, ids);
   for (let q = 0; q < ids.length; q++) {
     const c = solids.get(ids[q]!);
-    if ((c.flags & Blocks.Move) === 0 || c.y1 <= y + 1e-3 || c.y0 >= y + height - 1e-6) continue;
+    if ((c.flags & Blocks.Move) === 0 || c.y1 <= y + 1e-3 || c.y0 >= y + height) continue;
     if (circleOverlaps(c, x, z, r - 1e-4)) return false;
   }
   for (let k = 0; k < ctx.others.length; k++) {

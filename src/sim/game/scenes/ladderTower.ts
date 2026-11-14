@@ -42,8 +42,14 @@ import type { Scene } from '.';
  * lifted him onto the box where he stood, his head 0.28 m into the shelf. A refused move
  * now keeps its footing (body/motor.ts).
  * - SWP-1085-0: tick 1273.
+ *
+ * Two are a pose on the ladder a fraction of a micrometre into the underside of a shelf,
+ * which the pose check let by and the walking motor didn't. The pose check now takes a
+ * slab as overhead by the same comparison as the rest of the motor (body/mantle.ts).
+ * - SWP-1424-4: reaching for the rungs, as the ground under the reach rose (tick 98);
+ * - RFN-1208-3: climbing (tick 2117).
  */
-export const TOWER_FINDS: readonly string[] = ['seed=TOWER-0', 'seed=RES-2063-3', 'seed=SWP-1295-0', 'seed=SWP-1381-1', 'seed=SWP-1085-0'];
+export const TOWER_FINDS: readonly string[] = ['seed=TOWER-0', 'seed=RES-2063-3', 'seed=SWP-1295-0', 'seed=SWP-1381-1', 'seed=SWP-1085-0', 'seed=SWP-1424-4', 'seed=RFN-1208-3'];
 
 /** How long a tower is played, seconds: the long run's length for one, so whatever it finds on a tower the scene finds too. */
 export const TOWER_SECONDS = 240;

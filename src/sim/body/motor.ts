@@ -82,6 +82,11 @@ import type { DebugDraw } from '../kernel/debugDraw';
  *   half is soft, as it is between any two bodies: one that walks or falls into a body on a
  *   path is shoved out of it, and can still end a tick overlapping it (held there by a
  *   wall, or fallen onto it). The path holds still until it is clear;
+ * - a path's pose check (mantle.ts, poseClear) and the rest of the motor agree on what is
+ *   overhead, exactly: a slab is over a body only if its underside is at or above the
+ *   body's feet plus its height, compared as the walking motor and the watch compare it,
+ *   with no allowance. So a body on a path never ends a tick in a pose the walking motor
+ *   would call inside something, and one that comes off its path stays where it is;
  * - against other bodies a body is taken over the band the tick leaves it in. Settling can
  *   lift it as much as a step (onto a box, up a slope), so it is shoved from under feet
  *   that are just over its head before it steps up into them, as it is from beside them.

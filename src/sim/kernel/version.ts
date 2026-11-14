@@ -118,5 +118,10 @@ export const GEN_VERSION = 10;
  * while his position stands, and answers a held last round by coming straight back up there
  * once. The `held` event says which side the man was and how far off, and a `shift` event is
  * new. No pinned run holds a round, so no `behaviour` fingerprint moved.
+ * 30: a path's pose check takes a slab as overhead exactly as the walking motor does
+ * (body/mantle.ts, `poseClear`). It let a head a micrometre into a slab's underside, which
+ * was a head inside a shelf to the walking motor and the watch. A body on a ladder now holds
+ * still under the shelf, and one reaching for the rungs lets go. No pinned run has a path's
+ * pose within a micrometre of a slab, so no fingerprint moved.
  */
-export const SIM_VERSION = 29;
+export const SIM_VERSION = 30;
