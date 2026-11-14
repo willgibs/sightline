@@ -17,6 +17,11 @@
  * predates this tool, or has an older one, is run the same way as the head. The results
  * don't depend on `--jobs` or `--shard`.
  *
+ * `--shard k/n` runs one of CI's n shards: a bench dearer than an even share of the set is
+ * split by its camps (src/lab/standing.ts, `shard`), and each part is written as
+ * `<bench>.part-<p>-of-<n>.json`. Reading a results folder merges a bench's parts back
+ * into the bench, run for run, so `--diff` compares whole benches however they were run.
+ *
  * `--base` keeps results under .cache/standing/<inputs>/, where the inputs are what a
  * bench's results depend on (`inputsOf`): the source, the packages and how it's compiled.
  * A change to the docs or the tests doesn't move them, so it is never run again, and a
@@ -30,7 +35,8 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { RESULTS_FORMAT, parseResults, stringifyResults } from '../lab/results';
-import { choose, formatComparison, shard, type BenchResults, type Side, type StandingBench } from '../lab/standing';
+import { choose, formatComparison, mergeParts, partOf, pieceName, shard, whole, type BenchResults, type Piece, type Side, type StandingBench } from '../lab/standing';
+import type { ResultsFile } from '../lab/results';
 import { parseArgs } from './args';
 import { REPO } from './builds';
 import { loadLab, runLab } from './labRunner';
@@ -79,25 +85,28 @@ function holds(json: string, b: StandingBench): boolean {
   }
 }
 
-/** Runs `benches` of `root`'s lab into `out`, skipping any already there when `resume`. */
-async function runSet(root: string, out: string, benches: readonly StandingBench[], build: Build, resume = false): Promise<void> {
+/** Runs `pieces` of `root`'s lab into `out`, skipping any already there when `resume` (whole benches only). */
+async function runSet(root: string, out: string, pieces: readonly Piece[], build: Build, resume = false): Promise<void> {
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, 'build.json'), JSON.stringify(build, null, 1) + '\n');
   const lab = await loadLab(root);
-  for (const b of benches) {
-    const json = join(out, `${b.name}.json`);
-    if (resume && holds(json, b)) continue;
+  for (const p of pieces) {
+    const b = p.bench;
+    const name = pieceName(p);
+    const json = join(out, `${name}.json`);
+    if (resume && p.parts === 1 && holds(json, b)) continue;
     if (!lab.experiments[b.experiment]) {
-      console.log(`${b.name}: not in this build`);
+      console.log(`${name}: not in this build`);
       writeFileSync(json, JSON.stringify({ missing: `it has no experiment called '${b.experiment}'` }) + '\n');
-      rmSync(join(out, `${b.name}.txt`), { force: true });
+      rmSync(join(out, `${name}.txt`), { force: true });
       continue;
     }
-    process.stdout.write(`${b.name} `);
-    const run = await runLab({ root, name: b.experiment, camps: b.camps, rolls: b.dice, jobs, tick: () => process.stdout.write('.') });
+    process.stdout.write(`${name} `);
+    const part = p.parts > 1 ? { index: p.part, count: p.parts } : undefined;
+    const run = await runLab({ root, name: b.experiment, camps: b.camps, rolls: b.dice, jobs, part, tick: () => process.stdout.write('.') });
     const took = `${run.runs} runs on ${run.processes} processes, in ${run.seconds.toFixed(0)} s.`;
     console.log(` ${took}`);
-    writeFileSync(join(out, `${b.name}.txt`), `${run.text}\n${took}\n`);
+    writeFileSync(join(out, `${name}.txt`), `${run.text}\n${took}\n`);
     writeFileSync(json, stringifyResults(run.file));
   }
 }
@@ -108,13 +117,29 @@ function readSide(dir: string, names?: readonly string[]): Side {
   const buildPath = join(dir, 'build.json');
   const build = existsSync(buildPath) ? (JSON.parse(readFileSync(buildPath, 'utf8')) as Build) : null;
   const benches = new Map<string, BenchResults>();
+  // A bench split across CI's shards comes as parts, each its own file, merged back here.
+  const split = new Map<string, { parts: number; files: Map<number, ResultsFile> }>();
   for (const f of readdirSync(dir).sort()) {
     if (!f.endsWith('.json') || f === 'build.json') continue;
-    const name = f.slice(0, -'.json'.length);
+    const stem = f.slice(0, -'.json'.length);
+    const piece = partOf(stem);
+    const name = piece?.bench ?? stem;
     if (names && !names.includes(name)) continue;
     const text = readFileSync(join(dir, f), 'utf8');
     const raw = JSON.parse(text) as { missing?: string };
-    benches.set(name, typeof raw.missing === 'string' ? { missing: raw.missing } : parseResults(text));
+    if (typeof raw.missing === 'string') benches.set(name, { missing: raw.missing });
+    else if (!piece) benches.set(name, parseResults(text));
+    else {
+      const s = split.get(name) ?? { parts: piece.parts, files: new Map<number, ResultsFile>() };
+      if (s.parts !== piece.parts) throw new Error(`${dir} holds ${name} split two ways: in ${s.parts} parts and in ${piece.parts}`);
+      s.files.set(piece.part, parseResults(text));
+      split.set(name, s);
+    }
+  }
+  for (const [name, s] of split) {
+    if (benches.has(name)) continue;
+    const ran = [...s.files.keys()].sort((x, y) => x - y);
+    benches.set(name, ran.length === s.parts ? mergeParts(ran.map((k) => s.files.get(k)!)) : { missing: `only part ${ran.map((k) => k + 1).join(', ')} of ${s.parts} ran` });
   }
   const label = build ? `${basename(resolve(dir))} (${build.commit.slice(0, 7)}${build.clean ? '' : ', with uncommitted changes'})` : basename(resolve(dir));
   return { label, benches };
@@ -154,7 +179,7 @@ async function resultsOfRef(ref: string, benches: readonly StandingBench[]): Pro
   try {
     gitIn(REPO, 'worktree', 'add', '--detach', '--quiet', dir, commit);
     symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'), 'dir');
-    await runSet(dir, cache, benches, { format: RESULTS_FORMAT, commit, tree, inputs, clean: true }, true);
+    await runSet(dir, cache, benches.map(whole), { format: RESULTS_FORMAT, commit, tree, inputs, clean: true }, true);
   } finally {
     try {
       execFileSync('git', ['worktree', 'remove', '--force', dir], { cwd: REPO, stdio: 'ignore' });
@@ -184,11 +209,13 @@ async function main(): Promise<void> {
     diff(a, b);
     return;
   }
-  let benches = choose(only);
+  const benches = choose(only);
+  let pieces = benches.map(whole);
   const shardArg = args.get('shard');
   if (shardArg) {
+    if (args.has('base')) throw new Error("--shard deals the set out to CI's machines (--out); --base runs it whole");
     const [k, n] = shardArg.split('/').map(Number);
-    benches = shard(benches, k!, n!);
+    pieces = shard(benches, k!, n!);
   }
   if (args.has('base')) {
     const ref = args.get('base')!;
@@ -199,7 +226,7 @@ async function main(): Promise<void> {
     if (here.clean && benches.every((b) => holds(join(mine, `${b.name}.json`), b))) console.log(`This checkout: cached (${here.inputs.slice(0, 7)}).`);
     else {
       console.log(`This checkout (${here.commit.slice(0, 7)}${here.clean ? '' : ', with uncommitted changes'}):`);
-      await runSet(REPO, mine, benches, here, here.clean);
+      await runSet(REPO, mine, pieces, here, here.clean);
     }
     console.log();
     const names = benches.map((b) => b.name);
@@ -214,8 +241,8 @@ async function main(): Promise<void> {
   }
   const root = resolve(args.get('root') ?? REPO);
   const started = performance.now();
-  await runSet(root, resolve(out), benches, buildOf(root));
-  console.log(`${benches.length} benches in ${((performance.now() - started) / 1000).toFixed(0)} s.`);
+  await runSet(root, resolve(out), pieces, buildOf(root));
+  console.log(`${pieces.length} ${pieces.length === 1 ? 'piece' : 'pieces'} in ${((performance.now() - started) / 1000).toFixed(0)} s.`);
 }
 
 await main();

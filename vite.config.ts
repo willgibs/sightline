@@ -1,7 +1,8 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'vite';
 import { buildStamp } from './src/headless/build';
 import { playtestInbox } from './src/headless/playtestInbox';
 
+// The tests' settings are in vitest.config.ts, which builds on this.
 export default defineConfig({
   define: { 'import.meta.env.VITE_BUILD': JSON.stringify(buildStamp()) },
   // Development only: runs played in the dev server are kept in playtests/ (src/app/playtest.ts).
@@ -11,15 +12,5 @@ export default defineConfig({
     target: 'es2022',
     sourcemap: true,
     chunkSizeWarningLimit: 1500,
-  },
-  test: {
-    include: ['tests/**/*.test.ts'],
-    // Browser tests need a real browser: npm run test:browser.
-    exclude: ['tests/browser/**', 'node_modules/**'],
-    environment: 'node',
-    // Windows' runner is the slowest, and the heaviest tests (a sitting generated headless) pass 60 s there.
-    testTimeout: 180_000,
-    // A beforeAll may generate worlds, and a generated camp takes seconds on a busy runner.
-    hookTimeout: 180_000,
   },
 });

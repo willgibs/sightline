@@ -83,6 +83,12 @@ export interface LabOptions {
   jobs?: number;
   /** Called as each run finishes. */
   tick?: () => void;
+  /**
+   * Only part of the camps: those whose place in the list leaves `index` when divided by
+   * `count` (a dear bench split across CI's machines, src/lab/standing.ts, `shard`). Every
+   * run is independent, so the parts together are the whole run for run (`mergeParts`).
+   */
+  part?: { index: number; count: number };
 }
 
 /** Runs one experiment of `root`'s lab. Throws if there's no such experiment there. */
@@ -93,7 +99,9 @@ export async function runLab(o: LabOptions): Promise<LabRun> {
   const count = o.camps ?? exp.camps;
   const rolls = o.rolls ?? 1;
   if (!Number.isInteger(rolls) || rolls < 1) throw new Error(`--dice takes how many rolls, not '${rolls}'`);
-  const seeds = lab.seedsOf(exp.series, count);
+  const part = o.part;
+  if (part && !(Number.isInteger(part.count) && part.count >= 1 && Number.isInteger(part.index) && part.index >= 0 && part.index < part.count)) throw new Error(`a part is index/count with 0 ≤ index < count, not ${part.index}/${part.count}`);
+  const seeds = lab.seedsOf(exp.series, count).filter((_, i) => !part || i % part.count === part.index);
   const dice = Array.from({ length: rolls }, (_, k) => k);
   // Camp by camp: each camp's runs are one block, which one process takes whole.
   const jobs: Job[] = seeds.flatMap((seed) => exp.arms.flatMap((_, arm) => dice.map((d) => ({ seed, arm, dice: d })))).map((j, id) => ({ ...j, id }));
@@ -101,16 +109,19 @@ export async function runLab(o: LabOptions): Promise<LabRun> {
   const size = Math.max(1, Math.min(o.jobs ?? Math.max(1, availableParallelism() - 2), blocks.length));
   const started = performance.now();
   const results = new Array<RunResult>(jobs.length);
-  await share(resolve(o.root), o.name, blocks, size, results, o.tick ?? (() => {}));
+  // A part can hold no camps at all; with nothing to share out, no process would ever report back.
+  if (jobs.length > 0) await share(resolve(o.root), o.name, blocks, size, results, o.tick ?? (() => {}));
   // Back to arms, each in the order of the seeds and their rolls, whichever process finished what first.
   const byArm: Results = new Map(exp.arms.map((arm, a) => [arm.name, jobs.filter((j) => j.arm === a).map((j) => results[j.id]!)]));
   let text: string;
-  try {
+  if (jobs.length === 0) text = 'No camps fell in this part.';
+  else try {
     const best = lab.tournament ? lab.tournament(exp, byArm, rolls) : null;
-    text = (lab.formatReport ?? formatReport)(exp, (lab.report ?? report)(exp, byArm, rolls), count, rolls, best as never);
+    text = (lab.formatReport ?? formatReport)(exp, (lab.report ?? report)(exp, byArm, rolls), seeds.length, rolls, best as never);
   } catch {
-    text = formatReport(exp, report(exp, byArm, rolls), count, rolls);
+    text = formatReport(exp, report(exp, byArm, rolls), seeds.length, rolls);
   }
+  if (part) text = `Part ${part.index + 1} of ${part.count} of the camps.\n${text}`;
   return { file: toResultsFile(exp, seeds, rolls, byArm), text, runs: jobs.length, processes: size, seconds: (performance.now() - started) / 1000 };
 }
 
