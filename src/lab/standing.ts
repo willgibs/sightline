@@ -37,6 +37,8 @@ export const STANDING: readonly StandingBench[] = [
   { name: 'takedown', experiment: 'takedown', cost: 142 },
   { name: 'ladder', experiment: 'ladder', cost: 127 },
   { name: 'flaws', experiment: 'flaws', cost: 116 },
+  // Estimated, until CI measures it: here it took 406 s beside answer's 288 (75 on CI), and 1.5 times answer's CPU.
+  { name: 'sittings', experiment: 'sittings', cost: 110 },
   { name: 'firefight', experiment: 'firefight', cost: 89 },
   { name: 'answer', experiment: 'answer', cost: 75 },
 ];
