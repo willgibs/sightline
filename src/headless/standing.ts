@@ -2,7 +2,7 @@
  * The standing benches (src/lab/standing.ts), run on a build and compared run by run with
  * another: does every other bench of the camp still read as it did?
  *
- *   npm run standing -- --base origin/main            this checkout against a ref (cached by tree)
+ *   npm run standing -- --base origin/main            this checkout against a ref (cached by what a bench depends on)
  *   npm run standing -- --out <dir>                    runs the set into <dir>
  *        [--root <dir>]                                another checkout's experiments, with this tool
  *        [--only a,b] [--shard k/n] [--jobs N]
@@ -17,11 +17,16 @@
  * predates this tool, or has an older one, is run the same way as the head. The results
  * don't depend on `--jobs` or `--shard`.
  *
- * `--base` keeps results under .cache/standing/<tree>/: a ref's tree is run once, in a
- * temporary worktree beside this checkout, and this checkout's own is cached only when its
- * working tree is clean. `--diff` exits 0 whatever differs: it informs, it doesn't judge.
+ * `--base` keeps results under .cache/standing/<inputs>/, where the inputs are what a
+ * bench's results depend on (`inputsOf`): the source, the packages and how it's compiled.
+ * A change to the docs or the tests doesn't move them, so it is never run again, and a
+ * ref is run once, in a temporary worktree beside this checkout. This checkout's own
+ * results are cached only when its working tree is clean. A cached bench is used only if
+ * it was run as the set now defines it. `--diff` exits 0 whatever differs: it informs, it
+ * doesn't judge.
  */
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { RESULTS_FORMAT, parseResults, stringifyResults } from '../lab/results';
@@ -34,6 +39,8 @@ interface Build {
   format: number;
   commit: string;
   tree: string;
+  /** What its benches' results depend on (`inputsOf`). */
+  inputs: string;
   clean: boolean;
 }
 
@@ -43,8 +50,33 @@ const only = args.get('only')?.split(',').filter(Boolean);
 
 const gitIn = (dir: string, ...a: string[]): string => execFileSync('git', a, { cwd: dir, encoding: 'utf8' }).trim();
 
+/** What a bench's results depend on, as git holds them: the source, the packages it runs on, and how it's compiled and run. */
+const INPUTS = ['src', 'package-lock.json', 'tsconfig.json', '.nvmrc'] as const;
+
+/**
+ * One hash for everything a bench's results depend on at `commit`. Docs and tests aren't
+ * in it, so a change to those alone has the results of the build before it. The workflow
+ * computes the same hash in the shell (.github/workflows/standing.yml): git's hashes of
+ * the paths, one a line, through SHA-256.
+ */
+function inputsOf(root: string, commit = 'HEAD'): string {
+  const hashes = gitIn(root, 'rev-parse', ...INPUTS.map((p) => `${commit}:${p}`));
+  return createHash('sha256').update(`${hashes}\n`).digest('hex').slice(0, 40);
+}
+
 function buildOf(root: string): Build {
-  return { format: RESULTS_FORMAT, commit: gitIn(root, 'rev-parse', 'HEAD'), tree: gitIn(root, 'rev-parse', 'HEAD^{tree}'), clean: gitIn(root, 'status', '--porcelain') === '' };
+  return { format: RESULTS_FORMAT, commit: gitIn(root, 'rev-parse', 'HEAD'), tree: gitIn(root, 'rev-parse', 'HEAD^{tree}'), inputs: inputsOf(root), clean: gitIn(root, 'status', '--porcelain') === '' };
+}
+
+/** Whether `json` holds this bench as the set now defines it: one whose rolls or camps have changed since is run again. */
+function holds(json: string, b: StandingBench): boolean {
+  try {
+    const raw = JSON.parse(readFileSync(json, 'utf8')) as { missing?: string; rolls?: number; camps?: number };
+    if (typeof raw.missing === 'string') return true;
+    return raw.rolls === (b.dice ?? 1) && (b.camps === undefined || raw.camps === b.camps);
+  } catch {
+    return false;
+  }
 }
 
 /** Runs `benches` of `root`'s lab into `out`, skipping any already there when `resume`. */
@@ -54,7 +86,7 @@ async function runSet(root: string, out: string, benches: readonly StandingBench
   const lab = await loadLab(root);
   for (const b of benches) {
     const json = join(out, `${b.name}.json`);
-    if (resume && existsSync(json)) continue;
+    if (resume && holds(json, b)) continue;
     if (!lab.experiments[b.experiment]) {
       console.log(`${b.name}: not in this build`);
       writeFileSync(json, JSON.stringify({ missing: `it has no experiment called '${b.experiment}'` }) + '\n');
@@ -107,21 +139,22 @@ function diff(a: string, b: string, names?: readonly string[], labels?: [string,
 async function resultsOfRef(ref: string, benches: readonly StandingBench[]): Promise<string> {
   const commit = gitIn(REPO, 'rev-parse', '--verify', `${ref}^{commit}`);
   const tree = gitIn(REPO, 'rev-parse', `${commit}^{tree}`);
-  const cache = join(REPO, '.cache/standing', tree);
-  const todo = benches.filter((b) => !existsSync(join(cache, `${b.name}.json`)));
-  if (todo.length === 0 && cached(cache)) {
-    console.log(`${ref}: cached (${tree.slice(0, 7)}).`);
+  const inputs = inputsOf(REPO, commit);
+  const cache = join(REPO, '.cache/standing', inputs);
+  if (!cached(cache)) rmSync(cache, { recursive: true, force: true });
+  const todo = benches.filter((b) => !holds(join(cache, `${b.name}.json`), b));
+  if (todo.length === 0) {
+    console.log(`${ref}: cached (${inputs.slice(0, 7)}).`);
     return cache;
   }
-  if (!cached(cache)) rmSync(cache, { recursive: true, force: true });
-  const dir = join(REPO, '.cache/standing', `worktree-${tree.slice(0, 12)}`);
+  const dir = join(REPO, '.cache/standing', `worktree-${inputs.slice(0, 12)}`);
   rmSync(dir, { recursive: true, force: true });
   gitIn(REPO, 'worktree', 'prune');
   console.log(`${ref} (${commit.slice(0, 7)}): running ${todo.map((b) => b.name).join(', ')} in a temporary worktree.`);
   try {
     gitIn(REPO, 'worktree', 'add', '--detach', '--quiet', dir, commit);
     symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'), 'dir');
-    await runSet(dir, cache, benches, { format: RESULTS_FORMAT, commit, tree, clean: true }, true);
+    await runSet(dir, cache, benches, { format: RESULTS_FORMAT, commit, tree, inputs, clean: true }, true);
   } finally {
     try {
       execFileSync('git', ['worktree', 'remove', '--force', dir], { cwd: REPO, stdio: 'ignore' });
@@ -161,9 +194,9 @@ async function main(): Promise<void> {
     const ref = args.get('base')!;
     const base = await resultsOfRef(ref, benches);
     const here = buildOf(REPO);
-    const mine = here.clean ? join(REPO, '.cache/standing', here.tree) : join(REPO, '.cache/standing/working');
+    const mine = here.clean ? join(REPO, '.cache/standing', here.inputs) : join(REPO, '.cache/standing/working');
     if (!here.clean || !cached(mine)) rmSync(mine, { recursive: true, force: true });
-    if (here.clean && benches.every((b) => existsSync(join(mine, `${b.name}.json`)))) console.log(`This checkout: cached (${here.tree.slice(0, 7)}).`);
+    if (here.clean && benches.every((b) => holds(join(mine, `${b.name}.json`), b))) console.log(`This checkout: cached (${here.inputs.slice(0, 7)}).`);
     else {
       console.log(`This checkout (${here.commit.slice(0, 7)}${here.clean ? '' : ', with uncommitted changes'}):`);
       await runSet(REPO, mine, benches, here, here.clean);

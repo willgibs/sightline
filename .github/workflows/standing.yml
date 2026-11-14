@@ -4,8 +4,9 @@ name: Standing benches
 # they did (src/lab/standing.ts). This runs the standing set on the pull request's base
 # and head, on clean machines, and compares them run by run in the job summary. It
 # informs and never fails because a bench differs: whether a difference is intended is
-# the author's call. Results are cached by tree, so a base already run, or a head whose
-# code didn't change, is not run again.
+# the author's call. Results are cached by what a bench depends on (the source, the
+# packages and how it's compiled), so a base already run is not run again, and a pull
+# request that touches only docs or tests runs nothing.
 #
 # The head's tool runs both sides (`--root`), so a base that predates the tool is run the
 # same way.
@@ -33,7 +34,7 @@ jobs:
         side: [base, head]
         shard: [1, 2, 3, 4]
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,14 +45,17 @@ jobs:
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.base }}
           path: base
-      - id: tree
+      # The same hash as src/headless/standing.ts, inputsOf: git's hashes of what a bench's results depend on, through SHA-256.
+      - id: inputs
         shell: bash
-        run: echo "hash=$(git -C '${{ matrix.side }}' rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+        working-directory: ${{ matrix.side }}
+        run: echo "hash=$(git rev-parse HEAD:src HEAD:package-lock.json HEAD:tsconfig.json HEAD:.nvmrc | sha256sum | cut -c1-40)" >> "$GITHUB_OUTPUT"
+      # The key also carries the head's tool and its set: a side run by an older tool, or as an older set, is run again.
       - id: cache
         uses: actions/cache/restore@v4
         with:
           path: standing-results
-          key: standing-${{ steps.tree.outputs.hash }}-${{ matrix.shard }}-of-4
+          key: standing-${{ steps.inputs.outputs.hash }}-${{ hashFiles('head/src/lab/standing.ts', 'head/src/lab/results.ts', 'head/src/headless/labRunner.ts', 'head/src/headless/standing.ts') }}-${{ matrix.shard }}-of-4
       - if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/setup-node@v4
         with:
@@ -71,7 +75,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: standing-results
-          key: standing-${{ steps.tree.outputs.hash }}-${{ matrix.shard }}-of-4
+          key: standing-${{ steps.inputs.outputs.hash }}-${{ hashFiles('head/src/lab/standing.ts', 'head/src/lab/results.ts', 'head/src/headless/labRunner.ts', 'head/src/headless/standing.ts') }}-${{ matrix.shard }}-of-4
       - uses: actions/upload-artifact@v4
         with:
           name: standing-${{ matrix.side }}-${{ matrix.shard }}
