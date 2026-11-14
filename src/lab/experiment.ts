@@ -1,6 +1,7 @@
 import type { Tuning } from '../config/tuning';
 import { Rng } from '../sim/kernel/core/rng';
 import { randomSeed } from '../sim/kernel/core/seed';
+import { SITTINGS, SITTINGS_SERIES } from './sittings';
 import { clusteredRate, excludesZero, mean, median, pairedDifference, splitVariance, type Interval, type VarianceSplit } from './stats';
 
 /**
@@ -49,8 +50,15 @@ export interface Experiment {
   run(seed: string, arm: Arm, tuning: Tuning): Record<string, number>;
 }
 
-/** The camps of a series, always the same ones. */
+/**
+ * The camps of a series, always the same ones: drawn from its name, or for the sittings'
+ * series, the owner's sittings by name (src/lab/sittings.ts), each a link a run plays.
+ */
 export function seedsOf(series: string, count: number): string[] {
+  if (series === SITTINGS_SERIES) {
+    if (count > SITTINGS.length) throw new Error(`There are ${SITTINGS.length} sittings, not ${count}`);
+    return SITTINGS.slice(0, count).map((s) => s.name);
+  }
   const list = new Rng(series, 'list');
   return Array.from({ length: count }, () => randomSeed(() => list.next()));
 }
